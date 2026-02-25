@@ -854,6 +854,11 @@ body::before {
   border-style: dashed;
 }
 
+.product-card--link {
+  display: block;
+  cursor: pointer;
+}
+
 .product-card-header {
   display: flex;
   justify-content: space-between;
@@ -917,6 +922,181 @@ body::before {
   max-width: 720px;
 }
 
+/* --- Features Grid (ShopCaddie) --- */
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-md);
+}
+
+.feature-card {
+  padding: var(--space-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-card);
+  transition: border-color 0.4s ease, transform 0.4s ease;
+}
+
+.feature-card:hover {
+  border-color: rgba(196, 68, 58, 0.3);
+  transform: translateY(-4px);
+}
+
+.feature-icon {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-border);
+  color: var(--color-accent);
+  margin-bottom: var(--space-sm);
+}
+
+.feature-icon--coming-soon {
+  border-style: dashed;
+  opacity: 0.6;
+}
+
+.feature-card h3 {
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+  line-height: 1.3;
+}
+
+.feature-card p {
+  color: var(--color-text-secondary);
+  font-size: 0.92rem;
+  line-height: 1.7;
+}
+
+.feature-badge {
+  font-family: var(--font-body);
+  font-size: 0.6rem;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+  background: var(--color-accent-dim);
+  padding: 0.2rem 0.5rem;
+  vertical-align: middle;
+  margin-left: 0.5rem;
+}
+
+/* --- Pricing Grid (ShopCaddie) --- */
+.pricing-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-md);
+  align-items: start;
+}
+
+.pricing-card {
+  padding: var(--space-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-card);
+  position: relative;
+  transition: border-color 0.4s ease, transform 0.4s ease;
+}
+
+.pricing-card:hover {
+  transform: translateY(-4px);
+}
+
+.pricing-card--featured {
+  border-color: var(--color-accent);
+  padding-top: calc(var(--space-md) + 1.5rem);
+}
+
+.pricing-card--featured:hover {
+  border-color: var(--color-accent-hover);
+}
+
+.pricing-card-badge {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  background: var(--color-accent);
+  color: var(--color-white);
+  font-family: var(--font-body);
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  text-align: center;
+  padding: 0.4rem;
+}
+
+.pricing-card-header {
+  margin-bottom: var(--space-md);
+  padding-bottom: var(--space-md);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.pricing-card h3 {
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+  margin-bottom: 0.5rem;
+}
+
+.pricing-price {
+  font-family: var(--font-display);
+  font-size: 3rem;
+  font-weight: 500;
+  line-height: 1;
+  color: var(--color-text-primary);
+}
+
+.pricing-price span {
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  font-weight: 300;
+  color: var(--color-text-muted);
+}
+
+.pricing-features {
+  list-style: none;
+  margin-bottom: var(--space-md);
+}
+
+.pricing-features li {
+  font-size: 0.9rem;
+  color: var(--color-text-secondary);
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--color-border);
+  padding-left: 1.2rem;
+  position: relative;
+}
+
+.pricing-features li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-accent);
+}
+
+.pricing-features li:last-child {
+  border-bottom: none;
+}
+
+.pricing-note {
+  text-align: center;
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+  margin-top: var(--space-lg);
+}
+
 /* --- Responsive --- */
 @media (max-width: 1024px) {
   .services-grid {
@@ -935,6 +1115,15 @@ body::before {
 
   .product-grid {
     grid-template-columns: 1fr;
+  }
+
+  .features-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .pricing-grid {
+    grid-template-columns: 1fr;
+    max-width: 480px;
   }
 }
 
