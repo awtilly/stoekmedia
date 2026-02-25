@@ -102,7 +102,22 @@ td.pts{font-weight:800;color:var(--gold);text-align:center;font-size:15px}td.dim
 .champ-box .champ-label{font-size:10px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:1px}
 .champ-box .champ-team{font-size:18px;font-weight:800;margin-top:4px}
 .champ-box .champ-owner{font-size:12px;color:var(--g500);margin-top:2px}
+
+/* ── Room Lobby ── */
+.lobby{max-width:480px;margin:80px auto;text-align:center}
+.lobby h1{font-size:32px;font-weight:900;margin-bottom:4px}.lobby h1 span{color:var(--gold)}
+.lobby-sub{color:var(--g500);font-size:15px;margin-bottom:32px}
+.lobby-card{border:1px solid var(--g200);border-radius:10px;padding:24px;margin-bottom:16px;text-align:left}
+.lobby-card h3{font-size:16px;font-weight:800;margin-bottom:8px}
+.lobby-card p{font-size:13px;color:var(--g500);margin-bottom:14px}
+.lobby-or{color:var(--g300);font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:1px;padding:8px 0}
+.room-badge{display:inline-flex;align-items:center;gap:8px;background:var(--gold-bg);border:1px solid var(--gold);border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700;color:var(--gold);cursor:pointer}
+.room-badge:hover{background:#f5ecd5}
+.sync-dot{width:8px;height:8px;border-radius:50%;background:var(--green);display:inline-block;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
 </style>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 </head>
 <body>
 <div class="container" id="app"></div>
@@ -119,8 +134,109 @@ let S={phase:"setup",year:2025,players:[],teams:[],ds:{order:[],cp:0,started:fal
   bracket:{South:Array(15).fill(null),East:Array(15).fill(null),Midwest:Array(15).fill(null),West:Array(15).fill(null),ff:Array(3).fill(null)},
   bracketRegion:"South",fr:"All",fs:"All"};
 
-function sv(){try{localStorage.setItem("mm4",JSON.stringify(S))}catch(e){}}
+/* ── Firebase Setup ── */
+const firebaseConfig = {
+  apiKey: "AIzaSyCv2XLxjpR5S5nfa0tlkwYqoPaXzbtULXI",
+  authDomain: "march-madness-snake-draft.firebaseapp.com",
+  projectId: "march-madness-snake-draft",
+  storageBucket: "march-madness-snake-draft.firebasestorage.app",
+  messagingSenderId: "564071043666",
+  appId: "1:564071043666:web:e4ace7ca3e9966cdebc58b"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+let roomId = null;
+let isRemoteUpdate = false;
+let unsubRoom = null;
+
+function sv(){
+  try{localStorage.setItem("mm4",JSON.stringify(S))}catch(e){}
+  if(roomId && !isRemoteUpdate){
+    db.collection("rooms").doc(roomId).set({state:JSON.stringify(S),updatedAt:firebase.firestore.FieldValue.serverTimestamp()}).catch(e=>console.warn("Firestore write error:",e));
+  }
+}
 function ld(){try{const s=localStorage.getItem("mm4");if(s)Object.assign(S,JSON.parse(s))}catch(e){}}
+
+function createRoom(){
+  const code = Math.random().toString(36).substring(2,8).toUpperCase();
+  roomId = code;
+  const url = new URL(window.location);
+  url.searchParams.set("room", code);
+  window.history.replaceState({}, "", url);
+  ld();
+  if(!S.bracket)S.bracket={South:Array(15).fill(null),East:Array(15).fill(null),Midwest:Array(15).fill(null),West:Array(15).fill(null),ff:Array(3).fill(null)};
+  if(!S.bracketRegion)S.bracketRegion="South";
+  if(!S.games)S.games=[];
+  syncGames();
+  sv();
+  connectToRoom(code);
+  R();
+}
+
+function joinRoom(){
+  const code = document.getElementById("room-code").value.trim().toUpperCase();
+  if(!code) return;
+  roomId = code;
+  const url = new URL(window.location);
+  url.searchParams.set("room", code);
+  window.history.replaceState({}, "", url);
+  connectToRoom(code);
+  R();
+}
+
+function connectToRoom(code){
+  if(unsubRoom) unsubRoom();
+  unsubRoom = db.collection("rooms").doc(code).onSnapshot(doc => {
+    if(!doc.exists){
+      sv();
+      return;
+    }
+    const data = doc.data();
+    if(data && data.state){
+      isRemoteUpdate = true;
+      const remote = JSON.parse(data.state);
+      Object.assign(S, remote);
+      localStorage.setItem("mm4", JSON.stringify(S));
+      R();
+      isRemoteUpdate = false;
+    }
+  }, err => console.warn("Firestore listen error:", err));
+}
+
+function renderLobby(){
+  document.getElementById("app").innerHTML = `
+    <div class="lobby">
+      <h1><span>March Madness</span> Draft</h1>
+      <p class="lobby-sub">Create or join a room to sync brackets with friends in real time.</p>
+      <div class="lobby-card">
+        <h3>Create a Room</h3>
+        <p>Start a new tournament and share the code with friends.</p>
+        <button class="btn btn-primary" onclick="createRoom()">Create Room</button>
+      </div>
+      <div class="lobby-or">— or —</div>
+      <div class="lobby-card">
+        <h3>Join a Room</h3>
+        <p>Enter a room code to join an existing tournament.</p>
+        <div class="row" style="gap:8px">
+          <input id="room-code" placeholder="Room code..." style="flex:1;text-transform:uppercase" onkeydown="if(event.key==='Enter')joinRoom()">
+          <button class="btn btn-primary" onclick="joinRoom()">Join</button>
+        </div>
+      </div>
+      <div style="margin-top:24px;border-top:1px solid var(--g200);padding-top:20px">
+        <button class="btn btn-secondary" onclick="startLocal()">Play Offline Instead</button>
+      </div>
+    </div>`;
+}
+
+function startLocal(){
+  roomId = null;
+  const url = new URL(window.location);
+  url.searchParams.delete("room");
+  window.history.replaceState({}, "", url);
+  ld();
+  R();
+}
 function sc(s){return s<=4?"seed-top":s<=8?"seed-mid":"seed-low"}
 function sb(s){return`<span class="seed-badge ${sc(s)}">${s}</span>`}
 function esc(s){const d=document.createElement("div");d.textContent=s;return d.innerHTML}
@@ -246,7 +362,7 @@ function R(){
   const canD=S.players.length>=2&&S.teams.length>=S.players.length,canT=S.ds.complete;
   const app=document.getElementById("app");
   app.innerHTML=`
-    <div class="header"><div><h1><span>March Madness</span> Draft</h1><div class="header-sub">${S.year} — ${S.players.length} players — ${S.teams.length} teams</div></div><button class="btn btn-secondary btn-sm" onclick="resetAll()">New Tournament</button></div>
+    <div class="header"><div><h1><span>March Madness</span> Draft</h1><div class="header-sub">${S.year} — ${S.players.length} players — ${S.teams.length} teams${roomId?` · <span class="room-badge" onclick="copyRoomLink()" title="Click to copy link"><span class="sync-dot"></span> Room: ${roomId}</span>`:''}</div></div><button class="btn btn-secondary btn-sm" onclick="resetAll()">New Tournament</button></div>
     <nav>
       <button class="${S.phase==='setup'?'active':''}" onclick="go('setup')">Setup</button>
       <button class="${S.phase==='teams'?'active':''}" onclick="go('teams')">Teams</button>
@@ -260,7 +376,22 @@ function R(){
   ({setup:rSetup,teams:rTeams,draft:rDraft,bracket:rBracket,leaderboard:rLB,settings:rSettings})[S.phase]?.(c);
 }
 function go(p){S.phase=p;R();}
-function resetAll(){if(!confirm("Start a new tournament?"))return;localStorage.removeItem("mm4");location.reload();}
+
+function copyRoomLink(){
+  const url = new URL(window.location);
+  url.searchParams.set("room", roomId);
+  navigator.clipboard.writeText(url.toString()).then(()=>alert("Room link copied!")).catch(()=>alert("Link: " + url.toString()));
+}
+
+function resetAll(){
+  if(!confirm("Start a new tournament?"))return;
+  if(roomId){
+    db.collection("rooms").doc(roomId).delete().catch(()=>{});
+    if(unsubRoom) unsubRoom();
+  }
+  localStorage.removeItem("mm4");
+  location.reload();
+}
 
 function rSetup(c){
   c.innerHTML=`<div class="section-title">Tournament Setup</div><p class="section-desc">Add players in draft order.</p>
@@ -480,12 +611,22 @@ function rSettings(c){
 }
 function sP(k){const pr={doubling:{1:1,2:2,3:4,4:8,5:16,6:32},linear:{1:1,2:2,3:3,4:4,5:5,6:6},backLoaded:{1:1,2:2,3:4,4:8,5:20,6:40},flat:{1:1,2:1,3:1,4:1,5:1,6:1}};S.rp={...pr[k]};R()}
 
-ld();
-if(!S.bracket)S.bracket={South:Array(15).fill(null),East:Array(15).fill(null),Midwest:Array(15).fill(null),West:Array(15).fill(null),ff:Array(3).fill(null)};
-if(!S.bracketRegion)S.bracketRegion="South";
-if(!S.games)S.games=[];
-syncGames();
-R();
+/* ── Boot ── */
+const params = new URLSearchParams(window.location.search);
+const urlRoom = params.get("room");
+
+if(urlRoom){
+  roomId = urlRoom.toUpperCase();
+  ld();
+  if(!S.bracket)S.bracket={South:Array(15).fill(null),East:Array(15).fill(null),Midwest:Array(15).fill(null),West:Array(15).fill(null),ff:Array(3).fill(null)};
+  if(!S.bracketRegion)S.bracketRegion="South";
+  if(!S.games)S.games=[];
+  syncGames();
+  connectToRoom(roomId);
+  R();
+} else {
+  renderLobby();
+}
 </script>
 </body>
 </html>
