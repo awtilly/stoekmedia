@@ -150,15 +150,60 @@ let roomId = null;
 let isRemoteUpdate = false;
 let unsubRoom = null;
 
+/* ── Admin PIN Protection ── */
+let adminUnlocked = false;
+
+function adminSessionKey(){ return roomId ? 'mm4_admin_' + roomId : null; }
+
+function checkAdminSession(){
+  if(!roomId) { adminUnlocked = false; return; }
+  const k = adminSessionKey();
+  adminUnlocked = k ? sessionStorage.getItem(k) === '1' : false;
+}
+
+function unlockAdmin(){
+  adminUnlocked = true;
+  const k = adminSessionKey();
+  if(k) sessionStorage.setItem(k, '1');
+}
+
+function lockAdmin(){
+  adminUnlocked = false;
+  const k = adminSessionKey();
+  if(k) sessionStorage.removeItem(k);
+  R();
+}
+
+async function requireAdmin(){
+  if(!roomId) return true;
+  if(adminUnlocked) return true;
+  const doc = await db.collection("rooms").doc(roomId).get();
+  const data = doc.exists ? doc.data() : null;
+  if(!data || !data.adminPin){
+    const pin = prompt("This room has no admin PIN yet.\nSet a 4-digit PIN to protect editing:");
+    if(!pin || !/^\d{4}$/.test(pin.trim())){ alert("PIN must be exactly 4 digits."); return false; }
+    await db.collection("rooms").doc(roomId).set({ adminPin: pin.trim() }, { merge: true });
+    unlockAdmin();
+    return true;
+  }
+  const entry = prompt("Enter 4-digit admin PIN:");
+  if(!entry) return false;
+  if(entry.trim() === data.adminPin){ unlockAdmin(); return true; }
+  alert("Incorrect PIN.");
+  return false;
+}
+
 function sv(){
   try{localStorage.setItem("mm4",JSON.stringify(S))}catch(e){}
   if(roomId && !isRemoteUpdate){
-    db.collection("rooms").doc(roomId).set({state:JSON.stringify(S),updatedAt:firebase.firestore.FieldValue.serverTimestamp()}).catch(e=>console.warn("Firestore write error:",e));
+    db.collection("rooms").doc(roomId).set({state:JSON.stringify(S),updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true}).catch(e=>console.warn("Firestore write error:",e));
   }
 }
 function ld(){try{const s=localStorage.getItem("mm4");if(s)Object.assign(S,JSON.parse(s))}catch(e){}}
 
-function createRoom(){
+async function createRoom(){
+  const pin = prompt("Set a 4-digit admin PIN to protect editing:");
+  if(!pin || !/^\d{4}$/.test(pin.trim())){ alert("PIN must be exactly 4 digits."); return; }
   const code = Math.random().toString(36).substring(2,8).toUpperCase();
   roomId = code;
   const url = new URL(window.location);
@@ -169,7 +214,8 @@ function createRoom(){
   if(!S.bracketRegion)S.bracketRegion="South";
   if(!S.games)S.games=[];
   syncGames();
-  sv();
+  await db.collection("rooms").doc(code).set({ adminPin: pin.trim(), state: JSON.stringify(S), updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+  unlockAdmin();
   connectToRoom(code);
   R();
 }
@@ -362,7 +408,7 @@ function R(){
   const canD=S.players.length>=2&&S.teams.length>=S.players.length,canT=S.ds.complete;
   const app=document.getElementById("app");
   app.innerHTML=`
-    <div class="header"><div><h1><span>March Madness</span> Draft</h1><div class="header-sub">${S.year} — ${S.players.length} players — ${S.teams.length} teams${roomId?` · <span class="room-badge" onclick="copyRoomLink()" title="Click to copy link"><span class="sync-dot"></span> Room: ${roomId}</span>`:''}</div></div><button class="btn btn-secondary btn-sm" onclick="resetAll()">New Tournament</button></div>
+    <div class="header"><div><h1><span>March Madness</span> Draft</h1><div class="header-sub">${S.year} — ${S.players.length} players — ${S.teams.length} teams${roomId?` · <span class="room-badge" onclick="copyRoomLink()" title="Click to copy link"><span class="sync-dot"></span> Room: ${roomId}</span>`:''}</div></div></div>
     <nav>
       <button class="${S.phase==='setup'?'active':''}" onclick="go('setup')">Setup</button>
       <button class="${S.phase==='teams'?'active':''}" onclick="go('teams')">Teams</button>
@@ -383,7 +429,8 @@ function copyRoomLink(){
   navigator.clipboard.writeText(url.toString()).then(()=>alert("Room link copied!")).catch(()=>alert("Link: " + url.toString()));
 }
 
-function resetAll(){
+async function resetAll(){
+  if(!await requireAdmin())return;
   if(!confirm("Start a new tournament?"))return;
   if(roomId){
     db.collection("rooms").doc(roomId).delete().catch(()=>{});
@@ -395,16 +442,16 @@ function resetAll(){
 
 function rSetup(c){
   c.innerHTML=`<div class="section-title">Tournament Setup</div><p class="section-desc">Add players in draft order.</p>
-  <div class="card" style="margin-bottom:14px"><span class="label">Year</span><input type="number" value="${S.year}" style="width:100px" onchange="S.year=Number(this.value)||2025;R()"></div>
+  <div class="card" style="margin-bottom:14px"><span class="label">Year</span><input type="number" value="${S.year}" style="width:100px" onchange="changeYear(this.value)"></div>
   <div class="card"><span class="label">Players (${S.players.length})</span>
   <div class="row" style="margin-bottom:12px"><input id="pn" placeholder="Player name..." style="flex:1" onkeydown="if(event.key==='Enter')aP()"><button class="btn btn-primary" onclick="aP()">Add</button></div>
   ${S.players.length===0?'<p style="color:var(--g400);text-align:center;padding:14px;font-size:13px">No players yet</p>':''}
   ${S.players.map((p,i)=>`<div class="player-row"><span class="player-num">#${i+1}</span><span style="flex:1;font-weight:600">${esc(p.name)}</span><button class="icon-btn" onclick="mP(${i},-1)">▲</button><button class="icon-btn" onclick="mP(${i},1)">▼</button><button class="icon-btn icon-btn-danger" onclick="rP('${p.id}')">✕</button></div>`).join('')}
   ${S.players.length>=2?`<p style="color:var(--g400);font-size:12px;margin-top:10px">Snake: ${S.players.map(p=>p.name).join(' → ')} → ${[...S.players].reverse().map(p=>p.name).join(' → ')} → ...</p>`:''}</div>`;
 }
-function aP(){const el=document.getElementById("pn");const n=el.value.trim();if(!n)return;S.players.push({id:uid(),name:n,teamIds:[]});R();setTimeout(()=>document.getElementById("pn")?.focus(),0)}
-function rP(id){S.players=S.players.filter(p=>p.id!==id);R()}
-function mP(i,d){const s=i+d;if(s<0||s>=S.players.length)return;[S.players[i],S.players[s]]=[S.players[s],S.players[i]];R()}
+async function aP(){if(!await requireAdmin())return;const el=document.getElementById("pn");const n=el.value.trim();if(!n)return;S.players.push({id:uid(),name:n,teamIds:[]});R();setTimeout(()=>document.getElementById("pn")?.focus(),0)}
+async function rP(id){if(!await requireAdmin())return;S.players=S.players.filter(p=>p.id!==id);R()}
+async function mP(i,d){if(!await requireAdmin())return;const s=i+d;if(s<0||s>=S.players.length)return;[S.players[i],S.players[s]]=[S.players[s],S.players[i]];R()}
 
 function rTeams(c){
   const br=REGIONS.map(r=>({r,t:S.teams.filter(t=>t.region===r).sort((a,b)=>a.seed-b.seed)}));
@@ -421,11 +468,11 @@ function rTeams(c){
     <div style="width:110px"><span class="label">Region</span><select id="tr" style="width:100%">${REGIONS.map(r=>`<option value="${r}">${r}</option>`).join('')}</select></div>
     <button class="btn btn-primary" onclick="aT()">Add</button></div></div>
   <div class="grid-2">${br.map(({r,t})=>`<div class="card" style="padding:14px"><h3 style="font-size:15px;font-weight:800;margin-bottom:8px;color:var(--gold)">${r} <span style="color:var(--g400);font-size:12px">(${t.length}/16)</span></h3>${t.length===0?'<p style="color:var(--g300);font-size:13px">No teams</p>':t.map(t=>`<div class="team-item">${sb(t.seed)}<span style="flex:1">${esc(t.name)}</span><button class="icon-btn icon-btn-danger" onclick="dT('${t.id}')">✕</button></div>`).join('')}</div>`).join('')}</div>
-  ${S.teams.length>0?`<div style="margin-top:14px;text-align:right"><button class="btn btn-danger btn-sm" onclick="if(confirm('Clear all?')){S.teams=[];R()}">Clear All</button></div>`:''}`;
+  ${S.teams.length>0?`<div style="margin-top:14px;text-align:right"><button class="btn btn-danger btn-sm" onclick="clearAllTeams()">Clear All</button></div>`:''}`;
 }
-function aT(){const n=document.getElementById("tn").value.trim();if(!n)return;S.teams.push({id:uid(),name:n,seed:Number(document.getElementById("ts").value),region:document.getElementById("tr").value});R();setTimeout(()=>document.getElementById("tn")?.focus(),0)}
-function dT(id){S.teams=S.teams.filter(t=>t.id!==id);R()}
-function pBulk(){const lines=document.getElementById("bt").value.split("\n").filter(l=>l.trim());for(const l of lines){const m=l.match(/^(.+?)\s*,\s*(\d{1,2})\s*,\s*(\w[\w\s]*?)\s*$/);if(m){const reg=REGIONS.find(r=>r.toLowerCase()===m[3].trim().toLowerCase());if(reg)S.teams.push({id:uid(),name:m[1].trim(),seed:Number(m[2]),region:reg})}}R()}
+async function aT(){if(!await requireAdmin())return;const n=document.getElementById("tn").value.trim();if(!n)return;S.teams.push({id:uid(),name:n,seed:Number(document.getElementById("ts").value),region:document.getElementById("tr").value});R();setTimeout(()=>document.getElementById("tn")?.focus(),0)}
+async function dT(id){if(!await requireAdmin())return;S.teams=S.teams.filter(t=>t.id!==id);R()}
+async function pBulk(){if(!await requireAdmin())return;const lines=document.getElementById("bt").value.split("\n").filter(l=>l.trim());for(const l of lines){const m=l.match(/^(.+?)\s*,\s*(\d{1,2})\s*,\s*(\w[\w\s]*?)\s*$/);if(m){const reg=REGIONS.find(r=>r.toLowerCase()===m[3].trim().toLowerCase());if(reg)S.teams.push({id:uid(),name:m[1].trim(),seed:Number(m[2]),region:reg})}}R()}
 
 function rDraft(c){
   const ds=S.ds;
@@ -452,10 +499,10 @@ function rDraft(c){
     ${S.players.map(p=>{const pt=S.teams.filter(t=>p.teamIds.includes(t.id)).sort((a,b)=>a.seed-b.seed);const act=p.id===cid&&!ds.complete;return`<div class="roster-card ${act?'active':''}"><div class="row" style="justify-content:space-between;margin-bottom:4px"><span style="font-weight:700;font-size:13px;color:${act?'var(--gold)':'var(--black)'}">${esc(p.name)}</span><span style="color:var(--g400);font-size:11px">${pt.length}</span></div>${pt.map(t=>`<div style="display:flex;align-items:center;gap:5px;font-size:12px;padding:1px 0">${sb(t.seed)} ${esc(t.name)}</div>`).join('')}</div>`}).join('')}
   </div></div>`;
 }
-function startD(){S.ds={order:snk(S.players.map(p=>p.id),S.teams.length),cp:0,started:true,complete:false};S.players.forEach(p=>p.teamIds=[]);R()}
-function pickT(tid){const ds=S.ds;if(ds.complete)return;const p=S.players.find(p=>p.id===ds.order[ds.cp]);if(p)p.teamIds.push(tid);ds.cp++;if(ds.cp>=ds.order.length)ds.complete=true;R()}
-function undoD(){const ds=S.ds;if(ds.cp===0)return;ds.cp--;ds.complete=false;const p=S.players.find(p=>p.id===ds.order[ds.cp]);if(p)p.teamIds.pop();R()}
-function resetD(){if(!confirm("Reset draft?"))return;S.ds={order:[],cp:0,started:false,complete:false};S.players.forEach(p=>p.teamIds=[]);R()}
+async function startD(){if(!await requireAdmin())return;S.ds={order:snk(S.players.map(p=>p.id),S.teams.length),cp:0,started:true,complete:false};S.players.forEach(p=>p.teamIds=[]);R()}
+async function pickT(tid){if(!await requireAdmin())return;const ds=S.ds;if(ds.complete)return;const p=S.players.find(p=>p.id===ds.order[ds.cp]);if(p)p.teamIds.push(tid);ds.cp++;if(ds.cp>=ds.order.length)ds.complete=true;R()}
+async function undoD(){if(!await requireAdmin())return;const ds=S.ds;if(ds.cp===0)return;ds.cp--;ds.complete=false;const p=S.players.find(p=>p.id===ds.order[ds.cp]);if(p)p.teamIds.pop();R()}
+async function resetD(){if(!await requireAdmin())return;if(!confirm("Reset draft?"))return;S.ds={order:[],cp:0,started:false,complete:false};S.players.forEach(p=>p.teamIds=[]);R()}
 
 function rBracket(c){
   const reg=S.bracketRegion;
@@ -604,12 +651,27 @@ function rSettings(c){
       <button class="preset-btn ${isP('backLoaded')?'active':''}" onclick="sP('backLoaded')">Back-loaded (1,2,4,8,20,40)</button>
       <button class="preset-btn ${isP('flat')?'active':''}" onclick="sP('flat')">Flat (1 per round)</button></div>
     <span class="label">Points Per Round</span>
-    <div class="grid-3">${[1,2,3,4,5,6].map(r=>`<div><div style="font-size:12px;color:var(--g500);margin-bottom:4px">${RN[r]}</div><input type="number" value="${S.rp[r]}" style="width:100%" onchange="S.rp[${r}]=Number(this.value)||0;R()"></div>`).join('')}</div></div>
+    <div class="grid-3">${[1,2,3,4,5,6].map(r=>`<div><div style="font-size:12px;color:var(--g500);margin-bottom:4px">${RN[r]}</div><input type="number" value="${S.rp[r]}" style="width:100%" onchange="changeScoring(${r},this.value)"></div>`).join('')}</div></div>
   <div class="card" style="margin-bottom:14px"><div class="row" style="justify-content:space-between"><div><div style="font-weight:700;margin-bottom:4px">Upset Bonus</div><div style="font-size:13px;color:var(--g500)">Upsets award bonus = seed difference (e.g. 12 beats 5 = +7).</div></div>
-    <button class="toggle ${S.ub?'on':'off'}" onclick="S.ub=!S.ub;R()"><span class="toggle-knob"></span></button></div></div>
-  <div class="card"><span class="label">Preview</span><p style="font-size:13px;color:var(--g500);line-height:1.7">12-seed beats 5-seed in R64: Base <strong style="color:var(--gold)">${S.rp[1]}</strong>${S.ub?' + Upset <strong style="color:var(--gold)">7</strong>':''} = <strong>${S.rp[1]+(S.ub?7:0)} pts</strong></p></div>`;
+    <button class="toggle ${S.ub?'on':'off'}" onclick="toggleUpsetBonus()"><span class="toggle-knob"></span></button></div></div>
+  <div class="card"><span class="label">Preview</span><p style="font-size:13px;color:var(--g500);line-height:1.7">12-seed beats 5-seed in R64: Base <strong style="color:var(--gold)">${S.rp[1]}</strong>${S.ub?' + Upset <strong style="color:var(--gold)">7</strong>':''} = <strong>${S.rp[1]+(S.ub?7:0)} pts</strong></p></div>
+  ${roomId?`<div class="card" style="margin-bottom:14px"><span class="label">Admin Access</span>
+    <div class="row" style="justify-content:space-between;align-items:center">
+      <div><div style="font-weight:700;margin-bottom:4px">${adminUnlocked?'Unlocked':'Locked'}</div>
+        <div style="font-size:13px;color:var(--g500)">${adminUnlocked?'You can edit players, teams, draft, and scoring.':'Enter PIN to make changes.'}</div></div>
+      ${adminUnlocked?`<button class="btn btn-secondary btn-sm" onclick="lockAdmin()">Lock</button>`:`<button class="btn btn-primary btn-sm" onclick="requireAdmin().then(ok=>{if(ok)R()})">Unlock</button>`}
+    </div></div>`:''}
+  <div class="card" style="border-color:var(--red)"><span class="label" style="color:var(--red)">Danger Zone</span>
+    <div class="row" style="justify-content:space-between;align-items:center">
+      <div><div style="font-weight:700;margin-bottom:4px">New Tournament</div><div style="font-size:13px;color:var(--g500)">Delete this room and start fresh.</div></div>
+      <button class="btn btn-danger btn-sm" onclick="resetAll()">New Tournament</button>
+    </div></div>`;
 }
-function sP(k){const pr={doubling:{1:1,2:2,3:4,4:8,5:16,6:32},linear:{1:1,2:2,3:3,4:4,5:5,6:6},backLoaded:{1:1,2:2,3:4,4:8,5:20,6:40},flat:{1:1,2:1,3:1,4:1,5:1,6:1}};S.rp={...pr[k]};R()}
+async function changeYear(v){if(!await requireAdmin())return;S.year=Number(v)||2025;R()}
+async function clearAllTeams(){if(!await requireAdmin())return;if(!confirm('Clear all teams?'))return;S.teams=[];R()}
+async function changeScoring(r,v){if(!await requireAdmin())return;S.rp[r]=Number(v)||0;R()}
+async function toggleUpsetBonus(){if(!await requireAdmin())return;S.ub=!S.ub;R()}
+async function sP(k){if(!await requireAdmin())return;const pr={doubling:{1:1,2:2,3:4,4:8,5:16,6:32},linear:{1:1,2:2,3:3,4:4,5:5,6:6},backLoaded:{1:1,2:2,3:4,4:8,5:20,6:40},flat:{1:1,2:1,3:1,4:1,5:1,6:1}};S.rp={...pr[k]};R()}
 
 /* ── Boot ── */
 const params = new URLSearchParams(window.location.search);
@@ -622,6 +684,7 @@ if(urlRoom){
   if(!S.bracketRegion)S.bracketRegion="South";
   if(!S.games)S.games=[];
   syncGames();
+  checkAdminSession();
   connectToRoom(roomId);
   R();
 } else {
