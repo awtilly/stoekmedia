@@ -304,7 +304,8 @@ function getTeamForSlot(region,gameIdx,slotIdx){
   return winnerId?S.teams.find(t=>t.id===winnerId):null;
 }
 
-function advanceTeam(region,gameIdx,teamId){
+async function advanceTeam(region,gameIdx,teamId){
+  if(!await requireAdmin())return;
   const b=S.bracket[region];
   const oldWinner=b[gameIdx];
   b[gameIdx]=teamId;
@@ -356,7 +357,8 @@ function clearDownstream(region,changedGame){
   }
 }
 
-function advanceFF(ffIdx,teamId){
+async function advanceFF(ffIdx,teamId){
+  if(!await requireAdmin())return;
   S.bracket.ff[ffIdx]=teamId;
   if(ffIdx<2){
     const cw=S.bracket.ff[2];
