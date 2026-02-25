@@ -241,36 +241,31 @@ async function requireAdmin(){
 }
 
 /* ── Player Identity ── */
-function getMyPlayerId(){ return roomId ? sessionStorage.getItem('mm4_me_' + roomId) : null; }
-function setMyPlayerId(id){ if(roomId) sessionStorage.setItem('mm4_me_' + roomId, id); }
+function getMyPlayerId(){ return roomId ? localStorage.getItem('mm4_me_' + roomId) : null; }
+function setMyPlayerId(id){ if(roomId) localStorage.setItem('mm4_me_' + roomId, id); }
 
-function joinAsPlayer(){
-  const el=document.getElementById('join-name');
-  const name=el.value.trim();
-  if(!name) return;
-  const id=uid();
-  S.players.push({id,name,teamIds:[]});
+function claimPlayer(id){
   setMyPlayerId(id);
-  sv();
   S.phase='leaderboard';
   R();
 }
 
 function renderJoinScreen(){
+  const players=S.players||[];
   document.getElementById("app").innerHTML=`
     <div class="lobby">
       <h1><span>March Madness</span> Draft</h1>
-      <p class="lobby-sub">You've been invited to join a tournament!</p>
+      <p class="lobby-sub">Welcome to room <strong>${roomId}</strong></p>
       <div class="lobby-card">
-        <h3>Join Tournament</h3>
-        <p>Enter your name to join room <strong>${roomId}</strong>.</p>
-        <div class="row" style="gap:8px">
-          <input id="join-name" placeholder="Your name..." style="flex:1" onkeydown="if(event.key==='Enter')joinAsPlayer()">
-          <button class="btn btn-primary" onclick="joinAsPlayer()">Join</button>
-        </div>
+        <h3>Who are you?</h3>
+        ${players.length>0?`
+          <p>Select your name to continue.</p>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            ${players.map(p=>`<button class="btn btn-primary" style="width:100%;justify-content:center" onclick="claimPlayer('${p.id}')">${esc(p.name)}</button>`).join('')}
+          </div>
+        `:`<p>The commissioner hasn't added players yet. Check back soon!</p>`}
       </div>
     </div>`;
-  setTimeout(()=>document.getElementById('join-name')?.focus(),0);
 }
 
 const VIEW_LOCAL = ['phase','bracketRegion','fr','fs'];
