@@ -282,9 +282,15 @@ function sv(){
 function ld(){try{const s=localStorage.getItem("mm4");if(s)Object.assign(S,JSON.parse(s))}catch(e){}}
 
 async function createRoom(){
+  const nameInput = document.getElementById("room-name");
+  const raw = nameInput ? nameInput.value.trim() : '';
+  if(!raw){ alert("Enter a room name."); return; }
+  const code = raw.toUpperCase().replace(/[^A-Z0-9]/g,'');
+  if(code.length < 2 || code.length > 20){ alert("Room name must be 2-20 letters/numbers."); return; }
+  const existing = await db.collection("rooms").doc(code).get();
+  if(existing.exists){ alert("That room name is already taken. Try another."); return; }
   const pin = prompt("Set a 4-digit admin PIN to protect editing:");
   if(!pin || !/^\d{4}$/.test(pin.trim())){ alert("PIN must be exactly 4 digits."); return; }
-  const code = Math.random().toString(36).substring(2,8).toUpperCase();
   roomId = code;
   const url = new URL(window.location);
   url.searchParams.set("room", code);
@@ -339,8 +345,11 @@ function renderLobby(){
       <p class="lobby-sub">Create or join a room to sync brackets with friends in real time.</p>
       <div class="lobby-card">
         <h3>Create a Room</h3>
-        <p>Start a new tournament and share the code with friends.</p>
-        <button class="btn btn-primary" onclick="createRoom()">Create Room</button>
+        <p>Choose a name for your room and share it with friends.</p>
+        <div class="row" style="gap:8px">
+          <input id="room-name" placeholder="Room name..." style="flex:1;text-transform:uppercase" onkeydown="if(event.key==='Enter')createRoom()">
+          <button class="btn btn-primary" onclick="createRoom()">Create</button>
+        </div>
       </div>
       <div class="lobby-or">— or —</div>
       <div class="lobby-card">
