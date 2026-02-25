@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ShopCaddie Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Fraunces:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #F7F5F2; font-family: 'DM Sans', sans-serif; color: #1A1714; min-height: 100vh; }
+
+  /* Nav */
+  .topnav { background: #1A1714; padding: 0 32px; height: 60px; display: flex; align-items: center; justify-content: space-between; }
+  .topnav-brand { display: flex; align-items: center; gap: 10px; }
+  .topnav-logo { width: 32px; height: 32px; border-radius: 8px; background: linear-gradient(135deg, #2D6B4D, #4AAF7C); display: flex; align-items: center; justify-content: center; font-size: 16px; color: #fff; font-weight: 700; font-family: 'Fraunces', serif; }
+  .topnav-name { color: #fff; font-size: 17px; font-weight: 600; font-family: 'Fraunces', serif; letter-spacing: -0.01em; }
+  .topnav-right { display: flex; align-items: center; gap: 24px; }
+  .topnav-shop { color: #A09890; font-size: 13px; font-weight: 500; }
+  .topnav-avatar { width: 34px; height: 34px; border-radius: 50%; background: #2D6B4D; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 13px; font-weight: 600; }
+
+  /* Layout */
+  .container { max-width: 1120px; margin: 0 auto; padding: 28px 24px; }
+  .header { margin-bottom: 24px; display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 16px; }
+  .header h1 { font-family: 'Fraunces', serif; font-size: 28px; font-weight: 700; letter-spacing: -0.02em; }
+  .header-sub { color: #8C8478; font-size: 14px; margin-top: 6px; font-weight: 500; }
+  .header-actions { display: flex; gap: 8px; }
+
+  .btn { padding: 9px 18px; border-radius: 9px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: 'DM Sans', sans-serif; transition: all 0.15s; }
+  .btn-outline { border: 1px solid #E8E4DF; background: #fff; color: #1A1714; }
+  .btn-outline:hover { background: #F7F5F2; }
+  .btn-primary { border: none; background: linear-gradient(135deg, #2D6B4D, #3A8A62); color: #fff; box-shadow: 0 2px 8px rgba(45,107,77,0.25); }
+  .btn-primary:hover { box-shadow: 0 4px 14px rgba(45,107,77,0.35); }
+  .btn-sm { padding: 8px 16px; border-radius: 8px; font-size: 12px; }
+  .btn-approve { background: #2D6B4D; color: #fff; border: none; }
+  .btn-edit { background: #fff; color: #8C8478; border: 1px solid #E8E4DF; }
+
+  /* Stats */
+  .stats { display: flex; gap: 14px; margin-bottom: 24px; flex-wrap: wrap; }
+  .stat-card { background: #fff; border-radius: 14px; padding: 22px 24px; border: 1px solid #E8E4DF; flex: 1; min-width: 150px; }
+  .stat-label { font-size: 12px; color: #8C8478; letter-spacing: 0.04em; text-transform: uppercase; font-weight: 600; }
+  .stat-value { font-size: 36px; font-family: 'Fraunces', serif; font-weight: 700; margin-top: 4px; line-height: 1.1; }
+  .stat-sub { font-size: 13px; color: #10B981; margin-top: 6px; font-weight: 500; }
+  .stat-accent { color: #2D6B4D; }
+
+  /* Tabs */
+  .tabs { display: flex; gap: 0; margin-bottom: 20px; border-bottom: 2px solid #E8E4DF; overflow-x: auto; }
+  .tab { padding: 10px 20px; font-size: 14px; font-weight: 600; background: none; border: none; border-bottom: 2px solid transparent; color: #8C8478; cursor: pointer; margin-bottom: -2px; display: flex; align-items: center; gap: 8px; white-space: nowrap; font-family: 'DM Sans', sans-serif; transition: color 0.15s; }
+  .tab:hover { color: #5C5650; }
+  .tab.active { border-bottom-color: #2D6B4D; color: #1A1714; }
+  .tab-badge { background: #E8A23E; color: #fff; font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 10px; }
+
+  /* Panels */
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  /* Message cards */
+  .msg-card { background: #fff; border-radius: 14px; padding: 20px 24px; border: 1px solid #E8E4DF; display: flex; gap: 16px; align-items: flex-start; margin-bottom: 12px; transition: opacity 0.3s; }
+  .msg-card.approved { opacity: 0.5; }
+  .msg-body { flex: 1; }
+  .msg-header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; flex-wrap: wrap; }
+  .msg-name { font-weight: 700; font-size: 15px; }
+  .badge { font-size: 11px; font-weight: 600; padding: 2px 9px; border-radius: 6px; display: inline-block; }
+  .badge-followup { background: #EFF6FF; color: #3B82F6; }
+  .badge-review { background: #F5F3FF; color: #8B5CF6; }
+  .badge-winback { background: #FEF2F2; color: #EF4444; }
+  .badge-pending { background: #FEF5E7; color: #E8A23E; }
+  .badge-scheduled { background: #F5F3FF; color: #8B5CF6; }
+  .badge-sent { background: #ECFDF5; color: #10B981; }
+  .msg-text { font-size: 13.5px; color: #5C5650; line-height: 1.55; }
+  .msg-time { font-size: 12px; color: #A09890; margin-top: 8px; font-weight: 500; }
+  .msg-actions { display: flex; gap: 8px; flex-shrink: 0; padding-top: 4px; }
+
+  /* Customer Table */
+  .table-wrap { background: #fff; border-radius: 14px; border: 1px solid #E8E4DF; overflow: hidden; overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; min-width: 700px; }
+  thead tr { border-bottom: 1px solid #E8E4DF; }
+  th { padding: 14px 20px; text-align: left; font-weight: 600; color: #8C8478; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; }
+  tbody tr { border-bottom: 1px solid #F0EDE9; cursor: pointer; transition: background 0.15s; }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: #FAFAF8; }
+  td { padding: 14px 20px; }
+  td.name { font-weight: 600; }
+  td.muted { color: #5C5650; }
+  td.light { color: #8C8478; }
+  .status-badge { font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 6px; display: inline-block; }
+
+  /* Customer Detail */
+  .detail-panel { background: #fff; border-radius: 14px; border: 1px solid #E8E4DF; padding: 28px; margin-top: 16px; display: none; }
+  .detail-panel.visible { display: block; }
+  .detail-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; flex-wrap: wrap; gap: 16px; }
+  .detail-name { font-family: 'Fraunces', serif; font-size: 22px; font-weight: 700; }
+  .detail-meta { color: #8C8478; font-size: 13px; margin-top: 4px; }
+  .detail-stats { display: flex; gap: 24px; }
+  .detail-stat { text-align: center; }
+  .detail-stat-val { font-family: 'Fraunces', serif; font-size: 24px; font-weight: 700; }
+  .detail-stat-label { font-size: 11px; color: #8C8478; text-transform: uppercase; letter-spacing: 0.04em; font-weight: 600; margin-top: 2px; }
+  .detail-section { margin-top: 20px; }
+  .detail-section h4 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; color: #8C8478; font-weight: 600; margin-bottom: 12px; }
+  .history-item { display: flex; gap: 14px; padding: 12px 0; border-bottom: 1px solid #F0EDE9; }
+  .history-item:last-child { border-bottom: none; }
+  .history-dot { width: 8px; height: 8px; border-radius: 50%; background: #2D6B4D; margin-top: 6px; flex-shrink: 0; }
+  .history-dot.blue { background: #3B82F6; }
+  .history-dot.amber { background: #E8A23E; }
+  .history-dot.purple { background: #8B5CF6; }
+  .history-content { flex: 1; }
+  .history-title { font-weight: 600; font-size: 13.5px; }
+  .history-date { font-size: 12px; color: #A09890; margin-top: 2px; }
+
+  /* Campaign cards */
+  .campaign-card { background: #fff; border-radius: 14px; padding: 20px 24px; border: 1px solid #E8E4DF; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px; }
+  .campaign-info { flex: 1; min-width: 280px; }
+  .campaign-header { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+  .campaign-name { font-weight: 700; font-size: 15px; }
+  .campaign-desc { font-size: 13px; color: #8C8478; line-height: 1.4; }
+  .campaign-note { font-size: 12px; color: #A09890; font-weight: 500; margin-top: 10px; }
+  .campaign-stats { display: flex; gap: 20px; text-align: center; flex-shrink: 0; }
+  .campaign-stat-val { font-size: 22px; font-family: 'Fraunces', serif; font-weight: 700; }
+  .campaign-stat-label { font-size: 11px; color: #8C8478; font-weight: 500; }
+
+  /* Platform banner */
+  .platform-banner { margin-top: 32px; background: linear-gradient(135deg, #1A1714, #2A2520); border-radius: 16px; padding: 28px 32px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px; }
+  .platform-banner h3 { font-family: 'Fraunces', serif; font-size: 20px; font-weight: 700; color: #fff; margin-bottom: 6px; letter-spacing: -0.01em; }
+  .platform-banner p { font-size: 14px; color: #A09890; }
+  .platform-tags { display: flex; gap: 12px; flex-wrap: wrap; }
+  .platform-tag { background: rgba(255,255,255,0.08); border-radius: 10px; padding: 12px 18px; display: flex; align-items: center; gap: 8px; border: 1px solid rgba(255,255,255,0.1); }
+  .platform-tag span:first-child { font-size: 18px; }
+  .platform-tag span:last-child { color: #fff; font-size: 13px; font-weight: 600; }
+
+  .close-btn { background: none; border: 1px solid #E8E4DF; border-radius: 8px; padding: 6px 14px; font-size: 12px; font-weight: 600; color: #8C8478; cursor: pointer; font-family: 'DM Sans', sans-serif; }
+  .close-btn:hover { background: #F7F5F2; }
+</style>
+</head>
+<body>
+
+<!-- Nav -->
+<div class="topnav">
+  <div class="topnav-brand">
+    <div class="topnav-logo">S</div>
+    <span class="topnav-name">ShopCaddie</span>
+  </div>
+  <div class="topnav-right">
+    <span class="topnav-shop">Your Pro Shop</span>
+    <div class="topnav-avatar">JS</div>
+  </div>
+</div>
+
+<div class="container">
+  <!-- Header -->
+  <div class="header">
+    <div>
+      <h1>Good morning</h1>
+      <div class="header-sub">2 messages ready for your approval · 1 campaign scheduled this week</div>
+    </div>
+    <div class="header-actions">
+      <button class="btn btn-outline">+ Add Customer</button>
+      <button class="btn btn-primary">New Campaign</button>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats">
+    <div class="stat-card">
+      <div class="stat-label">Customers</div>
+      <div class="stat-value">247</div>
+      <div class="stat-sub">↑ 12 this month</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Messages Sent</div>
+      <div class="stat-value">89</div>
+      <div class="stat-sub">↑ 34% vs last month</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Response Rate</div>
+      <div class="stat-value stat-accent">41%</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Google Reviews</div>
+      <div class="stat-value">18</div>
+      <div class="stat-sub">↑ 6 this month</div>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab active" data-tab="messages">Message Queue <span class="tab-badge">2</span></button>
+    <button class="tab" data-tab="customers">Customer Directory</button>
+    <button class="tab" data-tab="campaigns">Campaigns</button>
+  </div>
+
+  <!-- Messages Panel -->
+  <div id="messages" class="panel active">
+    <div class="msg-card" id="msg-1">
+      <div class="msg-body">
+        <div class="msg-header">
+          <span class="msg-name">Mike Reynolds</span>
+          <span class="badge badge-followup">Follow-Up</span>
+          <span class="badge badge-pending">○ Needs Approval</span>
+        </div>
+        <div class="msg-text">"Hey Mike — how's the TSR3 treating you? Been about two weeks since the fitting. If the flight isn't dialed in yet, swing by and we'll tweak the settings. No charge."</div>
+        <div class="msg-time">Today, 10:15 AM</div>
+      </div>
+      <div class="msg-actions">
+        <button class="btn btn-sm btn-approve" onclick="approveMsg('msg-1')">✓ Approve</button>
+        <button class="btn btn-sm btn-edit">Edit</button>
+      </div>
+    </div>
+
+    <div class="msg-card" id="msg-2">
+      <div class="msg-body">
+        <div class="msg-header">
+          <span class="msg-name">Rachel Adams</span>
+          <span class="badge badge-followup">Follow-Up</span>
+          <span class="badge badge-pending">○ Needs Approval</span>
+        </div>
+        <div class="msg-text">"Hi Rachel! Just checking in on the Mizuno Pro 245s. Those irons usually take a round or two to really feel natural. How are they working out for you?"</div>
+        <div class="msg-time">Today, 10:15 AM</div>
+      </div>
+      <div class="msg-actions">
+        <button class="btn btn-sm btn-approve" onclick="approveMsg('msg-2')">✓ Approve</button>
+        <button class="btn btn-sm btn-edit">Edit</button>
+      </div>
+    </div>
+
+    <div class="msg-card">
+      <div class="msg-body">
+        <div class="msg-header">
+          <span class="msg-name">James Watson</span>
+          <span class="badge badge-followup">Follow-Up</span>
+          <span class="badge badge-scheduled">◷ Scheduled</span>
+        </div>
+        <div class="msg-text">"James — how's the G430 hybrid fitting into the bag? A lot of guys find it becomes their go-to club off the tee on tight holes. Let me know if you need the loft adjusted."</div>
+        <div class="msg-time">Scheduled · Feb 27</div>
+      </div>
+    </div>
+
+    <div class="msg-card">
+      <div class="msg-body">
+        <div class="msg-header">
+          <span class="msg-name">Sarah Chen</span>
+          <span class="badge badge-review">Review Request</span>
+          <span class="badge badge-sent">✓ Sent</span>
+        </div>
+        <div class="msg-text">"Sarah, glad you're loving the Paradym irons! If you have a minute, a quick Google review would mean a lot to us. Here's the link..."</div>
+        <div class="msg-time">Sent · Feb 15</div>
+      </div>
+    </div>
+
+    <div class="msg-card">
+      <div class="msg-body">
+        <div class="msg-header">
+          <span class="msg-name">Lisa Thompson</span>
+          <span class="badge badge-winback">Win-Back</span>
+          <span class="badge badge-scheduled">◷ Scheduled</span>
+        </div>
+        <div class="msg-text">"Lisa — it's been a while! We just got the new TaylorMade Qi35 line in stock and thought of you. Swing by for a demo, no appointment needed."</div>
+        <div class="msg-time">Scheduled · Mar 1</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Customer Directory Panel -->
+  <div id="customers" class="panel">
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Customer</th>
+            <th>Phone</th>
+            <th>Last Purchase</th>
+            <th>Date</th>
+            <th>Lifetime Value</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr onclick="showDetail('mike')">
+            <td class="name">Mike Reynolds</td>
+            <td class="muted">(573) 555-0142</td>
+            <td class="muted">Titleist TSR3 Driver</td>
+            <td class="light">Feb 12, 2026</td>
+            <td class="muted">$1,847</td>
+            <td><span class="status-badge" style="background:#FEF5E7;color:#E8A23E;">Follow-Up Due</span></td>
+          </tr>
+          <tr onclick="showDetail('sarah')">
+            <td class="name">Sarah Chen</td>
+            <td class="muted">(573) 555-0298</td>
+            <td class="muted">Callaway Paradym Irons</td>
+            <td class="light">Feb 8, 2026</td>
+            <td class="muted">$2,340</td>
+            <td><span class="status-badge" style="background:#EFF6FF;color:#3B82F6;">Review Sent</span></td>
+          </tr>
+          <tr onclick="showDetail('david')">
+            <td class="name">David Park</td>
+            <td class="muted">(573) 555-0377</td>
+            <td class="muted">Scotty Cameron Putter</td>
+            <td class="light">Jan 22, 2026</td>
+            <td class="muted">$3,120</td>
+            <td><span class="status-badge" style="background:#ECFDF5;color:#10B981;">Engaged</span></td>
+          </tr>
+          <tr onclick="showDetail('lisa')">
+            <td class="name">Lisa Thompson</td>
+            <td class="muted">(573) 555-0411</td>
+            <td class="muted">TaylorMade Qi35 Fairway</td>
+            <td class="light">Jan 15, 2026</td>
+            <td class="muted">$890</td>
+            <td><span class="status-badge" style="background:#FEF2F2;color:#EF4444;">Lapsed</span></td>
+          </tr>
+          <tr>
+            <td class="name">James Watson</td>
+            <td class="muted">(573) 555-0533</td>
+            <td class="muted">Ping G430 Hybrid</td>
+            <td class="light">Feb 18, 2026</td>
+            <td class="muted">$1,260</td>
+            <td><span class="status-badge" style="background:#F5F3FF;color:#8B5CF6;">Scheduled</span></td>
+          </tr>
+          <tr>
+            <td class="name">Rachel Adams</td>
+            <td class="muted">(573) 555-0619</td>
+            <td class="muted">Mizuno Pro 245 Irons</td>
+            <td class="light">Feb 20, 2026</td>
+            <td class="muted">$1,580</td>
+            <td><span class="status-badge" style="background:#FEF5E7;color:#E8A23E;">Follow-Up Due</span></td>
+          </tr>
+          <tr>
+            <td class="name">Tom Bradley</td>
+            <td class="muted">(573) 555-0744</td>
+            <td class="muted">Titleist Vokey Wedges (3)</td>
+            <td class="light">Dec 5, 2025</td>
+            <td class="muted">$4,210</td>
+            <td><span class="status-badge" style="background:#ECFDF5;color:#10B981;">Engaged</span></td>
+          </tr>
+          <tr>
+            <td class="name">Nancy Kim</td>
+            <td class="muted">(573) 555-0855</td>
+            <td class="muted">Callaway Chrome Soft (2dz)</td>
+            <td class="light">Feb 22, 2026</td>
+            <td class="muted">$620</td>
+            <td><span class="status-badge" style="background:#F5F3FF;color:#8B5CF6;">Scheduled</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Mike Detail -->
+    <div class="detail-panel" id="detail-mike">
+      <div class="detail-header">
+        <div>
+          <div class="detail-name">Mike Reynolds</div>
+          <div class="detail-meta">(573) 555-0142 · Customer since Aug 2024 · 5 purchases</div>
+        </div>
+        <div style="display:flex;gap:12px;align-items:center;">
+          <div class="detail-stats">
+            <div class="detail-stat">
+              <div class="detail-stat-val">$1,847</div>
+              <div class="detail-stat-label">Lifetime Value</div>
+            </div>
+            <div class="detail-stat">
+              <div class="detail-stat-val" style="color:#2D6B4D;">5</div>
+              <div class="detail-stat-label">Purchases</div>
+            </div>
+          </div>
+          <button class="close-btn" onclick="hideDetail('mike')">✕ Close</button>
+        </div>
+      </div>
+      <div style="display:flex;gap:24px;flex-wrap:wrap;">
+        <div style="flex:1;min-width:300px;">
+          <div class="detail-section">
+            <h4>Purchase History</h4>
+            <div class="history-item">
+              <div class="history-dot"></div>
+              <div class="history-content">
+                <div class="history-title">Titleist TSR3 Driver — $549</div>
+                <div class="history-date">Feb 12, 2026 · Custom fitting</div>
+              </div>
+            </div>
+            <div class="history-item">
+              <div class="history-dot"></div>
+              <div class="history-content">
+                <div class="history-title">Titleist Pro V1 (3 dozen) — $156</div>
+                <div class="history-date">Dec 18, 2025</div>
+              </div>
+            </div>
+            <div class="history-item">
+              <div class="history-dot"></div>
+              <div class="history-content">
+                <div class="history-title">SuperStroke S-Tech Grip Regrip (13) — $182</div>
+                <div class="history-date">Oct 3, 2025</div>
+              </div>
+            </div>
+            <div class="history-item">
+              <div class="history-dot"></div>
+              <div class="history-content">
+                <div class="history-title">Titleist TSi2 Fairway Wood — $349</div>
+                <div class="history-date">Jun 15, 2025</div>
+              </div>
+            </div>
+            <div class="history-item">
+              <div class="history-dot"></div>
+              <div class="history-content">
+                <div class="history-title">Titleist Players 4 Stand Bag — $280</div>
+                <div class="history-date">Aug 22, 2024</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div style="flex:1;min-width:300px;">
+          <div class="detail-section">
+            <h4>Message History</h4>
+            <div class="history-item">
+              <div class="history-dot amber"></div>
+              <div class="history-content">
+                <div class="history-title">Follow-Up: TSR3 Driver check-in</div>
+                <div class="history-date">Pending approval · Today</div>
+              </div>
+            </div>
+            <div class="history-item">
+              <div class="history-dot blue"></div>
+              <div class="history-content">
+                <div class="history-title">Review Request sent</div>
+                <div class="history-date">Dec 30, 2025 · ✓ Left a 5-star review</div>
+              </div>
+            </div>
+            <div class="history-item">
+              <div class="history-dot purple"></div>
+              <div class="history-content">
+                <div class="history-title">Follow-Up: Regrip check-in</div>
+                <div class="history-date">Oct 10, 2025 · Replied "feels great"</div>
+              </div>
+            </div>
+            <div class="history-item">
+              <div class="history-dot purple"></div>
+              <div class="history-content">
+                <div class="history-title">Follow-Up: Fairway wood check-in</div>
+                <div class="history-date">Jun 22, 2025 · No reply</div>
+              </div>
+            </div>
+          </div>
+          <div class="detail-section" style="margin-top:20px;">
+            <h4>Notes</h4>
+            <div style="background:#FAFAF8;border-radius:10px;padding:14px 16px;font-size:13px;color:#5C5650;line-height:1.5;border:1px solid #F0EDE9;">
+              Titleist loyalist. Plays 2x/week. Interested in TSR irons when they drop. Prefers morning tee times. Member at The Country Club.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sarah Detail -->
+    <div class="detail-panel" id="detail-sarah">
+      <div class="detail-header">
+        <div>
+          <div class="detail-name">Sarah Chen</div>
+          <div class="detail-meta">(573) 555-0298 · Customer since Mar 2025 · 3 purchases</div>
+        </div>
+        <div style="display:flex;gap:12px;align-items:center;">
+          <div class="detail-stats">
+            <div class="detail-stat">
+              <div class="detail-stat-val">$2,340</div>
+              <div class="detail-stat-label">Lifetime Value</div>
+            </div>
+            <div class="detail-stat">
+              <div class="detail-stat-val" style="color:#2D6B4D;">3</div>
+              <div class="detail-stat-label">Purchases</div>
+            </div>
+          </div>
+          <button class="close-btn" onclick="hideDetail('sarah')">✕ Close</button>
+        </div>
+      </div>
+      <div style="display:flex;gap:24px;flex-wrap:wrap;">
+        <div style="flex:1;min-width:300px;">
+          <div class="detail-section">
+            <h4>Purchase History</h4>
+            <div class="history-item">
+              <div class="history-dot"></div>
+              <div class="history-content">
+                <div class="history-title">Callaway Paradym Irons (5-PW) — $1,200</div>
+                <div class="history-date">Feb 8, 2026 · Custom fitting</div>
+              </div>
+            </div>
+            <div class="history-item">
+              <div class="history-dot"></div>
+              <div class="history-content">
+                <div class="history-title">Callaway Paradym X Driver — $580</div>
+                <div class="history-date">Sep 12, 2025</div>
+              </div>
+            </div>
+            <div class="history-item">
+              <div class="history-dot"></div>
+              <div class="history-content">
+                <div class="history-title">Callaway Chrome Soft (1 dozen) — $52</div>
+                <div class="history-date">Mar 20, 2025</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div style="flex:1;min-width:300px;">
+          <div class="detail-section">
+            <h4>Message History</h4>
+            <div class="history-item">
+              <div class="history-dot blue"></div>
+              <div class="history-content">
+                <div class="history-title">Review Request: Paradym Irons</div>
+                <div class="history-date">Feb 15, 2026 · Awaiting response</div>
+              </div>
+            </div>
+            <div class="history-item">
+              <div class="history-dot purple"></div>
+              <div class="history-content">
+                <div class="history-title">Follow-Up: Driver check-in</div>
+                <div class="history-date">Sep 19, 2025 · Replied "love it!"</div>
+              </div>
+            </div>
+          </div>
+          <div class="detail-section" style="margin-top:20px;">
+            <h4>Notes</h4>
+            <div style="background:#FAFAF8;border-radius:10px;padding:14px 16px;font-size:13px;color:#5C5650;line-height:1.5;border:1px solid #F0EDE9;">
+              Going all-in on Callaway. New to golf (~2 years). Taking lessons. Good candidate for wedge set next.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- David Detail -->
+    <div class="detail-panel" id="detail-david">
+      <div class="detail-header">
+        <div>
+          <div class="detail-name">David Park</div>
+          <div class="detail-meta">(573) 555-0377 · Customer since Jan 2024 · 8 purchases</div>
+        </div>
+        <div style="display:flex;gap:12px;align-items:center;">
+          <div class="detail-stats">
+            <div class="detail-stat">
+              <div class="detail-stat-val">$3,120</div>
+              <div class="detail-stat-label">Lifetime Value</div>
+            </div>
+            <div class="detail-stat">
+              <div class="detail-stat-val" style="color:#2D6B4D;">8</div>
+              <div class="detail-stat-label">Purchases</div>
+            </div>
+          </div>
+          <button class="close-btn" onclick="hideDetail('david')">✕ Close</button>
+        </div>
+      </div>
+      <div style="display:flex;gap:24px;flex-wrap:wrap;">
+        <div style="flex:1;min-width:300px;">
+          <div class="detail-section">
+            <h4>Purchase History</h4>
+            <div class="history-item">
+              <div class="history-dot"></div>
+              <div class="history-content">
+                <div class="history-title">Scotty Cameron Special Select — $429</div>
+                <div class="history-date">Jan 22, 2026</div>
+              </div>
+            </div>
+            <div class="history-item">
+              <div class="history-dot"></div>
+              <div class="history-content">
+                <div class="history-title">Titleist Vokey SM10 (52°, 56°, 60°) — $510</div>
+                <div class="history-date">Nov 8, 2025</div>
+              </div>
+            </div>
+            <div class="history-item">
+              <div class="history-dot"></div>
+              <div class="history-content">
+                <div class="history-title">FootJoy Premiere Series Shoes — $210</div>
+                <div class="history-date">Aug 14, 2025</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div style="flex:1;min-width:300px;">
+          <div class="detail-section">
+            <h4>Message History</h4>
+            <div class="history-item">
+              <div class="history-dot purple"></div>
+              <div class="history-content">
+                <div class="history-title">Follow-Up: Scotty Cameron check-in</div>
+                <div class="history-date">Jan 29, 2026 · Replied "rolling pure"</div>
+              </div>
+            </div>
+            <div class="history-item">
+              <div class="history-dot blue"></div>
+              <div class="history-content">
+                <div class="history-title">Review Request</div>
+                <div class="history-date">Nov 22, 2025 · ✓ Left a 5-star review</div>
+              </div>
+            </div>
+          </div>
+          <div class="detail-section" style="margin-top:20px;">
+            <h4>Notes</h4>
+            <div style="background:#FAFAF8;border-radius:10px;padding:14px 16px;font-size:13px;color:#5C5650;line-height:1.5;border:1px solid #F0EDE9;">
+              Serious player, single-digit handicap. Buys premium gear. Plays in club tournaments. VIP customer — always give him first look at new arrivals.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Lisa Detail -->
+    <div class="detail-panel" id="detail-lisa">
+      <div class="detail-header">
+        <div>
+          <div class="detail-name">Lisa Thompson</div>
+          <div class="detail-meta">(573) 555-0411 · Customer since Jul 2025 · 2 purchases</div>
+        </div>
+        <div style="display:flex;gap:12px;align-items:center;">
+          <div class="detail-stats">
+            <div class="detail-stat">
+              <div class="detail-stat-val">$890</div>
+              <div class="detail-stat-label">Lifetime Value</div>
+            </div>
+            <div class="detail-stat">
+              <div class="detail-stat-val" style="color:#EF4444;">2</div>
+              <div class="detail-stat-label">Purchases</div>
+            </div>
+          </div>
+          <button class="close-btn" onclick="hideDetail('lisa')">✕ Close</button>
+        </div>
+      </div>
+      <div style="display:flex;gap:24px;flex-wrap:wrap;">
+        <div style="flex:1;min-width:300px;">
+          <div class="detail-section">
+            <h4>Purchase History</h4>
+            <div class="history-item">
+              <div class="history-dot"></div>
+              <div class="history-content">
+                <div class="history-title">TaylorMade Qi35 Fairway Wood — $350</div>
+                <div class="history-date">Jan 15, 2026</div>
+              </div>
+            </div>
+            <div class="history-item">
+              <div class="history-dot"></div>
+              <div class="history-content">
+                <div class="history-title">TaylorMade Kalea Driver — $500</div>
+                <div class="history-date">Jul 8, 2025</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div style="flex:1;min-width:300px;">
+          <div class="detail-section">
+            <h4>Message History</h4>
+            <div class="history-item">
+              <div class="history-dot amber"></div>
+              <div class="history-content">
+                <div class="history-title">Win-Back: New Qi35 line promo</div>
+                <div class="history-date">Scheduled · Mar 1, 2026</div>
+              </div>
+            </div>
+            <div class="history-item">
+              <div class="history-dot purple"></div>
+              <div class="history-content">
+                <div class="history-title">Follow-Up: Kalea Driver check-in</div>
+                <div class="history-date">Jul 15, 2025 · No reply</div>
+              </div>
+            </div>
+          </div>
+          <div class="detail-section" style="margin-top:20px;">
+            <h4>Notes</h4>
+            <div style="background:#FAFAF8;border-radius:10px;padding:14px 16px;font-size:13px;color:#5C5650;line-height:1.5;border:1px solid #F0EDE9;">
+              Newer golfer. TaylorMade preference. Hasn't been in since January — good win-back candidate. Mentioned wanting irons next.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Campaigns Panel -->
+  <div id="campaigns" class="panel">
+    <div class="campaign-card">
+      <div class="campaign-info">
+        <div class="campaign-header">
+          <span class="campaign-name">Spring Driver Launch</span>
+          <span class="badge" style="background:#ECFDF5;color:#10B981;">Active</span>
+        </div>
+        <div class="campaign-desc">Post-purchase follow-ups for all club purchases in the last 30 days</div>
+        <div class="campaign-note">3 messages scheduled tomorrow</div>
+      </div>
+      <div class="campaign-stats">
+        <div><div class="campaign-stat-val">89</div><div class="campaign-stat-label">Sent</div></div>
+        <div><div class="campaign-stat-val" style="color:#2D6B4D;">41</div><div class="campaign-stat-label">Responses</div></div>
+      </div>
+    </div>
+    <div class="campaign-card">
+      <div class="campaign-info">
+        <div class="campaign-header">
+          <span class="campaign-name">Google Review Push</span>
+          <span class="badge" style="background:#EFF6FF;color:#3B82F6;">Active</span>
+        </div>
+        <div class="campaign-desc">Review requests sent 14 days after purchase to customers with positive follow-up interactions</div>
+        <div class="campaign-note">2 reviews received this week</div>
+      </div>
+      <div class="campaign-stats">
+        <div><div class="campaign-stat-val">34</div><div class="campaign-stat-label">Sent</div></div>
+        <div><div class="campaign-stat-val" style="color:#2D6B4D;">18</div><div class="campaign-stat-label">Reviews</div></div>
+      </div>
+    </div>
+    <div class="campaign-card">
+      <div class="campaign-info">
+        <div class="campaign-header">
+          <span class="campaign-name">Lapsed Customer Win-Back</span>
+          <span class="badge" style="background:#FEF5E7;color:#E8A23E;">Scheduled</span>
+        </div>
+        <div class="campaign-desc">Personalized re-engagement messages for customers inactive 90+ days, triggered by new inventory arrivals</div>
+        <div class="campaign-note">12 customers queued · Launches Mar 1</div>
+      </div>
+      <div class="campaign-stats">
+        <div><div class="campaign-stat-val">0</div><div class="campaign-stat-label">Sent</div></div>
+        <div><div class="campaign-stat-val">12</div><div class="campaign-stat-label">Queued</div></div>
+      </div>
+    </div>
+    <div class="campaign-card">
+      <div class="campaign-info">
+        <div class="campaign-header">
+          <span class="campaign-name">Winter Re-Engagement</span>
+          <span class="badge" style="background:#F5F3F0;color:#8C8478;">Completed</span>
+        </div>
+        <div class="campaign-desc">Win-back campaign for customers who hadn't visited in 6+ months</div>
+        <div class="campaign-note">Campaign ended Jan 31</div>
+      </div>
+      <div class="campaign-stats">
+        <div><div class="campaign-stat-val">156</div><div class="campaign-stat-label">Sent</div></div>
+        <div><div class="campaign-stat-val" style="color:#2D6B4D;">62</div><div class="campaign-stat-label">Responses</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Platform Banner -->
+  <div class="platform-banner">
+    <div>
+      <h3>Manage your shop from anywhere</h3>
+      <p>Approve messages from your phone between fittings, or run campaigns from your desktop. ShopCaddie works wherever you do.</p>
+    </div>
+    <div class="platform-tags">
+      <div class="platform-tag"><span>🌐</span><span>Web App</span></div>
+      <div class="platform-tag"><span>📱</span><span>iOS App</span></div>
+      <div class="platform-tag"><span>📱</span><span>Android</span></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Tab switching
+  document.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+      tab.classList.add('active');
+      document.getElementById(tab.dataset.tab).classList.add('active');
+      // Hide any open detail panels
+      document.querySelectorAll('.detail-panel').forEach(d => d.classList.remove('visible'));
+    });
+  });
+
+  // Approve message
+  function approveMsg(id) {
+    const card = document.getElementById(id);
+    card.classList.add('approved');
+    const actions = card.querySelector('.msg-actions');
+    if (actions) actions.innerHTML = '<span class="badge badge-sent" style="font-size:12px;padding:6px 14px;">✓ Approved</span>';
+    // Update badge count
+    const badge = document.querySelector('.tab-badge');
+    const current = parseInt(badge.textContent);
+    if (current > 1) { badge.textContent = current - 1; }
+    else { badge.remove(); }
+  }
+
+  // Show customer detail
+  function showDetail(name) {
+    document.querySelectorAll('.detail-panel').forEach(d => d.classList.remove('visible'));
+    const panel = document.getElementById('detail-' + name);
+    if (panel) {
+      panel.classList.add('visible');
+      panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }
+
+  function hideDetail(name) {
+    document.getElementById('detail-' + name).classList.remove('visible');
+  }
+</script>
+</body>
+</html>

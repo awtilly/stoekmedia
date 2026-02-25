@@ -130,14 +130,27 @@
     </div>
   </section>
 
-  <!-- ===== DASHBOARD PREVIEW (placeholder for future demos) ===== -->
+  <!-- ===== DASHBOARD PREVIEW ===== -->
   <section class="section-pad-lg" style="background: var(--color-bg-elevated);">
     <div class="container">
-      <div class="cta-banner reveal">
-        <span class="section-label">The Dashboard</span>
-        <h2>See it in <em>action.</em></h2>
-        <p>ShopCaddie's dashboard puts everything in one place — your customers, your messages, your campaigns. Book a demo to see it live.</p>
-        <a href="/bookings/" class="btn btn-primary btn-arrow">Book a Demo</a>
+      <span class="section-label reveal">The Dashboard</span>
+      <h2 class="reveal" style="font-family: var(--font-display); font-size: clamp(2rem, 4vw, 3.2rem); font-weight: 500; line-height: 1.15; margin-bottom: var(--space-sm);">See it in <em style="font-family: var(--font-display); font-style: italic; color: var(--color-accent);">action.</em></h2>
+      <p class="reveal" style="color: var(--color-text-secondary); font-size: 1.05rem; line-height: 1.8; max-width: 600px; margin-bottom: var(--space-lg);">Your customers, messages, and campaigns — all in one place. Click around the live preview below.</p>
+
+      <div class="dashboard-preview reveal">
+        <div class="dashboard-browser-bar">
+          <div class="browser-dots">
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
+          <div class="browser-url">app.shopcaddie.com/dashboard</div>
+        </div>
+        <iframe src="dashboard-demo.html" class="dashboard-iframe" title="ShopCaddie Dashboard Preview" loading="lazy"></iframe>
+      </div>
+
+      <div style="text-align: center; margin-top: var(--space-lg);" class="reveal">
+        <a href="/bookings/" class="btn btn-primary btn-arrow">Book a Live Demo</a>
       </div>
     </div>
   </section>
