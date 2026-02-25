@@ -786,6 +786,137 @@ body::before {
   line-height: 1.8;
 }
 
+/* --- Work Card Tags --- */
+.work-card-tag {
+  font-family: var(--font-body);
+  font-size: 0.65rem;
+  font-weight: 500;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+  margin-bottom: 0.5rem;
+  display: block;
+}
+
+/* --- Software Preview (placeholder cards) --- */
+.work-card-image--software,
+.work-card-image--blog {
+  background: var(--color-bg-elevated);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.software-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: var(--space-md);
+}
+
+.software-preview-icon {
+  font-family: var(--font-display);
+  font-size: 2.5rem;
+  color: var(--color-accent);
+  opacity: 0.7;
+}
+
+.software-preview-text {
+  font-family: var(--font-body);
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+/* --- Software Page: Product Cards --- */
+.product-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-md);
+}
+
+.product-card {
+  padding: var(--space-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-card);
+  transition: border-color 0.4s ease, transform 0.4s ease;
+}
+
+.product-card:hover {
+  border-color: rgba(196, 68, 58, 0.3);
+  transform: translateY(-4px);
+}
+
+.product-card--placeholder {
+  border-style: dashed;
+}
+
+.product-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-sm);
+}
+
+.product-icon {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  color: var(--color-accent);
+  font-style: italic;
+}
+
+.product-status {
+  font-family: var(--font-body);
+  font-size: 0.65rem;
+  font-weight: 500;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+  padding: 0.3rem 0.8rem;
+  border: 1px solid var(--color-accent-dim);
+  background: var(--color-accent-dim);
+}
+
+.product-card h3 {
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  font-weight: 500;
+  margin-bottom: var(--space-sm);
+  line-height: 1.3;
+}
+
+.product-card p {
+  color: var(--color-text-secondary);
+  font-size: 0.92rem;
+  line-height: 1.7;
+}
+
+.product-tags {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.product-tag {
+  font-family: var(--font-body);
+  font-size: 0.65rem;
+  font-weight: 400;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  padding: 0.25rem 0.6rem;
+  border: 1px solid var(--color-border);
+}
+
+/* --- Software Intro --- */
+.software-intro {
+  max-width: 720px;
+}
+
 /* --- Responsive --- */
 @media (max-width: 1024px) {
   .services-grid {
@@ -799,6 +930,10 @@ body::before {
   }
 
   .work-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .product-grid {
     grid-template-columns: 1fr;
   }
 }
