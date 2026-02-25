@@ -265,6 +265,9 @@ function renderJoinScreen(){
           </div>
         `:`<p>The commissioner hasn't added players yet. Check back soon!</p>`}
       </div>
+      <div style="margin-top:16px">
+        <button class="btn btn-secondary btn-sm" onclick="startLocal()">Leave Room</button>
+      </div>
     </div>`;
 }
 
@@ -304,6 +307,7 @@ function joinRoom(){
   const url = new URL(window.location);
   url.searchParams.set("room", code);
   window.history.replaceState({}, "", url);
+  checkAdminSession();
   connectToRoom(code);
   R();
 }
@@ -484,11 +488,11 @@ function scores(){
 }
 
 function R(){
-  sv();
   if(roomId && !adminUnlocked){
     const myId=getMyPlayerId();
     if(!myId || !S.players.some(p=>p.id===myId)){ renderJoinScreen(); return; }
   }
+  sv();
   const canD=S.players.length>=2&&S.teams.length>=S.players.length,canT=S.ds.complete;
   const app=document.getElementById("app");
   app.innerHTML=`
@@ -521,6 +525,7 @@ async function resetAll(){
     if(unsubRoom) unsubRoom();
   }
   localStorage.removeItem("mm4");
+  if(roomId) localStorage.removeItem('mm4_me_' + roomId);
   location.reload();
 }
 
