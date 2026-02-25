@@ -7,7 +7,7 @@
 <style>
 :root{--gold:#C5991A;--gold-bg:#faf6eb;--black:#1a1a1a;--white:#fff;--g50:#f9f9f9;--g100:#f0f0f0;--g200:#e0e0e0;--g300:#ccc;--g400:#999;--g500:#777;--g600:#555;--green:#2d8a4e;--red:#c0392b}
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--white);color:var(--black);line-height:1.5}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--white);color:var(--black);line-height:1.5;-webkit-text-size-adjust:100%}
 .container{max-width:1200px;margin:0 auto;padding:16px}
 .header{display:flex;justify-content:space-between;align-items:center;padding-bottom:16px;border-bottom:2px solid var(--g200);margin-bottom:16px;flex-wrap:wrap;gap:8px}
 .header h1{font-size:24px;font-weight:800}.header h1 span{color:var(--gold)}.header-sub{font-size:13px;color:var(--g500)}
@@ -61,10 +61,57 @@ td.pts{font-weight:800;color:var(--gold);text-align:center;font-size:15px}td.dim
 .section-title{font-size:22px;font-weight:800;margin-bottom:4px}.section-desc{color:var(--g500);font-size:14px;margin-bottom:20px}
 .hidden{display:none}
 .round-tab{padding:7px 14px;border-radius:6px;border:none;background:none;font-weight:700;font-size:12px;cursor:pointer;font-family:inherit;color:var(--g400)}.round-tab.active{background:var(--gold-bg);color:var(--gold)}.round-tab:hover{color:var(--gold)}
-@media(max-width:700px){.draft-grid{grid-template-columns:1fr}}
+@media(max-width:700px){
+  .draft-grid{grid-template-columns:1fr}
+  .container{padding:10px}
+  .header{padding-bottom:10px;margin-bottom:10px}
+  .header h1{font-size:18px}
+  .header-sub{font-size:12px}
+  nav{gap:0;margin-bottom:14px;flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  nav::-webkit-scrollbar{display:none}
+  nav button{padding:10px 12px;font-size:12px;flex-shrink:0}
+  .section-title{font-size:18px}
+  .section-desc{font-size:13px;margin-bottom:14px}
+  .card{padding:14px;margin-bottom:10px}
+  .btn{padding:10px 16px;font-size:14px;min-height:44px}
+  .btn-sm{padding:8px 14px;font-size:13px;min-height:40px}
+  input,select{padding:10px 12px;font-size:16px;min-height:44px}
+  .icon-btn{font-size:18px;padding:6px;min-width:36px;min-height:36px;display:inline-flex;align-items:center;justify-content:center}
+  .player-row{padding:10px 12px;gap:8px}
+  .pick-btn{padding:10px 12px;min-height:44px}
+  .grid-2{grid-template-columns:1fr}
+  .grid-3{grid-template-columns:repeat(3,1fr);gap:6px}
+  .podium-card{min-width:0;padding:12px}
+  .podium-pts{font-size:26px}
+  .lobby{margin:40px auto;padding:0 10px}
+  .lobby h1{font-size:26px}
+  .lobby-card{padding:18px}
+  .lobby-sub{font-size:14px;margin-bottom:20px}
+  .preset-btn{padding:8px 12px;font-size:12px;min-height:40px}
+  table{font-size:12px}
+  th,td{padding:6px 5px}
+  .tag{padding:4px 6px;font-size:11px}
+  .roster-card{padding:10px}
+  .room-badge{font-size:11px;padding:3px 8px}
+  .footer{font-size:11px}
+  .bracket .round{min-width:120px}
+  .bracket .slot{height:34px;padding:0 6px;font-size:12px}
+  .bracket .slot .sd{font-size:11px}
+  .bracket .slot .ow{font-size:10px}
+  .bracket .round-header{font-size:10px}
+  .ff-bracket{flex-direction:column;align-items:stretch;gap:16px}
+  .ff-side{min-width:0;width:100%}
+  .ff-slot{height:44px;padding:0 12px;font-size:14px}
+  .ff-conn{display:none}
+  .ff-center{padding:0;min-width:0;width:100%}
+  .ff-game{min-width:0!important}
+  .champ-box{padding:16px}
+  .champ-box .champ-team{font-size:16px}
+  .round-tab{padding:8px 12px;font-size:12px}
+}
 
 /* ── BRACKET STYLES ── */
-.bracket-wrap{overflow-x:auto;padding:10px 0}
+.bracket-wrap{overflow-x:auto;padding:10px 0;-webkit-overflow-scrolling:touch}
 .bracket{display:flex;align-items:stretch;min-height:520px}
 .bracket .round{display:flex;flex-direction:column;min-width:145px;position:relative}
 .bracket .round-header{text-align:center;font-size:11px;font-weight:700;color:var(--g400);text-transform:uppercase;letter-spacing:.5px;padding:0 0 8px;margin-bottom:4px;border-bottom:1px solid var(--g100)}
@@ -551,9 +598,9 @@ function rBracket(c){
   c.innerHTML=`
     <div class="section-title">Bracket</div>
     <p class="section-desc">Click a team to advance them to the next round.</p>
-    <div class="row" style="margin-bottom:16px;gap:4px">
-      ${REGIONS.map(r=>`<button class="round-tab ${reg===r?'active':''}" onclick="S.bracketRegion='${r}';R()">${r}</button>`).join('')}
-      <button class="round-tab ${reg==='ff'?'active':''}" onclick="S.bracketRegion='ff';R()">Final Four</button>
+    <div style="display:flex;gap:4px;margin-bottom:16px;overflow-x:auto;-webkit-overflow-scrolling:touch">
+      ${REGIONS.map(r=>`<button class="round-tab" style="${reg===r?'background:var(--gold-bg);color:var(--gold)':''};flex-shrink:0" onclick="S.bracketRegion='${r}';R()">${r}</button>`).join('')}
+      <button class="round-tab" style="${reg==='ff'?'background:var(--gold-bg);color:var(--gold)':''};flex-shrink:0" onclick="S.bracketRegion='ff';R()">Final Four</button>
     </div>
     <div id="bracket-area"></div>`;
 
