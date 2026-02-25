@@ -194,6 +194,28 @@ img {
   transform-origin: left;
 }
 
+/* ShopCaddie nav link branding */
+.nav-shopcaddie {
+  font-weight: 600 !important;
+  letter-spacing: 0.04em !important;
+}
+
+.nav-shopcaddie .sc-shop {
+  color: var(--color-text-primary);
+}
+
+.nav-shopcaddie .sc-caddie {
+  color: #2ecc71;
+}
+
+.nav-shopcaddie::after {
+  background: #2ecc71 !important;
+}
+
+.nav-shopcaddie:hover .sc-shop {
+  color: var(--color-white);
+}
+
 /* Mobile nav toggle */
 .nav-toggle {
   display: none;
