@@ -212,6 +212,28 @@ img {
   background: #2ecc71 !important;
 }
 
+/* GreenDoor nav link branding */
+.nav-greendoor {
+  font-weight: 600 !important;
+  letter-spacing: 0.04em !important;
+}
+
+.nav-greendoor .gd-green {
+  color: #22c55e;
+}
+
+.nav-greendoor .gd-door {
+  color: var(--color-text-primary);
+}
+
+.nav-greendoor::after {
+  background: #22c55e !important;
+}
+
+.nav-greendoor:hover .gd-door {
+  color: var(--color-white);
+}
+
 .nav-shopcaddie:hover .sc-shop {
   color: var(--color-white);
 }

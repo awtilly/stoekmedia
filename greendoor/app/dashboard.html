@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard — GreenDoor</title>
+  <link rel="stylesheet" href="/assets/css/style.css">
+  <link rel="stylesheet" href="/greendoor/css/greendoor.css">
+</head>
+<body>
+
+  <!-- Navigation -->
+  <nav class="nav scrolled">
+    <div class="container">
+      <a href="/" class="nav-logo">Stoek <span>Media</span></a>
+      <ul class="nav-links">
+        <li><a href="/greendoor/" class="nav-greendoor"><span class="gd-green">Green</span><span class="gd-door">Door</span></a></li>
+        <li class="nav-crm-divider"></li>
+        <li><a href="/greendoor/app/dashboard" class="gd-nav-active">Dashboard</a></li>
+        <li><a href="/greendoor/app/clients">Clients</a></li>
+        <li id="nav-admin-tab" style="display:none;"><a href="/greendoor/app/admin">Admin</a></li>
+        <li class="nav-crm-divider"></li>
+        <li><span id="nav-user-name" class="nav-user-name"></span></li>
+        <li><button class="nav-logout-btn" onclick="handleLogout()">Logout</button></li>
+      </ul>
+      <button class="nav-toggle" aria-label="Menu">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+    </div>
+  </nav>
+
+  <div class="gd-page">
+    <div class="gd-content">
+
+      <!-- Loading State -->
+      <div id="dashboard-loading" class="gd-loading">
+        <div class="gd-spinner gd-spinner-lg"></div>
+        <span class="gd-loading-text">Loading dashboard...</span>
+      </div>
+
+      <!-- Dashboard Content (hidden until loaded) -->
+      <div id="dashboard-content" class="gd-hidden">
+
+        <!-- Welcome -->
+        <div class="gd-welcome">
+          <h1>Welcome back, <em id="welcome-name"></em></h1>
+        </div>
+
+        <!-- Stat Cards -->
+        <div class="gd-stats-row">
+          <div class="gd-stat-card">
+            <div class="gd-stat-number" id="stat-total">0</div>
+            <div class="gd-stat-label">Total Clients</div>
+          </div>
+          <div class="gd-stat-card">
+            <div class="gd-stat-number" id="stat-buyers">0</div>
+            <div class="gd-stat-label">Active Buyers</div>
+          </div>
+          <div class="gd-stat-card">
+            <div class="gd-stat-number" id="stat-sellers">0</div>
+            <div class="gd-stat-label">Active Sellers</div>
+          </div>
+          <div class="gd-stat-card">
+            <div class="gd-stat-number" id="stat-contracts">0</div>
+            <div class="gd-stat-label">Under Contract</div>
+          </div>
+        </div>
+
+        <!-- Two Column: Activity + Showings -->
+        <div class="gd-two-col">
+
+          <!-- Recent Activity -->
+          <div class="gd-card">
+            <h3>Recent Activity</h3>
+            <div id="activity-feed" class="gd-activity-feed">
+              <div class="gd-empty">
+                <div class="gd-empty-icon">&#128203;</div>
+                <div class="gd-empty-text">No recent activity</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Upcoming Showings -->
+          <div class="gd-card">
+            <h3>Upcoming Showings</h3>
+            <div id="showings-list" class="gd-showings-list">
+              <div class="gd-empty">
+                <div class="gd-empty-icon">&#127968;</div>
+                <div class="gd-empty-text">No upcoming showings</div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="gd-quick-actions">
+          <a href="/greendoor/app/clients" class="gd-btn gd-btn-primary">+ Add New Client</a>
+          <a href="/greendoor/app/clients" class="gd-btn">View All Clients</a>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script src="/assets/js/main.js"></script>
+  <script type="module" src="/greendoor/js/auth.js"></script>
+  <script type="module" src="/greendoor/js/dashboard.js"></script>
+</body>
+</html>

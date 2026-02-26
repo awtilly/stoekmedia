@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Log In — GreenDoor</title>
+  <link rel="stylesheet" href="/assets/css/style.css">
+  <link rel="stylesheet" href="/greendoor/css/greendoor.css">
+</head>
+<body>
+  <div class="gd-login-page">
+    <div class="gd-login-card">
+      <div class="gd-login-logo"><span class="gd-green">Green</span><span class="gd-door">Door</span></div>
+      <p class="gd-login-subtitle">Agent Portal</p>
+
+      <div class="gd-form-group">
+        <label for="login-email">Email</label>
+        <input type="email" id="login-email" class="gd-input" placeholder="you@example.com" autocomplete="email">
+      </div>
+      <div class="gd-form-group">
+        <label for="login-password">Password</label>
+        <input type="password" id="login-password" class="gd-input" placeholder="Your password" autocomplete="current-password"
+               onkeydown="if(event.key==='Enter') handleLogin()">
+      </div>
+
+      <button id="login-btn" class="gd-btn gd-btn-primary gd-btn-full" onclick="handleLogin()">Log In</button>
+
+      <p id="login-error" class="gd-login-error"></p>
+
+      <div class="gd-login-links">
+        <a href="#" onclick="handleForgotPassword(); return false;">Forgot password?</a>
+        <a href="/greendoor/">Back to GreenDoor</a>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/greendoor/js/auth.js"></script>
+</body>
+</html>

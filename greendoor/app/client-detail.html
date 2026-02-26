@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Client — GreenDoor</title>
+  <link rel="stylesheet" href="/assets/css/style.css">
+  <link rel="stylesheet" href="/greendoor/css/greendoor.css">
+</head>
+<body>
+
+  <!-- Navigation -->
+  <nav class="nav scrolled">
+    <div class="container">
+      <a href="/" class="nav-logo">Stoek <span>Media</span></a>
+      <ul class="nav-links">
+        <li><a href="/greendoor/" class="nav-greendoor"><span class="gd-green">Green</span><span class="gd-door">Door</span></a></li>
+        <li class="nav-crm-divider"></li>
+        <li><a href="/greendoor/app/dashboard">Dashboard</a></li>
+        <li><a href="/greendoor/app/clients" class="gd-nav-active">Clients</a></li>
+        <li id="nav-admin-tab" style="display:none;"><a href="/greendoor/app/admin">Admin</a></li>
+        <li class="nav-crm-divider"></li>
+        <li><span id="nav-user-name" class="nav-user-name"></span></li>
+        <li><button class="nav-logout-btn" onclick="handleLogout()">Logout</button></li>
+      </ul>
+      <button class="nav-toggle" aria-label="Menu">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+    </div>
+  </nav>
+
+  <div class="gd-page">
+    <div class="gd-content">
+
+      <!-- Loading -->
+      <div id="detail-loading" class="gd-loading">
+        <div class="gd-spinner gd-spinner-lg"></div>
+        <span class="gd-loading-text">Loading client...</span>
+      </div>
+
+      <!-- Client Content -->
+      <div id="detail-content" class="gd-hidden">
+
+        <!-- Header -->
+        <div class="gd-client-header">
+          <div>
+            <h1 id="client-name"></h1>
+            <span id="client-badge" class="gd-badge"></span>
+            <div class="gd-client-quick-stats">
+              <div class="gd-client-quick-stat">
+                <div class="num" id="qs-activities">0</div>
+                <div class="lbl">Activities</div>
+              </div>
+              <div class="gd-client-quick-stat">
+                <div class="num" id="qs-files">0</div>
+                <div class="lbl">Files</div>
+              </div>
+              <div class="gd-client-quick-stat">
+                <div class="num" id="qs-days">0</div>
+                <div class="lbl">Days Since Contact</div>
+              </div>
+            </div>
+          </div>
+          <a href="/greendoor/app/clients" class="gd-btn gd-btn-sm">&larr; Back to Clients</a>
+        </div>
+
+        <!-- Tabs -->
+        <div class="gd-tabs">
+          <button class="gd-tab active" data-tab="overview">Overview</button>
+          <button class="gd-tab" data-tab="activity">Activity</button>
+          <button class="gd-tab" data-tab="files">Files</button>
+          <button class="gd-tab" data-tab="properties">Properties</button>
+        </div>
+
+        <!-- ===== OVERVIEW TAB ===== -->
+        <div id="tab-overview" class="gd-tab-content active">
+          <form id="overview-form">
+
+            <div class="gd-form-section">
+              <div class="gd-form-section-title">Contact</div>
+              <div class="gd-form-row">
+                <div class="gd-form-group">
+                  <label>Full Name</label>
+                  <input type="text" id="ov-fullName" class="gd-input">
+                </div>
+                <div class="gd-form-group">
+                  <label>Email</label>
+                  <input type="email" id="ov-email" class="gd-input">
+                </div>
+              </div>
+              <div class="gd-form-group">
+                <label>Phone</label>
+                <input type="tel" id="ov-phone" class="gd-input">
+              </div>
+            </div>
+
+            <div class="gd-form-section">
+              <div class="gd-form-section-title">Status &amp; Source</div>
+              <div class="gd-form-row">
+                <div class="gd-form-group">
+                  <label>Status</label>
+                  <select id="ov-status" class="gd-input">
+                    <option value="lead">Lead</option>
+                    <option value="active_buyer">Active Buyer</option>
+                    <option value="active_seller">Active Seller</option>
+                    <option value="under_contract">Under Contract</option>
+                    <option value="closed">Closed</option>
+                    <option value="inactive">Inactive</option>
+                  </select>
+                </div>
+                <div class="gd-form-group">
+                  <label>Source</label>
+                  <select id="ov-source" class="gd-input">
+                    <option value="">Select...</option>
+                    <option value="Referral">Referral</option>
+                    <option value="Online Ad">Online Ad</option>
+                    <option value="Open House">Open House</option>
+                    <option value="Website">Website</option>
+                    <option value="Social Media">Social Media</option>
+                    <option value="Cold Call">Cold Call</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+              </div>
+              <div class="gd-form-group">
+                <label>Timeline</label>
+                <select id="ov-timeline" class="gd-input">
+                  <option value="">Select...</option>
+                  <option value="Immediate">Immediate</option>
+                  <option value="1-3 Months">1-3 Months</option>
+                  <option value="3-6 Months">3-6 Months</option>
+                  <option value="6-12 Months">6-12 Months</option>
+                  <option value="Just Browsing">Just Browsing</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="gd-form-section">
+              <div class="gd-form-section-title">Budget</div>
+              <div class="gd-form-row">
+                <div class="gd-form-group">
+                  <label>Budget Min ($)</label>
+                  <input type="number" id="ov-budgetMin" class="gd-input">
+                </div>
+                <div class="gd-form-group">
+                  <label>Budget Max ($)</label>
+                  <input type="number" id="ov-budgetMax" class="gd-input">
+                </div>
+              </div>
+            </div>
+
+            <div class="gd-form-section">
+              <div class="gd-form-section-title">Preferences</div>
+              <div class="gd-form-group">
+                <label>Preferred Locations (comma-separated)</label>
+                <input type="text" id="ov-preferredLocations" class="gd-input" placeholder="Downtown, Suburbs, East Side">
+              </div>
+              <div class="gd-form-group">
+                <label>Property Types</label>
+                <div class="gd-checkbox-group" id="ov-propertyTypes">
+                  <label class="gd-checkbox-label"><input type="checkbox" value="Single Family"> Single Family</label>
+                  <label class="gd-checkbox-label"><input type="checkbox" value="Condo"> Condo</label>
+                  <label class="gd-checkbox-label"><input type="checkbox" value="Townhouse"> Townhouse</label>
+                  <label class="gd-checkbox-label"><input type="checkbox" value="Multi-Family"> Multi-Family</label>
+                  <label class="gd-checkbox-label"><input type="checkbox" value="Land"> Land</label>
+                </div>
+              </div>
+              <div class="gd-form-row">
+                <div class="gd-form-group"><label>Beds Min</label><input type="number" id="ov-bedsMin" class="gd-input"></div>
+                <div class="gd-form-group"><label>Beds Max</label><input type="number" id="ov-bedsMax" class="gd-input"></div>
+              </div>
+              <div class="gd-form-row">
+                <div class="gd-form-group"><label>Baths Min</label><input type="number" id="ov-bathsMin" class="gd-input"></div>
+                <div class="gd-form-group"><label>Baths Max</label><input type="number" id="ov-bathsMax" class="gd-input"></div>
+              </div>
+              <div class="gd-form-row">
+                <div class="gd-form-group"><label>Sq Ft Min</label><input type="number" id="ov-sqftMin" class="gd-input"></div>
+                <div class="gd-form-group"><label>Sq Ft Max</label><input type="number" id="ov-sqftMax" class="gd-input"></div>
+              </div>
+              <div class="gd-form-group">
+                <label>Must-Have Features (comma-separated)</label>
+                <input type="text" id="ov-mustHaveFeatures" class="gd-input" placeholder="Pool, Garage, Open Floor Plan">
+              </div>
+            </div>
+
+            <div class="gd-form-section">
+              <div class="gd-form-section-title">Pre-Approval</div>
+              <div class="gd-form-row">
+                <div class="gd-form-group">
+                  <label>Pre-Approval Status</label>
+                  <select id="ov-preApprovalStatus" class="gd-input">
+                    <option value="">Select...</option>
+                    <option value="Not Started">Not Started</option>
+                    <option value="In Progress">In Progress</option>
+                    <option value="Approved">Approved</option>
+                    <option value="N/A">N/A</option>
+                  </select>
+                </div>
+                <div class="gd-form-group">
+                  <label>Pre-Approval Amount ($)</label>
+                  <input type="number" id="ov-preApprovalAmount" class="gd-input">
+                </div>
+              </div>
+            </div>
+
+            <div class="gd-form-section">
+              <div class="gd-form-section-title">Notes</div>
+              <div class="gd-form-group">
+                <textarea id="ov-notes" class="gd-input" rows="5" placeholder="Free-form notes..."></textarea>
+              </div>
+            </div>
+
+            <div style="display: flex; gap: var(--space-sm); justify-content: space-between; align-items: center; flex-wrap: wrap;">
+              <button type="button" class="gd-btn gd-btn-primary" onclick="saveOverview()">Save Changes</button>
+              <button type="button" class="gd-btn gd-btn-danger" onclick="deleteClient()">Delete Client</button>
+            </div>
+          </form>
+        </div>
+
+        <!-- ===== ACTIVITY TAB ===== -->
+        <div id="tab-activity" class="gd-tab-content">
+          <div class="gd-activity-actions">
+            <button class="gd-btn gd-btn-sm" onclick="openActivityModal('note')">+ Add Note</button>
+            <button class="gd-btn gd-btn-sm" onclick="openActivityModal('call')">+ Log Call</button>
+            <button class="gd-btn gd-btn-sm" onclick="openActivityModal('email')">Send Email</button>
+          </div>
+          <div id="activity-timeline" class="gd-timeline">
+            <div class="gd-empty">
+              <div class="gd-empty-icon">&#128221;</div>
+              <div class="gd-empty-text">No activities yet</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ===== FILES TAB ===== -->
+        <div id="tab-files" class="gd-tab-content">
+          <div class="gd-folder-filters" id="folder-filters">
+            <button class="gd-folder-btn active" data-folder="all">All</button>
+            <button class="gd-folder-btn" data-folder="contracts">Contracts</button>
+            <button class="gd-folder-btn" data-folder="disclosures">Disclosures</button>
+            <button class="gd-folder-btn" data-folder="inspections">Inspections</button>
+            <button class="gd-folder-btn" data-folder="financial">Financial</button>
+            <button class="gd-folder-btn" data-folder="photos">Photos</button>
+            <button class="gd-folder-btn" data-folder="other">Other</button>
+          </div>
+
+          <div class="gd-file-controls">
+            <select id="upload-folder" class="gd-input" style="min-width: 140px; max-width: 180px;">
+              <option value="contracts">Contracts</option>
+              <option value="disclosures">Disclosures</option>
+              <option value="inspections">Inspections</option>
+              <option value="financial">Financial</option>
+              <option value="photos">Photos</option>
+              <option value="other">Other</option>
+            </select>
+            <div class="gd-file-input-wrapper">
+              <button class="gd-btn gd-btn-sm">Choose File</button>
+              <input type="file" id="file-input" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.xlsx,.csv">
+            </div>
+            <span id="file-name-display" class="gd-text-muted"></span>
+            <button class="gd-btn gd-btn-primary gd-btn-sm" onclick="uploadFile()">Upload</button>
+          </div>
+
+          <div id="upload-progress" class="gd-progress-bar">
+            <div id="upload-progress-fill" class="gd-progress-fill"></div>
+          </div>
+
+          <div id="files-list">
+            <div class="gd-empty">
+              <div class="gd-empty-icon">&#128193;</div>
+              <div class="gd-empty-text">No files uploaded yet</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ===== PROPERTIES TAB ===== -->
+        <div id="tab-properties" class="gd-tab-content">
+          <div class="gd-section-header">
+            <div></div>
+            <button class="gd-btn gd-btn-primary gd-btn-sm" onclick="openPropertyModal()">+ Add Property</button>
+          </div>
+          <div id="properties-grid" class="gd-property-grid">
+            <div class="gd-empty" style="grid-column: 1/-1;">
+              <div class="gd-empty-icon">&#127968;</div>
+              <div class="gd-empty-text">No properties bookmarked yet</div>
+            </div>
+          </div>
+          <div id="compare-bar" class="gd-compare-bar">
+            <span id="compare-count">0 selected</span>
+            <button class="gd-btn gd-btn-primary gd-btn-sm" onclick="showComparison()">Compare Selected</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Activity Modal -->
+  <div id="activity-modal" class="gd-modal-overlay">
+    <div class="gd-modal">
+      <div class="gd-modal-header">
+        <h3 id="activity-modal-title">Add Note</h3>
+        <button class="gd-modal-close" onclick="closeActivityModal()">&times;</button>
+      </div>
+      <div class="gd-modal-body">
+        <div id="activity-email-to" class="gd-form-group gd-hidden">
+          <label>To</label>
+          <input type="text" id="act-to" class="gd-input" readonly>
+        </div>
+        <div class="gd-form-group">
+          <label>Subject</label>
+          <input type="text" id="act-subject" class="gd-input">
+        </div>
+        <div id="activity-duration-group" class="gd-form-group gd-hidden">
+          <label>Duration</label>
+          <input type="text" id="act-duration" class="gd-input" placeholder="15 min">
+        </div>
+        <div class="gd-form-group">
+          <label id="act-body-label">Body</label>
+          <textarea id="act-body" class="gd-input" rows="4"></textarea>
+        </div>
+        <p id="email-note" class="gd-text-muted gd-hidden">Email logging only — sending integration coming soon.</p>
+      </div>
+      <div class="gd-modal-footer">
+        <button class="gd-btn" onclick="closeActivityModal()">Cancel</button>
+        <button class="gd-btn gd-btn-primary" onclick="saveActivity()">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Property Modal -->
+  <div id="property-modal" class="gd-modal-overlay">
+    <div class="gd-modal" style="max-width: 620px;">
+      <div class="gd-modal-header">
+        <h3 id="property-modal-title">Add Property</h3>
+        <button class="gd-modal-close" onclick="closePropertyModal()">&times;</button>
+      </div>
+      <div class="gd-modal-body">
+        <div class="gd-form-group">
+          <label>Address *</label>
+          <input type="text" id="prop-address" class="gd-input">
+        </div>
+        <div class="gd-form-row">
+          <div class="gd-form-group">
+            <label>MLS Number</label>
+            <input type="text" id="prop-mlsNumber" class="gd-input">
+          </div>
+          <div class="gd-form-group">
+            <label>Listing Price</label>
+            <input type="number" id="prop-listingPrice" class="gd-input">
+          </div>
+        </div>
+        <div class="gd-form-row">
+          <div class="gd-form-group">
+            <label>Status</label>
+            <select id="prop-status" class="gd-input">
+              <option value="interested">Interested</option>
+              <option value="shown">Shown</option>
+              <option value="offer_made">Offer Made</option>
+              <option value="rejected">Rejected</option>
+              <option value="under_contract">Under Contract</option>
+              <option value="closed">Closed</option>
+            </select>
+          </div>
+          <div class="gd-form-group">
+            <label>Showing Date</label>
+            <input type="datetime-local" id="prop-showingDate" class="gd-input">
+          </div>
+        </div>
+        <div class="gd-form-group">
+          <label>Client Rating</label>
+          <div id="prop-stars" class="gd-stars">
+            <span class="gd-star clickable" data-rating="1">&#9733;</span>
+            <span class="gd-star clickable" data-rating="2">&#9733;</span>
+            <span class="gd-star clickable" data-rating="3">&#9733;</span>
+            <span class="gd-star clickable" data-rating="4">&#9733;</span>
+            <span class="gd-star clickable" data-rating="5">&#9733;</span>
+          </div>
+        </div>
+        <div class="gd-form-group">
+          <label>Client Feedback</label>
+          <textarea id="prop-clientFeedback" class="gd-input" rows="2"></textarea>
+        </div>
+        <div class="gd-form-group">
+          <label>Realtor Notes</label>
+          <textarea id="prop-realtorNotes" class="gd-input" rows="2"></textarea>
+        </div>
+        <div class="gd-form-group">
+          <label>Listing URL</label>
+          <input type="url" id="prop-listingUrl" class="gd-input" placeholder="https://...">
+        </div>
+      </div>
+      <div class="gd-modal-footer">
+        <button class="gd-btn" onclick="closePropertyModal()">Cancel</button>
+        <button class="gd-btn gd-btn-primary" onclick="saveProperty()">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Compare Modal -->
+  <div id="compare-modal" class="gd-modal-overlay">
+    <div class="gd-modal" style="max-width: 900px;">
+      <div class="gd-modal-header">
+        <h3>Property Comparison</h3>
+        <button class="gd-modal-close" onclick="closeCompareModal()">&times;</button>
+      </div>
+      <div class="gd-modal-body" style="overflow-x: auto;">
+        <table class="gd-compare-table" id="compare-table"></table>
+      </div>
+    </div>
+  </div>
+
+  <script src="/assets/js/main.js"></script>
+  <script type="module" src="/greendoor/js/auth.js"></script>
+  <script type="module" src="/greendoor/js/client-detail.js"></script>
+</body>
+</html>
