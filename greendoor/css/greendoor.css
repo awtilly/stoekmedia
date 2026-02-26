@@ -22,6 +22,30 @@
   --gd-light-gray: #d1d5db;
 }
 
+/* --- CRM Nav Logo --- */
+.gd-nav-logo {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+}
+
+.gd-nav-logo .gd-green {
+  color: #22c55e;
+}
+
+.gd-nav-logo .gd-door {
+  color: var(--color-text-primary);
+}
+
+.gd-by-line {
+  font-size: 0.5rem;
+  font-weight: 400;
+  letter-spacing: 0.12em;
+  text-transform: lowercase;
+  color: var(--color-text-muted);
+  margin-top: 1px;
+}
+
 /* --- CRM Layout --- */
 .gd-page {
   padding-top: var(--nav-height);
