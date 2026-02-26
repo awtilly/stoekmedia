@@ -19,6 +19,7 @@
         <li><a href="/greendoor/app/dashboard">Dashboard</a></li>
         <li><a href="/greendoor/app/clients" class="gd-nav-active">Clients</a></li>
         <li id="nav-admin-tab" style="display:none;"><a href="/greendoor/app/admin">Admin</a></li>
+        <li><a href="/greendoor/app/settings">Settings</a></li>
         <li class="nav-crm-divider"></li>
         <li><span id="nav-user-name" class="nav-user-name"></span></li>
         <li><button class="nav-logout-btn" onclick="handleLogout()">Logout</button></li>
@@ -224,7 +225,7 @@
           <div class="gd-activity-actions">
             <button class="gd-btn gd-btn-sm" onclick="openActivityModal('note')">+ Add Note</button>
             <button class="gd-btn gd-btn-sm" onclick="openActivityModal('call')">+ Log Call</button>
-            <button class="gd-btn gd-btn-sm" onclick="openActivityModal('email')">Send Email</button>
+            <button class="gd-btn gd-btn-sm gd-btn-email" onclick="openActivityModal('email')">&#9993; Send Email</button>
           </div>
           <div id="activity-timeline" class="gd-timeline">
             <div class="gd-empty">
@@ -261,6 +262,7 @@
             </div>
             <span id="file-name-display" class="gd-text-muted"></span>
             <button class="gd-btn gd-btn-primary gd-btn-sm" onclick="uploadFile()">Upload</button>
+            <button class="gd-btn gd-btn-signature gd-btn-sm" onclick="openSignatureModal()">&#9997; Send for Signature</button>
           </div>
 
           <div id="upload-progress" class="gd-progress-bar">
@@ -272,6 +274,12 @@
               <div class="gd-empty-icon">&#128193;</div>
               <div class="gd-empty-text">No files uploaded yet</div>
             </div>
+          </div>
+
+          <!-- Pending Signatures -->
+          <div id="pending-signatures" class="gd-pending-signatures gd-hidden">
+            <h4 class="gd-pending-title">&#9997; Documents Pending Signature</h4>
+            <div id="pending-signatures-list"></div>
           </div>
         </div>
 
@@ -309,6 +317,12 @@
           <label>To</label>
           <input type="text" id="act-to" class="gd-input" readonly>
         </div>
+        <div id="activity-template-group" class="gd-form-group gd-hidden">
+          <label>Use Template</label>
+          <select id="act-template" class="gd-input" onchange="applyTemplate()">
+            <option value="">— No template —</option>
+          </select>
+        </div>
         <div class="gd-form-group">
           <label>Subject</label>
           <input type="text" id="act-subject" class="gd-input">
@@ -319,13 +333,15 @@
         </div>
         <div class="gd-form-group">
           <label id="act-body-label">Body</label>
-          <textarea id="act-body" class="gd-input" rows="4"></textarea>
+          <textarea id="act-body" class="gd-input" rows="6"></textarea>
         </div>
-        <p id="email-note" class="gd-text-muted gd-hidden">Email logging only — sending integration coming soon.</p>
+        <div id="email-save-template" class="gd-hidden">
+          <a href="#" class="gd-link-secondary" onclick="event.preventDefault(); saveAsTemplate();">Save as Template</a>
+        </div>
       </div>
       <div class="gd-modal-footer">
         <button class="gd-btn" onclick="closeActivityModal()">Cancel</button>
-        <button class="gd-btn gd-btn-primary" onclick="saveActivity()">Save</button>
+        <button id="act-save-btn" class="gd-btn gd-btn-primary" onclick="saveActivity()">Save</button>
       </div>
     </div>
   </div>
@@ -408,6 +424,57 @@
       </div>
       <div class="gd-modal-body" style="overflow-x: auto;">
         <table class="gd-compare-table" id="compare-table"></table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Signature Modal -->
+  <div id="signature-modal" class="gd-modal-overlay">
+    <div class="gd-modal" style="max-width: 540px;">
+      <div class="gd-modal-header">
+        <h3>&#9997; Send for Signature</h3>
+        <button class="gd-modal-close" onclick="closeSignatureModal()">&times;</button>
+      </div>
+      <div class="gd-modal-body">
+        <div class="gd-form-group">
+          <label>Document Source</label>
+          <div class="gd-sig-toggle">
+            <button class="gd-sig-toggle-btn active" data-mode="existing" onclick="setSigMode('existing')">Select Existing File</button>
+            <button class="gd-sig-toggle-btn" data-mode="upload" onclick="setSigMode('upload')">Upload New Document</button>
+          </div>
+        </div>
+        <div id="sig-existing-group" class="gd-form-group">
+          <label>Select File</label>
+          <select id="sig-file-select" class="gd-input">
+            <option value="">— Choose a file —</option>
+          </select>
+        </div>
+        <div id="sig-upload-group" class="gd-form-group gd-hidden">
+          <label>Upload Document</label>
+          <div class="gd-file-input-wrapper">
+            <button class="gd-btn gd-btn-sm">Choose File</button>
+            <input type="file" id="sig-file-input" accept=".pdf,.doc,.docx">
+          </div>
+          <span id="sig-file-name" class="gd-text-muted"></span>
+        </div>
+        <div class="gd-form-row">
+          <div class="gd-form-group">
+            <label>Signer Name</label>
+            <input type="text" id="sig-signer-name" class="gd-input">
+          </div>
+          <div class="gd-form-group">
+            <label>Signer Email</label>
+            <input type="email" id="sig-signer-email" class="gd-input">
+          </div>
+        </div>
+        <div id="sig-progress" class="gd-hidden">
+          <div class="gd-spinner"></div>
+          <span class="gd-text-muted" id="sig-progress-text">Sending to BoldSign...</span>
+        </div>
+      </div>
+      <div class="gd-modal-footer">
+        <button class="gd-btn" onclick="closeSignatureModal()">Cancel</button>
+        <button id="sig-send-btn" class="gd-btn gd-btn-signature" onclick="submitSignature()">&#9997; Send for Signature</button>
       </div>
     </div>
   </div>

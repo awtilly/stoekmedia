@@ -2371,6 +2371,207 @@ textarea.gd-input {
   margin-bottom: 0.15rem;
 }
 
+/* ================================================================
+   SEND FOR SIGNATURE BUTTON
+   ================================================================ */
+
+.gd-btn-signature {
+  background-color: #22c55e;
+  color: #ffffff;
+  border-color: #22c55e;
+}
+
+.gd-btn-signature:hover {
+  background-color: #16a34a;
+  border-color: #16a34a;
+}
+
+.gd-btn-email {
+  background-color: #3b82f6;
+  color: #ffffff;
+  border-color: #3b82f6;
+}
+
+.gd-btn-email:hover {
+  background-color: #2563eb;
+  border-color: #2563eb;
+}
+
+/* --- Signature Modal Toggle --- */
+.gd-sig-toggle {
+  display: flex;
+  gap: 0;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.gd-sig-toggle-btn {
+  flex: 1;
+  padding: 0.45rem 0.75rem;
+  border: none;
+  background: #f9fafb;
+  cursor: pointer;
+  font-size: 0.82rem;
+  color: #6b7280;
+  transition: background 0.2s, color 0.2s;
+}
+
+.gd-sig-toggle-btn.active {
+  background: #22c55e;
+  color: #ffffff;
+}
+
+.gd-sig-toggle-btn:not(:last-child) {
+  border-right: 1px solid #d1d5db;
+}
+
+/* --- Signature Progress --- */
+#sig-progress {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) 0;
+}
+
+/* ================================================================
+   PENDING SIGNATURES SECTION
+   ================================================================ */
+
+.gd-pending-signatures {
+  margin-top: var(--space-lg);
+  border-left: 3px solid #f59e0b;
+  padding-left: var(--space-md);
+}
+
+.gd-pending-title {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: var(--space-sm);
+}
+
+.gd-envelope-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 0.6rem 0;
+  border-bottom: 1px solid #f3f4f6;
+  flex-wrap: wrap;
+}
+
+.gd-envelope-name {
+  font-weight: 500;
+  color: #1f2937;
+  flex: 1;
+  min-width: 120px;
+}
+
+.gd-envelope-signer {
+  color: #6b7280;
+  font-size: 0.85rem;
+}
+
+.gd-badge-esig {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 12px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #ffffff;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+/* ================================================================
+   SIGNED BADGE ON FILES
+   ================================================================ */
+
+.gd-badge-signed {
+  display: inline-block;
+  background: #dcfce7;
+  color: #16a34a;
+  padding: 0.1rem 0.4rem;
+  border-radius: 10px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  margin-left: 0.3rem;
+  vertical-align: middle;
+}
+
+/* ================================================================
+   EMAIL TEMPLATE & SAVE-AS-TEMPLATE
+   ================================================================ */
+
+.gd-link-secondary {
+  color: #6b7280;
+  font-size: 0.82rem;
+  text-decoration: underline;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.gd-link-secondary:hover {
+  color: #22c55e;
+}
+
+/* --- AI Draft → Email Button --- */
+.gd-btn-ai-email {
+  margin-top: 0.5rem;
+  background: #3b82f6;
+  color: #fff;
+  border-color: #3b82f6;
+}
+
+.gd-btn-ai-email:hover {
+  background: #2563eb;
+}
+
+/* ================================================================
+   SETTINGS PAGE
+   ================================================================ */
+
+.gd-settings-card {
+  margin-bottom: var(--space-md);
+}
+
+.gd-settings-card h3 {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: var(--space-md);
+  padding-bottom: var(--space-xs);
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.gd-signature-textarea {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.gd-settings-status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  color: #1f2937;
+}
+
+.gd-settings-status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #9ca3af;
+  flex-shrink: 0;
+}
+
+.gd-settings-status-dot.gd-connected {
+  background: #22c55e;
+}
+
 /* --- Mobile Responsive --- */
 @media (max-width: 768px) {
   .gd-ai-panel {
@@ -2385,5 +2586,24 @@ textarea.gd-input {
     left: var(--space-md) !important;
     right: var(--space-md) !important;
     width: auto;
+  }
+
+  .gd-envelope-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25rem;
+  }
+
+  .gd-file-controls {
+    flex-wrap: wrap;
+  }
+
+  .gd-sig-toggle {
+    flex-direction: column;
+  }
+
+  .gd-sig-toggle-btn:not(:last-child) {
+    border-right: none;
+    border-bottom: 1px solid #d1d5db;
   }
 }

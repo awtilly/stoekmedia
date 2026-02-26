@@ -22,15 +22,25 @@ let selectedRating = 0;
 let allProperties = [];
 let allFiles = [];
 let selectedCompare = new Set();
+let emailTemplates = [];
+let realtorProfile = null;
 
 if (!clientId) {
   window.location.href = "/greendoor/app/clients";
 }
 
+/* --- Cloud Functions --- */
+const askAssistant = httpsCallable(functions, "askAssistant");
+const sendEmailFn = httpsCallable(functions, "sendEmail");
+const sendForSignatureFn = httpsCallable(functions, "sendForSignature");
+const checkSignatureStatusFn = httpsCallable(functions, "checkSignatureStatus");
+
 /* --- Auth gate --- */
 onAuthStateChanged(auth, async (user) => {
   if (!user) return;
+  realtorProfile = await getCurrentUser();
   await loadClient(user.uid);
+  loadEmailTemplates(user.uid);
 });
 
 /* --- Load client --- */
@@ -64,7 +74,7 @@ async function loadClient(uid) {
     }
 
     populateOverview(clientData);
-    await Promise.all([loadActivities(uid), loadFiles(uid), loadProperties(uid)]);
+    await Promise.all([loadActivities(uid), loadFiles(uid), loadProperties(uid), loadEnvelopes(uid)]);
 
     document.getElementById("detail-loading").classList.add("gd-hidden");
     document.getElementById("detail-content").classList.remove("gd-hidden");
@@ -141,6 +151,7 @@ window.saveOverview = async function () {
 
   try {
     await updateDoc(doc(db, "clients", clientId), data);
+    clientData = { ...clientData, ...data };
     document.getElementById("client-name").textContent = data.fullName;
     const badge = document.getElementById("client-badge");
     badge.textContent = statusLabel(data.status);
@@ -224,21 +235,27 @@ async function loadActivities(uid) {
 
 window.openActivityModal = function (type) {
   currentActivityType = type;
-  const titles = { note: "Add Note", call: "Log Call", email: "Log Email" };
+  const titles = { note: "Add Note", call: "Log Call", email: "Send Email" };
   document.getElementById("activity-modal-title").textContent = titles[type] || "Add Activity";
   document.getElementById("act-subject").value = "";
   document.getElementById("act-body").value = "";
   document.getElementById("act-duration").value = "";
 
   document.getElementById("activity-email-to").classList.toggle("gd-hidden", type !== "email");
+  document.getElementById("activity-template-group").classList.toggle("gd-hidden", type !== "email");
   document.getElementById("activity-duration-group").classList.toggle("gd-hidden", type !== "call");
-  document.getElementById("email-note").classList.toggle("gd-hidden", type !== "email");
+  document.getElementById("email-save-template").classList.toggle("gd-hidden", type !== "email");
+
+  const saveBtn = document.getElementById("act-save-btn");
+  saveBtn.textContent = type === "email" ? "Send Email" : "Save";
+  saveBtn.disabled = false;
 
   if (type === "email" && clientData) {
     document.getElementById("act-to").value = clientData.email || "";
   }
 
   document.getElementById("act-body-label").textContent = type === "call" ? "Summary" : "Body";
+  document.getElementById("act-template").value = "";
   document.getElementById("activity-modal").classList.add("active");
 };
 
@@ -253,6 +270,40 @@ window.saveActivity = async function () {
   const subject = document.getElementById("act-subject").value.trim();
   if (!subject) { showToast("Subject is required.", "error"); return; }
 
+  // If email type, send via SendGrid
+  if (currentActivityType === "email") {
+    const to = document.getElementById("act-to").value.trim();
+    if (!to) { showToast("Recipient email is required.", "error"); return; }
+
+    const body = document.getElementById("act-body").value.trim();
+    const saveBtn = document.getElementById("act-save-btn");
+    saveBtn.disabled = true;
+    saveBtn.textContent = "Sending...";
+
+    try {
+      await sendEmailFn({
+        to,
+        toName: clientData.fullName || "",
+        subject,
+        body: body.replace(/\n/g, "<br>"),
+        clientId
+      });
+      showToast("Email sent successfully!");
+      closeActivityModal();
+      await loadActivities(user.uid);
+      const c = await getCountFromServer(query(collection(db, "activities"), where("clientId", "==", clientId), where("realtorId", "==", user.uid)));
+      document.getElementById("qs-activities").textContent = c.data().count;
+      document.getElementById("qs-days").textContent = "0";
+    } catch (err) {
+      console.error("Send email error:", err);
+      showToast(err.message || "Failed to send email.", "error");
+      saveBtn.disabled = false;
+      saveBtn.textContent = "Send Email";
+    }
+    return;
+  }
+
+  // Non-email activity: save locally
   let body = document.getElementById("act-body").value.trim();
   if (currentActivityType === "call") {
     const dur = document.getElementById("act-duration").value.trim();
@@ -278,6 +329,77 @@ window.saveActivity = async function () {
   } catch (e) {
     console.error("Save activity error:", e);
     showToast("Failed to save activity.", "error");
+  }
+};
+
+/* ===== EMAIL TEMPLATES ===== */
+async function loadEmailTemplates(uid) {
+  try {
+    const systemQ = query(collection(db, "emailTemplates"), where("createdBy", "==", "system"));
+    const userQ = query(collection(db, "emailTemplates"), where("createdBy", "==", uid));
+    const [systemSnap, userSnap] = await Promise.all([getDocs(systemQ), getDocs(userQ)]);
+
+    emailTemplates = [];
+    systemSnap.forEach(d => emailTemplates.push({ id: d.id, ...d.data() }));
+    userSnap.forEach(d => emailTemplates.push({ id: d.id, ...d.data() }));
+
+    const select = document.getElementById("act-template");
+    select.innerHTML = '<option value="">— No template —</option>';
+    emailTemplates.forEach((t, i) => {
+      const label = t.createdBy === "system" ? t.name : t.name + " (Custom)";
+      select.innerHTML += `<option value="${i}">${label}</option>`;
+    });
+  } catch (e) {
+    console.error("Load templates error:", e);
+  }
+}
+
+function replaceMergeTags(text) {
+  if (!text) return text;
+  return text
+    .replace(/\{\{clientName\}\}/g, clientData?.fullName || "")
+    .replace(/\{\{realtorName\}\}/g, realtorProfile?.fullName || "")
+    .replace(/\{\{realtorPhone\}\}/g, realtorProfile?.phone || "")
+    .replace(/\{\{realtorEmail\}\}/g, realtorProfile?.email || "")
+    .replace(/\{\{realtorCompany\}\}/g, realtorProfile?.company || "");
+}
+
+window.applyTemplate = function () {
+  const idx = document.getElementById("act-template").value;
+  if (idx === "") return;
+  const t = emailTemplates[parseInt(idx)];
+  if (!t) return;
+  document.getElementById("act-subject").value = replaceMergeTags(t.subject);
+  // Strip HTML tags for textarea display
+  const bodyText = replaceMergeTags(t.body).replace(/<[^>]+>/g, "").replace(/&mdash;/g, "—").replace(/&amp;/g, "&");
+  document.getElementById("act-body").value = bodyText;
+};
+
+window.saveAsTemplate = async function () {
+  const user = auth.currentUser;
+  if (!user) return;
+
+  const subject = document.getElementById("act-subject").value.trim();
+  const body = document.getElementById("act-body").value.trim();
+  if (!subject) { showToast("Enter a subject first.", "error"); return; }
+
+  const name = prompt("Template name:");
+  if (!name) return;
+
+  try {
+    await addDoc(collection(db, "emailTemplates"), {
+      name,
+      subject,
+      body: body.replace(/\n/g, "<br>"),
+      category: "general",
+      createdBy: user.uid,
+      createdAt: serverTimestamp()
+    });
+    showToast("Template saved!");
+    await loadEmailTemplates(user.uid);
+  } catch (e) {
+    console.error("Save template error:", e);
+    showToast("Failed to save template.", "error");
   }
 };
 
@@ -326,15 +448,17 @@ function renderFiles() {
     return;
   }
 
-  el.innerHTML = filtered.map(f => `
+  el.innerHTML = filtered.map(f => {
+    const signedBadge = f.fileName.startsWith("SIGNED_") ? ' <span class="gd-badge-signed">&#9997; Signed</span>' : '';
+    return `
     <div class="gd-file-row">
-      <span class="gd-file-name">${f.fileName}</span>
+      <span class="gd-file-name">${f.fileName}${signedBadge}</span>
       <span class="gd-badge gd-badge-${f.folder}">${f.folder}</span>
       <span class="gd-file-meta">${formatFileSize(f.fileSize)}</span>
       <span class="gd-file-meta">${formatDate(f.uploadedAt)}</span>
       <a href="${f.downloadUrl}" target="_blank" class="gd-file-download">Download</a>
-    </div>
-  `).join("");
+    </div>`;
+  }).join("");
 }
 
 window.uploadFile = async function () {
@@ -403,6 +527,181 @@ window.uploadFile = async function () {
       }
     }
   );
+};
+
+/* ===== BOLDSIGN E-SIGNATURES ===== */
+let sigMode = "existing";
+
+window.openSignatureModal = function () {
+  // Populate file dropdown with contracts + other files
+  const select = document.getElementById("sig-file-select");
+  select.innerHTML = '<option value="">— Choose a file —</option>';
+  allFiles.filter(f => f.folder === "contracts" || f.folder === "other" || f.folder === "disclosures").forEach(f => {
+    select.innerHTML += `<option value="${f.downloadUrl}" data-name="${f.fileName}">${f.fileName} (${f.folder})</option>`;
+  });
+
+  // Pre-fill signer info from client data
+  document.getElementById("sig-signer-name").value = clientData?.fullName || "";
+  document.getElementById("sig-signer-email").value = clientData?.email || "";
+  document.getElementById("sig-progress").classList.add("gd-hidden");
+  document.getElementById("sig-send-btn").disabled = false;
+  document.getElementById("sig-file-input").value = "";
+  document.getElementById("sig-file-name").textContent = "";
+
+  setSigMode("existing");
+  document.getElementById("signature-modal").classList.add("active");
+};
+
+window.closeSignatureModal = function () {
+  document.getElementById("signature-modal").classList.remove("active");
+};
+
+window.setSigMode = function (mode) {
+  sigMode = mode;
+  document.querySelectorAll(".gd-sig-toggle-btn").forEach(b => b.classList.toggle("active", b.dataset.mode === mode));
+  document.getElementById("sig-existing-group").classList.toggle("gd-hidden", mode !== "existing");
+  document.getElementById("sig-upload-group").classList.toggle("gd-hidden", mode !== "upload");
+};
+
+document.getElementById("sig-file-input").addEventListener("change", (e) => {
+  document.getElementById("sig-file-name").textContent = e.target.files[0]?.name || "";
+});
+
+window.submitSignature = async function () {
+  const user = auth.currentUser;
+  if (!user) return;
+
+  const signerName = document.getElementById("sig-signer-name").value.trim();
+  const signerEmail = document.getElementById("sig-signer-email").value.trim();
+
+  if (!signerName || !signerEmail) {
+    showToast("Signer name and email are required.", "error");
+    return;
+  }
+
+  let fileUrl, fileName;
+
+  if (sigMode === "existing") {
+    const select = document.getElementById("sig-file-select");
+    fileUrl = select.value;
+    fileName = select.selectedOptions[0]?.dataset?.name;
+    if (!fileUrl) { showToast("Select a file.", "error"); return; }
+  } else {
+    const fileInput = document.getElementById("sig-file-input");
+    const file = fileInput.files[0];
+    if (!file) { showToast("Choose a file to upload.", "error"); return; }
+
+    // Upload the file first
+    const progressEl = document.getElementById("sig-progress");
+    const progressText = document.getElementById("sig-progress-text");
+    progressEl.classList.remove("gd-hidden");
+    progressText.textContent = "Uploading document...";
+    document.getElementById("sig-send-btn").disabled = true;
+
+    const storagePath = `files/${user.uid}/${clientId}/contracts/${file.name}`;
+    const storageRef = ref(storage, storagePath);
+
+    try {
+      const snapshot = await uploadBytesResumable(storageRef, file);
+      fileUrl = await getDownloadURL(storageRef);
+      fileName = file.name;
+
+      // Create file record
+      await addDoc(collection(db, "files"), {
+        clientId,
+        realtorId: user.uid,
+        fileName: file.name,
+        storagePath,
+        downloadUrl: fileUrl,
+        folder: "contracts",
+        fileSize: file.size,
+        mimeType: file.type,
+        uploadedAt: serverTimestamp()
+      });
+    } catch (e) {
+      console.error("Upload error:", e);
+      showToast("File upload failed.", "error");
+      progressEl.classList.add("gd-hidden");
+      document.getElementById("sig-send-btn").disabled = false;
+      return;
+    }
+  }
+
+  // Send to BoldSign
+  const progressEl = document.getElementById("sig-progress");
+  const progressText = document.getElementById("sig-progress-text");
+  progressEl.classList.remove("gd-hidden");
+  progressText.textContent = "Sending to BoldSign...";
+  document.getElementById("sig-send-btn").disabled = true;
+
+  try {
+    await sendForSignatureFn({ clientId, fileUrl, fileName, signerEmail, signerName });
+    showToast("Document sent for signature!");
+    closeSignatureModal();
+    await Promise.all([loadFiles(user.uid), loadEnvelopes(user.uid)]);
+  } catch (err) {
+    console.error("Signature error:", err);
+    showToast(err.message || "Failed to send for signature.", "error");
+    progressEl.classList.add("gd-hidden");
+    document.getElementById("sig-send-btn").disabled = false;
+  }
+};
+
+/* --- Pending Signatures / Envelopes --- */
+async function loadEnvelopes(uid) {
+  try {
+    const q = query(
+      collection(db, "envelopes"),
+      where("clientId", "==", clientId),
+      where("realtorId", "==", uid)
+    );
+    const snap = await getDocs(q);
+    const pending = snap.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .filter(e => e.status !== "completed");
+
+    const section = document.getElementById("pending-signatures");
+    const list = document.getElementById("pending-signatures-list");
+
+    if (pending.length === 0) {
+      section.classList.add("gd-hidden");
+      return;
+    }
+
+    section.classList.remove("gd-hidden");
+
+    const statusColors = {
+      sent: "#3b82f6", viewed: "#8b5cf6", signed: "#22c55e",
+      completed: "#22c55e", declined: "#ef4444", expired: "#6b7280", revoked: "#6b7280"
+    };
+
+    list.innerHTML = pending.map(e => `
+      <div class="gd-envelope-row">
+        <span class="gd-envelope-name">${e.fileName}</span>
+        <span class="gd-envelope-signer">${e.signerName}</span>
+        <span class="gd-badge-esig" style="background: ${statusColors[e.status] || "#6b7280"}">${statusLabel(e.status)}</span>
+        <span class="gd-file-meta">${formatDate(e.sentAt)}</span>
+        <button class="gd-btn gd-btn-sm" onclick="checkEnvelopeStatus('${e.documentId}')">Check Status</button>
+      </div>
+    `).join("");
+  } catch (e) {
+    console.error("Load envelopes error:", e);
+  }
+}
+
+window.checkEnvelopeStatus = async function (documentId) {
+  try {
+    showToast("Checking status...");
+    const result = await checkSignatureStatusFn({ documentId });
+    showToast("Status: " + statusLabel(result.data.status));
+    const user = auth.currentUser;
+    if (user) {
+      await Promise.all([loadEnvelopes(user.uid), loadFiles(user.uid)]);
+    }
+  } catch (err) {
+    console.error("Check status error:", err);
+    showToast(err.message || "Failed to check status.", "error");
+  }
 };
 
 /* ===== PROPERTIES TAB ===== */
@@ -607,7 +906,6 @@ window.closeCompareModal = function () {
 };
 
 /* ===== AI CHAT PANEL ===== */
-const askAssistant = httpsCallable(functions, "askAssistant");
 let aiChatHistory = [];
 
 function formatAiResponse(text) {
@@ -634,9 +932,39 @@ function addAiMessage(text, type) {
   } else {
     div.className = "gd-ai-msg gd-ai-msg-ai";
     div.innerHTML = formatAiResponse(text);
+
+    // If the response looks like an email draft, add "Open in Email" button
+    if (text.toLowerCase().includes("subject:") || text.toLowerCase().includes("dear ") || text.toLowerCase().includes("hi " + (clientData?.fullName?.split(" ")[0] || "").toLowerCase())) {
+      const btn = document.createElement("button");
+      btn.className = "gd-btn gd-btn-sm gd-btn-ai-email";
+      btn.textContent = "Open in Email";
+      btn.onclick = () => openAiDraftInEmail(text);
+      div.appendChild(btn);
+    }
   }
   el.appendChild(div);
   el.scrollTop = el.scrollHeight;
+}
+
+function openAiDraftInEmail(aiText) {
+  // Try to extract subject line
+  let subject = "";
+  let body = aiText;
+  const subjectMatch = aiText.match(/(?:\*\*)?Subject:?\s*(?:\*\*)?\s*(.+?)(?:\n|$)/i);
+  if (subjectMatch) {
+    subject = subjectMatch[1].replace(/\*\*/g, "").trim();
+    body = aiText.replace(subjectMatch[0], "").trim();
+  }
+
+  // Clean up markdown formatting for the textarea
+  body = body
+    .replace(/\*\*(.+?)\*\*/g, "$1")
+    .replace(/^\s*[-*]\s+/gm, "- ")
+    .trim();
+
+  openActivityModal("email");
+  document.getElementById("act-subject").value = subject;
+  document.getElementById("act-body").value = body;
 }
 
 function showTypingIndicator() {

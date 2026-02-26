@@ -1,12 +1,20 @@
-const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const { onCall, onRequest, HttpsError } = require("firebase-functions/v2/https");
 const { defineSecret } = require("firebase-functions/params");
 const { initializeApp } = require("firebase-admin/app");
 const { getFirestore, Timestamp, FieldValue } = require("firebase-admin/firestore");
+const { getStorage } = require("firebase-admin/storage");
+const crypto = require("crypto");
 
 initializeApp();
 const db = getFirestore();
 
 const anthropicKey = defineSecret("ANTHROPIC_API_KEY");
+const sendgridKey = defineSecret("SENDGRID_API_KEY");
+const boldsignKey = defineSecret("BOLDSIGN_API_KEY");
+
+/* ================================================================
+   AI ASSISTANT
+   ================================================================ */
 
 const SYSTEM_PROMPT = `You are GreenDoor AI, an intelligent assistant for real estate professionals. You help realtors manage their clients, draft communications, analyze client preferences, and make smart recommendations. Be concise, professional, and actionable. When drafting emails, write them ready to send — not as templates with brackets. Use the client's actual name and details. Format emails with proper greeting and sign-off. When making suggestions, be specific and reference actual data from the client's history. Use markdown formatting: **bold** for emphasis, bullet points for lists.`;
 
@@ -44,7 +52,6 @@ exports.askAssistant = onCall(
 
     try {
       if (clientId && context === "client_detail") {
-        // Fetch client data and verify ownership
         const clientSnap = await db.doc(`clients/${clientId}`).get();
         if (!clientSnap.exists) {
           throw new HttpsError("not-found", "Client not found.");
@@ -54,7 +61,6 @@ exports.askAssistant = onCall(
           throw new HttpsError("permission-denied", "You do not have access to this client.");
         }
 
-        // Fetch activities
         const activitiesSnap = await db.collection("activities")
           .where("clientId", "==", clientId)
           .where("realtorId", "==", uid)
@@ -71,7 +77,6 @@ exports.askAssistant = onCall(
           };
         });
 
-        // Fetch properties
         const propsSnap = await db.collection("bookmarkedProperties")
           .where("clientId", "==", clientId)
           .where("realtorId", "==", uid)
@@ -88,7 +93,6 @@ exports.askAssistant = onCall(
           };
         });
 
-        // Fetch file names
         const filesSnap = await db.collection("files")
           .where("clientId", "==", clientId)
           .where("realtorId", "==", uid)
@@ -133,7 +137,6 @@ FILES (${files.length}):
 ${files.map(f => `- ${f.name} (${f.folder})`).join("\n") || "No files"}`;
 
       } else if (context === "dashboard") {
-        // Dashboard summary
         const clientsSnap = await db.collection("clients")
           .where("realtorId", "==", uid)
           .get();
@@ -156,7 +159,6 @@ ${files.map(f => `- ${f.name} (${f.folder})`).join("\n") || "No files"}`;
           }
         });
 
-        // Upcoming showings in next 7 days
         const nowTs = Timestamp.now();
         const weekFromNow = Timestamp.fromDate(new Date(now + sevenDaysMs));
         const showingsSnap = await db.collection("bookmarkedProperties")
@@ -192,7 +194,6 @@ ${staleClients.map(c => `  - ${c.name} (${c.status}) — ${c.daysAgo} days since
 ${showings.map(s => `  - ${s.date}: ${s.address} with ${s.clientName}`).join("\n") || "  No showings scheduled"}`;
       }
 
-      // Call Anthropic API
       const Anthropic = require("@anthropic-ai/sdk");
       const client = new Anthropic({ apiKey: anthropicKey.value() });
 
@@ -218,6 +219,460 @@ ${showings.map(s => `  - ${s.date}: ${s.address} with ${s.clientName}`).join("\n
       if (err instanceof HttpsError) throw err;
       console.error("askAssistant error:", err);
       throw new HttpsError("internal", "Something went wrong. Please try again.");
+    }
+  }
+);
+
+/* ================================================================
+   SEND EMAIL VIA SENDGRID
+   ================================================================ */
+
+exports.sendEmail = onCall(
+  { secrets: [sendgridKey], region: "us-central1", maxInstances: 10 },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "You must be logged in.");
+    }
+
+    const uid = request.auth.uid;
+    const { to, toName, subject, body, clientId } = request.data;
+
+    if (!to || !subject || !body) {
+      throw new HttpsError("invalid-argument", "Recipient, subject, and body are required.");
+    }
+
+    // Get realtor profile for reply-to and signature
+    const userSnap = await db.doc(`users/${uid}`).get();
+    const userData = userSnap.exists ? userSnap.data() : {};
+    const replyToEmail = userData.email || request.auth.token.email;
+    const replyToName = userData.fullName || "GreenDoor Realtor";
+
+    // Append email signature if set
+    let htmlBody = body;
+    if (userData.emailSignature) {
+      htmlBody += `<br><br>--<br>${userData.emailSignature.replace(/\n/g, "<br>")}`;
+    }
+
+    try {
+      const sgMail = require("@sendgrid/mail");
+      sgMail.setApiKey(sendgridKey.value());
+
+      await sgMail.send({
+        to: { email: to, name: toName || "" },
+        from: { email: "greendoor@stoekmedia.com", name: "GreenDoor" },
+        replyTo: { email: replyToEmail, name: replyToName },
+        subject,
+        html: htmlBody
+      });
+
+      // Log activity
+      if (clientId) {
+        await db.collection("activities").add({
+          clientId,
+          realtorId: uid,
+          type: "email",
+          subject,
+          body: htmlBody,
+          timestamp: FieldValue.serverTimestamp()
+        });
+
+        await db.doc(`clients/${clientId}`).update({
+          lastActivityDate: FieldValue.serverTimestamp()
+        });
+      }
+
+      return { success: true };
+    } catch (err) {
+      console.error("sendEmail error:", err);
+      if (err.response) {
+        console.error("SendGrid response:", err.response.body);
+      }
+      throw new HttpsError("internal", "Failed to send email. Please try again.");
+    }
+  }
+);
+
+/* ================================================================
+   SEED DEFAULT EMAIL TEMPLATES
+   ================================================================ */
+
+exports.seedEmailTemplates = onCall(
+  { region: "us-central1" },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "You must be logged in.");
+    }
+
+    // Check if system templates already exist
+    const existing = await db.collection("emailTemplates")
+      .where("createdBy", "==", "system")
+      .limit(1)
+      .get();
+
+    if (!existing.empty) {
+      return { seeded: false, message: "Templates already exist." };
+    }
+
+    const templates = [
+      {
+        name: "Welcome Email",
+        category: "welcome",
+        subject: "Welcome, {{clientName}}!",
+        body: `<p>Hi {{clientName}},</p>
+<p>Thank you for choosing to work with me on your real estate journey! I'm excited to help you find the perfect home.</p>
+<p>Here's what you can expect from me:</p>
+<ul>
+<li>Regular updates on new listings that match your criteria</li>
+<li>Quick responses to any questions you have</li>
+<li>Expert guidance through every step of the process</li>
+</ul>
+<p>Feel free to reach out anytime at {{realtorPhone}} or just reply to this email.</p>
+<p>Looking forward to working together!</p>
+<p>Best,<br>{{realtorName}}<br>{{realtorCompany}}</p>`
+      },
+      {
+        name: "Post-Showing Follow-up",
+        category: "follow_up",
+        subject: "Thoughts on the property?",
+        body: `<p>Hi {{clientName}},</p>
+<p>Thank you for taking the time to tour the property today! I'd love to hear your thoughts.</p>
+<p>What did you think? Was there anything you particularly liked or any concerns? Your feedback helps me refine the search and find exactly what you're looking for.</p>
+<p>If you'd like to schedule another showing or see similar properties, just let me know!</p>
+<p>Best,<br>{{realtorName}}<br>{{realtorCompany}}</p>`
+      },
+      {
+        name: "New Listing Alert",
+        category: "showing",
+        subject: "A property you might love",
+        body: `<p>Hi {{clientName}},</p>
+<p>I just came across a listing that I think could be a great fit for you!</p>
+<p><strong>[Property details here]</strong></p>
+<p>Would you like to schedule a showing? I have availability this week and would love to walk through it with you.</p>
+<p>Let me know what you think!</p>
+<p>Best,<br>{{realtorName}}<br>{{realtorCompany}}</p>`
+      },
+      {
+        name: "Monthly Check-in",
+        category: "follow_up",
+        subject: "Quick market update from {{realtorName}}",
+        body: `<p>Hi {{clientName}},</p>
+<p>Just wanted to check in and see how things are going! The market has been active lately, and I wanted to make sure you're staying informed.</p>
+<p>If your timeline or preferences have changed at all, please let me know so I can adjust my search accordingly.</p>
+<p>I'm always here if you have any questions about the market or your home search.</p>
+<p>Best,<br>{{realtorName}}<br>{{realtorCompany}}</p>`
+      },
+      {
+        name: "Closing Congratulations",
+        category: "closing",
+        subject: "Congratulations on your new home!",
+        body: `<p>Hi {{clientName}},</p>
+<p>Congratulations on closing on your new home! It was a pleasure working with you throughout this process.</p>
+<p>If you ever need anything — whether it's a recommendation for a contractor, questions about your home, or just want to chat — don't hesitate to reach out.</p>
+<p>Also, if you know anyone who's looking to buy or sell, I'd love to help them too. Referrals mean the world to me!</p>
+<p>Wishing you all the best in your new home!</p>
+<p>Warmly,<br>{{realtorName}}<br>{{realtorCompany}}</p>`
+      }
+    ];
+
+    const batch = db.batch();
+    for (const t of templates) {
+      const ref = db.collection("emailTemplates").doc();
+      batch.set(ref, {
+        ...t,
+        createdBy: "system",
+        createdAt: FieldValue.serverTimestamp()
+      });
+    }
+    await batch.commit();
+
+    return { seeded: true, count: templates.length };
+  }
+);
+
+/* ================================================================
+   BOLDSIGN: SEND FOR SIGNATURE
+   ================================================================ */
+
+exports.sendForSignature = onCall(
+  { secrets: [boldsignKey], region: "us-central1", maxInstances: 10 },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "You must be logged in.");
+    }
+
+    const uid = request.auth.uid;
+    const { clientId, fileUrl, fileName, signerEmail, signerName } = request.data;
+
+    if (!clientId || !fileUrl || !fileName || !signerEmail || !signerName) {
+      throw new HttpsError("invalid-argument", "All fields are required.");
+    }
+
+    // Verify client ownership
+    const clientSnap = await db.doc(`clients/${clientId}`).get();
+    if (!clientSnap.exists || clientSnap.data().realtorId !== uid) {
+      throw new HttpsError("permission-denied", "Access denied.");
+    }
+
+    try {
+      const fetch = require("node-fetch");
+      const FormData = require("form-data");
+
+      // Download file from Firebase Storage URL
+      const fileResponse = await fetch(fileUrl);
+      if (!fileResponse.ok) {
+        throw new Error("Failed to download file from storage.");
+      }
+      const fileBuffer = await fileResponse.buffer();
+
+      // Build multipart form for BoldSign REST API
+      const form = new FormData();
+      form.append("Files", fileBuffer, { filename: fileName, contentType: "application/pdf" });
+      form.append("Title", fileName);
+      form.append("Signers[0][Name]", signerName);
+      form.append("Signers[0][EmailAddress]", signerEmail);
+      form.append("Signers[0][SignerType]", "Signer");
+      form.append("Signers[0][FormFields][0][FieldType]", "Signature");
+      form.append("Signers[0][FormFields][0][PageNumber]", "1");
+      form.append("Signers[0][FormFields][0][Bounds][X]", "100");
+      form.append("Signers[0][FormFields][0][Bounds][Y]", "100");
+      form.append("Signers[0][FormFields][0][Bounds][Width]", "200");
+      form.append("Signers[0][FormFields][0][Bounds][Height]", "50");
+
+      const bsResponse = await fetch("https://api.boldsign.com/v1/document/send", {
+        method: "POST",
+        headers: {
+          "X-API-KEY": boldsignKey.value(),
+          ...form.getHeaders()
+        },
+        body: form
+      });
+
+      if (!bsResponse.ok) {
+        const errorText = await bsResponse.text();
+        console.error("BoldSign send error:", bsResponse.status, errorText);
+        throw new Error("BoldSign API error: " + bsResponse.status);
+      }
+
+      const bsData = await bsResponse.json();
+      const documentId = bsData.documentId;
+
+      // Store envelope in Firestore
+      await db.doc(`envelopes/${documentId}`).set({
+        documentId,
+        clientId,
+        realtorId: uid,
+        fileName,
+        signerEmail,
+        signerName,
+        status: "sent",
+        sentAt: FieldValue.serverTimestamp(),
+        firebaseFileUrl: fileUrl,
+        signedDocumentUrl: null
+      });
+
+      // Log activity
+      await db.collection("activities").add({
+        clientId,
+        realtorId: uid,
+        type: "email",
+        subject: "Sent for signature: " + fileName,
+        body: "Sent to " + signerName + " (" + signerEmail + ") via BoldSign",
+        timestamp: FieldValue.serverTimestamp()
+      });
+
+      await db.doc(`clients/${clientId}`).update({
+        lastActivityDate: FieldValue.serverTimestamp()
+      });
+
+      return { success: true, documentId };
+    } catch (err) {
+      if (err instanceof HttpsError) throw err;
+      console.error("sendForSignature error:", err);
+      throw new HttpsError("internal", "Failed to send document for signature.");
+    }
+  }
+);
+
+/* ================================================================
+   BOLDSIGN: CHECK SIGNATURE STATUS
+   ================================================================ */
+
+async function handleCompletedDocument(documentId, envelopeData, apiKey) {
+  const fetch = require("node-fetch");
+
+  // Download signed document from BoldSign
+  const downloadResponse = await fetch(
+    `https://api.boldsign.com/v1/document/download?documentId=${documentId}`,
+    { headers: { "X-API-KEY": apiKey } }
+  );
+
+  if (!downloadResponse.ok) {
+    console.error("Failed to download signed document:", downloadResponse.status);
+    return;
+  }
+
+  const signedBuffer = await downloadResponse.buffer();
+
+  // Upload to Firebase Storage
+  const bucket = getStorage().bucket();
+  const signedFileName = `SIGNED_${envelopeData.fileName}`;
+  const storagePath = `files/${envelopeData.realtorId}/${envelopeData.clientId}/contracts/${signedFileName}`;
+  const file = bucket.file(storagePath);
+
+  const downloadToken = crypto.randomUUID();
+  await file.save(signedBuffer, {
+    contentType: "application/pdf",
+    metadata: { metadata: { firebaseStorageDownloadTokens: downloadToken } }
+  });
+
+  const downloadUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(storagePath)}?alt=media&token=${downloadToken}`;
+
+  // Create file record
+  await db.collection("files").add({
+    clientId: envelopeData.clientId,
+    realtorId: envelopeData.realtorId,
+    fileName: signedFileName,
+    storagePath,
+    downloadUrl,
+    folder: "contracts",
+    fileSize: signedBuffer.length,
+    mimeType: "application/pdf",
+    uploadedAt: FieldValue.serverTimestamp()
+  });
+
+  // Update envelope
+  await db.doc(`envelopes/${documentId}`).update({
+    status: "completed",
+    signedDocumentUrl: downloadUrl
+  });
+
+  // Log activity
+  await db.collection("activities").add({
+    clientId: envelopeData.clientId,
+    realtorId: envelopeData.realtorId,
+    type: "file_share",
+    subject: "Document signed: " + envelopeData.fileName,
+    body: "Signed by " + envelopeData.signerName,
+    timestamp: FieldValue.serverTimestamp()
+  });
+
+  await db.doc(`clients/${envelopeData.clientId}`).update({
+    lastActivityDate: FieldValue.serverTimestamp()
+  });
+}
+
+exports.checkSignatureStatus = onCall(
+  { secrets: [boldsignKey], region: "us-central1", maxInstances: 10 },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "You must be logged in.");
+    }
+
+    const uid = request.auth.uid;
+    const { documentId } = request.data;
+
+    if (!documentId) {
+      throw new HttpsError("invalid-argument", "Document ID is required.");
+    }
+
+    // Verify envelope ownership
+    const envelopeSnap = await db.doc(`envelopes/${documentId}`).get();
+    if (!envelopeSnap.exists || envelopeSnap.data().realtorId !== uid) {
+      throw new HttpsError("permission-denied", "Access denied.");
+    }
+
+    try {
+      const fetch = require("node-fetch");
+
+      const statusResponse = await fetch(
+        `https://api.boldsign.com/v1/document/properties?documentId=${documentId}`,
+        { headers: { "X-API-KEY": boldsignKey.value() } }
+      );
+
+      if (!statusResponse.ok) {
+        const errorText = await statusResponse.text();
+        console.error("BoldSign status error:", statusResponse.status, errorText);
+        throw new Error("BoldSign API error");
+      }
+
+      const docDetails = await statusResponse.json();
+      const status = (docDetails.status || "").toLowerCase().replace(/\s/g, "_");
+
+      // Update envelope status
+      await db.doc(`envelopes/${documentId}`).update({ status });
+
+      // If completed, download and file the signed document
+      if (status === "completed") {
+        const envelopeData = envelopeSnap.data();
+        await handleCompletedDocument(documentId, envelopeData, boldsignKey.value());
+      }
+
+      return { status, updatedAt: new Date().toISOString() };
+    } catch (err) {
+      if (err instanceof HttpsError) throw err;
+      console.error("checkSignatureStatus error:", err);
+      throw new HttpsError("internal", "Failed to check signature status.");
+    }
+  }
+);
+
+/* ================================================================
+   BOLDSIGN: WEBHOOK HANDLER
+   ================================================================ */
+
+exports.boldSignWebhook = onRequest(
+  { secrets: [boldsignKey], region: "us-central1" },
+  async (req, res) => {
+    if (req.method !== "POST") {
+      res.status(405).send("Method not allowed");
+      return;
+    }
+
+    try {
+      const payload = req.body;
+      const event = payload.event || {};
+      const eventType = (event.eventType || payload.eventType || "").toLowerCase();
+      const documentId = event.documentId || payload.documentId;
+
+      console.log("BoldSign webhook received:", eventType, documentId);
+
+      if (!documentId) {
+        res.status(400).send("Missing documentId");
+        return;
+      }
+
+      // Find the envelope
+      const envelopeSnap = await db.doc(`envelopes/${documentId}`).get();
+      if (!envelopeSnap.exists) {
+        console.log("Envelope not found for documentId:", documentId);
+        res.status(200).send("OK");
+        return;
+      }
+
+      // Map BoldSign event types to our status
+      const statusMap = {
+        sent: "sent",
+        viewed: "viewed",
+        signed: "signed",
+        completed: "completed",
+        declined: "declined",
+        revoked: "revoked",
+        expired: "expired"
+      };
+
+      const newStatus = statusMap[eventType] || eventType;
+      await db.doc(`envelopes/${documentId}`).update({ status: newStatus });
+
+      // If completed, download and file the signed document
+      if (newStatus === "completed") {
+        const envelopeData = envelopeSnap.data();
+        await handleCompletedDocument(documentId, envelopeData, boldsignKey.value());
+      }
+
+      res.status(200).send("OK");
+    } catch (err) {
+      console.error("Webhook error:", err);
+      res.status(500).send("Internal error");
     }
   }
 );

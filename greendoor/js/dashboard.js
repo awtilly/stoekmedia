@@ -6,6 +6,7 @@ import {
 import { getCurrentUser, timeAgo, formatDate } from "./auth.js";
 
 const askAssistant = httpsCallable(functions, "askAssistant");
+const seedEmailTemplates = httpsCallable(functions, "seedEmailTemplates");
 
 onAuthStateChanged(auth, async (user) => {
   if (!user) return;
@@ -111,6 +112,9 @@ onAuthStateChanged(auth, async (user) => {
 
   document.getElementById("dashboard-loading").classList.add("gd-hidden");
   document.getElementById("dashboard-content").classList.remove("gd-hidden");
+
+  // Seed email templates (no-op if already exist)
+  seedEmailTemplates().catch(() => {});
 
   // Load AI briefing
   loadBriefing();
