@@ -637,7 +637,8 @@ exports.boldSignWebhook = onRequest(
       console.log("BoldSign webhook received:", eventType, documentId);
 
       if (!documentId) {
-        res.status(400).send("Missing documentId");
+        // Verification or unknown payload — return 200 to acknowledge
+        res.status(200).send("OK");
         return;
       }
 
