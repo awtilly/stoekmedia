@@ -1,6 +1,6 @@
 import { auth, db } from "./firebase-config.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-import { doc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { getCurrentUser, showToast } from "./auth.js";
 
 onAuthStateChanged(auth, async (user) => {
@@ -30,7 +30,7 @@ window.saveProfile = async function () {
   };
 
   try {
-    await updateDoc(doc(db, "users", user.uid), data);
+    await setDoc(doc(db, "users", user.uid), data, { merge: true });
     showToast("Profile saved!");
   } catch (e) {
     console.error("Save profile error:", e);

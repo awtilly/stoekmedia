@@ -32,21 +32,26 @@ exports.askAssistant = onCall(
       throw new HttpsError("invalid-argument", "A question is required.");
     }
 
-    // Rate limiting: 50 requests per day
+    // Validate question length
+    if (question.length > 2000) {
+      throw new HttpsError("invalid-argument", "Question is too long (max 2000 characters).");
+    }
+
+    // Rate limiting: 50 requests per day (atomic transaction)
     const today = new Date().toISOString().slice(0, 10);
     const rateLimitRef = db.doc(`rateLimits/${uid}`);
-    const rateLimitSnap = await rateLimitRef.get();
-    const rateLimitData = rateLimitSnap.exists ? rateLimitSnap.data() : {};
-
-    if (rateLimitData.date === today && rateLimitData.count >= 50) {
-      throw new HttpsError("resource-exhausted", "Daily AI limit reached (50 requests). Try again tomorrow.");
-    }
-
-    if (rateLimitData.date === today) {
-      await rateLimitRef.update({ count: FieldValue.increment(1) });
-    } else {
-      await rateLimitRef.set({ date: today, count: 1 });
-    }
+    await db.runTransaction(async (t) => {
+      const rateLimitSnap = await t.get(rateLimitRef);
+      const rateLimitData = rateLimitSnap.exists ? rateLimitSnap.data() : {};
+      if (rateLimitData.date === today && rateLimitData.count >= 50) {
+        throw new HttpsError("resource-exhausted", "Daily AI limit reached (50 requests). Try again tomorrow.");
+      }
+      if (rateLimitData.date === today) {
+        t.update(rateLimitRef, { count: FieldValue.increment(1) });
+      } else {
+        t.set(rateLimitRef, { date: today, count: 1 });
+      }
+    });
 
     let contextText = "";
 
@@ -241,6 +246,14 @@ exports.sendEmail = onCall(
       throw new HttpsError("invalid-argument", "Recipient, subject, and body are required.");
     }
 
+    // Verify client ownership if clientId provided
+    if (clientId) {
+      const clientSnap = await db.doc(`clients/${clientId}`).get();
+      if (!clientSnap.exists || clientSnap.data().realtorId !== uid) {
+        throw new HttpsError("permission-denied", "Access denied.");
+      }
+    }
+
     // Get realtor profile for reply-to and signature
     const userSnap = await db.doc(`users/${uid}`).get();
     const userData = userSnap.exists ? userSnap.data() : {};
@@ -250,7 +263,7 @@ exports.sendEmail = onCall(
     // Append email signature if set
     let htmlBody = body;
     if (userData.emailSignature) {
-      htmlBody += `<br><br>--<br>${userData.emailSignature.replace(/\n/g, "<br>")}`;
+      htmlBody += `<br><br>--<br>${userData.emailSignature.replace(/\r\n|\r|\n/g, "<br>")}`;
     }
 
     try {
@@ -407,6 +420,11 @@ exports.sendForSignature = onCall(
       throw new HttpsError("invalid-argument", "All fields are required.");
     }
 
+    // Validate fileUrl to prevent SSRF — only allow Firebase Storage URLs
+    if (!fileUrl.startsWith("https://firebasestorage.googleapis.com/")) {
+      throw new HttpsError("invalid-argument", "Invalid file URL.");
+    }
+
     // Verify client ownership
     const clientSnap = await db.doc(`clients/${clientId}`).get();
     if (!clientSnap.exists || clientSnap.data().realtorId !== uid) {
@@ -498,6 +516,13 @@ exports.sendForSignature = onCall(
    ================================================================ */
 
 async function handleCompletedDocument(documentId, envelopeData, apiKey) {
+  // Guard against duplicate processing
+  const currentSnap = await db.doc(`envelopes/${documentId}`).get();
+  if (currentSnap.exists && currentSnap.data().signedDocumentUrl) {
+    console.log("Document already processed, skipping:", documentId);
+    return;
+  }
+
   const fetch = require("node-fetch");
 
   // Download signed document from BoldSign

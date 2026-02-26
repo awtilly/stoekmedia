@@ -30,6 +30,7 @@ async function loadClients(uid) {
   }
 
   document.getElementById("clients-loading").classList.add("gd-hidden");
+  document.getElementById("clients-table-wrap").classList.remove("gd-hidden");
 }
 
 function renderClients(clients) {
