@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Get Started — GreenDoor</title>
+  <link rel="stylesheet" href="/assets/css/style.css">
+  <link rel="stylesheet" href="/greendoor/css/greendoor.css">
+</head>
+<body class="gd-light">
+  <div class="gd-onboarding-page">
+    <div class="gd-onboarding-card">
+      <div class="gd-login-logo"><span class="gd-green">Green</span><span class="gd-door">Door</span></div>
+      <p class="gd-login-subtitle">Let's set up your account</p>
+
+      <!-- Stepper -->
+      <div class="gd-stepper">
+        <div class="gd-step active" data-step="1">
+          <div class="gd-step-dot">1</div>
+          <div class="gd-step-label">Profile</div>
+        </div>
+        <div class="gd-step-line"></div>
+        <div class="gd-step" data-step="2">
+          <div class="gd-step-dot">2</div>
+          <div class="gd-step-label">Company</div>
+        </div>
+        <div class="gd-step-line"></div>
+        <div class="gd-step" data-step="3">
+          <div class="gd-step-dot">3</div>
+          <div class="gd-step-label">Get Started</div>
+        </div>
+      </div>
+
+      <!-- Step 1: Profile -->
+      <div class="gd-onboard-step active" id="step-1">
+        <h2 class="gd-onboard-title">Your Profile</h2>
+        <div class="gd-form-group">
+          <label for="onboard-name">Full Name</label>
+          <input type="text" id="onboard-name" class="gd-input" placeholder="Your full name">
+        </div>
+        <div class="gd-form-group">
+          <label for="onboard-phone">Phone Number</label>
+          <input type="tel" id="onboard-phone" class="gd-input" placeholder="(555) 123-4567">
+        </div>
+        <div class="gd-onboard-nav">
+          <div></div>
+          <button class="gd-btn gd-btn-primary" onclick="goToStep(2)">Continue</button>
+        </div>
+      </div>
+
+      <!-- Step 2: Company & Signature -->
+      <div class="gd-onboard-step" id="step-2">
+        <h2 class="gd-onboard-title">Company & Signature</h2>
+        <div class="gd-form-group">
+          <label for="onboard-company">Company Name</label>
+          <input type="text" id="onboard-company" class="gd-input" placeholder="Your brokerage or company">
+        </div>
+        <div class="gd-form-group">
+          <label for="onboard-signature">Email Signature</label>
+          <textarea id="onboard-signature" class="gd-input gd-signature-textarea" rows="4" placeholder="Jane Smith&#10;ABC Realty&#10;(555) 123-4567"></textarea>
+        </div>
+        <div class="gd-onboard-nav">
+          <button class="gd-btn gd-btn-ghost" onclick="goToStep(1)">Back</button>
+          <button class="gd-btn gd-btn-primary" onclick="goToStep(3)">Continue</button>
+        </div>
+      </div>
+
+      <!-- Step 3: Get Started -->
+      <div class="gd-onboard-step" id="step-3">
+        <h2 class="gd-onboard-title">You're All Set</h2>
+        <p style="color: #6b7280; font-size: 0.9rem; margin-bottom: 1.5rem;">Here's what you can do with GreenDoor:</p>
+        <div class="gd-tour-grid">
+          <div class="gd-tour-item">
+            <div class="gd-tour-icon">&#128101;</div>
+            <div>
+              <strong>Clients</strong>
+              <p>Track leads, buyers, and sellers in one place.</p>
+            </div>
+          </div>
+          <div class="gd-tour-item">
+            <div class="gd-tour-icon">&#127968;</div>
+            <div>
+              <strong>Properties</strong>
+              <p>Bookmark listings, schedule showings, compare options.</p>
+            </div>
+          </div>
+          <div class="gd-tour-item">
+            <div class="gd-tour-icon">&#128196;</div>
+            <div>
+              <strong>Documents</strong>
+              <p>Upload files, send for e-signature, stay organized.</p>
+            </div>
+          </div>
+          <div class="gd-tour-item">
+            <div class="gd-tour-icon">&#129302;</div>
+            <div>
+              <strong>AI Assistant</strong>
+              <p>Draft emails, get client insights, and more.</p>
+            </div>
+          </div>
+        </div>
+        <div class="gd-onboard-nav">
+          <button class="gd-btn gd-btn-ghost" onclick="goToStep(2)">Back</button>
+          <button class="gd-btn gd-btn-primary" id="onboard-finish-btn" onclick="finishOnboarding()">Go to Dashboard</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script type="module" src="/greendoor/js/auth.js"></script>
+  <script type="module" src="/greendoor/js/onboarding.js"></script>
+</body>
+</html>

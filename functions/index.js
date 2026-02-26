@@ -2,6 +2,7 @@ const { onCall, onRequest, HttpsError } = require("firebase-functions/v2/https")
 const { defineSecret } = require("firebase-functions/params");
 const { initializeApp } = require("firebase-admin/app");
 const { getFirestore, Timestamp, FieldValue } = require("firebase-admin/firestore");
+const { getAuth } = require("firebase-admin/auth");
 const { getStorage } = require("firebase-admin/storage");
 const crypto = require("crypto");
 
@@ -747,6 +748,119 @@ exports.boldSignWebhook = onRequest(
     } catch (err) {
       console.error("Webhook error:", err);
       res.status(500).send("Internal error");
+    }
+  }
+);
+
+/* ================================================================
+   INVITE REALTOR
+   ================================================================ */
+
+function buildWelcomeEmail(name, resetLink) {
+  return `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f8f9fa;font-family:Arial,Helvetica,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f8f9fa;padding:40px 0;">
+<tr><td align="center">
+<table width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border:1px solid #e5e7eb;max-width:560px;width:100%;">
+  <tr><td style="background:#16a34a;padding:32px 40px;text-align:center;">
+    <span style="font-size:28px;font-weight:700;color:#ffffff;letter-spacing:-0.5px;">Green</span><span style="font-size:28px;font-weight:700;color:#dcfce7;letter-spacing:-0.5px;">Door</span>
+  </td></tr>
+  <tr><td style="padding:40px;">
+    <p style="font-size:18px;font-weight:600;color:#1c1917;margin:0 0 16px;">Welcome to GreenDoor, ${name}!</p>
+    <p style="font-size:15px;color:#4b5563;line-height:1.7;margin:0 0 24px;">Your account has been created. GreenDoor is your all-in-one CRM for managing clients, tracking properties, sending documents, and growing your real estate business.</p>
+    <p style="font-size:15px;color:#4b5563;line-height:1.7;margin:0 0 24px;">Click the button below to set your password and get started:</p>
+    <table cellpadding="0" cellspacing="0" style="margin:0 auto 24px;"><tr><td style="background:#16a34a;padding:14px 32px;text-align:center;">
+      <a href="${resetLink}" style="color:#ffffff;text-decoration:none;font-size:15px;font-weight:600;display:inline-block;">Set Your Password</a>
+    </td></tr></table>
+    <p style="font-size:13px;color:#9ca3af;line-height:1.6;margin:0 0 8px;">If the button doesn't work, copy and paste this link into your browser:</p>
+    <p style="font-size:13px;color:#16a34a;word-break:break-all;margin:0 0 24px;">${resetLink}</p>
+    <p style="font-size:13px;color:#9ca3af;border-top:1px solid #e5e7eb;padding-top:16px;margin:0;">This link will expire in 1 hour. If you didn't expect this email, you can safely ignore it.</p>
+  </td></tr>
+</table>
+</td></tr></table>
+</body></html>`;
+}
+
+exports.inviteRealtor = onCall(
+  { secrets: [sendgridKey], region: "us-central1" },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "You must be logged in.");
+    }
+
+    // Verify caller is admin
+    const callerSnap = await db.doc(`users/${request.auth.uid}`).get();
+    if (!callerSnap.exists || callerSnap.data().role !== "admin") {
+      throw new HttpsError("permission-denied", "Only admins can invite realtors.");
+    }
+
+    const { email, fullName, company } = request.data;
+
+    if (!email || typeof email !== "string" || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      throw new HttpsError("invalid-argument", "A valid email address is required.");
+    }
+    if (!fullName || typeof fullName !== "string") {
+      throw new HttpsError("invalid-argument", "Full name is required.");
+    }
+
+    const auth = getAuth();
+
+    // Check if user already exists
+    try {
+      await auth.getUserByEmail(email);
+      throw new HttpsError("already-exists", "A user with this email already exists.");
+    } catch (err) {
+      if (err instanceof HttpsError) throw err;
+      // auth/user-not-found is expected — proceed
+      if (err.code !== "auth/user-not-found") {
+        console.error("getUserByEmail error:", err);
+        throw new HttpsError("internal", "Failed to check existing user.");
+      }
+    }
+
+    try {
+      // Create Firebase Auth user with random temp password
+      const tempPassword = crypto.randomBytes(16).toString("hex");
+      const userRecord = await auth.createUser({
+        email,
+        password: tempPassword,
+        displayName: fullName
+      });
+
+      // Create Firestore user doc
+      await db.doc(`users/${userRecord.uid}`).set({
+        fullName,
+        email,
+        company: company || "",
+        role: "realtor",
+        isActive: true,
+        onboardingComplete: false,
+        createdAt: FieldValue.serverTimestamp(),
+        invitedBy: request.auth.uid
+      });
+
+      // Generate password reset link
+      const resetLink = await auth.generatePasswordResetLink(email, {
+        url: "https://stoekmedia.com/greendoor/app/login"
+      });
+
+      // Send branded welcome email
+      const sgMail = require("@sendgrid/mail");
+      sgMail.setApiKey(sendgridKey.value());
+
+      await sgMail.send({
+        to: { email, name: fullName },
+        from: { email: "greendoor@stoekmedia.com", name: "GreenDoor" },
+        subject: "Welcome to GreenDoor — Set Your Password",
+        html: buildWelcomeEmail(fullName, resetLink)
+      });
+
+      return { success: true, uid: userRecord.uid };
+    } catch (err) {
+      if (err instanceof HttpsError) throw err;
+      console.error("inviteRealtor error:", err);
+      throw new HttpsError("internal", "Failed to invite realtor. Please try again.");
     }
   }
 );

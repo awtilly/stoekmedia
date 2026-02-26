@@ -18,19 +18,31 @@ let cachedProfile = null;
 onAuthStateChanged(auth, async (user) => {
   const path = window.location.pathname;
   const isLoginPage = path.includes("/app/login");
+  const isOnboardingPage = path.includes("/app/onboarding");
   const isCrmPage = path.includes("/greendoor/app/");
 
   if (user) {
-    if (isLoginPage) {
-      window.location.href = "/greendoor/app/dashboard";
-      return;
-    }
     try {
       const userDoc = await getDoc(doc(db, "users", user.uid));
       if (userDoc.exists()) {
         cachedProfile = { uid: user.uid, ...userDoc.data() };
         updateDoc(doc(db, "users", user.uid), { lastLogin: serverTimestamp() }).catch(() => {});
+
+        // Onboarding redirect: strict === false so existing users (without field) are unaffected
+        if (cachedProfile.onboardingComplete === false) {
+          if (!isOnboardingPage) {
+            window.location.href = "/greendoor/app/onboarding";
+            return;
+          }
+        } else if (isLoginPage) {
+          window.location.href = "/greendoor/app/dashboard";
+          return;
+        }
+
         renderNavUser(cachedProfile);
+      } else if (isLoginPage) {
+        window.location.href = "/greendoor/app/dashboard";
+        return;
       }
     } catch (e) {
       console.error("Failed to load user profile:", e);

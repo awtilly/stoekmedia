@@ -2572,6 +2572,182 @@ textarea.gd-input {
   background: #22c55e;
 }
 
+/* ============================================================
+   ONBOARDING WIZARD
+   ============================================================ */
+
+.gd-onboarding-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-md);
+}
+
+.gd-onboarding-card {
+  width: 100%;
+  max-width: 520px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  padding: 2.5rem;
+}
+
+/* --- Stepper --- */
+.gd-stepper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 1.5rem 0 2rem;
+}
+
+.gd-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.gd-step-dot {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 2px solid #d1d5db;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #9ca3af;
+  background: #ffffff;
+  transition: all 0.3s;
+}
+
+.gd-step.active .gd-step-dot {
+  border-color: #22c55e;
+  color: #ffffff;
+  background: #22c55e;
+}
+
+.gd-step.completed .gd-step-dot {
+  border-color: #22c55e;
+  color: #ffffff;
+  background: #22c55e;
+}
+
+.gd-step-label {
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #9ca3af;
+  transition: color 0.3s;
+}
+
+.gd-step.active .gd-step-label {
+  color: #1c1917;
+}
+
+.gd-step.completed .gd-step-label {
+  color: #22c55e;
+}
+
+.gd-step-line {
+  flex: 1;
+  height: 2px;
+  background: #e5e7eb;
+  margin: 0 0.75rem;
+  margin-bottom: 1.2rem;
+  min-width: 40px;
+}
+
+/* --- Step Panels --- */
+.gd-onboard-step {
+  display: none;
+}
+
+.gd-onboard-step.active {
+  display: block;
+}
+
+.gd-onboard-title {
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  font-weight: 500;
+  color: #1c1917;
+  margin-bottom: var(--space-md);
+}
+
+.gd-onboard-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: var(--space-lg);
+}
+
+/* --- Tour Items (Step 3) --- */
+.gd-tour-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-sm);
+}
+
+.gd-tour-item {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  padding: var(--space-sm);
+  border: 1px solid #f3f4f6;
+  background: #f9fafb;
+}
+
+.gd-tour-icon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+  line-height: 1;
+  margin-top: 2px;
+}
+
+.gd-tour-item strong {
+  font-size: 0.88rem;
+  color: #1c1917;
+  display: block;
+  margin-bottom: 0.15rem;
+}
+
+.gd-tour-item p {
+  font-size: 0.78rem;
+  color: #6b7280;
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* ============================================================
+   ADMIN STATUS BADGES
+   ============================================================ */
+
+.gd-badge-pending {
+  background: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+}
+
+.gd-badge-onboarding {
+  background: rgba(59, 130, 246, 0.15);
+  color: #3b82f6;
+}
+
+.gd-badge-complete {
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+}
+
+/* --- Admin section header with button --- */
+.gd-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-md);
+}
+
 /* --- Mobile Responsive --- */
 @media (max-width: 768px) {
   .gd-ai-panel {
@@ -2605,5 +2781,17 @@ textarea.gd-input {
   .gd-sig-toggle-btn:not(:last-child) {
     border-right: none;
     border-bottom: 1px solid #d1d5db;
+  }
+
+  .gd-onboarding-card {
+    padding: 1.5rem;
+  }
+
+  .gd-tour-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .gd-stepper {
+    margin: 1rem 0 1.5rem;
   }
 }

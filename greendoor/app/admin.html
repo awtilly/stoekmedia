@@ -70,6 +70,7 @@
         <!-- Realtor Management -->
         <div class="gd-section-header">
           <h2 style="font-family: var(--font-display); font-size: 1.5rem; font-weight: 500;">Realtor Management</h2>
+          <button class="gd-btn gd-btn-primary" onclick="openInviteModal()">Invite Realtor</button>
         </div>
 
         <div class="gd-table-wrap">
@@ -79,19 +80,45 @@
                 <th>Name</th>
                 <th>Email</th>
                 <th>Company</th>
+                <th>Status</th>
                 <th>Active</th>
                 <th>Clients</th>
                 <th>Last Login</th>
               </tr>
             </thead>
             <tbody id="realtors-tbody">
-              <tr><td colspan="6" style="text-align:center; color: var(--color-text-muted);">No realtors found.</td></tr>
+              <tr><td colspan="7" style="text-align:center; color: var(--color-text-muted);">No realtors found.</td></tr>
             </tbody>
           </table>
         </div>
 
-        <div class="gd-info-box">
-          To create new realtor accounts, go to <strong>Firebase Console &rarr; Authentication &rarr; Add User</strong>, then create their profile document in the <strong>users</strong> collection with <code>role</code> set to <code>realtor</code>.
+        <!-- Invite Realtor Modal -->
+        <div class="gd-modal-overlay" id="invite-modal">
+          <div class="gd-modal" style="max-width: 440px;">
+            <div class="gd-modal-header">
+              <h3>Invite Realtor</h3>
+              <button class="gd-modal-close" onclick="closeInviteModal()">&times;</button>
+            </div>
+            <div class="gd-modal-body">
+              <div class="gd-form-group">
+                <label for="invite-name">Full Name</label>
+                <input type="text" id="invite-name" class="gd-input" placeholder="Jane Smith">
+              </div>
+              <div class="gd-form-group">
+                <label for="invite-email">Email</label>
+                <input type="email" id="invite-email" class="gd-input" placeholder="jane@example.com">
+              </div>
+              <div class="gd-form-group">
+                <label for="invite-company">Company <span style="color: #9ca3af;">(optional)</span></label>
+                <input type="text" id="invite-company" class="gd-input" placeholder="ABC Realty">
+              </div>
+              <p id="invite-error" class="gd-login-error"></p>
+            </div>
+            <div class="gd-modal-footer">
+              <button class="gd-btn gd-btn-ghost" onclick="closeInviteModal()">Cancel</button>
+              <button class="gd-btn gd-btn-primary" id="invite-send-btn" onclick="sendInvite()">Send Invite</button>
+            </div>
+          </div>
         </div>
 
       </div>
