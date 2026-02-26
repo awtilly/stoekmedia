@@ -50,6 +50,14 @@
         { "fieldPath": "realtorId", "order": "ASCENDING" },
         { "fieldPath": "uploadedAt", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "envelopes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "clientId", "order": "ASCENDING" },
+        { "fieldPath": "realtorId", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

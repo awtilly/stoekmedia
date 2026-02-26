@@ -92,26 +92,26 @@
     <div class="gd-modal">
       <div class="gd-modal-header">
         <h3>Add New Client</h3>
-        <button class="gd-modal-close" onclick="closeAddModal()">&times;</button>
+        <button class="gd-modal-close" onclick="closeAddModal()" aria-label="Close">&times;</button>
       </div>
       <div class="gd-modal-body">
         <div class="gd-form-row">
           <div class="gd-form-group">
-            <label>Full Name *</label>
+            <label for="add-fullName">Full Name *</label>
             <input type="text" id="add-fullName" class="gd-input" required>
           </div>
           <div class="gd-form-group">
-            <label>Email *</label>
+            <label for="add-email">Email *</label>
             <input type="email" id="add-email" class="gd-input" required>
           </div>
         </div>
         <div class="gd-form-row">
           <div class="gd-form-group">
-            <label>Phone</label>
+            <label for="add-phone">Phone</label>
             <input type="tel" id="add-phone" class="gd-input">
           </div>
           <div class="gd-form-group">
-            <label>Status</label>
+            <label for="add-status">Status</label>
             <select id="add-status" class="gd-input">
               <option value="lead" selected>Lead</option>
               <option value="active_buyer">Active Buyer</option>
@@ -124,17 +124,17 @@
         </div>
         <div class="gd-form-row">
           <div class="gd-form-group">
-            <label>Budget Min</label>
+            <label for="add-budgetMin">Budget Min</label>
             <input type="number" id="add-budgetMin" class="gd-input" placeholder="200000">
           </div>
           <div class="gd-form-group">
-            <label>Budget Max</label>
+            <label for="add-budgetMax">Budget Max</label>
             <input type="number" id="add-budgetMax" class="gd-input" placeholder="500000">
           </div>
         </div>
         <div class="gd-form-row">
           <div class="gd-form-group">
-            <label>Timeline</label>
+            <label for="add-timeline">Timeline</label>
             <select id="add-timeline" class="gd-input">
               <option value="">Select...</option>
               <option value="Immediate">Immediate</option>
@@ -145,7 +145,7 @@
             </select>
           </div>
           <div class="gd-form-group">
-            <label>Source</label>
+            <label for="add-source">Source</label>
             <select id="add-source" class="gd-input">
               <option value="">Select...</option>
               <option value="Referral">Referral</option>
@@ -159,7 +159,7 @@
           </div>
         </div>
         <div class="gd-form-group">
-          <label>Notes</label>
+          <label for="add-notes">Notes</label>
           <textarea id="add-notes" class="gd-input" rows="3" placeholder="Any initial notes..."></textarea>
         </div>
       </div>
@@ -174,7 +174,7 @@
   <div id="ai-popover" class="gd-ai-popover">
     <div class="gd-ai-popover-header">
       <span>&#10024; Quick Summary</span>
-      <button class="gd-ai-popover-close" onclick="closeAiPopover()">&times;</button>
+      <button class="gd-ai-popover-close" onclick="closeAiPopover()" aria-label="Close">&times;</button>
     </div>
     <div id="ai-popover-content" class="gd-ai-popover-content">
       <div class="gd-spinner"></div>

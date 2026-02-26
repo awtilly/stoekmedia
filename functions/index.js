@@ -11,6 +11,7 @@ const db = getFirestore();
 const anthropicKey = defineSecret("ANTHROPIC_API_KEY");
 const sendgridKey = defineSecret("SENDGRID_API_KEY");
 const boldsignKey = defineSecret("BOLDSIGN_API_KEY");
+const boldsignWebhookSecret = defineSecret("BOLDSIGN_WEBHOOK_SECRET");
 
 /* ================================================================
    AI ASSISTANT
@@ -646,11 +647,58 @@ exports.checkSignatureStatus = onCall(
    ================================================================ */
 
 exports.boldSignWebhook = onRequest(
-  { secrets: [boldsignKey], region: "us-central1" },
+  { secrets: [boldsignKey, boldsignWebhookSecret], region: "us-central1" },
   async (req, res) => {
     if (req.method !== "POST") {
       res.status(405).send("Method not allowed");
       return;
+    }
+
+    // Verify webhook signature (skip if secret not configured yet)
+    const secret = boldsignWebhookSecret.value();
+    if (secret) {
+      const sigHeader = req.headers["x-boldsign-signature"] || "";
+      if (sigHeader) {
+        const parts = {};
+        sigHeader.split(",").forEach(p => {
+          const [k, v] = p.trim().split("=", 2);
+          if (k && v) parts[k] = v;
+        });
+
+        const timestamp = parts.t;
+        const receivedSig = parts.s0;
+
+        if (!timestamp || !receivedSig) {
+          res.status(401).send("Invalid signature header");
+          return;
+        }
+
+        // Reject requests older than 5 minutes (replay protection)
+        const age = Math.floor(Date.now() / 1000) - parseInt(timestamp);
+        if (Math.abs(age) > 300) {
+          res.status(401).send("Request too old");
+          return;
+        }
+
+        const rawBody = req.rawBody ? req.rawBody.toString("utf8") : JSON.stringify(req.body);
+        const expectedSig = crypto.createHmac("sha256", secret)
+          .update(timestamp + "." + rawBody, "utf8")
+          .digest("hex");
+
+        try {
+          const valid = crypto.timingSafeEqual(
+            Buffer.from(expectedSig, "hex"),
+            Buffer.from(receivedSig, "hex")
+          );
+          if (!valid) {
+            res.status(401).send("Signature mismatch");
+            return;
+          }
+        } catch {
+          res.status(401).send("Signature mismatch");
+          return;
+        }
+      }
     }
 
     try {

@@ -991,6 +991,23 @@ window.sendQuickAction = function (text) {
   sendAiMessage();
 };
 
+// Close modals on Escape key
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") {
+    const modals = [
+      { id: "activity-modal", close: () => closeActivityModal() },
+      { id: "property-modal", close: () => closePropertyModal() },
+      { id: "compare-modal", close: () => closeCompareModal() },
+      { id: "signature-modal", close: () => closeSignatureModal() }
+    ];
+    for (const m of modals) {
+      if (document.getElementById(m.id).classList.contains("active")) { m.close(); return; }
+    }
+    const aiPanel = document.getElementById("ai-panel");
+    if (aiPanel.classList.contains("open")) { toggleAiPanel(); }
+  }
+});
+
 window.sendAiMessage = async function () {
   const input = document.getElementById("ai-input");
   const btn = document.getElementById("ai-send-btn");

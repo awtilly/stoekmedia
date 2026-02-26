@@ -211,6 +211,16 @@ window.closeAiPopover = function () {
   document.getElementById("ai-popover").classList.remove("active");
 };
 
+// Close modal on Escape key
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") {
+    const modal = document.getElementById("add-modal");
+    if (modal.classList.contains("active")) { closeAddModal(); return; }
+    const popover = document.getElementById("ai-popover");
+    if (popover.classList.contains("active")) { closeAiPopover(); }
+  }
+});
+
 // Close popover when clicking outside
 document.addEventListener("click", (e) => {
   const popover = document.getElementById("ai-popover");
