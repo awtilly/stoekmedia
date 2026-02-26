@@ -69,6 +69,7 @@
               <th>Budget</th>
               <th>Location</th>
               <th>Last Activity</th>
+              <th style="width:40px;"></th>
             </tr>
           </thead>
           <tbody id="clients-tbody"></tbody>
@@ -165,6 +166,17 @@
         <button class="gd-btn" onclick="closeAddModal()">Cancel</button>
         <button class="gd-btn gd-btn-primary" onclick="saveClient()">Save Client</button>
       </div>
+    </div>
+  </div>
+
+  <!-- AI Summary Popover -->
+  <div id="ai-popover" class="gd-ai-popover">
+    <div class="gd-ai-popover-header">
+      <span>&#10024; Quick Summary</span>
+      <button class="gd-ai-popover-close" onclick="closeAiPopover()">&times;</button>
+    </div>
+    <div id="ai-popover-content" class="gd-ai-popover-content">
+      <div class="gd-spinner"></div>
     </div>
   </div>
 

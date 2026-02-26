@@ -1,4 +1,4 @@
-import { auth, db, storage } from "./firebase-config.js";
+import { auth, db, storage, functions, httpsCallable } from "./firebase-config.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import {
   doc, getDoc, updateDoc, deleteDoc, addDoc, getDocs,
@@ -604,4 +604,84 @@ window.showComparison = function () {
 
 window.closeCompareModal = function () {
   document.getElementById("compare-modal").classList.remove("active");
+};
+
+/* ===== AI CHAT PANEL ===== */
+const askAssistant = httpsCallable(functions, "askAssistant");
+let aiChatHistory = [];
+
+function formatAiResponse(text) {
+  let html = text
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/^\s*[-*]\s+(.+)$/gm, "<li>$1</li>")
+    .replace(/\n/g, "<br>");
+  html = html.replace(/((?:<li>.*<\/li><br>?)+)/g, "<ul>$1</ul>");
+  html = html.replace(/<ul><br>/g, "<ul>").replace(/<br><\/ul>/g, "</ul>");
+  html = html.replace(/<br><li>/g, "<li>");
+  return html;
+}
+
+function addAiMessage(text, type) {
+  const el = document.getElementById("ai-messages");
+  const div = document.createElement("div");
+  if (type === "user") {
+    div.className = "gd-ai-msg gd-ai-msg-user";
+    div.textContent = text;
+  } else if (type === "error") {
+    div.className = "gd-ai-msg gd-ai-msg-error";
+    div.textContent = text;
+  } else {
+    div.className = "gd-ai-msg gd-ai-msg-ai";
+    div.innerHTML = formatAiResponse(text);
+  }
+  el.appendChild(div);
+  el.scrollTop = el.scrollHeight;
+}
+
+function showTypingIndicator() {
+  const el = document.getElementById("ai-messages");
+  const div = document.createElement("div");
+  div.className = "gd-ai-typing";
+  div.id = "ai-typing";
+  div.innerHTML = '<div class="gd-ai-typing-dot"></div><div class="gd-ai-typing-dot"></div><div class="gd-ai-typing-dot"></div>';
+  el.appendChild(div);
+  el.scrollTop = el.scrollHeight;
+}
+
+function removeTypingIndicator() {
+  const t = document.getElementById("ai-typing");
+  if (t) t.remove();
+}
+
+window.toggleAiPanel = function () {
+  document.getElementById("ai-panel").classList.toggle("open");
+};
+
+window.sendQuickAction = function (text) {
+  document.getElementById("ai-input").value = text;
+  sendAiMessage();
+};
+
+window.sendAiMessage = async function () {
+  const input = document.getElementById("ai-input");
+  const btn = document.getElementById("ai-send-btn");
+  const question = input.value.trim();
+  if (!question) return;
+
+  addAiMessage(question, "user");
+  input.value = "";
+  btn.disabled = true;
+  showTypingIndicator();
+
+  try {
+    const result = await askAssistant({ question, clientId, context: "client_detail" });
+    removeTypingIndicator();
+    addAiMessage(result.data.response, "ai");
+  } catch (err) {
+    removeTypingIndicator();
+    const msg = err.message || "Something went wrong. Please try again.";
+    addAiMessage(msg, "error");
+  }
+  btn.disabled = false;
 };

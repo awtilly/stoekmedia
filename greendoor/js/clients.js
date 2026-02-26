@@ -1,9 +1,11 @@
-import { auth, db } from "./firebase-config.js";
+import { auth, db, functions, httpsCallable } from "./firebase-config.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import {
   collection, query, where, orderBy, getDocs, addDoc, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { getCurrentUser, formatCurrency, timeAgo, statusLabel, showToast } from "./auth.js";
+
+const askAssistant = httpsCallable(functions, "askAssistant");
 
 let allClients = [];
 
@@ -51,6 +53,7 @@ function renderClients(clients) {
       <td>${c.budgetMin || c.budgetMax ? formatCurrency(c.budgetMin) + " — " + formatCurrency(c.budgetMax) : "—"}</td>
       <td>${c.preferredLocations && c.preferredLocations.length ? c.preferredLocations[0] : "—"}</td>
       <td>${timeAgo(c.lastActivityDate)}</td>
+      <td><button class="gd-ai-icon-btn" onclick="event.stopPropagation(); showAiSummary('${c.id}', this)" title="AI Quick Summary">&#10024;</button></td>
     </tr>
   `).join("");
 }
@@ -153,3 +156,64 @@ window.saveClient = async function () {
     showToast("Failed to save client.", "error");
   }
 };
+
+/* ===== AI QUICK SUMMARY POPOVER ===== */
+let aiPopoverCache = {};
+
+function formatPopoverHtml(text) {
+  let html = text
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/^\s*[-*]\s+(.+)$/gm, "<li>$1</li>")
+    .replace(/\n/g, "<br>");
+  html = html.replace(/((?:<li>.*<\/li><br>?)+)/g, "<ul>$1</ul>");
+  html = html.replace(/<ul><br>/g, "<ul>").replace(/<br><\/ul>/g, "</ul>");
+  html = html.replace(/<br><li>/g, "<li>");
+  return html;
+}
+
+window.showAiSummary = async function (clientId, btnEl) {
+  const popover = document.getElementById("ai-popover");
+  const content = document.getElementById("ai-popover-content");
+
+  // Position popover near the button
+  const rect = btnEl.getBoundingClientRect();
+  popover.style.top = (rect.bottom + window.scrollY + 8) + "px";
+  popover.style.right = (window.innerWidth - rect.right) + "px";
+  popover.style.left = "auto";
+  popover.classList.add("active");
+
+  // Check cache
+  if (aiPopoverCache[clientId]) {
+    content.innerHTML = formatPopoverHtml(aiPopoverCache[clientId]);
+    return;
+  }
+
+  content.innerHTML = '<div class="gd-spinner"></div>';
+
+  try {
+    const result = await askAssistant({
+      question: "Give me a 3-4 sentence quick summary of this client: their status, key preferences, when they were last contacted, and what I should do next.",
+      clientId,
+      context: "client_detail"
+    });
+    const text = result.data.response;
+    aiPopoverCache[clientId] = text;
+    content.innerHTML = formatPopoverHtml(text);
+  } catch (err) {
+    console.error("AI summary error:", err);
+    content.innerHTML = '<span style="color: var(--color-error);">Could not load summary.</span>';
+  }
+};
+
+window.closeAiPopover = function () {
+  document.getElementById("ai-popover").classList.remove("active");
+};
+
+// Close popover when clicking outside
+document.addEventListener("click", (e) => {
+  const popover = document.getElementById("ai-popover");
+  if (popover.classList.contains("active") && !popover.contains(e.target) && !e.target.classList.contains("gd-ai-icon-btn")) {
+    popover.classList.remove("active");
+  }
+});

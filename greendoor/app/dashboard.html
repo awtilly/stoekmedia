@@ -48,6 +48,20 @@
           <h1>Welcome back, <em id="welcome-name"></em></h1>
         </div>
 
+        <!-- AI Daily Briefing -->
+        <div id="ai-briefing" class="gd-card gd-ai-briefing-card">
+          <div class="gd-ai-briefing-header">
+            <div class="gd-ai-briefing-title"><span>&#10024;</span> AI Daily Briefing</div>
+            <button class="gd-btn gd-btn-sm" onclick="refreshBriefing()">Refresh</button>
+          </div>
+          <div id="ai-briefing-content" class="gd-ai-briefing-content">
+            <div class="gd-ai-briefing-loading">
+              <div class="gd-spinner"></div>
+              <span>Generating your daily briefing...</span>
+            </div>
+          </div>
+        </div>
+
         <!-- Stat Cards -->
         <div class="gd-stats-row">
           <div class="gd-stat-card">

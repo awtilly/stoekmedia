@@ -1,9 +1,11 @@
-import { auth, db } from "./firebase-config.js";
+import { auth, db, functions, httpsCallable } from "./firebase-config.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import {
   collection, query, where, orderBy, limit, getDocs, getCountFromServer, Timestamp
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { getCurrentUser, timeAgo, formatDate } from "./auth.js";
+
+const askAssistant = httpsCallable(functions, "askAssistant");
 
 onAuthStateChanged(auth, async (user) => {
   if (!user) return;
@@ -109,4 +111,54 @@ onAuthStateChanged(auth, async (user) => {
 
   document.getElementById("dashboard-loading").classList.add("gd-hidden");
   document.getElementById("dashboard-content").classList.remove("gd-hidden");
+
+  // Load AI briefing
+  loadBriefing();
 });
+
+/* ===== AI DAILY BRIEFING ===== */
+function formatBriefingHtml(text) {
+  let html = text
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/^\s*[-*]\s+(.+)$/gm, "<li>$1</li>")
+    .replace(/\n/g, "<br>");
+  html = html.replace(/((?:<li>.*<\/li><br>?)+)/g, "<ul>$1</ul>");
+  html = html.replace(/<ul><br>/g, "<ul>").replace(/<br><\/ul>/g, "</ul>");
+  html = html.replace(/<br><li>/g, "<li>");
+  return html;
+}
+
+async function loadBriefing() {
+  const contentEl = document.getElementById("ai-briefing-content");
+  const today = new Date().toISOString().slice(0, 10);
+  const cacheKey = "gd_briefing_" + today;
+
+  // Check sessionStorage cache
+  const cached = sessionStorage.getItem(cacheKey);
+  if (cached) {
+    contentEl.innerHTML = formatBriefingHtml(cached);
+    return;
+  }
+
+  contentEl.innerHTML = '<div class="gd-ai-briefing-loading"><div class="gd-spinner"></div><span>Generating your daily briefing...</span></div>';
+
+  try {
+    const result = await askAssistant({
+      question: "Give me my daily briefing. Summarize my current client pipeline, flag any clients I haven't contacted in over 14 days, note upcoming showings this week, and suggest 2-3 priority actions for today. Keep it concise.",
+      context: "dashboard"
+    });
+    const text = result.data.response;
+    sessionStorage.setItem(cacheKey, text);
+    contentEl.innerHTML = formatBriefingHtml(text);
+  } catch (err) {
+    console.error("Briefing error:", err);
+    contentEl.innerHTML = '<div class="gd-ai-briefing-error">Could not load briefing. <button class="gd-btn gd-btn-sm" onclick="refreshBriefing()">Try Again</button></div>';
+  }
+}
+
+window.refreshBriefing = function () {
+  const today = new Date().toISOString().slice(0, 10);
+  sessionStorage.removeItem("gd_briefing_" + today);
+  loadBriefing();
+};
