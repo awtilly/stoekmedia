@@ -6,7 +6,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { getCurrentUser, formatDateTime, showToast } from "./auth.js";
 
-let currentView = "month";
+let currentView = "week";
 let currentDate = new Date();
 let allCalEvents = []; // merged showings + followUps + events
 let allClients = {};
