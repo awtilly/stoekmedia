@@ -11,6 +11,7 @@ let currentDate = new Date();
 let allCalEvents = []; // merged showings + followUps + events
 let allClients = {};
 let editingEventId = null;
+let draggingEventId = null;
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MONTHS = ["January", "February", "March", "April", "May", "June",
@@ -153,12 +154,15 @@ function renderMonth() {
     const dayEvents = allCalEvents.filter(e => sameDay(e.start, date));
     const maxShow = 3;
 
-    html += `<div class="gd-cal-day${isToday ? " today" : ""}" onclick="onDayClick(${year},${month},${d})">`;
+    html += `<div class="gd-cal-day${isToday ? " today" : ""}" data-date="${year}-${month}-${d}" onclick="onDayClick(${year},${month},${d})" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="event.preventDefault();this.classList.remove('drag-over');dropOnDay(${year},${month},${d})">`;
     html += `<div class="gd-cal-day-num">${d}</div>`;
     html += '<div class="gd-cal-day-events">';
 
     dayEvents.slice(0, maxShow).forEach(ev => {
-      html += `<div class="gd-cal-event-dot ${ev.type}" onclick="event.stopPropagation();showPopover('${ev.id}',this)">${ev.title}</div>`;
+      const clickHandler = ev.type === "event"
+        ? `event.stopPropagation();editEvent('${ev.id}')`
+        : `event.stopPropagation();showPopover('${ev.id}',this)`;
+      html += `<div class="gd-cal-event-dot ${ev.type}" draggable="true" ondragstart="onEventDragStart(event,'${ev.id}')" onclick="${clickHandler}">${ev.title}</div>`;
     });
 
     if (dayEvents.length > maxShow) {
@@ -202,7 +206,9 @@ function renderWeek() {
     const label = h === 0 ? "12 AM" : h < 12 ? `${h} AM` : h === 12 ? "12 PM" : `${h - 12} PM`;
     html += `<div class="gd-cal-week-time">${label}</div>`;
     for (let i = 0; i < 7; i++) {
-      html += `<div class="gd-cal-week-cell" data-day="${i}" data-hour="${h}"></div>`;
+      const cellDate = new Date(weekStart);
+      cellDate.setDate(cellDate.getDate() + i);
+      html += `<div class="gd-cal-week-cell" data-day="${i}" data-hour="${h}" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="event.preventDefault();this.classList.remove('drag-over');dropOnWeekCell(${cellDate.getFullYear()},${cellDate.getMonth()},${cellDate.getDate()},${h})"></div>`;
     }
   }
 
@@ -234,7 +240,12 @@ function renderWeek() {
         evEl.style.height = height + "px";
         evEl.style.background = ev.color;
         evEl.textContent = ev.title;
-        evEl.onclick = (e) => { e.stopPropagation(); showPopover(ev.id, evEl); };
+        evEl.draggable = true;
+        evEl.addEventListener("dragstart", (e) => { onEventDragStart(e, ev.id); });
+        evEl.onclick = (e) => {
+          e.stopPropagation();
+          if (ev.type === "event") { editEvent(ev.id); } else { showPopover(ev.id, evEl); }
+        };
         cell.appendChild(evEl);
       }
     });
@@ -436,6 +447,75 @@ window.deleteEvent = async function (id) {
     showToast("Failed to delete event.", "error");
   }
 };
+
+// Drag and drop
+window.onEventDragStart = function (e, eventId) {
+  draggingEventId = eventId;
+  e.dataTransfer.effectAllowed = "move";
+  e.dataTransfer.setData("text/plain", eventId);
+  // Add a slight delay so the drag image renders
+  setTimeout(() => {
+    e.target.style.opacity = "0.5";
+  }, 0);
+};
+
+window.dropOnDay = async function (year, month, day) {
+  if (!draggingEventId) return;
+  const ev = allCalEvents.find(e => e.id === draggingEventId);
+  if (!ev) return;
+
+  const newDate = new Date(year, month, day, ev.start.getHours(), ev.start.getMinutes());
+  await moveEvent(ev, newDate);
+  draggingEventId = null;
+};
+
+window.dropOnWeekCell = async function (year, month, day, hour) {
+  if (!draggingEventId) return;
+  const ev = allCalEvents.find(e => e.id === draggingEventId);
+  if (!ev) return;
+
+  const newDate = new Date(year, month, day, hour, ev.start.getMinutes());
+  await moveEvent(ev, newDate);
+  draggingEventId = null;
+};
+
+async function moveEvent(ev, newStart) {
+  const user = auth.currentUser;
+  if (!user) return;
+
+  const diff = newStart.getTime() - ev.start.getTime();
+  if (diff === 0) return;
+
+  const newEnd = new Date(ev.end.getTime() + diff);
+
+  try {
+    if (ev.type === "event") {
+      await updateDoc(doc(db, "events", ev.id), {
+        startDate: Timestamp.fromDate(newStart),
+        endDate: Timestamp.fromDate(newEnd)
+      });
+    } else if (ev.type === "showing") {
+      await updateDoc(doc(db, "showings", ev.id), {
+        showingDate: Timestamp.fromDate(newStart),
+        endDate: Timestamp.fromDate(newEnd),
+        updatedAt: serverTimestamp()
+      });
+    } else if (ev.type === "followup") {
+      await updateDoc(doc(db, "followUps", ev.id), {
+        dueDate: Timestamp.fromDate(newStart)
+      });
+    }
+
+    // Update locally for instant feedback
+    ev.start = newStart;
+    ev.end = newEnd;
+    render();
+    showToast("Event moved!");
+  } catch (e) {
+    console.error("Move event error:", e);
+    showToast("Failed to move event.", "error");
+  }
+}
 
 // Escape key
 document.addEventListener("keydown", (e) => {

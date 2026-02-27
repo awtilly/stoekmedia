@@ -3219,9 +3219,19 @@ textarea.gd-input {
   cursor: pointer;
 }
 
+.gd-cal-event-dot:hover {
+  filter: brightness(1.15);
+}
+
 .gd-cal-event-dot.showing { background: #22c55e; }
 .gd-cal-event-dot.followup { background: #f59e0b; }
 .gd-cal-event-dot.event { background: #3b82f6; }
+
+.gd-cal-day.drag-over {
+  background: #dcfce7;
+  outline: 2px dashed #22c55e;
+  outline-offset: -2px;
+}
 
 .gd-cal-more {
   font-size: 0.65rem;
@@ -3296,6 +3306,12 @@ textarea.gd-input {
   background: #f0fdf4;
 }
 
+.gd-cal-week-cell.drag-over {
+  background: #dcfce7;
+  outline: 2px dashed #22c55e;
+  outline-offset: -2px;
+}
+
 .gd-cal-week-event {
   position: absolute;
   left: 2px;
@@ -3307,6 +3323,10 @@ textarea.gd-input {
   overflow: hidden;
   cursor: pointer;
   z-index: 2;
+}
+
+.gd-cal-week-event:hover {
+  filter: brightness(1.15);
 }
 
 .gd-cal-week-event.showing { background: #22c55e; }
