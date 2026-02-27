@@ -1655,6 +1655,72 @@ window.sendQuickAction = function (text) {
   sendAiMessage();
 };
 
+/* ===== VOICE INPUT ===== */
+let recognition = null;
+let isListening = false;
+
+window.toggleVoiceInput = function () {
+  const micBtn = document.getElementById("ai-mic-btn");
+
+  if (isListening) {
+    if (recognition) recognition.stop();
+    return;
+  }
+
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    showToast("Voice input not supported in this browser.", "error");
+    return;
+  }
+
+  recognition = new SpeechRecognition();
+  recognition.lang = "en-US";
+  recognition.interimResults = true;
+  recognition.continuous = false;
+  recognition.maxAlternatives = 1;
+
+  const input = document.getElementById("ai-input");
+
+  recognition.onstart = () => {
+    isListening = true;
+    micBtn.classList.add("listening");
+    input.placeholder = "Listening...";
+  };
+
+  recognition.onresult = (e) => {
+    let transcript = "";
+    for (let i = 0; i < e.results.length; i++) {
+      transcript += e.results[i][0].transcript;
+    }
+    input.value = transcript;
+
+    // Auto-send when speech is final
+    if (e.results[e.results.length - 1].isFinal) {
+      setTimeout(() => {
+        if (input.value.trim()) {
+          sendAiMessage();
+        }
+      }, 400);
+    }
+  };
+
+  recognition.onerror = (e) => {
+    console.error("Speech error:", e.error);
+    if (e.error !== "aborted" && e.error !== "no-speech") {
+      showToast("Couldn't hear you — try again.", "error");
+    }
+  };
+
+  recognition.onend = () => {
+    isListening = false;
+    micBtn.classList.remove("listening");
+    input.placeholder = "Ask or speak to your AI assistant...";
+    recognition = null;
+  };
+
+  recognition.start();
+};
+
 // Close modals on Escape key
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {

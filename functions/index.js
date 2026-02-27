@@ -18,9 +18,30 @@ const boldsignWebhookSecret = defineSecret("BOLDSIGN_WEBHOOK_SECRET");
    AI ASSISTANT
    ================================================================ */
 
-const SYSTEM_PROMPT = `You are GreenDoor AI, an intelligent assistant for real estate professionals. You help realtors manage their clients, draft communications, analyze client preferences, and make smart recommendations. Be concise, professional, and actionable. When drafting emails, write them ready to send — not as templates with brackets. Use the client's actual name and details. Format emails with proper greeting and sign-off. When making suggestions, be specific and reference actual data from the client's history. Use markdown formatting: **bold** for emphasis, bullet points for lists.
+const SYSTEM_PROMPT = `You are GreenDoor AI, an intelligent voice-first assistant for real estate professionals. You help realtors manage their clients, schedule showings, set follow-ups, and keep their CRM up to date — all through natural conversation.
 
-You have tools to take actions on behalf of the realtor. When the user asks you to create a client, update client info, log an activity, or search for clients — use the appropriate tool instead of just describing what to do. After using a tool, confirm what you did in plain language.`;
+CORE BEHAVIOR:
+- Understand casual, messy, spoken language. Realtors talk fast — they'll say "Thursday" not "2026-02-27". They'll say "John" not "John Smith". Handle typos, abbreviations, and incomplete sentences.
+- When you can figure out what they mean, just do it. Don't ask for clarification you don't need.
+- When critical info is missing (like a date for a showing, or which client they mean when there are multiple matches), ask a short follow-up question. Keep it conversational, not robotic.
+- Today's date is ${new Date().toISOString().slice(0, 10)} (${["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"][new Date().getDay()]}). Use this to resolve relative dates: "Thursday" = the coming Thursday, "next week" = next Monday, "tomorrow" = the next day, etc.
+- After taking an action, confirm briefly what you did. Example: "Done — scheduled a showing at 455 W Test St for Thursday at 10:30 AM."
+
+MATCHING CLIENTS:
+- When the user mentions a name, fuzzy-match it against the client list in context. "John" matches "John Smith" if there's only one John. If ambiguous, ask: "I see John Smith and John Davis — which one?"
+- If you're already on a client's detail page, assume they mean that client unless they specify otherwise.
+
+DRAFTING EMAILS:
+- Write emails ready to send — no brackets or placeholders. Use the client's real name and details.
+- Format with proper greeting and sign-off.
+
+TOOLS:
+- You have tools to create showings, follow-ups, events, update clients, log activities, and more. Use them proactively when the user's intent is clear.
+- If the user says something like "I have a showing with John Thursday at 10:30 at 455 W Test St" — use create_showing immediately.
+- If they say "remind me to call Sarah next Monday" — use create_followup.
+- If they say "add a team meeting Friday at 2pm" — use create_event.
+
+Use markdown formatting: **bold** for emphasis, bullet points for lists. Be concise and actionable.`;
 
 /* --- AI Tool Definitions --- */
 const AI_TOOLS = [
@@ -93,6 +114,72 @@ const AI_TOOLS = [
         status: { type: "string", enum: ["lead", "active_buyer", "active_seller", "under_contract", "closed", "inactive"], description: "Filter by status" }
       },
       required: []
+    }
+  },
+  {
+    name: "create_showing",
+    description: "Schedule a property showing for a client. Use when the realtor says they have a showing, wants to schedule one, or mentions showing a property. Resolve relative dates like 'Thursday' or 'next Tuesday' to actual ISO dates before calling.",
+    input_schema: {
+      type: "object",
+      properties: {
+        address: { type: "string", description: "Property address for the showing" },
+        showingDate: { type: "string", description: "ISO 8601 datetime string for the showing start (e.g. 2026-03-05T10:30:00)" },
+        duration: { type: "number", description: "Duration in minutes (default: 60)" },
+        mlsNumber: { type: "string", description: "MLS number if known" },
+        listingPrice: { type: "number", description: "Listing price if known" },
+        notes: { type: "string", description: "Any notes about the showing" },
+        clientId: { type: "string", description: "Client ID. Use the current client if on client detail page, or resolve from name if mentioned." },
+        createFollowUp: { type: "boolean", description: "Whether to auto-create a follow-up reminder for the day after (default: true)" }
+      },
+      required: ["address", "showingDate"]
+    }
+  },
+  {
+    name: "update_showing",
+    description: "Update an existing showing — reschedule, complete, or cancel it. Use when the realtor wants to change a showing's time, mark it done, or cancel it.",
+    input_schema: {
+      type: "object",
+      properties: {
+        showingId: { type: "string", description: "The showing document ID" },
+        showingDate: { type: "string", description: "New ISO 8601 datetime if rescheduling" },
+        status: { type: "string", enum: ["scheduled", "completed", "cancelled"], description: "New status" },
+        clientRating: { type: "number", description: "Client rating 1-5 (when completing)" },
+        clientFeedback: { type: "string", description: "Client feedback (when completing)" },
+        realtorNotes: { type: "string", description: "Realtor notes" }
+      },
+      required: ["showingId"]
+    }
+  },
+  {
+    name: "create_followup",
+    description: "Create a follow-up reminder. Use when the realtor says 'remind me', 'follow up', 'don't forget to', or anything about a future task related to a client.",
+    input_schema: {
+      type: "object",
+      properties: {
+        title: { type: "string", description: "Short title for the follow-up (e.g. 'Call Sarah about listing')" },
+        dueDate: { type: "string", description: "ISO 8601 date string for when it's due (e.g. 2026-03-05)" },
+        priority: { type: "string", enum: ["low", "medium", "high"], description: "Priority level (default: medium)" },
+        notes: { type: "string", description: "Additional notes" },
+        clientId: { type: "string", description: "Client ID if associated with a client" }
+      },
+      required: ["title", "dueDate"]
+    }
+  },
+  {
+    name: "create_event",
+    description: "Create a calendar event. Use when the realtor wants to add a meeting, appointment, or any time-blocked event that isn't a property showing.",
+    input_schema: {
+      type: "object",
+      properties: {
+        title: { type: "string", description: "Event title" },
+        startDate: { type: "string", description: "ISO 8601 datetime for event start" },
+        endDate: { type: "string", description: "ISO 8601 datetime for event end (default: 1 hour after start)" },
+        allDay: { type: "boolean", description: "Whether it's an all-day event" },
+        description: { type: "string", description: "Event description" },
+        color: { type: "string", description: "Event color: #3b82f6 (blue), #22c55e (green), #f59e0b (amber), #ef4444 (red), #8b5cf6 (purple)" },
+        clientId: { type: "string", description: "Associated client ID if relevant" }
+      },
+      required: ["title", "startDate"]
     }
   }
 ];
@@ -212,12 +299,196 @@ async function handleSearchClients(input, uid) {
   return { success: true, count: results.length, clients: results.slice(0, 20) };
 }
 
+async function handleCreateShowing(input, uid, clientId) {
+  const resolvedClientId = input.clientId || clientId;
+  if (!resolvedClientId) {
+    return { success: false, error: "No client specified. Which client is this showing for?" };
+  }
+
+  // Verify ownership
+  const clientSnap = await db.doc(`clients/${resolvedClientId}`).get();
+  if (!clientSnap.exists || clientSnap.data().realtorId !== uid) {
+    return { success: false, error: "Client not found or access denied." };
+  }
+
+  const startDate = new Date(input.showingDate);
+  if (isNaN(startDate.getTime())) {
+    return { success: false, error: "Invalid date. Please provide a valid date and time." };
+  }
+
+  const duration = input.duration || 60;
+  const endDate = new Date(startDate.getTime() + duration * 60000);
+
+  const data = {
+    clientId: resolvedClientId,
+    realtorId: uid,
+    address: input.address,
+    mlsNumber: input.mlsNumber || "",
+    listingPrice: input.listingPrice || null,
+    showingDate: Timestamp.fromDate(startDate),
+    endDate: Timestamp.fromDate(endDate),
+    status: "scheduled",
+    realtorNotes: input.notes || "",
+    propertyId: null,
+    clientRating: null,
+    clientFeedback: "",
+    disclosuresSent: false,
+    followUpId: null,
+    createdAt: FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp()
+  };
+
+  const showingRef = await db.collection("showings").add(data);
+
+  // Log activity
+  await db.collection("activities").add({
+    clientId: resolvedClientId,
+    realtorId: uid,
+    type: "showing",
+    subject: `Showing scheduled: ${input.address}`,
+    body: `${startDate.toLocaleString("en-US", { weekday: "long", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}`,
+    timestamp: FieldValue.serverTimestamp()
+  });
+  await db.doc(`clients/${resolvedClientId}`).update({ lastActivityDate: FieldValue.serverTimestamp() });
+
+  // Auto-create follow-up
+  if (input.createFollowUp !== false) {
+    const fuDate = new Date(startDate.getTime() + 86400000);
+    await db.collection("followUps").add({
+      realtorId: uid,
+      clientId: resolvedClientId,
+      title: `Follow up: ${input.address} showing`,
+      dueDate: Timestamp.fromDate(fuDate),
+      priority: "medium",
+      status: "pending",
+      notes: "",
+      sourceType: "showing",
+      sourceId: showingRef.id,
+      createdAt: FieldValue.serverTimestamp()
+    });
+  }
+
+  return {
+    success: true,
+    showingId: showingRef.id,
+    address: input.address,
+    date: startDate.toISOString(),
+    clientName: clientSnap.data().fullName
+  };
+}
+
+async function handleUpdateShowing(input, uid) {
+  if (!input.showingId) {
+    return { success: false, error: "No showing ID provided." };
+  }
+
+  const showingSnap = await db.doc(`showings/${input.showingId}`).get();
+  if (!showingSnap.exists || showingSnap.data().realtorId !== uid) {
+    return { success: false, error: "Showing not found or access denied." };
+  }
+
+  const updates = { updatedAt: FieldValue.serverTimestamp() };
+  if (input.showingDate) {
+    const newDate = new Date(input.showingDate);
+    if (!isNaN(newDate.getTime())) {
+      updates.showingDate = Timestamp.fromDate(newDate);
+      const duration = 60;
+      updates.endDate = Timestamp.fromDate(new Date(newDate.getTime() + duration * 60000));
+    }
+  }
+  if (input.status) updates.status = input.status;
+  if (input.clientRating) updates.clientRating = input.clientRating;
+  if (input.clientFeedback) updates.clientFeedback = input.clientFeedback;
+  if (input.realtorNotes) updates.realtorNotes = input.realtorNotes;
+
+  await db.doc(`showings/${input.showingId}`).update(updates);
+
+  // Log activity if completing
+  if (input.status === "completed") {
+    const showing = showingSnap.data();
+    await db.collection("activities").add({
+      clientId: showing.clientId,
+      realtorId: uid,
+      type: "showing",
+      subject: `Showing completed: ${showing.address}`,
+      body: input.clientRating ? `Rating: ${input.clientRating}/5` : "",
+      timestamp: FieldValue.serverTimestamp()
+    });
+    await db.doc(`clients/${showing.clientId}`).update({ lastActivityDate: FieldValue.serverTimestamp() });
+  }
+
+  return { success: true, showingId: input.showingId, updates: Object.keys(updates) };
+}
+
+async function handleCreateFollowUp(input, uid, clientId) {
+  const resolvedClientId = input.clientId || clientId;
+
+  const dueDate = new Date(input.dueDate);
+  if (isNaN(dueDate.getTime())) {
+    return { success: false, error: "Invalid due date." };
+  }
+
+  const data = {
+    realtorId: uid,
+    clientId: resolvedClientId || null,
+    title: input.title,
+    dueDate: Timestamp.fromDate(dueDate),
+    priority: input.priority || "medium",
+    status: "pending",
+    notes: input.notes || "",
+    sourceType: null,
+    sourceId: null,
+    createdAt: FieldValue.serverTimestamp()
+  };
+
+  const docRef = await db.collection("followUps").add(data);
+  return {
+    success: true,
+    followUpId: docRef.id,
+    title: input.title,
+    dueDate: dueDate.toISOString().slice(0, 10)
+  };
+}
+
+async function handleCreateEvent(input, uid) {
+  const startDate = new Date(input.startDate);
+  if (isNaN(startDate.getTime())) {
+    return { success: false, error: "Invalid start date." };
+  }
+
+  const endDate = input.endDate ? new Date(input.endDate) : new Date(startDate.getTime() + 3600000);
+
+  const data = {
+    realtorId: uid,
+    title: input.title,
+    description: input.description || "",
+    startDate: Timestamp.fromDate(startDate),
+    endDate: Timestamp.fromDate(endDate),
+    allDay: input.allDay || false,
+    color: input.color || "#3b82f6",
+    clientId: input.clientId || null,
+    createdAt: FieldValue.serverTimestamp()
+  };
+
+  const docRef = await db.collection("events").add(data);
+  return {
+    success: true,
+    eventId: docRef.id,
+    title: input.title,
+    date: startDate.toISOString()
+  };
+}
+
 async function executeToolCall(toolName, toolInput, uid, clientId) {
   switch (toolName) {
     case "create_client": return handleCreateClient(toolInput, uid);
     case "update_client": return handleUpdateClient(toolInput, uid, clientId);
     case "log_activity": return handleLogActivity(toolInput, uid, clientId);
     case "search_clients": return handleSearchClients(toolInput, uid);
+    case "create_showing": return handleCreateShowing(toolInput, uid, clientId);
+    case "update_showing": return handleUpdateShowing(toolInput, uid);
+    case "create_followup": return handleCreateFollowUp(toolInput, uid, clientId);
+    case "create_event": return handleCreateEvent(toolInput, uid);
     default: return { success: false, error: `Unknown tool: ${toolName}` };
   }
 }
@@ -355,6 +626,7 @@ ${files.map(f => `- ${f.name} (${f.folder})`).join("\n") || "No files"}`;
         const showingsData = showingsSnap.docs.map(d => {
           const s = d.data();
           return {
+            id: d.id,
             address: s.address,
             date: s.showingDate ? s.showingDate.toDate().toISOString() : "unknown",
             status: s.status,
@@ -366,7 +638,7 @@ ${files.map(f => `- ${f.name} (${f.folder})`).join("\n") || "No files"}`;
         contextText += `
 
 SHOWINGS (${showingsData.length}):
-${showingsData.map(s => `- ${s.address} | ${s.date} | ${s.status}${s.rating ? " | Rating: " + s.rating + "/5" : ""}${s.feedback ? " | " + s.feedback : ""}`).join("\n") || "No showings"}`;
+${showingsData.map(s => `- [ID: ${s.id}] ${s.address} | ${s.date} | ${s.status}${s.rating ? " | Rating: " + s.rating + "/5" : ""}${s.feedback ? " | " + s.feedback : ""}`).join("\n") || "No showings"}`;
 
       } else if (context === "dashboard") {
         const clientsSnap = await db.collection("clients")
@@ -419,6 +691,7 @@ ${showingsData.map(s => `- ${s.address} | ${s.date} | ${s.status}${s.rating ? " 
         contextText = `
 DASHBOARD SUMMARY:
 - Total Clients: ${clients.length}
+- Client List: ${clients.map(c => `${c.name} [ID: ${c.id}] (${c.status})`).join(", ")}
 - By Status: ${Object.entries(statusCounts).map(([s, n]) => `${s}: ${n}`).join(", ") || "none"}
 - Clients Not Contacted in 14+ Days (${staleClients.length}):
 ${staleClients.map(c => `  - ${c.name} (${c.status}) — ${c.daysAgo} days since last contact`).join("\n") || "  None — you're on top of it!"}
@@ -463,17 +736,17 @@ ${showings.map(s => `  - ${s.date}: ${s.address} with ${s.clientName}`).join("\n
       // Context-conditional tool selection
       let tools;
       if (context === "client_detail" && clientId) {
-        tools = AI_TOOLS; // all 4 tools
+        tools = AI_TOOLS; // all tools
       } else if (context === "dashboard") {
-        tools = AI_TOOLS.filter(t => t.name === "create_client" || t.name === "search_clients");
+        tools = AI_TOOLS.filter(t => ["create_client", "search_clients", "create_event", "create_followup", "create_showing"].includes(t.name));
       } else {
         tools = [];
       }
 
-      // Agentic loop — up to 5 rounds
+      // Agentic loop — up to 8 rounds (allows for tool use + follow-up questions)
       const messages = [{ role: "user", content: userMessage }];
       const actionsPerformed = [];
-      const MAX_ROUNDS = 5;
+      const MAX_ROUNDS = 8;
 
       let finalText = "";
       for (let round = 0; round < MAX_ROUNDS; round++) {

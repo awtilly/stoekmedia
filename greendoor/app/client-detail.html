@@ -716,7 +716,8 @@
     </div>
     <div id="ai-messages" class="gd-ai-messages"></div>
     <div class="gd-ai-input-area">
-      <input type="text" id="ai-input" class="gd-ai-input" placeholder="Ask about this client..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendAiMessage();}">
+      <button id="ai-mic-btn" class="gd-ai-mic" onclick="toggleVoiceInput()" aria-label="Voice input" title="Speak to GreenDoor AI">&#127908;</button>
+      <input type="text" id="ai-input" class="gd-ai-input" placeholder="Ask or speak to your AI assistant..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendAiMessage();}">
       <button id="ai-send-btn" class="gd-ai-send" onclick="sendAiMessage()" aria-label="Send message">&#10148;</button>
     </div>
   </div>
