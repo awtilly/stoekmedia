@@ -208,6 +208,40 @@ onAuthStateChanged(auth, async (user) => {
     console.error("Schedule error:", e);
   }
 
+  // Load new listings
+  try {
+    const listingsQ = query(
+      collection(db, "listings"),
+      where("addedBy", "==", uid),
+      orderBy("createdAt", "desc"),
+      limit(5)
+    );
+    const listingsSnap = await getDocs(listingsQ);
+    const listingsEl = document.getElementById("new-listings");
+
+    if (!listingsSnap.empty) {
+      let html = "";
+      listingsSnap.forEach(d => {
+        const l = d.data();
+        const addr = l.address?.full || l.address?.street || "—";
+        const price = l.listingPrice ? `$${Number(l.listingPrice).toLocaleString()}` : "";
+        const meta = [l.bedrooms ? `${l.bedrooms}bd` : "", l.bathrooms ? `${l.bathrooms}ba` : "", l.squareFeet ? `${Number(l.squareFeet).toLocaleString()}sqft` : ""].filter(Boolean).join(" / ");
+        html += `
+          <div class="gd-new-listing-item" onclick="window.location.href='/greendoor/app/listings'" style="cursor:pointer;">
+            <div class="gd-new-listing-addr">${addr}</div>
+            <div class="gd-new-listing-meta">
+              ${price ? `<span class="gd-new-listing-price">${price}</span>` : ""}
+              ${meta ? `<span class="gd-text-muted">${meta}</span>` : ""}
+              <span class="gd-badge gd-lst-${l.status || "active"}">${l.status || "active"}</span>
+            </div>
+          </div>`;
+      });
+      listingsEl.innerHTML = html;
+    }
+  } catch (e) {
+    console.error("Listings error:", e);
+  }
+
   document.getElementById("dashboard-loading").classList.add("gd-hidden");
   document.getElementById("dashboard-content").classList.remove("gd-hidden");
 

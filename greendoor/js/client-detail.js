@@ -3,7 +3,7 @@ import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/fi
 import {
   doc, getDoc, updateDoc, deleteDoc, addDoc, getDocs,
   collection, query, where, orderBy, serverTimestamp, Timestamp,
-  getCountFromServer, limit
+  getCountFromServer, limit, onSnapshot
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import {
   ref, uploadBytesResumable, getDownloadURL
@@ -12,14 +12,16 @@ import {
   getCurrentUser, showToast, formatCurrency, formatDate, formatDateTime,
   timeAgo, formatFileSize, statusLabel
 } from "./auth.js";
+import { calculateMatchScore, matchScoreColor, matchScoreLabel } from "./match-engine.js";
 
 const params = new URLSearchParams(window.location.search);
 const clientId = params.get("id");
 let clientData = null;
 let currentActivityType = "note";
-let editingPropertyId = null;
+let editingMatchId = null;
 let selectedRating = 0;
-let allProperties = [];
+let allMatches = []; // clientListingMatches joined with listing data
+let allListingsCache = []; // all listings for match-a-listing panel
 let allFiles = [];
 let allShowings = [];
 let allFollowUps = [];
@@ -32,6 +34,8 @@ let completingShowingId = null;
 let completeRating = 0;
 let sigFiles = [];
 let sigSigners = [];
+let embedUnsubscribe = null;
+let embedPollInterval = null;
 
 if (!clientId) {
   window.location.href = "/greendoor/app/clients";
@@ -42,8 +46,8 @@ const askAssistant = httpsCallable(functions, "askAssistant");
 const sendEmailFn = httpsCallable(functions, "sendEmail");
 const sendForSignatureFn = httpsCallable(functions, "sendForSignature");
 const checkSignatureStatusFn = httpsCallable(functions, "checkSignatureStatus");
+const createEmbeddedSignatureRequestFn = httpsCallable(functions, "createEmbeddedSignatureRequest");
 const shareDocumentFn = httpsCallable(functions, "shareDocument");
-const scrapeListingFn = httpsCallable(functions, "scrapeListing");
 
 /* --- Auth gate --- */
 onAuthStateChanged(auth, async (user) => {
@@ -84,7 +88,7 @@ async function loadClient(uid) {
     }
 
     populateOverview(clientData);
-    await Promise.all([loadActivities(uid), loadFiles(uid), loadProperties(uid), loadEnvelopes(uid), loadShowings(uid), loadFollowUps(uid)]);
+    await Promise.all([loadActivities(uid), loadFiles(uid), loadMatches(uid), loadEnvelopes(uid), loadShowings(uid), loadFollowUps(uid)]);
 
     document.getElementById("detail-loading").classList.add("gd-hidden");
     document.getElementById("detail-content").classList.remove("gd-hidden");
@@ -112,6 +116,7 @@ function populateOverview(c) {
   document.getElementById("ov-sqftMin").value = c.sqftMin || "";
   document.getElementById("ov-sqftMax").value = c.sqftMax || "";
   document.getElementById("ov-mustHaveFeatures").value = (c.mustHaveFeatures || []).join(", ");
+  document.getElementById("ov-dealBreakers").value = (c.dealBreakers || []).join(", ");
   document.getElementById("ov-preApprovalStatus").value = c.preApprovalStatus || "";
   document.getElementById("ov-preApprovalAmount").value = c.preApprovalAmount || "";
   document.getElementById("ov-notes").value = c.notes || "";
@@ -136,6 +141,9 @@ window.saveOverview = async function () {
   const featStr = document.getElementById("ov-mustHaveFeatures").value;
   const features = featStr ? featStr.split(",").map(s => s.trim()).filter(Boolean) : [];
 
+  const dbStr = document.getElementById("ov-dealBreakers").value;
+  const dealBreakers = dbStr ? dbStr.split(",").map(s => s.trim()).filter(Boolean) : [];
+
   const data = {
     fullName: document.getElementById("ov-fullName").value.trim(),
     email: document.getElementById("ov-email").value.trim(),
@@ -154,6 +162,7 @@ window.saveOverview = async function () {
     sqftMin: Number(document.getElementById("ov-sqftMin").value) || null,
     sqftMax: Number(document.getElementById("ov-sqftMax").value) || null,
     mustHaveFeatures: features,
+    dealBreakers,
     preApprovalStatus: document.getElementById("ov-preApprovalStatus").value,
     preApprovalAmount: Number(document.getElementById("ov-preApprovalAmount").value) || null,
     notes: document.getElementById("ov-notes").value.trim()
@@ -181,7 +190,7 @@ window.deleteClient = async function () {
   if (!user) return;
 
   try {
-    const collections = ["activities", "files", "bookmarkedProperties", "showings", "followUps"];
+    const collections = ["activities", "files", "bookmarkedProperties", "clientListingMatches", "showings", "followUps"];
     for (const col of collections) {
       const q = query(collection(db, col), where("clientId", "==", clientId), where("realtorId", "==", user.uid));
       const snap = await getDocs(q);
@@ -854,7 +863,8 @@ window.submitSignature = async function () {
   document.getElementById("sig-send-btn").disabled = true;
 
   try {
-    await sendForSignatureFn({
+    progressText.textContent = "Preparing signature editor...";
+    const result = await createEmbeddedSignatureRequestFn({
       clientId,
       files: sigFiles,
       signers: sigSigners,
@@ -862,15 +872,71 @@ window.submitSignature = async function () {
       message: document.getElementById("sig-message").value.trim() || undefined,
       expiryDays: parseInt(document.getElementById("sig-expiry").value) || 30
     });
-    showToast("Documents sent for signature!");
     closeSignatureModal();
-    await Promise.all([loadFiles(user.uid), loadEnvelopes(user.uid)]);
+    openBoldSignEmbed(result.data.sendUrl, result.data.documentId);
   } catch (err) {
     console.error("Signature error:", err);
-    showToast(err.message || "Failed to send for signature.", "error");
+    showToast(err.message || "Failed to create signature request.", "error");
     progressEl.classList.add("gd-hidden");
     document.getElementById("sig-send-btn").disabled = false;
   }
+};
+
+/* --- BoldSign Embed --- */
+function openBoldSignEmbed(sendUrl, documentId) {
+  const modal = document.getElementById("boldsign-embed-modal");
+  const iframe = document.getElementById("boldsign-embed-iframe");
+  const loading = document.getElementById("boldsign-embed-loading");
+
+  loading.style.display = "";
+  iframe.style.display = "none";
+  iframe.src = sendUrl;
+  iframe.onload = () => {
+    loading.style.display = "none";
+    iframe.style.display = "";
+  };
+
+  modal.classList.add("active");
+
+  // Firestore listener: auto-close when draft transitions to sent/viewed/completed
+  embedUnsubscribe = onSnapshot(doc(db, "envelopes", documentId), (snap) => {
+    if (!snap.exists()) return;
+    const data = snap.data();
+    if (data.status && data.status !== "draft") {
+      showToast("Document sent for signature!");
+      closeBoldSignEmbed();
+      const user = auth.currentUser;
+      if (user) {
+        Promise.all([loadFiles(user.uid), loadEnvelopes(user.uid)]);
+      }
+    }
+  });
+
+  // Fallback poll in case webhook is delayed
+  embedPollInterval = setInterval(async () => {
+    try {
+      const result = await checkSignatureStatusFn({ documentId });
+      if (result.data.status && result.data.status !== "draft") {
+        showToast("Document sent for signature!");
+        closeBoldSignEmbed();
+        const user = auth.currentUser;
+        if (user) {
+          Promise.all([loadFiles(user.uid), loadEnvelopes(user.uid)]);
+        }
+      }
+    } catch (e) {
+      // Ignore poll errors
+    }
+  }, 15000);
+}
+
+window.closeBoldSignEmbed = function () {
+  const modal = document.getElementById("boldsign-embed-modal");
+  const iframe = document.getElementById("boldsign-embed-iframe");
+  modal.classList.remove("active");
+  iframe.src = "";
+  if (embedUnsubscribe) { embedUnsubscribe(); embedUnsubscribe = null; }
+  if (embedPollInterval) { clearInterval(embedPollInterval); embedPollInterval = null; }
 };
 
 /* --- Pending Signatures / Envelopes --- */
@@ -897,7 +963,7 @@ async function loadEnvelopes(uid) {
     section.classList.remove("gd-hidden");
 
     const statusColors = {
-      sent: "#3b82f6", viewed: "#8b5cf6", signed: "#22c55e",
+      draft: "#f59e0b", sent: "#3b82f6", viewed: "#8b5cf6", signed: "#22c55e",
       completed: "#22c55e", declined: "#ef4444", expired: "#6b7280", revoked: "#6b7280"
     };
 
@@ -915,8 +981,8 @@ async function loadEnvelopes(uid) {
         <span class="gd-envelope-name">${title}</span>
         ${signerInfo}
         <span class="gd-badge-esig" style="background: ${statusColors[e.status] || "#6b7280"}">${statusLabel(e.status)}</span>
-        <span class="gd-file-meta">${formatDate(e.sentAt)}</span>
-        <button class="gd-btn gd-btn-sm" onclick="checkEnvelopeStatus('${e.documentId}')">Check Status</button>
+        <span class="gd-file-meta">${e.status === "draft" ? "Draft" : formatDate(e.sentAt)}</span>
+        <button class="gd-btn gd-btn-sm" onclick="checkEnvelopeStatus('${e.documentId}')">${e.status === "draft" ? "Check Status" : "Check Status"}</button>
       </div>`;
     }).join("");
   } catch (e) {
@@ -939,49 +1005,105 @@ window.checkEnvelopeStatus = async function (documentId) {
   }
 };
 
-/* ===== PROPERTIES TAB ===== */
-async function loadProperties(uid) {
+/* ===== PROPERTIES TAB (Listings + Matches) ===== */
+async function loadMatches(uid) {
   try {
-    const q = query(
-      collection(db, "bookmarkedProperties"),
+    // Load clientListingMatches for this client
+    const matchQ = query(
+      collection(db, "clientListingMatches"),
       where("clientId", "==", clientId),
       where("realtorId", "==", uid),
-      orderBy("createdAt", "desc")
+      orderBy("matchedAt", "desc")
     );
-    const snap = await getDocs(q);
-    allProperties = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    renderProperties();
+    const matchSnap = await getDocs(matchQ);
+    const rawMatches = matchSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+    // Load referenced listings
+    allMatches = [];
+    for (const m of rawMatches) {
+      try {
+        const listingSnap = await getDoc(doc(db, "listings", m.listingId));
+        if (listingSnap.exists()) {
+          allMatches.push({ ...m, listing: { id: listingSnap.id, ...listingSnap.data() } });
+        }
+      } catch (e) {
+        // Listing may have been deleted
+      }
+    }
+
+    // Also cache all listings for match-a-listing panel
+    const allQ = query(collection(db, "listings"), orderBy("createdAt", "desc"));
+    const allSnap = await getDocs(allQ);
+    allListingsCache = allSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+    // Recalculate match scores
+    if (clientData) {
+      allMatches.forEach(m => {
+        const result = calculateMatchScore(m.listing, clientData);
+        m.calculatedScore = result.score;
+        m.breakdown = result.breakdown;
+        m.dealBreakerHits = result.dealBreakerHits;
+      });
+    }
+
+    renderMatches();
   } catch (e) {
-    console.error("Load properties error:", e);
+    console.error("Load matches error:", e);
   }
 }
 
-function renderProperties() {
+window.renderMatches = function () {
   const el = document.getElementById("properties-grid");
   selectedCompare.clear();
   updateCompareBar();
 
-  if (allProperties.length === 0) {
-    el.innerHTML = `<div class="gd-empty" style="grid-column:1/-1;"><div class="gd-empty-icon">&#127968;</div><div class="gd-empty-text">No properties bookmarked yet</div></div>`;
+  const statusFilter = document.getElementById("match-status-filter")?.value || "";
+  const sort = document.getElementById("match-sort")?.value || "score";
+
+  let matches = [...allMatches];
+  if (statusFilter) {
+    matches = matches.filter(m => m.status === statusFilter);
+  }
+
+  matches.sort((a, b) => {
+    switch (sort) {
+      case "price_asc": return (a.listing?.listingPrice || 0) - (b.listing?.listingPrice || 0);
+      case "price_desc": return (b.listing?.listingPrice || 0) - (a.listing?.listingPrice || 0);
+      case "newest": return (b.matchedAt?.toMillis?.() || 0) - (a.matchedAt?.toMillis?.() || 0);
+      default: return (b.calculatedScore || 0) - (a.calculatedScore || 0);
+    }
+  });
+
+  if (matches.length === 0) {
+    el.innerHTML = `<div class="gd-empty" style="grid-column:1/-1;"><div class="gd-empty-icon">&#127968;</div><div class="gd-empty-text">No matched listings yet</div></div>`;
     return;
   }
 
-  el.innerHTML = allProperties.map(p => {
-    const stars = renderStars(p.clientRating || 0);
+  el.innerHTML = matches.map(m => {
+    const l = m.listing;
+    const addr = l.address?.full || l.address?.street || "—";
+    const score = m.calculatedScore || m.matchScore || 0;
+    const color = matchScoreColor(score);
+    const stars = renderStars(m.clientRating || 0);
+
     return `
-      <div class="gd-property-card" data-id="${p.id}" onclick="editProperty('${p.id}')">
-        <input type="checkbox" class="gd-property-check" data-id="${p.id}" onclick="event.stopPropagation(); toggleCompare('${p.id}')">
-        <div class="gd-property-address">${p.address || "—"}</div>
-        <div class="gd-property-price">${p.listingPrice ? formatCurrency(p.listingPrice) : "—"}</div>
+      <div class="gd-property-card" data-id="${m.id}" onclick="openEditMatchModal('${m.id}')">
+        <input type="checkbox" class="gd-property-check" data-id="${m.id}" onclick="event.stopPropagation(); toggleCompare('${m.id}')">
+        <div class="gd-match-score-badge" style="border-color:${color}; color:${color}">${score}%</div>
+        <div class="gd-property-address">${addr}</div>
+        <div class="gd-property-price">${l.listingPrice ? formatCurrency(l.listingPrice) : "—"}</div>
         <div class="gd-property-meta">
-          <span class="gd-badge gd-badge-${p.status || "interested"}">${statusLabel(p.status || "interested")}</span>
+          <span class="gd-badge gd-badge-${m.status || "interested"}">${statusLabel(m.status || "interested")}</span>
+          ${l.bedrooms != null ? `<span>${l.bedrooms}bd</span>` : ""}
+          ${l.bathrooms != null ? `<span>${l.bathrooms}ba</span>` : ""}
+          ${l.squareFeet ? `<span>${Number(l.squareFeet).toLocaleString()}sqft</span>` : ""}
           <span class="gd-stars">${stars}</span>
         </div>
-        ${p.showingDate ? `<div class="gd-property-showing">Showing: ${formatDate(p.showingDate)}</div>` : ""}
-        ${p.listingUrl ? `<a href="${p.listingUrl}" target="_blank" class="gd-property-link" onclick="event.stopPropagation()">View Listing &rarr;</a>` : ""}
+        ${m.dealBreakerHits?.length ? `<div class="gd-match-dealbreaker">Deal breaker: ${m.dealBreakerHits.join(", ")}</div>` : ""}
+        ${l.listingUrl ? `<a href="${l.listingUrl}" target="_blank" class="gd-property-link" onclick="event.stopPropagation()">View Listing &rarr;</a>` : ""}
       </div>`;
   }).join("");
-}
+};
 
 function renderStars(rating) {
   let html = "";
@@ -991,174 +1113,161 @@ function renderStars(rating) {
   return html;
 }
 
-/* --- Star rating in modal --- */
-document.getElementById("prop-stars").addEventListener("click", (e) => {
+/* --- Edit Match Modal --- */
+document.getElementById("em-stars")?.addEventListener("click", (e) => {
   const star = e.target.closest(".gd-star");
   if (!star) return;
   selectedRating = parseInt(star.dataset.rating);
-  document.querySelectorAll("#prop-stars .gd-star").forEach(s => {
+  document.querySelectorAll("#em-stars .gd-star").forEach(s => {
     s.classList.toggle("filled", parseInt(s.dataset.rating) <= selectedRating);
   });
 });
 
-window.openPropertyModal = function (propId) {
-  editingPropertyId = propId || null;
-  document.getElementById("property-modal-title").textContent = propId ? "Edit Property" : "Add Property";
+window.openEditMatchModal = function (matchId) {
+  const m = allMatches.find(x => x.id === matchId);
+  if (!m) return;
+  editingMatchId = matchId;
 
-  if (propId) {
-    const p = allProperties.find(x => x.id === propId);
-    if (p) {
-      document.getElementById("prop-address").value = p.address || "";
-      document.getElementById("prop-mlsNumber").value = p.mlsNumber || "";
-      document.getElementById("prop-listingPrice").value = p.listingPrice || "";
-      document.getElementById("prop-status").value = p.status || "interested";
-      document.getElementById("prop-clientFeedback").value = p.clientFeedback || "";
-      document.getElementById("prop-realtorNotes").value = p.realtorNotes || "";
-      document.getElementById("prop-listingUrl").value = p.listingUrl || "";
-      selectedRating = p.clientRating || 0;
-
-      if (p.showingDate) {
-        const d = p.showingDate.toDate ? p.showingDate.toDate() : new Date(p.showingDate);
-        const iso = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
-        document.getElementById("prop-showingDate").value = iso;
-      } else {
-        document.getElementById("prop-showingDate").value = "";
-      }
-    }
-  } else {
-    document.getElementById("prop-address").value = "";
-    document.getElementById("prop-mlsNumber").value = "";
-    document.getElementById("prop-listingPrice").value = "";
-    document.getElementById("prop-status").value = "interested";
-    document.getElementById("prop-showingDate").value = "";
-    document.getElementById("prop-clientFeedback").value = "";
-    document.getElementById("prop-realtorNotes").value = "";
-    document.getElementById("prop-listingUrl").value = "";
-    selectedRating = 0;
-  }
-
-  document.querySelectorAll("#prop-stars .gd-star").forEach(s => {
+  const addr = m.listing?.address?.full || "Match";
+  document.getElementById("edit-match-title").textContent = addr;
+  document.getElementById("em-status").value = m.status || "interested";
+  document.getElementById("em-feedback").value = m.clientFeedback || "";
+  document.getElementById("em-notes").value = m.realtorNotes || "";
+  selectedRating = m.clientRating || 0;
+  document.querySelectorAll("#em-stars .gd-star").forEach(s => {
     s.classList.toggle("filled", parseInt(s.dataset.rating) <= selectedRating);
   });
 
-  document.getElementById("property-modal").classList.add("active");
+  document.getElementById("edit-match-modal").classList.add("active");
 };
 
-window.editProperty = function (id) {
-  openPropertyModal(id);
+window.closeEditMatchModal = function () {
+  document.getElementById("edit-match-modal").classList.remove("active");
+  editingMatchId = null;
 };
 
-window.closePropertyModal = function () {
-  document.getElementById("property-modal").classList.remove("active");
-  // Reset scrape UI
-  const scrapeStatus = document.getElementById("prop-scrape-status");
-  if (scrapeStatus) {
-    scrapeStatus.classList.add("gd-hidden");
-    scrapeStatus.className = "gd-scrape-status gd-hidden";
-    scrapeStatus.textContent = "";
-  }
-  const scrapeUrl = document.getElementById("prop-scrape-url");
-  if (scrapeUrl) scrapeUrl.value = "";
-};
-
-window.scrapeListingUrl = async function () {
-  const urlInput = document.getElementById("prop-scrape-url");
-  const statusEl = document.getElementById("prop-scrape-status");
-  const btn = document.getElementById("prop-scrape-btn");
-  const url = (urlInput.value || "").trim();
-
-  if (!url) {
-    showToast("Please paste a listing URL first.", "error");
-    return;
-  }
-
-  // Show loading state
-  statusEl.classList.remove("gd-hidden", "error", "success");
-  statusEl.classList.add("loading");
-  statusEl.innerHTML = '<div class="gd-spinner gd-spinner-sm"></div> Fetching listing details...';
-  btn.disabled = true;
-
-  try {
-    const result = await scrapeListingFn({ url });
-    const data = result.data?.data;
-
-    if (!data) {
-      throw new Error("No data returned");
-    }
-
-    // Auto-fill form fields
-    if (data.address) document.getElementById("prop-address").value = data.address;
-    if (data.mlsNumber) document.getElementById("prop-mlsNumber").value = data.mlsNumber;
-    if (data.listingPrice) document.getElementById("prop-listingPrice").value = data.listingPrice;
-    if (url) document.getElementById("prop-listingUrl").value = url;
-
-    // Build a notes string from extra scraped data
-    const extras = [];
-    if (data.bedrooms != null) extras.push(`${data.bedrooms} bed`);
-    if (data.bathrooms != null) extras.push(`${data.bathrooms} bath`);
-    if (data.squareFeet != null) extras.push(`${Number(data.squareFeet).toLocaleString()} sqft`);
-    if (data.yearBuilt) extras.push(`Built ${data.yearBuilt}`);
-    if (data.lotSize) extras.push(`Lot: ${data.lotSize}`);
-    if (data.propertyType) extras.push(data.propertyType);
-    if (data.description) extras.push(data.description);
-
-    if (extras.length > 0) {
-      const notesField = document.getElementById("prop-realtorNotes");
-      const existing = notesField.value.trim();
-      notesField.value = existing ? `${existing}\n${extras.join(" | ")}` : extras.join(" | ");
-    }
-
-    statusEl.classList.remove("loading");
-    statusEl.classList.add("success");
-    statusEl.textContent = "Listing details filled in successfully!";
-    showToast("Listing details auto-filled!");
-  } catch (err) {
-    console.error("Scrape error:", err);
-    statusEl.classList.remove("loading");
-    statusEl.classList.add("error");
-    statusEl.textContent = err.message || "Failed to fetch listing. Try a different URL or fill in manually.";
-  } finally {
-    btn.disabled = false;
-  }
-};
-
-window.saveProperty = async function () {
+window.saveMatch = async function () {
+  if (!editingMatchId) return;
   const user = auth.currentUser;
   if (!user) return;
 
-  const address = document.getElementById("prop-address").value.trim();
-  if (!address) { showToast("Address is required.", "error"); return; }
+  try {
+    await updateDoc(doc(db, "clientListingMatches", editingMatchId), {
+      status: document.getElementById("em-status").value,
+      clientRating: selectedRating,
+      clientFeedback: document.getElementById("em-feedback").value.trim(),
+      realtorNotes: document.getElementById("em-notes").value.trim()
+    });
+    showToast("Match updated!");
+    closeEditMatchModal();
+    await loadMatches(user.uid);
+  } catch (e) {
+    console.error("Save match error:", e);
+    showToast("Failed to save.", "error");
+  }
+};
 
-  const showingVal = document.getElementById("prop-showingDate").value;
-  const data = {
-    clientId,
-    realtorId: user.uid,
-    address,
-    mlsNumber: document.getElementById("prop-mlsNumber").value.trim(),
-    listingPrice: Number(document.getElementById("prop-listingPrice").value) || null,
-    status: document.getElementById("prop-status").value,
-    showingDate: showingVal ? Timestamp.fromDate(new Date(showingVal)) : null,
-    clientRating: selectedRating,
-    clientFeedback: document.getElementById("prop-clientFeedback").value.trim(),
-    realtorNotes: document.getElementById("prop-realtorNotes").value.trim(),
-    listingUrl: document.getElementById("prop-listingUrl").value.trim(),
-    photos: []
-  };
+window.deleteMatch = async function () {
+  if (!editingMatchId) return;
+  if (!confirm("Remove this listing match?")) return;
+  const user = auth.currentUser;
+  if (!user) return;
 
   try {
-    if (editingPropertyId) {
-      await updateDoc(doc(db, "bookmarkedProperties", editingPropertyId), data);
-      showToast("Property updated!");
-    } else {
-      data.createdAt = serverTimestamp();
-      await addDoc(collection(db, "bookmarkedProperties"), data);
-      showToast("Property added!");
-    }
-    closePropertyModal();
-    await loadProperties(user.uid);
+    await deleteDoc(doc(db, "clientListingMatches", editingMatchId));
+    showToast("Match removed.");
+    closeEditMatchModal();
+    await loadMatches(user.uid);
   } catch (e) {
-    console.error("Save property error:", e);
-    showToast("Failed to save property.", "error");
+    console.error("Delete match error:", e);
+    showToast("Failed to remove.", "error");
+  }
+};
+
+/* --- Match-a-Listing Panel --- */
+window.openMatchListingPanel = function () {
+  renderMatchListingResults();
+  document.getElementById("match-listing-modal").classList.add("active");
+};
+
+window.closeMatchListingPanel = function () {
+  document.getElementById("match-listing-modal").classList.remove("active");
+};
+
+window.filterMatchListings = function () {
+  renderMatchListingResults();
+};
+
+function renderMatchListingResults() {
+  const search = (document.getElementById("match-search")?.value || "").toLowerCase();
+  const el = document.getElementById("match-listing-results");
+  const matchedIds = new Set(allMatches.map(m => m.listingId));
+
+  let listings = allListingsCache.filter(l => {
+    if (matchedIds.has(l.id)) return false; // already matched
+    if (search) {
+      const addrStr = [l.address?.full, l.address?.city, l.mlsNumber].filter(Boolean).join(" ").toLowerCase();
+      if (!addrStr.includes(search)) return false;
+    }
+    return true;
+  });
+
+  // Score and sort
+  if (clientData) {
+    listings = listings.map(l => {
+      const result = calculateMatchScore(l, clientData);
+      return { ...l, _score: result.score, _color: matchScoreColor(result.score) };
+    }).sort((a, b) => b._score - a._score);
+  }
+
+  if (listings.length === 0) {
+    el.innerHTML = '<div class="gd-text-muted" style="padding:1rem;">No listings found</div>';
+    return;
+  }
+
+  el.innerHTML = listings.slice(0, 20).map(l => {
+    const addr = l.address?.full || "—";
+    return `
+      <div class="gd-match-listing-row">
+        <div>
+          ${l._score != null ? `<span class="gd-match-badge-inline" style="background:${l._color}">${l._score}%</span>` : ""}
+          <strong>${addr}</strong>
+          <span class="gd-text-muted">${l.listingPrice ? formatCurrency(l.listingPrice) : ""}</span>
+          <span class="gd-text-muted">${[l.bedrooms ? l.bedrooms + "bd" : "", l.bathrooms ? l.bathrooms + "ba" : ""].filter(Boolean).join(" / ")}</span>
+        </div>
+        <button class="gd-btn gd-btn-primary gd-btn-sm" onclick="matchListingToThisClient('${l.id}')">Match</button>
+      </div>`;
+  }).join("");
+}
+
+window.matchListingToThisClient = async function (listingId) {
+  const user = auth.currentUser;
+  if (!user || !clientData) return;
+
+  try {
+    const listing = allListingsCache.find(l => l.id === listingId);
+    const result = calculateMatchScore(listing, clientData);
+
+    await addDoc(collection(db, "clientListingMatches"), {
+      listingId,
+      clientId,
+      realtorId: user.uid,
+      matchScore: result.score,
+      matchBreakdown: result.breakdown,
+      dealBreakerHits: result.dealBreakerHits,
+      status: "interested",
+      clientRating: null,
+      clientFeedback: "",
+      realtorNotes: "",
+      matchedAt: serverTimestamp()
+    });
+
+    showToast("Listing matched!");
+    await loadMatches(user.uid);
+    renderMatchListingResults(); // refresh to remove matched listing
+  } catch (e) {
+    console.error("Match error:", e);
+    showToast("Failed to match.", "error");
   }
 };
 
@@ -1185,22 +1294,38 @@ function updateCompareBar() {
 }
 
 window.showComparison = function () {
-  const props = allProperties.filter(p => selectedCompare.has(p.id));
+  const matches = allMatches.filter(m => selectedCompare.has(m.id));
   const table = document.getElementById("compare-table");
 
-  let headerRow = "<tr><th></th>" + props.map(p => `<th>${p.address || "—"}</th>`).join("") + "</tr>";
+  let headerRow = "<tr><th></th>" + matches.map(m => {
+    const addr = m.listing?.address?.full || "—";
+    return `<th>${addr}</th>`;
+  }).join("") + "</tr>";
+
   const rows = [
-    { label: "Price", render: p => formatCurrency(p.listingPrice) },
-    { label: "Status", render: p => statusLabel(p.status) },
-    { label: "Rating", render: p => renderStars(p.clientRating || 0) },
-    { label: "Showing Date", render: p => p.showingDate ? formatDate(p.showingDate) : "—" },
-    { label: "Client Feedback", render: p => p.clientFeedback || "—" }
+    { label: "Match Score", render: m => { const s = m.calculatedScore || 0; return `<span style="color:${matchScoreColor(s)};font-weight:600;">${s}%</span>`; } },
+    { label: "Price", render: m => formatCurrency(m.listing?.listingPrice) },
+    { label: "Beds", render: m => m.listing?.bedrooms ?? "—" },
+    { label: "Baths", render: m => m.listing?.bathrooms ?? "—" },
+    { label: "Sq Ft", render: m => m.listing?.squareFeet ? Number(m.listing.squareFeet).toLocaleString() : "—" },
+    { label: "Type", render: m => m.listing?.propertyType || "—" },
+    { label: "Year Built", render: m => m.listing?.yearBuilt || "—" },
+    { label: "Status", render: m => statusLabel(m.status) },
+    { label: "Rating", render: m => renderStars(m.clientRating || 0) },
+    { label: "Feedback", render: m => m.clientFeedback || "—" }
   ];
 
-  let bodyHtml = rows.map(r =>
-    `<tr><td style="font-weight:500; color: var(--color-text-primary);">${r.label}</td>` +
-    props.map(p => `<td>${r.render(p)}</td>`).join("") + "</tr>"
-  ).join("");
+  const values = {};
+  rows.forEach(r => {
+    values[r.label] = matches.map(m => r.render(m));
+  });
+
+  let bodyHtml = rows.map(r => {
+    const vals = matches.map(m => r.render(m));
+    const allSame = vals.every(v => v === vals[0]);
+    return `<tr><td style="font-weight:500; color: var(--color-text-primary);">${r.label}</td>` +
+      vals.map(v => `<td${!allSame ? ' class="gd-compare-diff"' : ""}>${v}</td>`).join("") + "</tr>";
+  }).join("");
 
   table.innerHTML = headerRow + bodyHtml;
   document.getElementById("compare-modal").classList.add("active");
@@ -1295,11 +1420,14 @@ window.openShowingModal = function (showingId) {
   editingShowingId = showingId || null;
   document.getElementById("showing-modal-title").textContent = showingId ? "Edit Showing" : "Add Showing";
 
-  // Populate property dropdown
+  // Populate property dropdown from matched listings
   const select = document.getElementById("show-property");
   select.innerHTML = '<option value="">— Manual entry —</option>';
-  allProperties.forEach(p => {
-    select.innerHTML += `<option value="${p.id}">${p.address} ${p.mlsNumber ? "(MLS: " + p.mlsNumber + ")" : ""}</option>`;
+  allMatches.forEach(m => {
+    const l = m.listing;
+    if (!l) return;
+    const addr = l.address?.full || l.address?.street || "—";
+    select.innerHTML += `<option value="${l.id}">${addr} ${l.mlsNumber ? "(MLS: " + l.mlsNumber + ")" : ""}</option>`;
   });
 
   if (showingId) {
@@ -1338,13 +1466,14 @@ window.closeShowingModal = function () {
 };
 
 window.fillShowingFromProperty = function () {
-  const propId = document.getElementById("show-property").value;
-  if (!propId) return;
-  const p = allProperties.find(x => x.id === propId);
-  if (p) {
-    document.getElementById("show-address").value = p.address || "";
-    document.getElementById("show-mls").value = p.mlsNumber || "";
-    document.getElementById("show-price").value = p.listingPrice || "";
+  const listingId = document.getElementById("show-property").value;
+  if (!listingId) return;
+  const m = allMatches.find(x => x.listing?.id === listingId);
+  if (m?.listing) {
+    const l = m.listing;
+    document.getElementById("show-address").value = l.address?.full || "";
+    document.getElementById("show-mls").value = l.mlsNumber || "";
+    document.getElementById("show-price").value = l.listingPrice || "";
   }
 };
 
@@ -1410,10 +1539,62 @@ window.saveShowing = async function () {
         });
       }
 
+      // Auto-import: create skeleton listing if no matching listing exists
+      try {
+        const addrLower = address.toLowerCase();
+        const existingListing = allListingsCache.find(l =>
+          (l.address?.full || "").toLowerCase() === addrLower
+        );
+        let listingId = existingListing?.id || data.propertyId;
+
+        if (!listingId) {
+          // Create skeleton listing
+          const listingData = {
+            address: { full: address, street: address, city: "", state: "", zip: "", county: "", neighborhood: "", lat: null, lng: null },
+            listingPrice: data.listingPrice,
+            mlsNumber: data.mlsNumber || "",
+            status: "active",
+            source: "showing_import",
+            addedBy: user.uid,
+            photos: [],
+            features: [],
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp()
+          };
+          const listingRef = await addDoc(collection(db, "listings"), listingData);
+          listingId = listingRef.id;
+        }
+
+        // Auto-create clientListingMatch if not already matched
+        const matchQ = query(
+          collection(db, "clientListingMatches"),
+          where("listingId", "==", listingId),
+          where("clientId", "==", clientId),
+          where("realtorId", "==", user.uid)
+        );
+        const matchSnap = await getDocs(matchQ);
+        if (matchSnap.empty) {
+          await addDoc(collection(db, "clientListingMatches"), {
+            listingId,
+            clientId,
+            realtorId: user.uid,
+            matchScore: null,
+            status: "shown",
+            clientRating: null,
+            clientFeedback: "",
+            realtorNotes: "",
+            matchedAt: serverTimestamp()
+          });
+        }
+      } catch (importErr) {
+        console.warn("Auto-import listing from showing:", importErr);
+      }
+
       showToast("Showing added!");
     }
     closeShowingModal();
     await loadShowings(user.uid);
+    await loadMatches(user.uid); // refresh matches after auto-import
   } catch (e) {
     console.error("Save showing error:", e);
     showToast("Failed to save showing.", "error");
@@ -1798,7 +1979,8 @@ document.addEventListener("keydown", (e) => {
     const modals = [
       { id: "file-preview-modal", close: () => closePreview() },
       { id: "activity-modal", close: () => closeActivityModal() },
-      { id: "property-modal", close: () => closePropertyModal() },
+      { id: "match-listing-modal", close: () => closeMatchListingPanel() },
+      { id: "edit-match-modal", close: () => closeEditMatchModal() },
       { id: "compare-modal", close: () => closeCompareModal() },
       { id: "signature-modal", close: () => closeSignatureModal() },
       { id: "send-doc-modal", close: () => closeSendDocModal() },

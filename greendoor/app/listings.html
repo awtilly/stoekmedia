@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Listings — GreenDoor</title>
+  <link rel="stylesheet" href="/assets/css/style.css">
+  <link rel="stylesheet" href="/greendoor/css/greendoor.css">
+</head>
+<body class="gd-light">
+
+  <!-- Navigation -->
+  <nav class="nav scrolled">
+    <div class="container">
+      <a href="/greendoor/" class="nav-logo gd-nav-logo"><span class="gd-green">Green</span><span class="gd-door">Door</span><small class="gd-by-line">by stoekmedia</small></a>
+      <ul class="nav-links">
+        <li><a href="/greendoor/" class="nav-greendoor"><span class="gd-green">Green</span><span class="gd-door">Door</span></a></li>
+        <li class="nav-crm-divider"></li>
+        <li><a href="/greendoor/app/dashboard">Dashboard</a></li>
+        <li><a href="/greendoor/app/clients">Clients</a></li>
+        <li><a href="/greendoor/app/calendar">Calendar</a></li>
+        <li><a href="/greendoor/app/listings" class="gd-nav-active">Listings</a></li>
+        <li id="nav-admin-tab" style="display:none;"><a href="/greendoor/app/admin">Admin</a></li>
+        <li><a href="/greendoor/app/settings">Settings</a></li>
+        <li class="nav-crm-divider"></li>
+        <li><span id="nav-user-name" class="nav-user-name"></span></li>
+        <li><button class="nav-logout-btn" onclick="handleLogout()">Logout</button></li>
+      </ul>
+      <button class="nav-toggle" aria-label="Menu">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+    </div>
+  </nav>
+
+  <div class="gd-page">
+    <div class="gd-content">
+
+      <!-- Loading -->
+      <div id="listings-loading" class="gd-loading">
+        <div class="gd-spinner gd-spinner-lg"></div>
+        <span class="gd-loading-text">Loading listings...</span>
+      </div>
+
+      <!-- Listings Content -->
+      <div id="listings-content" class="gd-hidden">
+
+        <!-- Header -->
+        <div class="gd-listings-header">
+          <h1>Listings</h1>
+          <div class="gd-listings-header-actions">
+            <div class="gd-view-toggle">
+              <button class="gd-view-btn active" data-view="grid" title="Grid view">&#9638;</button>
+              <button class="gd-view-btn" data-view="list" title="List view">&#9776;</button>
+            </div>
+            <button class="gd-btn gd-btn-sm" onclick="toggleQuickMatch()">Quick Match</button>
+            <button class="gd-btn gd-btn-primary" onclick="openAddListingModal()">+ Add Listing</button>
+          </div>
+        </div>
+
+        <!-- Filter Bar -->
+        <div class="gd-listings-filters">
+          <div class="gd-filter-row">
+            <input type="text" id="filter-address" class="gd-input gd-filter-input" placeholder="Search address, city, MLS#...">
+            <div class="gd-filter-group">
+              <input type="number" id="filter-price-min" class="gd-input gd-filter-sm" placeholder="Min $">
+              <span class="gd-filter-sep">—</span>
+              <input type="number" id="filter-price-max" class="gd-input gd-filter-sm" placeholder="Max $">
+            </div>
+            <select id="filter-beds" class="gd-input gd-filter-sm">
+              <option value="">Beds</option>
+              <option value="1">1+</option>
+              <option value="2">2+</option>
+              <option value="3">3+</option>
+              <option value="4">4+</option>
+              <option value="5">5+</option>
+            </select>
+            <select id="filter-baths" class="gd-input gd-filter-sm">
+              <option value="">Baths</option>
+              <option value="1">1+</option>
+              <option value="2">2+</option>
+              <option value="3">3+</option>
+              <option value="4">4+</option>
+            </select>
+            <select id="filter-status" class="gd-input gd-filter-sm">
+              <option value="">Status</option>
+              <option value="active">Active</option>
+              <option value="pending">Pending</option>
+              <option value="sold">Sold</option>
+              <option value="coming_soon">Coming Soon</option>
+              <option value="withdrawn">Withdrawn</option>
+            </select>
+            <select id="filter-sort" class="gd-input gd-filter-sm">
+              <option value="newest">Newest</option>
+              <option value="price_asc">Price: Low-High</option>
+              <option value="price_desc">Price: High-Low</option>
+              <option value="dom">Days on Market</option>
+            </select>
+            <button class="gd-btn gd-btn-sm" onclick="clearFilters()">Clear</button>
+          </div>
+          <div class="gd-filter-row gd-filter-types">
+            <label class="gd-checkbox-label"><input type="checkbox" value="Single Family" class="filter-type-cb"> Single Family</label>
+            <label class="gd-checkbox-label"><input type="checkbox" value="Condo" class="filter-type-cb"> Condo</label>
+            <label class="gd-checkbox-label"><input type="checkbox" value="Townhouse" class="filter-type-cb"> Townhouse</label>
+            <label class="gd-checkbox-label"><input type="checkbox" value="Multi-Family" class="filter-type-cb"> Multi-Family</label>
+            <label class="gd-checkbox-label"><input type="checkbox" value="Land" class="filter-type-cb"> Land</label>
+          </div>
+        </div>
+
+        <!-- Grid View -->
+        <div id="listings-grid" class="gd-listings-grid">
+          <div class="gd-empty" style="grid-column:1/-1;">
+            <div class="gd-empty-icon">&#127968;</div>
+            <div class="gd-empty-text">No listings yet. Add your first listing to get started.</div>
+          </div>
+        </div>
+
+        <!-- List View (hidden by default) -->
+        <div id="listings-list" class="gd-listings-list gd-hidden">
+          <table class="gd-listings-table">
+            <thead>
+              <tr>
+                <th>Address</th>
+                <th>Price</th>
+                <th>Beds</th>
+                <th>Baths</th>
+                <th>Sq Ft</th>
+                <th>Status</th>
+                <th>DOM</th>
+                <th>MLS #</th>
+              </tr>
+            </thead>
+            <tbody id="listings-table-body"></tbody>
+          </table>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Quick Match Sidebar -->
+  <div id="quick-match-sidebar" class="gd-quick-match-sidebar">
+    <div class="gd-qm-header">
+      <h3>Quick Match</h3>
+      <button class="gd-modal-close" onclick="toggleQuickMatch()">&times;</button>
+    </div>
+    <div class="gd-qm-body">
+      <div class="gd-form-group">
+        <label for="qm-client">Select Client</label>
+        <select id="qm-client" class="gd-input" onchange="runQuickMatch()">
+          <option value="">— Choose a client —</option>
+        </select>
+      </div>
+      <div id="qm-prefs" class="gd-qm-prefs gd-hidden"></div>
+      <div class="gd-sig-option-row">
+        <input type="checkbox" id="qm-only-matches" onchange="applyFilters()">
+        <label for="qm-only-matches">Show only matches (60%+)</label>
+      </div>
+      <div id="qm-results" class="gd-qm-results"></div>
+    </div>
+  </div>
+
+  <!-- Add Listing Modal -->
+  <div id="add-listing-modal" class="gd-modal-overlay">
+    <div class="gd-modal gd-modal-lg">
+      <div class="gd-modal-header">
+        <h3 id="add-listing-title">Add Listing</h3>
+        <button class="gd-modal-close" onclick="closeAddListingModal()">&times;</button>
+      </div>
+      <div class="gd-modal-body">
+
+        <div class="gd-form-section">
+          <div class="gd-form-section-title">Address</div>
+          <div class="gd-form-group">
+            <label for="lst-address">Street Address *</label>
+            <input type="text" id="lst-address" class="gd-input" placeholder="Start typing an address...">
+          </div>
+          <div class="gd-form-row">
+            <div class="gd-form-group"><label for="lst-city">City</label><input type="text" id="lst-city" class="gd-input"></div>
+            <div class="gd-form-group"><label for="lst-state">State</label><input type="text" id="lst-state" class="gd-input" maxlength="2"></div>
+            <div class="gd-form-group"><label for="lst-zip">ZIP</label><input type="text" id="lst-zip" class="gd-input" maxlength="10"></div>
+          </div>
+          <div class="gd-form-row">
+            <div class="gd-form-group"><label for="lst-county">County</label><input type="text" id="lst-county" class="gd-input"></div>
+            <div class="gd-form-group"><label for="lst-neighborhood">Neighborhood</label><input type="text" id="lst-neighborhood" class="gd-input"></div>
+          </div>
+        </div>
+
+        <div class="gd-form-section">
+          <div class="gd-form-section-title">Pricing</div>
+          <div class="gd-form-row">
+            <div class="gd-form-group"><label for="lst-price">Listing Price *</label><input type="number" id="lst-price" class="gd-input"></div>
+            <div class="gd-form-group"><label for="lst-pricePerSqft">Price/Sq Ft</label><input type="number" id="lst-pricePerSqft" class="gd-input" readonly tabindex="-1"></div>
+          </div>
+        </div>
+
+        <div class="gd-form-section">
+          <div class="gd-form-section-title">Details</div>
+          <div class="gd-form-row">
+            <div class="gd-form-group"><label for="lst-beds">Bedrooms</label><input type="number" id="lst-beds" class="gd-input" min="0"></div>
+            <div class="gd-form-group"><label for="lst-baths">Bathrooms</label><input type="number" id="lst-baths" class="gd-input" min="0" step="0.5"></div>
+            <div class="gd-form-group"><label for="lst-sqft">Square Feet</label><input type="number" id="lst-sqft" class="gd-input" min="0"></div>
+          </div>
+          <div class="gd-form-row">
+            <div class="gd-form-group">
+              <label for="lst-type">Property Type</label>
+              <select id="lst-type" class="gd-input">
+                <option value="">Select...</option>
+                <option value="Single Family">Single Family</option>
+                <option value="Condo">Condo</option>
+                <option value="Townhouse">Townhouse</option>
+                <option value="Multi-Family">Multi-Family</option>
+                <option value="Land">Land</option>
+              </select>
+            </div>
+            <div class="gd-form-group"><label for="lst-yearBuilt">Year Built</label><input type="number" id="lst-yearBuilt" class="gd-input"></div>
+            <div class="gd-form-group"><label for="lst-lotSize">Lot Size</label><input type="text" id="lst-lotSize" class="gd-input" placeholder="0.25 acres"></div>
+          </div>
+          <div class="gd-form-row">
+            <div class="gd-form-group"><label for="lst-garage">Garage Spaces</label><input type="number" id="lst-garage" class="gd-input" min="0"></div>
+            <div class="gd-form-group"><label for="lst-stories">Stories</label><input type="number" id="lst-stories" class="gd-input" min="1"></div>
+          </div>
+        </div>
+
+        <div class="gd-form-section">
+          <div class="gd-form-section-title">Features</div>
+          <div class="gd-form-group">
+            <label>Tags</label>
+            <div class="gd-tag-input-wrap">
+              <div id="lst-features-tags" class="gd-tag-list"></div>
+              <input type="text" id="lst-features-input" class="gd-input gd-tag-field" placeholder="Type and press Enter...">
+            </div>
+            <div id="lst-features-suggestions" class="gd-tag-suggestions"></div>
+          </div>
+        </div>
+
+        <div class="gd-form-section">
+          <div class="gd-form-section-title">Schools</div>
+          <div class="gd-form-row">
+            <div class="gd-form-group"><label for="lst-schoolDistrict">School District</label><input type="text" id="lst-schoolDistrict" class="gd-input"></div>
+            <div class="gd-form-group"><label for="lst-schoolRating">Rating (1-10)</label><input type="number" id="lst-schoolRating" class="gd-input" min="1" max="10"></div>
+          </div>
+        </div>
+
+        <div class="gd-form-section">
+          <div class="gd-form-section-title">Media</div>
+          <div class="gd-form-group">
+            <label>Photos</label>
+            <div id="lst-photo-zone" class="gd-photo-upload-zone" onclick="document.getElementById('lst-photo-input').click()">
+              <span>Click or drag photos here</span>
+              <input type="file" id="lst-photo-input" accept="image/*" multiple style="display:none;">
+            </div>
+            <div id="lst-photo-preview" class="gd-photo-grid"></div>
+          </div>
+          <div class="gd-form-group">
+            <label for="lst-virtualTour">Virtual Tour URL</label>
+            <input type="url" id="lst-virtualTour" class="gd-input" placeholder="https://...">
+          </div>
+        </div>
+
+        <div class="gd-form-section">
+          <div class="gd-form-section-title">Listing Info</div>
+          <div class="gd-form-row">
+            <div class="gd-form-group"><label for="lst-mlsNumber">MLS Number</label><input type="text" id="lst-mlsNumber" class="gd-input"></div>
+            <div class="gd-form-group">
+              <label for="lst-status">Status</label>
+              <select id="lst-status" class="gd-input">
+                <option value="active">Active</option>
+                <option value="pending">Pending</option>
+                <option value="sold">Sold</option>
+                <option value="coming_soon">Coming Soon</option>
+                <option value="withdrawn">Withdrawn</option>
+              </select>
+            </div>
+          </div>
+          <div class="gd-form-row">
+            <div class="gd-form-group"><label for="lst-listDate">List Date</label><input type="date" id="lst-listDate" class="gd-input"></div>
+            <div class="gd-form-group"><label for="lst-listingUrl">Listing URL</label><input type="url" id="lst-listingUrl" class="gd-input" placeholder="https://..."></div>
+          </div>
+        </div>
+
+        <div class="gd-form-section">
+          <div class="gd-form-section-title">Notes</div>
+          <div class="gd-form-group">
+            <textarea id="lst-notes" class="gd-input" rows="3" placeholder="Internal notes about this listing..."></textarea>
+          </div>
+        </div>
+
+      </div>
+      <div class="gd-modal-footer">
+        <button class="gd-btn" onclick="closeAddListingModal()">Cancel</button>
+        <button class="gd-btn gd-btn-primary" onclick="saveListing()">Save Listing</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Listing Detail Modal -->
+  <div id="listing-detail-modal" class="gd-modal-overlay">
+    <div class="gd-modal gd-modal-lg">
+      <div class="gd-modal-header">
+        <h3 id="detail-listing-address">Listing Detail</h3>
+        <button class="gd-modal-close" onclick="closeListingDetail()">&times;</button>
+      </div>
+      <div class="gd-modal-body">
+        <!-- Tabs -->
+        <div class="gd-tabs gd-listing-detail-tabs">
+          <button class="gd-tab active" data-dtab="details" onclick="switchDetailTab('details')">Details</button>
+          <button class="gd-tab" data-dtab="matches" onclick="switchDetailTab('matches')">Client Matches</button>
+          <button class="gd-tab" data-dtab="activity" onclick="switchDetailTab('activity')">Activity</button>
+          <button class="gd-tab" data-dtab="market" onclick="switchDetailTab('market')">Market</button>
+        </div>
+
+        <!-- Details Tab -->
+        <div id="dtab-details" class="gd-dtab active">
+          <div id="detail-photo-gallery" class="gd-photo-gallery"></div>
+          <div id="detail-info" class="gd-detail-info"></div>
+        </div>
+
+        <!-- Client Matches Tab -->
+        <div id="dtab-matches" class="gd-dtab">
+          <div id="detail-matches"></div>
+        </div>
+
+        <!-- Activity Tab -->
+        <div id="dtab-activity" class="gd-dtab">
+          <div id="detail-activity" class="gd-timeline"></div>
+        </div>
+
+        <!-- Market Tab -->
+        <div id="dtab-market" class="gd-dtab">
+          <div class="gd-empty">
+            <div class="gd-empty-icon">&#128200;</div>
+            <div class="gd-empty-text">Market data coming in Phase 2</div>
+          </div>
+        </div>
+      </div>
+      <div class="gd-modal-footer">
+        <button class="gd-btn" onclick="editListingFromDetail()">Edit</button>
+        <button class="gd-btn gd-btn-danger" onclick="deleteListingFromDetail()">Delete</button>
+        <button class="gd-btn" onclick="closeListingDetail()">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/assets/js/main.js"></script>
+  <script type="module" src="/greendoor/js/auth.js"></script>
+  <script type="module" src="/greendoor/js/listings.js"></script>
+</body>
+</html>

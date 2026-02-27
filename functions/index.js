@@ -181,6 +181,53 @@ const AI_TOOLS = [
       },
       required: ["title", "startDate"]
     }
+  },
+  {
+    name: "add_listing",
+    description: "Add a new listing to the shared listings database.",
+    input_schema: {
+      type: "object",
+      properties: {
+        address: { type: "string", description: "Full street address" },
+        city: { type: "string", description: "City" },
+        state: { type: "string", description: "State (2-letter code)" },
+        zip: { type: "string", description: "ZIP code" },
+        listingPrice: { type: "number", description: "Listing price" },
+        bedrooms: { type: "number", description: "Number of bedrooms" },
+        bathrooms: { type: "number", description: "Number of bathrooms" },
+        squareFeet: { type: "number", description: "Square footage" },
+        propertyType: { type: "string", description: "Property type (Single Family, Condo, Townhouse, Multi-Family, Land)" },
+        mlsNumber: { type: "string", description: "MLS number" },
+        status: { type: "string", enum: ["active", "pending", "sold", "coming_soon", "withdrawn"], description: "Listing status" }
+      },
+      required: ["address"]
+    }
+  },
+  {
+    name: "match_listing_to_client",
+    description: "Match an existing listing to a client. Use when the realtor wants to bookmark/assign a listing for a specific client.",
+    input_schema: {
+      type: "object",
+      properties: {
+        listingId: { type: "string", description: "The listing document ID to match" },
+        clientId: { type: "string", description: "The client document ID to match to" }
+      },
+      required: ["listingId", "clientId"]
+    }
+  },
+  {
+    name: "search_listings",
+    description: "Search listings by address, price range, or features. Returns matching listings.",
+    input_schema: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "Search text (address, city, MLS#)" },
+        priceMin: { type: "number", description: "Minimum price filter" },
+        priceMax: { type: "number", description: "Maximum price filter" },
+        bedrooms: { type: "number", description: "Minimum bedrooms" }
+      },
+      required: []
+    }
   }
 ];
 
@@ -368,6 +415,56 @@ async function handleCreateShowing(input, uid, clientId) {
     });
   }
 
+  // Auto-import: create skeleton listing + match
+  try {
+    const addrLower = (input.address || "").toLowerCase();
+    const listingsSnap = await db.collection("listings")
+      .where("address.full", "==", input.address)
+      .limit(1)
+      .get();
+
+    let listingId = null;
+    if (!listingsSnap.empty) {
+      listingId = listingsSnap.docs[0].id;
+    } else {
+      const listingRef = await db.collection("listings").add({
+        address: { full: input.address, street: input.address, city: "", state: "", zip: "", county: "", neighborhood: "", lat: null, lng: null },
+        listingPrice: input.listingPrice || null,
+        mlsNumber: input.mlsNumber || "",
+        status: "active",
+        source: "showing_import",
+        addedBy: uid,
+        photos: [],
+        features: [],
+        createdAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp()
+      });
+      listingId = listingRef.id;
+    }
+
+    const matchSnap = await db.collection("clientListingMatches")
+      .where("listingId", "==", listingId)
+      .where("clientId", "==", resolvedClientId)
+      .where("realtorId", "==", uid)
+      .limit(1)
+      .get();
+    if (matchSnap.empty) {
+      await db.collection("clientListingMatches").add({
+        listingId,
+        clientId: resolvedClientId,
+        realtorId: uid,
+        matchScore: null,
+        status: "shown",
+        clientRating: null,
+        clientFeedback: "",
+        realtorNotes: "",
+        matchedAt: FieldValue.serverTimestamp()
+      });
+    }
+  } catch (importErr) {
+    console.warn("Auto-import listing from showing:", importErr);
+  }
+
   return {
     success: true,
     showingId: showingRef.id,
@@ -489,132 +586,142 @@ async function executeToolCall(toolName, toolInput, uid, clientId) {
     case "update_showing": return handleUpdateShowing(toolInput, uid);
     case "create_followup": return handleCreateFollowUp(toolInput, uid, clientId);
     case "create_event": return handleCreateEvent(toolInput, uid);
+    case "add_listing": return handleAddListing(toolInput, uid);
+    case "match_listing_to_client": return handleMatchListingToClient(toolInput, uid);
+    case "search_listings": return handleSearchListings(toolInput, uid);
     default: return { success: false, error: `Unknown tool: ${toolName}` };
   }
 }
 
 /* ================================================================
-   SCRAPE LISTING URL
+   LISTING AI TOOL HANDLERS
    ================================================================ */
 
-exports.scrapeListing = onCall(
-  { secrets: [anthropicKey], region: "us-central1", maxInstances: 5 },
+async function handleAddListing(input, uid) {
+  const data = {
+    address: {
+      full: input.address,
+      street: input.address,
+      city: input.city || "",
+      state: input.state || "",
+      zip: input.zip || "",
+      county: "",
+      neighborhood: "",
+      lat: null,
+      lng: null
+    },
+    listingPrice: input.listingPrice || null,
+    bedrooms: input.bedrooms || null,
+    bathrooms: input.bathrooms || null,
+    squareFeet: input.squareFeet || null,
+    propertyType: input.propertyType || "",
+    mlsNumber: input.mlsNumber || "",
+    status: input.status || "active",
+    source: "ai_assistant",
+    addedBy: uid,
+    photos: [],
+    features: [],
+    createdAt: FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp()
+  };
+
+  const ref = await db.collection("listings").add(data);
+  return { success: true, listingId: ref.id, address: input.address };
+}
+
+async function handleMatchListingToClient(input, uid) {
+  if (!input.listingId || !input.clientId) {
+    return { success: false, error: "Both listingId and clientId are required." };
+  }
+
+  // Verify listing exists
+  const listingSnap = await db.doc(`listings/${input.listingId}`).get();
+  if (!listingSnap.exists) {
+    return { success: false, error: "Listing not found." };
+  }
+
+  // Verify client ownership
+  const clientSnap = await db.doc(`clients/${input.clientId}`).get();
+  if (!clientSnap.exists || clientSnap.data().realtorId !== uid) {
+    return { success: false, error: "Client not found or access denied." };
+  }
+
+  // Check for existing match
+  const existingSnap = await db.collection("clientListingMatches")
+    .where("listingId", "==", input.listingId)
+    .where("clientId", "==", input.clientId)
+    .where("realtorId", "==", uid)
+    .limit(1)
+    .get();
+
+  if (!existingSnap.empty) {
+    return { success: true, message: "Already matched.", matchId: existingSnap.docs[0].id };
+  }
+
+  const ref = await db.collection("clientListingMatches").add({
+    listingId: input.listingId,
+    clientId: input.clientId,
+    realtorId: uid,
+    matchScore: null,
+    status: "interested",
+    clientRating: null,
+    clientFeedback: "",
+    realtorNotes: "",
+    matchedAt: FieldValue.serverTimestamp()
+  });
+
+  return {
+    success: true,
+    matchId: ref.id,
+    clientName: clientSnap.data().fullName,
+    address: listingSnap.data().address?.full
+  };
+}
+
+async function handleSearchListings(input, uid) {
+  let q = db.collection("listings");
+  const results = [];
+
+  const snap = await q.orderBy("createdAt", "desc").limit(50).get();
+  snap.forEach(d => {
+    const l = d.data();
+    const addr = (l.address?.full || "").toLowerCase();
+    const mls = (l.mlsNumber || "").toLowerCase();
+    const search = (input.query || "").toLowerCase();
+
+    if (search && !addr.includes(search) && !mls.includes(search)) return;
+    if (input.priceMin && l.listingPrice < input.priceMin) return;
+    if (input.priceMax && l.listingPrice > input.priceMax) return;
+    if (input.bedrooms && (l.bedrooms || 0) < input.bedrooms) return;
+
+    results.push({
+      id: d.id,
+      address: l.address?.full,
+      price: l.listingPrice,
+      beds: l.bedrooms,
+      baths: l.bathrooms,
+      sqft: l.squareFeet,
+      type: l.propertyType,
+      status: l.status,
+      mlsNumber: l.mlsNumber
+    });
+  });
+
+  return { success: true, count: results.length, listings: results.slice(0, 10) };
+}
+
+/* ================================================================
+   SYNC MLS LISTINGS (Phase 2 stub)
+   ================================================================ */
+
+exports.syncMlsListings = onCall(
+  { region: "us-central1", maxInstances: 1 },
   async (request) => {
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "You must be logged in.");
     }
-
-    const { url } = request.data;
-    if (!url || typeof url !== "string") {
-      throw new HttpsError("invalid-argument", "A listing URL is required.");
-    }
-
-    // Basic URL validation
-    let parsed;
-    try {
-      parsed = new URL(url);
-    } catch {
-      throw new HttpsError("invalid-argument", "Invalid URL format.");
-    }
-
-    if (!["http:", "https:"].includes(parsed.protocol)) {
-      throw new HttpsError("invalid-argument", "URL must be HTTP or HTTPS.");
-    }
-
-    try {
-      const fetch = require("node-fetch");
-
-      // Fetch the listing page
-      const response = await fetch(url, {
-        headers: {
-          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-          "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-          "Accept-Language": "en-US,en;q=0.9",
-        },
-        timeout: 15000,
-        follow: 5,
-      });
-
-      if (!response.ok) {
-        throw new HttpsError("unavailable", `Could not fetch listing page (HTTP ${response.status}).`);
-      }
-
-      const html = await response.text();
-
-      // Truncate HTML to avoid exceeding token limits — keep first 80k chars
-      const truncatedHtml = html.length > 80000 ? html.slice(0, 80000) : html;
-
-      // Use Claude to extract structured property data
-      const apiRes = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": anthropicKey.value(),
-          "anthropic-version": "2023-06-01",
-        },
-        body: JSON.stringify({
-          model: "claude-haiku-4-5-20251001",
-          max_tokens: 1024,
-          messages: [
-            {
-              role: "user",
-              content: `Extract property listing details from this HTML page. Return ONLY a JSON object with these fields (use null for any field you can't find):
-
-{
-  "address": "Full street address including city, state, zip",
-  "listingPrice": 350000,
-  "mlsNumber": "MLS-12345",
-  "bedrooms": 3,
-  "bathrooms": 2,
-  "squareFeet": 1800,
-  "yearBuilt": 1995,
-  "lotSize": "0.25 acres",
-  "propertyType": "Single Family",
-  "description": "Brief 1-2 sentence summary of the property"
-}
-
-Rules:
-- listingPrice must be a number (no $ or commas), or null
-- bedrooms and bathrooms must be numbers or null
-- squareFeet must be a number or null
-- Return ONLY the JSON object, no markdown or explanation
-
-HTML content:
-${truncatedHtml}`,
-            },
-          ],
-        }),
-      });
-
-      if (!apiRes.ok) {
-        const errText = await apiRes.text();
-        console.error("Claude API error:", errText);
-        throw new HttpsError("internal", "Failed to analyze listing page.");
-      }
-
-      const aiResult = await apiRes.json();
-      const rawText = aiResult.content?.[0]?.text || "{}";
-
-      // Parse the JSON response — handle potential markdown wrapping
-      let cleaned = rawText.trim();
-      if (cleaned.startsWith("```")) {
-        cleaned = cleaned.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "");
-      }
-
-      let propertyData;
-      try {
-        propertyData = JSON.parse(cleaned);
-      } catch {
-        console.error("Failed to parse AI response:", rawText);
-        throw new HttpsError("internal", "Could not parse listing data. Try a different URL.");
-      }
-
-      return { success: true, data: propertyData };
-    } catch (err) {
-      if (err instanceof HttpsError) throw err;
-      console.error("scrapeListing error:", err);
-      throw new HttpsError("internal", "Failed to fetch listing. The site may be blocking automated access.");
-    }
+    // Phase 2: SimplyRETS MLS feed integration
+    return { success: true, message: "MLS sync not yet configured.", synced: 0 };
   }
 );
 
@@ -682,21 +789,32 @@ exports.askAssistant = onCall(
           };
         });
 
-        const propsSnap = await db.collection("bookmarkedProperties")
+        // Load matched listings (clientListingMatches + listings join)
+        const matchesSnap = await db.collection("clientListingMatches")
           .where("clientId", "==", clientId)
           .where("realtorId", "==", uid)
           .get();
-        const properties = propsSnap.docs.map(d => {
-          const p = d.data();
-          return {
-            address: p.address,
-            price: p.listingPrice,
-            status: p.status,
-            rating: p.clientRating,
-            feedback: p.clientFeedback,
-            showingDate: p.showingDate ? p.showingDate.toDate().toISOString() : null
-          };
-        });
+        const properties = [];
+        for (const md of matchesSnap.docs) {
+          const m = md.data();
+          let listingData = {};
+          try {
+            const ls = await db.doc(`listings/${m.listingId}`).get();
+            if (ls.exists) listingData = ls.data();
+          } catch (e) { /* listing deleted */ }
+          properties.push({
+            address: listingData.address?.full || "Unknown",
+            price: listingData.listingPrice,
+            beds: listingData.bedrooms,
+            baths: listingData.bathrooms,
+            sqft: listingData.squareFeet,
+            type: listingData.propertyType,
+            matchStatus: m.status,
+            matchScore: m.matchScore,
+            rating: m.clientRating,
+            feedback: m.clientFeedback
+          });
+        }
 
         const filesSnap = await db.collection("files")
           .where("clientId", "==", clientId)
@@ -735,8 +853,8 @@ CLIENT PROFILE:
 RECENT ACTIVITIES (${activities.length} shown):
 ${activities.map(a => `- [${a.date}] ${a.type.toUpperCase()}: ${a.subject}${a.body ? " — " + a.body : ""}`).join("\n") || "No activities"}
 
-BOOKMARKED PROPERTIES (${properties.length}):
-${properties.map(p => `- ${p.address} | $${p.price?.toLocaleString() || "?"} | Status: ${p.status} | Rating: ${p.rating || "?"}/5${p.feedback ? " | Feedback: " + p.feedback : ""}${p.showingDate ? " | Showing: " + p.showingDate : ""}`).join("\n") || "No properties"}
+MATCHED LISTINGS (${properties.length}):
+${properties.map(p => `- ${p.address} | $${p.price?.toLocaleString() || "?"} | ${p.beds || "?"}bd/${p.baths || "?"}ba | ${p.type || "?"} | Match: ${p.matchStatus} | Score: ${p.matchScore || "?"}% | Rating: ${p.rating || "?"}/5${p.feedback ? " | Feedback: " + p.feedback : ""}`).join("\n") || "No matched listings"}
 
 FILES (${files.length}):
 ${files.map(f => `- ${f.name} (${f.folder})`).join("\n") || "No files"}`;
@@ -863,7 +981,7 @@ ${showings.map(s => `  - ${s.date}: ${s.address} with ${s.clientName}`).join("\n
       if (context === "client_detail" && clientId) {
         tools = AI_TOOLS; // all tools
       } else if (context === "dashboard") {
-        tools = AI_TOOLS.filter(t => ["create_client", "search_clients", "create_event", "create_followup", "create_showing"].includes(t.name));
+        tools = AI_TOOLS.filter(t => ["create_client", "search_clients", "create_event", "create_followup", "create_showing", "add_listing", "search_listings"].includes(t.name));
       } else {
         tools = [];
       }
@@ -1326,6 +1444,118 @@ exports.sendForSignature = onCall(
 );
 
 /* ================================================================
+   BOLDSIGN: EMBEDDED SIGNATURE REQUEST (Drag-and-drop field placement)
+   ================================================================ */
+
+exports.createEmbeddedSignatureRequest = onCall(
+  { secrets: [boldsignKey], region: "us-central1", maxInstances: 10 },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "You must be logged in.");
+    }
+
+    const uid = request.auth.uid;
+    let { clientId, files, signers, title, message, expiryDays } = request.data;
+
+    if (!clientId || !files || !files.length || !signers || !signers.length) {
+      throw new HttpsError("invalid-argument", "Client, at least one file, and at least one signer are required.");
+    }
+
+    for (const f of files) {
+      if (!f.fileUrl || !f.fileUrl.startsWith("https://firebasestorage.googleapis.com/")) {
+        throw new HttpsError("invalid-argument", "Invalid file URL.");
+      }
+    }
+
+    const clientSnap = await db.doc(`clients/${clientId}`).get();
+    if (!clientSnap.exists || clientSnap.data().realtorId !== uid) {
+      throw new HttpsError("permission-denied", "Access denied.");
+    }
+
+    const envelopeTitle = title || files.map(f => f.fileName).join(", ");
+
+    try {
+      const fetch = require("node-fetch");
+      const FormData = require("form-data");
+      const form = new FormData();
+
+      // Download and append all files
+      for (const f of files) {
+        const fileResponse = await fetch(f.fileUrl);
+        if (!fileResponse.ok) throw new Error("Failed to download file: " + f.fileName);
+        const fileBuffer = await fileResponse.buffer();
+        form.append("Files", fileBuffer, { filename: f.fileName, contentType: "application/pdf" });
+      }
+
+      form.append("Title", envelopeTitle);
+      if (message) form.append("Message", message);
+      if (expiryDays) form.append("ExpiryDays", String(expiryDays));
+      if (signers.length > 1) form.append("EnableSigningOrder", "true");
+
+      // Signers — no FormFields; the realtor places them in the embedded editor
+      signers.forEach((s, i) => {
+        form.append(`Signers[${i}][Name]`, s.name);
+        form.append(`Signers[${i}][EmailAddress]`, s.email);
+        form.append(`Signers[${i}][SignerType]`, "Signer");
+        form.append(`Signers[${i}][SignerOrder]`, String(s.order || i + 1));
+      });
+
+      // Embedded editor options
+      form.append("ShowToolbar", "true");
+      form.append("ShowSendButton", "true");
+      form.append("ShowNavigationButtons", "true");
+      form.append("ShowPreviewButton", "true");
+      form.append("SendViewOption", "PreparePage");
+
+      // Link valid for 1 hour
+      const validTill = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+      form.append("SendLinkValidTill", validTill);
+
+      const bsResponse = await fetch("https://api.boldsign.com/v1/document/createEmbeddedRequestUrl", {
+        method: "POST",
+        headers: {
+          "X-API-KEY": boldsignKey.value(),
+          ...form.getHeaders()
+        },
+        body: form
+      });
+
+      if (!bsResponse.ok) {
+        const errorText = await bsResponse.text();
+        console.error("BoldSign embedded request error:", bsResponse.status, errorText);
+        throw new Error("BoldSign API error: " + bsResponse.status);
+      }
+
+      const bsData = await bsResponse.json();
+      const { documentId, sendUrl } = bsData;
+
+      // Store envelope as draft — activity logged when realtor actually sends
+      await db.doc(`envelopes/${documentId}`).set({
+        documentId,
+        clientId,
+        realtorId: uid,
+        title: envelopeTitle,
+        files: files.map(f => ({ fileName: f.fileName, fileUrl: f.fileUrl })),
+        signers: signers.map(s => ({ name: s.name, email: s.email, order: s.order || 1, status: "draft" })),
+        status: "draft",
+        createdAt: FieldValue.serverTimestamp(),
+        signedDocumentUrl: null,
+        fileName: files[0].fileName,
+        signerEmail: signers[0].email,
+        signerName: signers[0].name,
+        firebaseFileUrl: files[0].fileUrl
+      });
+
+      return { success: true, sendUrl, documentId };
+    } catch (err) {
+      if (err instanceof HttpsError) throw err;
+      console.error("createEmbeddedSignatureRequest error:", err);
+      throw new HttpsError("internal", "Failed to create embedded signature request.");
+    }
+  }
+);
+
+/* ================================================================
    BOLDSIGN: CHECK SIGNATURE STATUS
    ================================================================ */
 
@@ -1354,7 +1584,8 @@ async function handleCompletedDocument(documentId, envelopeData, apiKey) {
 
   // Upload to Firebase Storage
   const bucket = getStorage().bucket();
-  const signedFileName = `SIGNED_${envelopeData.fileName}`;
+  const baseFileName = envelopeData.title || envelopeData.files?.[0]?.fileName || envelopeData.fileName || "document.pdf";
+  const signedFileName = `SIGNED_${baseFileName}`;
   const storagePath = `files/${envelopeData.realtorId}/${envelopeData.clientId}/contracts/${signedFileName}`;
   const file = bucket.file(storagePath);
 
@@ -1390,8 +1621,8 @@ async function handleCompletedDocument(documentId, envelopeData, apiKey) {
     clientId: envelopeData.clientId,
     realtorId: envelopeData.realtorId,
     type: "file_share",
-    subject: "Document signed: " + envelopeData.fileName,
-    body: "Signed by " + envelopeData.signerName,
+    subject: "Document signed: " + (envelopeData.title || envelopeData.fileName),
+    body: "Signed by " + (envelopeData.signers?.map(s => s.name).join(", ") || envelopeData.signerName || "signer"),
     timestamp: FieldValue.serverTimestamp()
   });
 
@@ -1525,6 +1756,14 @@ exports.boldSignWebhook = onRequest(
           res.status(401).send("Signature mismatch");
           return;
         }
+      } else {
+        // Signature header missing — only allow verification pings (no documentId)
+        const body = req.body || {};
+        const hasDocumentId = body.data?.documentId || body.event?.documentId || body.documentId;
+        if (hasDocumentId) {
+          res.status(401).send("Missing webhook signature");
+          return;
+        }
       }
     }
 
@@ -1532,7 +1771,7 @@ exports.boldSignWebhook = onRequest(
       const payload = req.body;
       const event = payload.event || {};
       const eventType = (event.eventType || payload.eventType || "").toLowerCase();
-      const documentId = event.documentId || payload.documentId;
+      const documentId = payload.data?.documentId || event.documentId || payload.documentId;
 
       console.log("BoldSign webhook received:", eventType, documentId);
 
@@ -1562,11 +1801,45 @@ exports.boldSignWebhook = onRequest(
       };
 
       const newStatus = statusMap[eventType] || eventType;
-      await db.doc(`envelopes/${documentId}`).update({ status: newStatus });
+      const envelopeData = envelopeSnap.data();
+      const updateData = { status: newStatus };
+
+      // Update per-signer statuses from webhook payload
+      const signerDetails = payload.data?.signerDetails;
+      if (signerDetails && envelopeData.signers) {
+        updateData.signers = envelopeData.signers.map(s => {
+          const match = signerDetails.find(
+            sd => sd.signerEmail?.toLowerCase() === s.email?.toLowerCase()
+          );
+          if (match) {
+            s.status = (match.status || "sent").toLowerCase().replace(/\s/g, "_");
+          }
+          return s;
+        });
+      }
+
+      await db.doc(`envelopes/${documentId}`).update(updateData);
+
+      // If a draft transitions to sent, log the activity (deferred from createEmbeddedSignatureRequest)
+      if (newStatus === "sent" && envelopeData.status === "draft") {
+        await db.doc(`envelopes/${documentId}`).update({ sentAt: FieldValue.serverTimestamp() });
+
+        await db.collection("activities").add({
+          clientId: envelopeData.clientId,
+          realtorId: envelopeData.realtorId,
+          type: "email",
+          subject: `Sent for signature: ${envelopeData.title || envelopeData.fileName}`,
+          body: `${envelopeData.files?.length || 1} doc(s) sent to ${envelopeData.signers?.map(s => s.name).join(", ") || envelopeData.signerName || "signer"} via BoldSign`,
+          timestamp: FieldValue.serverTimestamp()
+        });
+
+        await db.doc(`clients/${envelopeData.clientId}`).update({
+          lastActivityDate: FieldValue.serverTimestamp()
+        });
+      }
 
       // If completed, download and file the signed document
       if (newStatus === "completed") {
-        const envelopeData = envelopeSnap.data();
         await handleCompletedDocument(documentId, envelopeData, boldsignKey.value());
       }
 
@@ -1575,6 +1848,198 @@ exports.boldSignWebhook = onRequest(
       console.error("Webhook error:", err);
       res.status(500).send("Internal error");
     }
+  }
+);
+
+/* ================================================================
+   BOLDSIGN: STRESS TEST (Admin Only)
+   ================================================================ */
+
+exports.stressTestBoldSign = onCall(
+  { secrets: [boldsignKey, boldsignWebhookSecret], region: "us-central1", timeoutSeconds: 120 },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "You must be logged in.");
+    }
+
+    // Admin-only
+    const callerSnap = await db.doc(`users/${request.auth.uid}`).get();
+    if (!callerSnap.exists || callerSnap.data().role !== "admin") {
+      throw new HttpsError("permission-denied", "Only admins can run diagnostics.");
+    }
+
+    const fetch = require("node-fetch");
+    const FormData = require("form-data");
+    const apiKey = boldsignKey.value();
+    const secret = boldsignWebhookSecret.value();
+    const adminEmail = callerSnap.data().email || request.auth.token.email;
+    const results = [];
+    let testDocumentId = null;
+
+    // Helper
+    function record(test, passed, details, rawResponse) {
+      results.push({ test, passed, details, ...(rawResponse ? { rawResponse } : {}) });
+    }
+
+    // --- Test 1: API Key ---
+    try {
+      const resp = await fetch(
+        "https://api.boldsign.com/v1/document/list?Page=1&PageSize=1",
+        { headers: { "X-API-KEY": apiKey } }
+      );
+      if (resp.ok) {
+        const data = await resp.json();
+        record("API Key", true, `Key valid. ${data.result?.length ?? 0} doc(s) returned.`);
+      } else {
+        const text = await resp.text();
+        record("API Key", false, `HTTP ${resp.status}: ${text}`);
+      }
+    } catch (err) {
+      record("API Key", false, err.message);
+    }
+
+    // --- Test 2: Send Document ---
+    try {
+      // Create a tiny test PDF
+      const pdfBytes = Buffer.from(
+        "%PDF-1.0\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n" +
+        "2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n" +
+        "3 0 obj<</Type/Page/MediaBox[0 0 612 792]/Parent 2 0 R/Resources<<>>>>endobj\n" +
+        "xref\n0 4\n0000000000 65535 f \n0000000009 00000 n \n0000000058 00000 n \n0000000115 00000 n \n" +
+        "trailer<</Size 4/Root 1 0 R>>\nstartxref\n206\n%%EOF"
+      );
+
+      const form = new FormData();
+      form.append("Title", "GreenDoor Stress Test");
+      form.append("Message", "Automated diagnostic — safe to ignore.");
+      form.append("Signers[0][Name]", "GreenDoor Admin");
+      form.append("Signers[0][EmailAddress]", adminEmail);
+      form.append("Signers[0][SignerType]", "Signer");
+      form.append("Signers[0][SignerOrder]", "1");
+      form.append("Signers[0][FormFields][0][FieldType]", "Signature");
+      form.append("Signers[0][FormFields][0][PageNumber]", "1");
+      form.append("Signers[0][FormFields][0][Bounds][X]", "100");
+      form.append("Signers[0][FormFields][0][Bounds][Y]", "100");
+      form.append("Signers[0][FormFields][0][Bounds][Width]", "200");
+      form.append("Signers[0][FormFields][0][Bounds][Height]", "50");
+      form.append("Files", pdfBytes, { filename: "stress-test.pdf", contentType: "application/pdf" });
+      form.append("ExpiryDays", "1");
+
+      const resp = await fetch("https://api.boldsign.com/v1/document/send", {
+        method: "POST",
+        headers: { "X-API-KEY": apiKey, ...form.getHeaders() },
+        body: form
+      });
+
+      if (resp.ok) {
+        const data = await resp.json();
+        testDocumentId = data.documentId;
+        record("Send Document", true, `Sent. documentId: ${testDocumentId}`);
+      } else {
+        const text = await resp.text();
+        record("Send Document", false, `HTTP ${resp.status}: ${text}`);
+      }
+    } catch (err) {
+      record("Send Document", false, err.message);
+    }
+
+    // --- Test 3: Get Properties ---
+    if (testDocumentId) {
+      try {
+        const resp = await fetch(
+          `https://api.boldsign.com/v1/document/properties?documentId=${testDocumentId}`,
+          { headers: { "X-API-KEY": apiKey } }
+        );
+        if (resp.ok) {
+          const data = await resp.json();
+          record("Get Properties", true, `Status: ${data.status}. Signers: ${data.signerDetails?.length ?? 0}`);
+
+          // --- Test 4: Field Mapping ---
+          const signer = data.signerDetails?.[0];
+          if (signer && typeof signer.signerEmail === "string" && typeof signer.status === "string") {
+            record("Field Mapping", true, `signerEmail="${signer.signerEmail}", status="${signer.status}"`);
+          } else {
+            record("Field Mapping", false, "signerDetails missing expected fields (signerEmail, status)", JSON.stringify(signer || null));
+          }
+        } else {
+          const text = await resp.text();
+          record("Get Properties", false, `HTTP ${resp.status}: ${text}`);
+          record("Field Mapping", false, "Skipped — properties call failed");
+        }
+      } catch (err) {
+        record("Get Properties", false, err.message);
+        record("Field Mapping", false, "Skipped — properties call failed");
+      }
+    } else {
+      record("Get Properties", false, "Skipped — no documentId from send");
+      record("Field Mapping", false, "Skipped — no documentId from send");
+    }
+
+    // --- Test 5: Download ---
+    if (testDocumentId) {
+      try {
+        const resp = await fetch(
+          `https://api.boldsign.com/v1/document/download?documentId=${testDocumentId}`,
+          { headers: { "X-API-KEY": apiKey } }
+        );
+        if (resp.ok) {
+          const buf = await resp.buffer();
+          const isPdf = buf.length > 4 && buf.slice(0, 5).toString().startsWith("%PDF");
+          record("Download", isPdf, isPdf ? `Valid PDF, ${buf.length} bytes` : `Got ${buf.length} bytes but not a PDF`);
+        } else {
+          const text = await resp.text();
+          record("Download", false, `HTTP ${resp.status}: ${text}`);
+        }
+      } catch (err) {
+        record("Download", false, err.message);
+      }
+    } else {
+      record("Download", false, "Skipped — no documentId from send");
+    }
+
+    // --- Test 6: Webhook HMAC ---
+    try {
+      if (!secret) {
+        record("Webhook HMAC", false, "BOLDSIGN_WEBHOOK_SECRET not configured");
+      } else {
+        const testTimestamp = String(Math.floor(Date.now() / 1000));
+        const testBody = '{"test":true}';
+        const sig = crypto.createHmac("sha256", secret)
+          .update(testTimestamp + "." + testBody, "utf8")
+          .digest("hex");
+        const valid = sig && sig.length === 64 && /^[0-9a-f]+$/.test(sig);
+        record("Webhook HMAC", valid, valid ? `HMAC generated OK (${sig.substring(0, 16)}...)` : "HMAC generation produced invalid output");
+      }
+    } catch (err) {
+      record("Webhook HMAC", false, err.message);
+    }
+
+    // --- Test 7: Void / Cleanup ---
+    if (testDocumentId) {
+      try {
+        const resp = await fetch(
+          `https://api.boldsign.com/v1/document/void?documentId=${testDocumentId}`,
+          {
+            method: "POST",
+            headers: { "X-API-KEY": apiKey, "Content-Type": "application/json" },
+            body: JSON.stringify({ message: "GreenDoor stress test cleanup" })
+          }
+        );
+        if (resp.ok || resp.status === 204) {
+          record("Void/Cleanup", true, "Test document voided successfully");
+        } else {
+          const text = await resp.text();
+          record("Void/Cleanup", false, `HTTP ${resp.status}: ${text}`);
+        }
+      } catch (err) {
+        record("Void/Cleanup", false, err.message);
+      }
+    } else {
+      record("Void/Cleanup", false, "Skipped — no documentId to void");
+    }
+
+    const passed = results.filter(r => r.passed).length;
+    return { results, summary: `${passed}/${results.length} passed` };
   }
 );
 

@@ -19,6 +19,7 @@
         <li><a href="/greendoor/app/dashboard">Dashboard</a></li>
         <li><a href="/greendoor/app/clients">Clients</a></li>
         <li><a href="/greendoor/app/calendar">Calendar</a></li>
+        <li><a href="/greendoor/app/listings">Listings</a></li>
         <li id="nav-admin-tab" style="display:none;"><a href="/greendoor/app/admin">Admin</a></li>
         <li><a href="/greendoor/app/settings" class="gd-nav-active">Settings</a></li>
         <li class="nav-crm-divider"></li>
@@ -83,6 +84,10 @@
           <p class="gd-text-muted" style="margin: 0.5rem 0 0 0; font-size: 0.85rem;">
             All e-signature requests are sent through the platform's BoldSign account. Contact admin to configure a dedicated BoldSign account.
           </p>
+          <div id="boldsign-diagnostics" class="gd-diagnostics" style="display:none;">
+            <button id="btn-run-diagnostics" class="gd-btn gd-btn-outline" onclick="runBoldSignTest()" style="margin-top: 0.75rem;">Run Diagnostics</button>
+            <div id="diagnostics-results" class="gd-diagnostics-results" style="display:none;"></div>
+          </div>
         </div>
 
         <!-- Email Section -->

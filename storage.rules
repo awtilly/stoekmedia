@@ -4,5 +4,8 @@ service firebase.storage {
     match /files/{realtorUid}/{allPaths=**} {
       allow read, write: if request.auth != null && request.auth.uid == realtorUid;
     }
+    match /listings/{listingId}/{allPaths=**} {
+      allow read, write: if request.auth != null;
+    }
   }
 }

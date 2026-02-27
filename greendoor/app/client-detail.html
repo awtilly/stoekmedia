@@ -19,6 +19,7 @@
         <li><a href="/greendoor/app/dashboard">Dashboard</a></li>
         <li><a href="/greendoor/app/clients" class="gd-nav-active">Clients</a></li>
         <li><a href="/greendoor/app/calendar">Calendar</a></li>
+        <li><a href="/greendoor/app/listings">Listings</a></li>
         <li id="nav-admin-tab" style="display:none;"><a href="/greendoor/app/admin">Admin</a></li>
         <li><a href="/greendoor/app/settings">Settings</a></li>
         <li class="nav-crm-divider"></li>
@@ -186,6 +187,10 @@
                 <label for="ov-mustHaveFeatures">Must-Have Features (comma-separated)</label>
                 <input type="text" id="ov-mustHaveFeatures" class="gd-input" placeholder="Pool, Garage, Open Floor Plan">
               </div>
+              <div class="gd-form-group">
+                <label for="ov-dealBreakers">Deal Breakers (comma-separated)</label>
+                <input type="text" id="ov-dealBreakers" class="gd-input" placeholder="HOA, Flood Zone, Busy Road">
+              </div>
             </div>
 
             <div class="gd-form-section">
@@ -305,13 +310,29 @@
         <!-- ===== PROPERTIES TAB ===== -->
         <div id="tab-properties" class="gd-tab-content">
           <div class="gd-section-header">
-            <div></div>
-            <button class="gd-btn gd-btn-primary gd-btn-sm" onclick="openPropertyModal()">+ Add Property</button>
+            <div class="gd-match-filter-bar">
+              <select id="match-sort" class="gd-input gd-filter-sm" onchange="renderMatches()">
+                <option value="score">Sort: Match Score</option>
+                <option value="price_asc">Sort: Price Low-High</option>
+                <option value="price_desc">Sort: Price High-Low</option>
+                <option value="newest">Sort: Newest</option>
+              </select>
+              <select id="match-status-filter" class="gd-input gd-filter-sm" onchange="renderMatches()">
+                <option value="">All Statuses</option>
+                <option value="interested">Interested</option>
+                <option value="shown">Shown</option>
+                <option value="offer_made">Offer Made</option>
+                <option value="rejected">Rejected</option>
+                <option value="under_contract">Under Contract</option>
+                <option value="closed">Closed</option>
+              </select>
+            </div>
+            <button class="gd-btn gd-btn-primary gd-btn-sm" onclick="openMatchListingPanel()">+ Match a Listing</button>
           </div>
           <div id="properties-grid" class="gd-property-grid">
             <div class="gd-empty" style="grid-column: 1/-1;">
               <div class="gd-empty-icon">&#127968;</div>
-              <div class="gd-empty-text">No properties bookmarked yet</div>
+              <div class="gd-empty-text">No matched listings yet</div>
             </div>
           </div>
           <div id="compare-bar" class="gd-compare-bar">
@@ -365,57 +386,49 @@
     </div>
   </div>
 
-  <!-- Property Modal -->
-  <div id="property-modal" class="gd-modal-overlay">
-    <div class="gd-modal" style="max-width: 620px;">
+  <!-- Match-a-Listing Panel -->
+  <div id="match-listing-modal" class="gd-modal-overlay">
+    <div class="gd-modal" style="max-width: 700px;">
       <div class="gd-modal-header">
-        <h3 id="property-modal-title">Add Property</h3>
-        <button class="gd-modal-close" onclick="closePropertyModal()" aria-label="Close">&times;</button>
+        <h3>Match a Listing</h3>
+        <button class="gd-modal-close" onclick="closeMatchListingPanel()" aria-label="Close">&times;</button>
       </div>
       <div class="gd-modal-body">
-        <div class="gd-form-group gd-scrape-group">
-          <label for="prop-scrape-url">Paste Listing Link</label>
-          <div class="gd-scrape-row">
-            <input type="url" id="prop-scrape-url" class="gd-input" placeholder="Paste Zillow, Redfin, Realtor.com link...">
-            <button class="gd-btn gd-btn-primary gd-btn-sm" id="prop-scrape-btn" onclick="scrapeListingUrl()">Fetch</button>
-          </div>
-          <div id="prop-scrape-status" class="gd-scrape-status gd-hidden"></div>
-        </div>
-        <div class="gd-form-divider"></div>
         <div class="gd-form-group">
-          <label for="prop-address">Address *</label>
-          <input type="text" id="prop-address" class="gd-input">
+          <input type="text" id="match-search" class="gd-input" placeholder="Search listings by address, MLS#..." oninput="filterMatchListings()">
         </div>
-        <div class="gd-form-row">
-          <div class="gd-form-group">
-            <label for="prop-mlsNumber">MLS Number</label>
-            <input type="text" id="prop-mlsNumber" class="gd-input">
-          </div>
-          <div class="gd-form-group">
-            <label for="prop-listingPrice">Listing Price</label>
-            <input type="number" id="prop-listingPrice" class="gd-input">
-          </div>
+        <div id="match-listing-results" class="gd-match-listing-results">
+          <div class="gd-text-muted" style="padding:1rem;">Loading listings...</div>
         </div>
-        <div class="gd-form-row">
-          <div class="gd-form-group">
-            <label for="prop-status">Status</label>
-            <select id="prop-status" class="gd-input">
-              <option value="interested">Interested</option>
-              <option value="shown">Shown</option>
-              <option value="offer_made">Offer Made</option>
-              <option value="rejected">Rejected</option>
-              <option value="under_contract">Under Contract</option>
-              <option value="closed">Closed</option>
-            </select>
-          </div>
-          <div class="gd-form-group">
-            <label for="prop-showingDate">Showing Date</label>
-            <input type="datetime-local" id="prop-showingDate" class="gd-input">
-          </div>
+      </div>
+      <div class="gd-modal-footer">
+        <button class="gd-btn" onclick="closeMatchListingPanel()">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit Match Modal -->
+  <div id="edit-match-modal" class="gd-modal-overlay">
+    <div class="gd-modal" style="max-width: 500px;">
+      <div class="gd-modal-header">
+        <h3 id="edit-match-title">Edit Match</h3>
+        <button class="gd-modal-close" onclick="closeEditMatchModal()" aria-label="Close">&times;</button>
+      </div>
+      <div class="gd-modal-body">
+        <div class="gd-form-group">
+          <label for="em-status">Status</label>
+          <select id="em-status" class="gd-input">
+            <option value="interested">Interested</option>
+            <option value="shown">Shown</option>
+            <option value="offer_made">Offer Made</option>
+            <option value="rejected">Rejected</option>
+            <option value="under_contract">Under Contract</option>
+            <option value="closed">Closed</option>
+          </select>
         </div>
         <div class="gd-form-group">
           <label>Client Rating</label>
-          <div id="prop-stars" class="gd-stars">
+          <div id="em-stars" class="gd-stars">
             <span class="gd-star clickable" data-rating="1">&#9733;</span>
             <span class="gd-star clickable" data-rating="2">&#9733;</span>
             <span class="gd-star clickable" data-rating="3">&#9733;</span>
@@ -424,28 +437,25 @@
           </div>
         </div>
         <div class="gd-form-group">
-          <label for="prop-clientFeedback">Client Feedback</label>
-          <textarea id="prop-clientFeedback" class="gd-input" rows="2"></textarea>
+          <label for="em-feedback">Client Feedback</label>
+          <textarea id="em-feedback" class="gd-input" rows="2"></textarea>
         </div>
         <div class="gd-form-group">
-          <label for="prop-realtorNotes">Realtor Notes</label>
-          <textarea id="prop-realtorNotes" class="gd-input" rows="2"></textarea>
-        </div>
-        <div class="gd-form-group">
-          <label for="prop-listingUrl">Listing URL</label>
-          <input type="url" id="prop-listingUrl" class="gd-input" placeholder="https://...">
+          <label for="em-notes">Realtor Notes</label>
+          <textarea id="em-notes" class="gd-input" rows="2"></textarea>
         </div>
       </div>
       <div class="gd-modal-footer">
-        <button class="gd-btn" onclick="closePropertyModal()">Cancel</button>
-        <button class="gd-btn gd-btn-primary" onclick="saveProperty()">Save</button>
+        <button class="gd-btn gd-btn-danger" onclick="deleteMatch()">Remove Match</button>
+        <button class="gd-btn" onclick="closeEditMatchModal()">Cancel</button>
+        <button class="gd-btn gd-btn-primary" onclick="saveMatch()">Save</button>
       </div>
     </div>
   </div>
 
   <!-- Compare Modal -->
   <div id="compare-modal" class="gd-modal-overlay">
-    <div class="gd-modal" style="max-width: 900px;">
+    <div class="gd-modal gd-modal-lg">
       <div class="gd-modal-header">
         <h3>Property Comparison</h3>
         <button class="gd-modal-close" onclick="closeCompareModal()" aria-label="Close">&times;</button>
@@ -511,7 +521,28 @@
       </div>
       <div class="gd-modal-footer">
         <button class="gd-btn" onclick="closeSignatureModal()">Cancel</button>
-        <button id="sig-send-btn" class="gd-btn gd-btn-signature" onclick="submitSignature()">&#9997; Send for Signature</button>
+        <button id="sig-send-btn" class="gd-btn gd-btn-signature" onclick="submitSignature()">&#9997; Place Fields &amp; Send</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- BoldSign Embed Modal -->
+  <div id="boldsign-embed-modal" class="gd-modal-overlay">
+    <div class="gd-modal gd-boldsign-embed-modal">
+      <div class="gd-modal-header">
+        <h3>Place Signature Fields</h3>
+        <button class="gd-modal-close" onclick="closeBoldSignEmbed()" aria-label="Close">&times;</button>
+      </div>
+      <div class="gd-modal-body gd-boldsign-embed-body">
+        <div id="boldsign-embed-loading" class="gd-loading">
+          <div class="gd-spinner gd-spinner-lg"></div>
+          <span class="gd-loading-text">Loading editor...</span>
+        </div>
+        <iframe id="boldsign-embed-iframe" class="gd-boldsign-iframe" allow="clipboard-write"></iframe>
+      </div>
+      <div class="gd-modal-footer">
+        <span class="gd-text-muted" style="flex:1;">Drag signature fields onto the document, then click Send in the editor above.</span>
+        <button class="gd-btn" onclick="closeBoldSignEmbed()">Cancel</button>
       </div>
     </div>
   </div>
@@ -588,7 +619,7 @@
       </div>
       <div class="gd-modal-body">
         <div class="gd-form-group">
-          <label for="show-property">Property (from bookmarked)</label>
+          <label for="show-property">Property (from matched listings)</label>
           <select id="show-property" class="gd-input" onchange="fillShowingFromProperty()">
             <option value="">— Manual entry —</option>
           </select>
@@ -733,6 +764,7 @@
 
   <script src="/assets/js/main.js"></script>
   <script type="module" src="/greendoor/js/auth.js"></script>
+  <script type="module" src="/greendoor/js/match-engine.js"></script>
   <script type="module" src="/greendoor/js/client-detail.js"></script>
 </body>
 </html>
