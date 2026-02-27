@@ -77,18 +77,13 @@ onAuthStateChanged(auth, async (user) => {
     console.error("Activity feed error:", e);
   }
 
-  // Build client name cache (shared across showings + schedule)
-  const clientCache = {};
-  try {
-    const clientsSnap = await getDocs(query(collection(db, "clients"), where("realtorId", "==", uid)));
-    clientsSnap.forEach(d => { clientCache[d.id] = d.data().fullName || "Unknown"; });
-  } catch (e) {
-    console.error("Client cache error:", e);
-  }
-
-  // --- Upcoming Showings (matches calendar's showings collection) ---
+  // --- Upcoming Showings ---
   try {
     const now = Timestamp.now();
+    const clientCache = {};
+    const clientsSnap = await getDocs(query(collection(db, "clients"), where("realtorId", "==", uid)));
+    clientsSnap.forEach(d => { clientCache[d.id] = d.data().fullName || "Unknown"; });
+
     const showQ = query(
       collection(db, "showings"),
       where("realtorId", "==", uid),
@@ -113,99 +108,6 @@ onAuthStateChanged(auth, async (user) => {
     if (rows.length > 0) showEl.innerHTML = rows.join("");
   } catch (e) {
     console.error("Showings error:", e);
-  }
-
-  // --- Today's Schedule (showings + follow-ups + events — same sources as calendar) ---
-  try {
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-    const todayEnd = new Date();
-    todayEnd.setHours(23, 59, 59, 999);
-    const todayStartTs = Timestamp.fromDate(todayStart);
-    const todayEndTs = Timestamp.fromDate(todayEnd);
-
-    const scheduleItems = [];
-
-    // Showings today
-    const showingsQ = query(
-      collection(db, "showings"),
-      where("realtorId", "==", uid),
-      where("showingDate", ">=", todayStartTs),
-      where("showingDate", "<=", todayEndTs)
-    );
-    const showingsSnap = await getDocs(showingsQ);
-    showingsSnap.forEach(d => {
-      const s = d.data();
-      if (s.status === "cancelled") return;
-      scheduleItems.push({
-        time: s.showingDate.toDate(),
-        type: "showing",
-        title: `Showing: ${s.address || "—"}`,
-        subtitle: clientCache[s.clientId] || "",
-        clientId: s.clientId
-      });
-    });
-
-    // Follow-ups due today (pending only, matching calendar filter)
-    const fuQ = query(
-      collection(db, "followUps"),
-      where("realtorId", "==", uid),
-      where("dueDate", ">=", todayStartTs),
-      where("dueDate", "<=", todayEndTs)
-    );
-    const fuSnap = await getDocs(fuQ);
-    fuSnap.forEach(d => {
-      const f = d.data();
-      if (f.status === "completed" || f.status === "dismissed") return;
-      scheduleItems.push({
-        time: f.dueDate.toDate(),
-        type: "followup",
-        title: f.title || "Follow-up",
-        subtitle: clientCache[f.clientId] || "",
-        clientId: f.clientId
-      });
-    });
-
-    // Custom events today (all statuses, matching calendar)
-    const evQ = query(
-      collection(db, "events"),
-      where("realtorId", "==", uid),
-      where("startDate", ">=", todayStartTs),
-      where("startDate", "<=", todayEndTs)
-    );
-    const evSnap = await getDocs(evQ);
-    evSnap.forEach(d => {
-      const e = d.data();
-      scheduleItems.push({
-        time: e.startDate.toDate(),
-        type: "event",
-        title: e.title || "Event",
-        subtitle: e.clientId ? (clientCache[e.clientId] || "") : "",
-        clientId: e.clientId
-      });
-    });
-
-    // Sort by time
-    scheduleItems.sort((a, b) => a.time - b.time);
-
-    const scheduleEl = document.getElementById("today-schedule");
-    if (scheduleItems.length > 0) {
-      scheduleEl.innerHTML = scheduleItems.map(item => {
-        const timeStr = item.time.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-        const clientLink = item.clientId
-          ? `<a href="/greendoor/app/client-detail?id=${item.clientId}" class="gd-schedule-link">${item.subtitle}</a>`
-          : "";
-        return `
-          <div class="gd-schedule-item">
-            <div class="gd-schedule-dot ${item.type}"></div>
-            <span class="gd-schedule-time">${timeStr}</span>
-            <span class="gd-schedule-title">${item.title}</span>
-            ${clientLink}
-          </div>`;
-      }).join("");
-    }
-  } catch (e) {
-    console.error("Schedule error:", e);
   }
 
   document.getElementById("dashboard-loading").classList.add("gd-hidden");
