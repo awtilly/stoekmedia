@@ -425,8 +425,9 @@ document.getElementById("folder-filters").addEventListener("click", (e) => {
 });
 
 document.getElementById("file-input").addEventListener("change", (e) => {
-  const name = e.target.files[0]?.name || "";
-  document.getElementById("file-name-display").textContent = name;
+  if (e.target.files[0]) {
+    uploadFile();
+  }
 });
 
 async function loadFiles(uid) {
@@ -461,14 +462,15 @@ function renderFiles() {
     const signedBadge = f.fileName.startsWith("SIGNED_") ? ' <span class="gd-badge-signed">&#9997; Signed</span>' : '';
     const checked = selectedFiles.has(f.id) ? "checked" : "";
     return `
-    <div class="gd-file-row">
-      <input type="checkbox" class="gd-file-check" data-id="${f.id}" ${checked} onclick="toggleFileSelect('${f.id}')">
+    <div class="gd-file-row" onclick="openPreview('${f.id}')">
+      <input type="checkbox" class="gd-file-check" data-id="${f.id}" ${checked} onclick="event.stopPropagation(); toggleFileSelect('${f.id}')">
+      <span class="gd-file-preview-icon">&#128065;</span>
       <span class="gd-file-name">${f.fileName}${signedBadge}</span>
       <span class="gd-badge gd-badge-${f.folder}">${f.folder}</span>
       <span class="gd-file-meta">${formatFileSize(f.fileSize)}</span>
       <span class="gd-file-meta">${formatDate(f.uploadedAt)}</span>
-      <button class="gd-btn gd-btn-sm gd-file-send-btn" onclick="sendSingleFile('${f.id}')">Send</button>
-      <a href="${f.downloadUrl}" target="_blank" class="gd-file-download">Download</a>
+      <button class="gd-btn gd-btn-sm gd-file-send-btn" onclick="event.stopPropagation(); sendSingleFile('${f.id}')">Send</button>
+      <a href="${f.downloadUrl}" target="_blank" class="gd-file-download" onclick="event.stopPropagation()">Download</a>
     </div>`;
   }).join("");
 }
@@ -527,7 +529,6 @@ window.uploadFile = async function () {
         await updateDoc(doc(db, "clients", clientId), { lastActivityDate: serverTimestamp() });
         showToast("File uploaded!");
         fileInput.value = "";
-        document.getElementById("file-name-display").textContent = "";
         progressBar.classList.remove("active");
         await loadFiles(user.uid);
         const c = await getCountFromServer(query(collection(db, "files"), where("clientId", "==", clientId), where("realtorId", "==", user.uid)));
@@ -652,7 +653,6 @@ window.uploadAndSend = async function () {
       folder, fileSize: file.size, mimeType: file.type, uploadedAt: serverTimestamp()
     });
     fileInput.value = "";
-    document.getElementById("file-name-display").textContent = "";
     await loadFiles(user.uid);
 
     // Open send modal with this file
@@ -665,6 +665,38 @@ window.uploadAndSend = async function () {
     console.error("Upload error:", e);
     showToast("Upload failed.", "error");
   }
+};
+
+/* ===== FILE PREVIEW ===== */
+
+window.openPreview = function (fileId) {
+  const f = allFiles.find(x => x.id === fileId);
+  if (!f) return;
+
+  document.getElementById("preview-file-name").textContent = f.fileName;
+  document.getElementById("preview-download").href = f.downloadUrl;
+
+  const contentEl = document.getElementById("preview-content");
+  const ext = (f.fileName.split(".").pop() || "").toLowerCase();
+  const mime = (f.mimeType || "").toLowerCase();
+
+  if (mime.startsWith("image/") || ["jpg", "jpeg", "png", "gif", "webp"].includes(ext)) {
+    contentEl.innerHTML = `<img src="${f.downloadUrl}" alt="${f.fileName}">`;
+  } else if (mime === "application/pdf" || ext === "pdf") {
+    contentEl.innerHTML = `<iframe src="${f.downloadUrl}"></iframe>`;
+  } else if (["doc", "docx", "xlsx", "xls", "csv", "ppt", "pptx"].includes(ext)) {
+    const viewerUrl = `https://docs.google.com/gview?url=${encodeURIComponent(f.downloadUrl)}&embedded=true`;
+    contentEl.innerHTML = `<iframe src="${viewerUrl}"></iframe>`;
+  } else {
+    contentEl.innerHTML = `<div class="gd-empty"><div class="gd-empty-icon">&#128196;</div><div class="gd-empty-text">Preview not available for this file type</div><div class="gd-empty-sub">Use the Download button below</div></div>`;
+  }
+
+  document.getElementById("file-preview-modal").classList.add("active");
+};
+
+window.closePreview = function () {
+  document.getElementById("file-preview-modal").classList.remove("active");
+  document.getElementById("preview-content").innerHTML = "";
 };
 
 /* ===== BOLDSIGN E-SIGNATURES (Multi-doc/signer) ===== */
@@ -1627,6 +1659,7 @@ window.sendQuickAction = function (text) {
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
     const modals = [
+      { id: "file-preview-modal", close: () => closePreview() },
       { id: "activity-modal", close: () => closeActivityModal() },
       { id: "property-modal", close: () => closePropertyModal() },
       { id: "compare-modal", close: () => closeCompareModal() },

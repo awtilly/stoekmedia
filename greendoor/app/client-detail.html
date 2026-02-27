@@ -279,13 +279,8 @@
               <option value="photos">Photos</option>
               <option value="other">Other</option>
             </select>
-            <div class="gd-file-input-wrapper">
-              <button class="gd-btn gd-btn-sm">Choose File</button>
-              <input type="file" id="file-input" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.xlsx,.csv">
-            </div>
-            <span id="file-name-display" class="gd-text-muted"></span>
-            <button class="gd-btn gd-btn-primary gd-btn-sm" onclick="uploadFile()">Upload</button>
-            <button class="gd-btn gd-btn-sm" onclick="uploadAndSend()">Upload &amp; Send</button>
+            <button class="gd-upload-circle" onclick="document.getElementById('file-input').click()" title="Upload file">+</button>
+            <input type="file" id="file-input" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.xlsx,.csv" style="display:none;">
             <button class="gd-btn gd-btn-signature gd-btn-sm" onclick="openSignatureModal()">&#9997; Send for Signature</button>
           </div>
 
@@ -508,6 +503,21 @@
       <div class="gd-modal-footer">
         <button class="gd-btn" onclick="closeSignatureModal()">Cancel</button>
         <button id="sig-send-btn" class="gd-btn gd-btn-signature" onclick="submitSignature()">&#9997; Send for Signature</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- File Preview Modal -->
+  <div id="file-preview-modal" class="gd-modal-overlay">
+    <div class="gd-modal gd-preview-modal">
+      <div class="gd-modal-header">
+        <h3 id="preview-file-name">File Preview</h3>
+        <button class="gd-modal-close" onclick="closePreview()" aria-label="Close">&times;</button>
+      </div>
+      <div class="gd-modal-body" id="preview-content"></div>
+      <div class="gd-modal-footer">
+        <a id="preview-download" href="#" target="_blank" class="gd-btn gd-btn-primary">Download</a>
+        <button class="gd-btn" onclick="closePreview()">Close</button>
       </div>
     </div>
   </div>
