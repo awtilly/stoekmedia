@@ -46,9 +46,13 @@
       <!-- Dashboard Content (hidden until loaded) -->
       <div id="dashboard-content" class="gd-hidden">
 
-        <!-- Welcome -->
-        <div class="gd-welcome">
+        <!-- Welcome + Quick Actions -->
+        <div class="gd-welcome" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:var(--space-sm);">
           <h1>Welcome back, <em id="welcome-name"></em></h1>
+          <div class="gd-quick-actions" style="margin:0;">
+            <a href="/greendoor/app/clients" class="gd-btn gd-btn-primary">+ New Client</a>
+            <a href="/greendoor/app/clients" class="gd-btn">View All Clients</a>
+          </div>
         </div>
 
         <!-- AI Daily Briefing -->
@@ -138,12 +142,6 @@
             </div>
           </div>
 
-        </div>
-
-        <!-- Quick Actions -->
-        <div class="gd-quick-actions">
-          <a href="/greendoor/app/clients" class="gd-btn gd-btn-primary">+ Add New Client</a>
-          <a href="/greendoor/app/clients" class="gd-btn">View All Clients</a>
         </div>
 
       </div>

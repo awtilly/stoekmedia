@@ -80,7 +80,7 @@ onAuthStateChanged(auth, async (user) => {
   try {
     const now = Timestamp.now();
     const showQ = query(
-      collection(db, "bookmarkedProperties"),
+      collection(db, "showings"),
       where("realtorId", "==", uid),
       where("showingDate", ">=", now),
       orderBy("showingDate", "asc"),
@@ -96,15 +96,16 @@ onAuthStateChanged(auth, async (user) => {
 
       let html = "";
       showSnap.forEach(d => {
-        const p = d.data();
+        const s = d.data();
+        if (s.status === "cancelled") return;
         html += `
           <div class="gd-showing-item">
-            <span class="gd-showing-date">${formatDate(p.showingDate)}</span>
-            <span class="gd-showing-address">${p.address || "—"}</span>
-            <span class="gd-showing-client">${clientCache[p.clientId] || "—"}</span>
+            <span class="gd-showing-date">${formatDateTime(s.showingDate)}</span>
+            <span class="gd-showing-address">${s.address || "—"}</span>
+            <span class="gd-showing-client">${clientCache[s.clientId] || "—"}</span>
           </div>`;
       });
-      showEl.innerHTML = html;
+      showEl.innerHTML = html || showEl.innerHTML;
     }
   } catch (e) {
     console.error("Showings error:", e);
@@ -281,7 +282,7 @@ async function loadBriefing() {
 
   try {
     const result = await askAssistant({
-      question: "Give me my daily briefing. Summarize my current client pipeline, flag any clients I haven't contacted in over 14 days, note upcoming showings this week, and suggest 2-3 priority actions for today. Keep it concise.",
+      question: "Give me a brief daily snapshot in 3-5 bullet points max. Flag any clients I haven't contacted in 14+ days, note today's showings if any, and suggest 1-2 priority actions. Be very concise — no more than 6 lines total.",
       context: "dashboard"
     });
     const text = result.data.response;

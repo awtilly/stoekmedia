@@ -2414,9 +2414,11 @@ textarea.gd-input {
 }
 
 .gd-ai-briefing-content {
-  font-size: 0.9rem;
-  line-height: 1.7;
+  font-size: 0.85rem;
+  line-height: 1.6;
   color: #4b5563;
+  max-height: 160px;
+  overflow-y: auto;
 }
 
 .gd-ai-briefing-content ul {
