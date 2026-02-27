@@ -41,6 +41,12 @@ service cloud.firestore {
       allow update, delete: if isAuthenticated() && (isOwner(resource.data.realtorId) || isAdmin());
     }
 
+    match /templateFiles/{templateId} {
+      allow read: if isAuthenticated() && (isOwner(resource.data.realtorId) || isAdmin());
+      allow create: if isAuthenticated() && incomingRealtorIdMatchesAuth();
+      allow update, delete: if isAuthenticated() && (isOwner(resource.data.realtorId) || isAdmin());
+    }
+
     match /bookmarkedProperties/{propertyId} {
       allow read: if isAuthenticated() && (isOwner(resource.data.realtorId) || isAdmin());
       allow create: if isAuthenticated() && incomingRealtorIdMatchesAuth();

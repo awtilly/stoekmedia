@@ -4501,3 +4501,63 @@ textarea.gd-input {
     flex-wrap: wrap;
   }
 }
+
+/* ============================================================
+   TEMPLATE FILE ROWS (Settings page)
+   ============================================================ */
+
+.gd-tpl-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.gd-tpl-row:last-child {
+  border-bottom: none;
+}
+
+body.gd-light .gd-tpl-row {
+  border-bottom-color: #f3f4f6;
+}
+
+.gd-tpl-name-input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 0.25rem 0.4rem;
+  font-size: 0.85rem;
+  color: inherit;
+  font-family: inherit;
+  transition: border-color 0.2s;
+}
+
+.gd-tpl-name-input:hover {
+  border-color: #d1d5db;
+}
+
+.gd-tpl-name-input:focus {
+  outline: none;
+  border-color: #22c55e;
+  background: #fff;
+}
+
+.gd-tpl-delete {
+  background: none;
+  border: none;
+  color: #9ca3af;
+  font-size: 1.1rem;
+  cursor: pointer;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  line-height: 1;
+  transition: color 0.2s, background 0.2s;
+}
+
+.gd-tpl-delete:hover {
+  color: #dc2626;
+  background: rgba(220, 38, 38, 0.08);
+}

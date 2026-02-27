@@ -166,6 +166,14 @@
         { "fieldPath": "realtorId", "order": "ASCENDING" },
         { "fieldPath": "searchedAt", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "templateFiles",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "realtorId", "order": "ASCENDING" },
+        { "fieldPath": "uploadedAt", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

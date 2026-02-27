@@ -36,6 +36,7 @@ let sigFiles = [];
 let sigSigners = [];
 let embedUnsubscribe = null;
 let embedPollInterval = null;
+let allTemplateFiles = [];
 
 if (!clientId) {
   window.location.href = "/greendoor/app/clients";
@@ -88,7 +89,7 @@ async function loadClient(uid) {
     }
 
     populateOverview(clientData);
-    await Promise.all([loadActivities(uid), loadFiles(uid), loadMatches(uid), loadEnvelopes(uid), loadShowings(uid), loadFollowUps(uid)]);
+    await Promise.all([loadActivities(uid), loadFiles(uid), loadTemplateFiles(uid), loadMatches(uid), loadEnvelopes(uid), loadShowings(uid), loadFollowUps(uid)]);
 
     document.getElementById("detail-loading").classList.add("gd-hidden");
     document.getElementById("detail-content").classList.remove("gd-hidden");
@@ -456,6 +457,20 @@ async function loadFiles(uid) {
   }
 }
 
+async function loadTemplateFiles(uid) {
+  try {
+    const q = query(
+      collection(db, "templateFiles"),
+      where("realtorId", "==", uid),
+      orderBy("uploadedAt", "desc")
+    );
+    const snap = await getDocs(q);
+    allTemplateFiles = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  } catch (e) {
+    console.error("Load template files error:", e);
+  }
+}
+
 function renderFiles() {
   const el = document.getElementById("files-list");
   let filtered = allFiles;
@@ -743,9 +758,28 @@ window.closePreview = function () {
 function populateSigExistingDropdown() {
   const select = document.getElementById("sig-add-existing");
   select.innerHTML = '<option value="">+ Add from existing files...</option>';
-  allFiles.filter(f => ["contracts", "disclosures", "other"].includes(f.folder)).forEach(f => {
-    select.innerHTML += `<option value="${f.id}">${f.fileName} (${f.folder})</option>`;
-  });
+
+  // My Templates group
+  if (allTemplateFiles.length > 0) {
+    let tplGroup = '<optgroup label="My Templates">';
+    allTemplateFiles.forEach(t => {
+      const name = t.templateName || t.fileName;
+      tplGroup += `<option value="tpl:${t.id}">${name} (${t.category || 'other'})</option>`;
+    });
+    tplGroup += '</optgroup>';
+    select.innerHTML += tplGroup;
+  }
+
+  // Client files group
+  const clientFiles = allFiles.filter(f => ["contracts", "disclosures", "other"].includes(f.folder));
+  if (clientFiles.length > 0) {
+    let fileGroup = '<optgroup label="Client Files">';
+    clientFiles.forEach(f => {
+      fileGroup += `<option value="${f.id}">${f.fileName} (${f.folder})</option>`;
+    });
+    fileGroup += '</optgroup>';
+    select.innerHTML += fileGroup;
+  }
 }
 
 function renderSigFiles() {
@@ -820,12 +854,22 @@ window.closeSignatureModal = function () {
 
 // Add existing file from dropdown
 document.getElementById("sig-add-existing").addEventListener("change", (e) => {
-  const fileId = e.target.value;
-  if (!fileId) return;
-  const f = allFiles.find(x => x.id === fileId);
-  if (f && !sigFiles.some(sf => sf.fileUrl === f.downloadUrl)) {
-    sigFiles.push({ fileUrl: f.downloadUrl, fileName: f.fileName });
-    renderSigFiles();
+  const val = e.target.value;
+  if (!val) return;
+
+  if (val.startsWith("tpl:")) {
+    const tplId = val.substring(4);
+    const t = allTemplateFiles.find(x => x.id === tplId);
+    if (t && !sigFiles.some(sf => sf.fileUrl === t.downloadUrl)) {
+      sigFiles.push({ fileUrl: t.downloadUrl, fileName: t.templateName || t.fileName });
+      renderSigFiles();
+    }
+  } else {
+    const f = allFiles.find(x => x.id === val);
+    if (f && !sigFiles.some(sf => sf.fileUrl === f.downloadUrl)) {
+      sigFiles.push({ fileUrl: f.downloadUrl, fileName: f.fileName });
+      renderSigFiles();
+    }
   }
   e.target.value = "";
 });

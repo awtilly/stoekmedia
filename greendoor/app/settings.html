@@ -73,6 +73,35 @@
           <button class="gd-btn gd-btn-primary" onclick="saveProfile()">Save Profile</button>
         </div>
 
+        <!-- Document Templates Section -->
+        <div class="gd-card gd-settings-card">
+          <h3>Document Templates</h3>
+          <p class="gd-text-muted" style="margin: 0 0 1rem 0; font-size: 0.85rem;">
+            Upload reusable documents (purchase agreements, disclosures, etc.) that can be pulled into any client's signature flow.
+          </p>
+          <div class="gd-form-row" style="align-items: flex-end;">
+            <div class="gd-form-group" style="flex: 1;">
+              <label for="tpl-category">Category</label>
+              <select id="tpl-category" class="gd-input">
+                <option value="contracts">Contracts</option>
+                <option value="disclosures">Disclosures</option>
+                <option value="inspections">Inspections</option>
+                <option value="financial">Financial</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            <div class="gd-form-group" style="flex: 0 0 auto;">
+              <button class="gd-btn gd-btn-primary" onclick="document.getElementById('tpl-file-input').click()">Upload Template</button>
+              <input type="file" id="tpl-file-input" accept=".pdf,.doc,.docx" multiple hidden>
+            </div>
+          </div>
+          <div id="tpl-progress" class="gd-hidden" style="margin-bottom: 1rem;">
+            <div class="gd-progress-bar"><div id="tpl-progress-fill" class="gd-progress-fill" style="width:0%"></div></div>
+            <span id="tpl-progress-text" class="gd-text-muted" style="font-size:0.8rem;">Uploading...</span>
+          </div>
+          <div id="template-list"></div>
+        </div>
+
         <!-- BoldSign Section -->
         <div class="gd-card gd-settings-card">
           <h3>E-Signatures</h3>
