@@ -18,7 +18,12 @@ const MONTHS = ["January", "February", "March", "April", "May", "June",
 
 onAuthStateChanged(auth, async (user) => {
   if (!user) return;
-  await loadCalendarData(user.uid);
+  try {
+    await loadCalendarData(user.uid);
+  } catch (e) {
+    console.error("Failed to load calendar data:", e);
+    showToast("Failed to load some calendar data.", "error");
+  }
   document.getElementById("calendar-loading").classList.add("gd-hidden");
   document.getElementById("calendar-content").classList.remove("gd-hidden");
   render();
@@ -26,14 +31,18 @@ onAuthStateChanged(auth, async (user) => {
 
 async function loadCalendarData(uid) {
   // Load all clients for name lookup
-  const clientsSnap = await getDocs(query(collection(db, "clients"), where("realtorId", "==", uid)));
-  clientsSnap.forEach(d => { allClients[d.id] = d.data(); });
+  try {
+    const clientsSnap = await getDocs(query(collection(db, "clients"), where("realtorId", "==", uid)));
+    clientsSnap.forEach(d => { allClients[d.id] = d.data(); });
+  } catch (e) {
+    console.error("Load clients for calendar:", e);
+  }
 
   // Load showings, follow-ups, and custom events
   const [showingsSnap, followUpsSnap, eventsSnap] = await Promise.all([
-    getDocs(query(collection(db, "showings"), where("realtorId", "==", uid), orderBy("showingDate", "asc"))),
-    getDocs(query(collection(db, "followUps"), where("realtorId", "==", uid), orderBy("dueDate", "asc"))),
-    getDocs(query(collection(db, "events"), where("realtorId", "==", uid), orderBy("startDate", "asc")))
+    getDocs(query(collection(db, "showings"), where("realtorId", "==", uid), orderBy("showingDate", "asc"))).catch(e => { console.error("Load showings:", e); return { forEach() {} }; }),
+    getDocs(query(collection(db, "followUps"), where("realtorId", "==", uid), orderBy("dueDate", "asc"))).catch(e => { console.error("Load follow-ups:", e); return { forEach() {} }; }),
+    getDocs(query(collection(db, "events"), where("realtorId", "==", uid), orderBy("startDate", "asc"))).catch(e => { console.error("Load events:", e); return { forEach() {} }; })
   ]);
 
   allCalEvents = [];
@@ -41,11 +50,12 @@ async function loadCalendarData(uid) {
   showingsSnap.forEach(d => {
     const s = d.data();
     if (s.status === "cancelled") return;
+    const start = s.showingDate?.toDate ? s.showingDate.toDate() : new Date();
     allCalEvents.push({
       id: d.id, type: "showing",
       title: s.address || "Showing",
-      start: s.showingDate?.toDate ? s.showingDate.toDate() : new Date(),
-      end: s.endDate?.toDate ? s.endDate.toDate() : new Date(s.showingDate?.toDate().getTime() + 3600000),
+      start,
+      end: s.endDate?.toDate ? s.endDate.toDate() : new Date(start.getTime() + 3600000),
       clientId: s.clientId,
       color: "#22c55e",
       data: s
