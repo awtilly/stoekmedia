@@ -77,6 +77,16 @@ onAuthStateChanged(auth, async (user) => {
     console.error("Activity feed error:", e);
   }
 
+  // Build client name cache (shared across showings + schedule)
+  const clientCache = {};
+  try {
+    const clientsSnap = await getDocs(query(collection(db, "clients"), where("realtorId", "==", uid)));
+    clientsSnap.forEach(d => { clientCache[d.id] = d.data().fullName || "Unknown"; });
+  } catch (e) {
+    console.error("Client cache error:", e);
+  }
+
+  // --- Upcoming Showings (matches calendar's showings collection) ---
   try {
     const now = Timestamp.now();
     const showQ = query(
@@ -89,29 +99,23 @@ onAuthStateChanged(auth, async (user) => {
     const showSnap = await getDocs(showQ);
     const showEl = document.getElementById("showings-list");
 
-    if (!showSnap.empty) {
-      const clientCache = {};
-      const clientsSnap = await getDocs(query(collection(db, "clients"), where("realtorId", "==", uid)));
-      clientsSnap.forEach(d => { clientCache[d.id] = d.data().fullName; });
-
-      let html = "";
-      showSnap.forEach(d => {
-        const s = d.data();
-        if (s.status === "cancelled") return;
-        html += `
-          <div class="gd-showing-item">
-            <span class="gd-showing-date">${formatDateTime(s.showingDate)}</span>
-            <span class="gd-showing-address">${s.address || "—"}</span>
-            <span class="gd-showing-client">${clientCache[s.clientId] || "—"}</span>
-          </div>`;
-      });
-      showEl.innerHTML = html || showEl.innerHTML;
-    }
+    const rows = [];
+    showSnap.forEach(d => {
+      const s = d.data();
+      if (s.status === "cancelled") return;
+      rows.push(`
+        <div class="gd-showing-item">
+          <span class="gd-showing-date">${formatDateTime(s.showingDate)}</span>
+          <span class="gd-showing-address">${s.address || "—"}</span>
+          <span class="gd-showing-client">${clientCache[s.clientId] || "—"}</span>
+        </div>`);
+    });
+    if (rows.length > 0) showEl.innerHTML = rows.join("");
   } catch (e) {
     console.error("Showings error:", e);
   }
 
-  // Load Today's Schedule
+  // --- Today's Schedule (showings + follow-ups + events — same sources as calendar) ---
   try {
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
@@ -120,14 +124,9 @@ onAuthStateChanged(auth, async (user) => {
     const todayStartTs = Timestamp.fromDate(todayStart);
     const todayEndTs = Timestamp.fromDate(todayEnd);
 
-    // Ensure we have client name cache
-    const clientCache2 = {};
-    const clientsSnap2 = await getDocs(query(collection(db, "clients"), where("realtorId", "==", uid)));
-    clientsSnap2.forEach(d => { clientCache2[d.id] = d.data().fullName || "Unknown"; });
-
     const scheduleItems = [];
 
-    // Showings today (new collection)
+    // Showings today
     const showingsQ = query(
       collection(db, "showings"),
       where("realtorId", "==", uid),
@@ -142,12 +141,12 @@ onAuthStateChanged(auth, async (user) => {
         time: s.showingDate.toDate(),
         type: "showing",
         title: `Showing: ${s.address || "—"}`,
-        subtitle: clientCache2[s.clientId] || "",
+        subtitle: clientCache[s.clientId] || "",
         clientId: s.clientId
       });
     });
 
-    // Follow-ups due today
+    // Follow-ups due today (pending only, matching calendar filter)
     const fuQ = query(
       collection(db, "followUps"),
       where("realtorId", "==", uid),
@@ -157,17 +156,17 @@ onAuthStateChanged(auth, async (user) => {
     const fuSnap = await getDocs(fuQ);
     fuSnap.forEach(d => {
       const f = d.data();
-      if (f.status !== "pending") return;
+      if (f.status === "completed" || f.status === "dismissed") return;
       scheduleItems.push({
         time: f.dueDate.toDate(),
         type: "followup",
         title: f.title || "Follow-up",
-        subtitle: clientCache2[f.clientId] || "",
+        subtitle: clientCache[f.clientId] || "",
         clientId: f.clientId
       });
     });
 
-    // Custom events today
+    // Custom events today (all statuses, matching calendar)
     const evQ = query(
       collection(db, "events"),
       where("realtorId", "==", uid),
@@ -181,7 +180,7 @@ onAuthStateChanged(auth, async (user) => {
         time: e.startDate.toDate(),
         type: "event",
         title: e.title || "Event",
-        subtitle: e.clientId ? (clientCache2[e.clientId] || "") : "",
+        subtitle: e.clientId ? (clientCache[e.clientId] || "") : "",
         clientId: e.clientId
       });
     });
@@ -207,40 +206,6 @@ onAuthStateChanged(auth, async (user) => {
     }
   } catch (e) {
     console.error("Schedule error:", e);
-  }
-
-  // Load new listings
-  try {
-    const listingsQ = query(
-      collection(db, "listings"),
-      where("addedBy", "==", uid),
-      orderBy("createdAt", "desc"),
-      limit(5)
-    );
-    const listingsSnap = await getDocs(listingsQ);
-    const listingsEl = document.getElementById("new-listings");
-
-    if (!listingsSnap.empty) {
-      let html = "";
-      listingsSnap.forEach(d => {
-        const l = d.data();
-        const addr = l.address?.full || l.address?.street || "—";
-        const price = l.listingPrice ? `$${Number(l.listingPrice).toLocaleString()}` : "";
-        const meta = [l.bedrooms ? `${l.bedrooms}bd` : "", l.bathrooms ? `${l.bathrooms}ba` : "", l.squareFeet ? `${Number(l.squareFeet).toLocaleString()}sqft` : ""].filter(Boolean).join(" / ");
-        html += `
-          <div class="gd-new-listing-item" onclick="window.location.href='/greendoor/app/listings'" style="cursor:pointer;">
-            <div class="gd-new-listing-addr">${addr}</div>
-            <div class="gd-new-listing-meta">
-              ${price ? `<span class="gd-new-listing-price">${price}</span>` : ""}
-              ${meta ? `<span class="gd-text-muted">${meta}</span>` : ""}
-              <span class="gd-badge gd-lst-${l.status || "active"}">${l.status || "active"}</span>
-            </div>
-          </div>`;
-      });
-      listingsEl.innerHTML = html;
-    }
-  } catch (e) {
-    console.error("Listings error:", e);
   }
 
   document.getElementById("dashboard-loading").classList.add("gd-hidden");
@@ -282,7 +247,7 @@ async function loadBriefing() {
 
   try {
     const result = await askAssistant({
-      question: "Give me a brief daily snapshot in 3-5 bullet points max. Flag any clients I haven't contacted in 14+ days, note today's showings if any, and suggest 1-2 priority actions. Be very concise — no more than 6 lines total.",
+      question: "3 bullet points max, one line each. 1) Any clients not contacted in 14+ days? 2) Today's showings? 3) One priority action. No headers, no intros, no sign-offs. Just the 3 bullets.",
       context: "dashboard"
     });
     const text = result.data.response;
