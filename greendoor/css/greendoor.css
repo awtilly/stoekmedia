@@ -1570,6 +1570,42 @@ textarea.gd-input {
   border: none;
 }
 
+/* --- Scrape Listing URL --- */
+.gd-scrape-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+.gd-scrape-row .gd-input {
+  flex: 1;
+}
+.gd-scrape-group {
+  background: var(--card-bg, #f8faf9);
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  border: 1px dashed var(--gd-green);
+}
+.gd-scrape-status {
+  margin-top: 0.5rem;
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.gd-scrape-status.loading {
+  color: var(--gd-green);
+}
+.gd-scrape-status.error {
+  color: #ef4444;
+}
+.gd-scrape-status.success {
+  color: var(--gd-green);
+}
+.gd-form-divider {
+  border-top: 1px solid var(--border-color, #e5e7eb);
+  margin: 0.5rem 0;
+}
+
 /* --- Property Cards --- */
 .gd-property-grid {
   display: grid;

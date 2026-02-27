@@ -373,6 +373,15 @@
         <button class="gd-modal-close" onclick="closePropertyModal()" aria-label="Close">&times;</button>
       </div>
       <div class="gd-modal-body">
+        <div class="gd-form-group gd-scrape-group">
+          <label for="prop-scrape-url">Paste Listing Link</label>
+          <div class="gd-scrape-row">
+            <input type="url" id="prop-scrape-url" class="gd-input" placeholder="Paste Zillow, Redfin, Realtor.com link...">
+            <button class="gd-btn gd-btn-primary gd-btn-sm" id="prop-scrape-btn" onclick="scrapeListingUrl()">Fetch</button>
+          </div>
+          <div id="prop-scrape-status" class="gd-scrape-status gd-hidden"></div>
+        </div>
+        <div class="gd-form-divider"></div>
         <div class="gd-form-group">
           <label for="prop-address">Address *</label>
           <input type="text" id="prop-address" class="gd-input">

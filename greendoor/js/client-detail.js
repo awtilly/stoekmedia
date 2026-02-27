@@ -43,6 +43,7 @@ const sendEmailFn = httpsCallable(functions, "sendEmail");
 const sendForSignatureFn = httpsCallable(functions, "sendForSignature");
 const checkSignatureStatusFn = httpsCallable(functions, "checkSignatureStatus");
 const shareDocumentFn = httpsCallable(functions, "shareDocument");
+const scrapeListingFn = httpsCallable(functions, "scrapeListing");
 
 /* --- Auth gate --- */
 onAuthStateChanged(auth, async (user) => {
@@ -1049,6 +1050,76 @@ window.editProperty = function (id) {
 
 window.closePropertyModal = function () {
   document.getElementById("property-modal").classList.remove("active");
+  // Reset scrape UI
+  const scrapeStatus = document.getElementById("prop-scrape-status");
+  if (scrapeStatus) {
+    scrapeStatus.classList.add("gd-hidden");
+    scrapeStatus.className = "gd-scrape-status gd-hidden";
+    scrapeStatus.textContent = "";
+  }
+  const scrapeUrl = document.getElementById("prop-scrape-url");
+  if (scrapeUrl) scrapeUrl.value = "";
+};
+
+window.scrapeListingUrl = async function () {
+  const urlInput = document.getElementById("prop-scrape-url");
+  const statusEl = document.getElementById("prop-scrape-status");
+  const btn = document.getElementById("prop-scrape-btn");
+  const url = (urlInput.value || "").trim();
+
+  if (!url) {
+    showToast("Please paste a listing URL first.", "error");
+    return;
+  }
+
+  // Show loading state
+  statusEl.classList.remove("gd-hidden", "error", "success");
+  statusEl.classList.add("loading");
+  statusEl.innerHTML = '<div class="gd-spinner gd-spinner-sm"></div> Fetching listing details...';
+  btn.disabled = true;
+
+  try {
+    const result = await scrapeListingFn({ url });
+    const data = result.data?.data;
+
+    if (!data) {
+      throw new Error("No data returned");
+    }
+
+    // Auto-fill form fields
+    if (data.address) document.getElementById("prop-address").value = data.address;
+    if (data.mlsNumber) document.getElementById("prop-mlsNumber").value = data.mlsNumber;
+    if (data.listingPrice) document.getElementById("prop-listingPrice").value = data.listingPrice;
+    if (url) document.getElementById("prop-listingUrl").value = url;
+
+    // Build a notes string from extra scraped data
+    const extras = [];
+    if (data.bedrooms != null) extras.push(`${data.bedrooms} bed`);
+    if (data.bathrooms != null) extras.push(`${data.bathrooms} bath`);
+    if (data.squareFeet != null) extras.push(`${Number(data.squareFeet).toLocaleString()} sqft`);
+    if (data.yearBuilt) extras.push(`Built ${data.yearBuilt}`);
+    if (data.lotSize) extras.push(`Lot: ${data.lotSize}`);
+    if (data.propertyType) extras.push(data.propertyType);
+    if (data.description) extras.push(data.description);
+
+    if (extras.length > 0) {
+      const notesField = document.getElementById("prop-realtorNotes");
+      const existing = notesField.value.trim();
+      notesField.value = existing ? `${existing}\n${extras.join(" | ")}` : extras.join(" | ");
+    }
+
+    statusEl.classList.remove("loading");
+    statusEl.classList.add("success");
+    statusEl.textContent = "Listing details filled in successfully!";
+    showToast("Listing details auto-filled!");
+  } catch (err) {
+    console.error("Scrape error:", err);
+    statusEl.classList.remove("loading");
+    statusEl.classList.add("error");
+    statusEl.textContent = err.message || "Failed to fetch listing. Try a different URL or fill in manually.";
+  } finally {
+    btn.disabled = false;
+  }
 };
 
 window.saveProperty = async function () {

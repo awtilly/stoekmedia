@@ -493,6 +493,131 @@ async function executeToolCall(toolName, toolInput, uid, clientId) {
   }
 }
 
+/* ================================================================
+   SCRAPE LISTING URL
+   ================================================================ */
+
+exports.scrapeListing = onCall(
+  { secrets: [anthropicKey], region: "us-central1", maxInstances: 5 },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "You must be logged in.");
+    }
+
+    const { url } = request.data;
+    if (!url || typeof url !== "string") {
+      throw new HttpsError("invalid-argument", "A listing URL is required.");
+    }
+
+    // Basic URL validation
+    let parsed;
+    try {
+      parsed = new URL(url);
+    } catch {
+      throw new HttpsError("invalid-argument", "Invalid URL format.");
+    }
+
+    if (!["http:", "https:"].includes(parsed.protocol)) {
+      throw new HttpsError("invalid-argument", "URL must be HTTP or HTTPS.");
+    }
+
+    try {
+      const fetch = require("node-fetch");
+
+      // Fetch the listing page
+      const response = await fetch(url, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+          "Accept-Language": "en-US,en;q=0.9",
+        },
+        timeout: 15000,
+        follow: 5,
+      });
+
+      if (!response.ok) {
+        throw new HttpsError("unavailable", `Could not fetch listing page (HTTP ${response.status}).`);
+      }
+
+      const html = await response.text();
+
+      // Truncate HTML to avoid exceeding token limits — keep first 80k chars
+      const truncatedHtml = html.length > 80000 ? html.slice(0, 80000) : html;
+
+      // Use Claude to extract structured property data
+      const apiRes = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": anthropicKey.value(),
+          "anthropic-version": "2023-06-01",
+        },
+        body: JSON.stringify({
+          model: "claude-haiku-4-5-20251001",
+          max_tokens: 1024,
+          messages: [
+            {
+              role: "user",
+              content: `Extract property listing details from this HTML page. Return ONLY a JSON object with these fields (use null for any field you can't find):
+
+{
+  "address": "Full street address including city, state, zip",
+  "listingPrice": 350000,
+  "mlsNumber": "MLS-12345",
+  "bedrooms": 3,
+  "bathrooms": 2,
+  "squareFeet": 1800,
+  "yearBuilt": 1995,
+  "lotSize": "0.25 acres",
+  "propertyType": "Single Family",
+  "description": "Brief 1-2 sentence summary of the property"
+}
+
+Rules:
+- listingPrice must be a number (no $ or commas), or null
+- bedrooms and bathrooms must be numbers or null
+- squareFeet must be a number or null
+- Return ONLY the JSON object, no markdown or explanation
+
+HTML content:
+${truncatedHtml}`,
+            },
+          ],
+        }),
+      });
+
+      if (!apiRes.ok) {
+        const errText = await apiRes.text();
+        console.error("Claude API error:", errText);
+        throw new HttpsError("internal", "Failed to analyze listing page.");
+      }
+
+      const aiResult = await apiRes.json();
+      const rawText = aiResult.content?.[0]?.text || "{}";
+
+      // Parse the JSON response — handle potential markdown wrapping
+      let cleaned = rawText.trim();
+      if (cleaned.startsWith("```")) {
+        cleaned = cleaned.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "");
+      }
+
+      let propertyData;
+      try {
+        propertyData = JSON.parse(cleaned);
+      } catch {
+        console.error("Failed to parse AI response:", rawText);
+        throw new HttpsError("internal", "Could not parse listing data. Try a different URL.");
+      }
+
+      return { success: true, data: propertyData };
+    } catch (err) {
+      if (err instanceof HttpsError) throw err;
+      console.error("scrapeListing error:", err);
+      throw new HttpsError("internal", "Failed to fetch listing. The site may be blocking automated access.");
+    }
+  }
+);
+
 exports.askAssistant = onCall(
   { secrets: [anthropicKey], region: "us-central1", maxInstances: 10 },
   async (request) => {
