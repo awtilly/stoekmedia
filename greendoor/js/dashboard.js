@@ -3,7 +3,7 @@ import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/fi
 import {
   collection, query, where, orderBy, limit, getDocs, getCountFromServer, Timestamp
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-import { getCurrentUser, timeAgo, formatDate } from "./auth.js";
+import { getCurrentUser, timeAgo, formatDate, formatDateTime } from "./auth.js";
 
 const askAssistant = httpsCallable(functions, "askAssistant");
 const seedEmailTemplates = httpsCallable(functions, "seedEmailTemplates");
@@ -108,6 +108,104 @@ onAuthStateChanged(auth, async (user) => {
     }
   } catch (e) {
     console.error("Showings error:", e);
+  }
+
+  // Load Today's Schedule
+  try {
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date();
+    todayEnd.setHours(23, 59, 59, 999);
+    const todayStartTs = Timestamp.fromDate(todayStart);
+    const todayEndTs = Timestamp.fromDate(todayEnd);
+
+    // Ensure we have client name cache
+    const clientCache2 = {};
+    const clientsSnap2 = await getDocs(query(collection(db, "clients"), where("realtorId", "==", uid)));
+    clientsSnap2.forEach(d => { clientCache2[d.id] = d.data().fullName || "Unknown"; });
+
+    const scheduleItems = [];
+
+    // Showings today (new collection)
+    const showingsQ = query(
+      collection(db, "showings"),
+      where("realtorId", "==", uid),
+      where("showingDate", ">=", todayStartTs),
+      where("showingDate", "<=", todayEndTs)
+    );
+    const showingsSnap = await getDocs(showingsQ);
+    showingsSnap.forEach(d => {
+      const s = d.data();
+      if (s.status === "cancelled") return;
+      scheduleItems.push({
+        time: s.showingDate.toDate(),
+        type: "showing",
+        title: `Showing: ${s.address || "—"}`,
+        subtitle: clientCache2[s.clientId] || "",
+        clientId: s.clientId
+      });
+    });
+
+    // Follow-ups due today
+    const fuQ = query(
+      collection(db, "followUps"),
+      where("realtorId", "==", uid),
+      where("dueDate", ">=", todayStartTs),
+      where("dueDate", "<=", todayEndTs)
+    );
+    const fuSnap = await getDocs(fuQ);
+    fuSnap.forEach(d => {
+      const f = d.data();
+      if (f.status !== "pending") return;
+      scheduleItems.push({
+        time: f.dueDate.toDate(),
+        type: "followup",
+        title: f.title || "Follow-up",
+        subtitle: clientCache2[f.clientId] || "",
+        clientId: f.clientId
+      });
+    });
+
+    // Custom events today
+    const evQ = query(
+      collection(db, "events"),
+      where("realtorId", "==", uid),
+      where("startDate", ">=", todayStartTs),
+      where("startDate", "<=", todayEndTs)
+    );
+    const evSnap = await getDocs(evQ);
+    evSnap.forEach(d => {
+      const e = d.data();
+      scheduleItems.push({
+        time: e.startDate.toDate(),
+        type: "event",
+        title: e.title || "Event",
+        subtitle: e.clientId ? (clientCache2[e.clientId] || "") : "",
+        clientId: e.clientId
+      });
+    });
+
+    // Sort by time
+    scheduleItems.sort((a, b) => a.time - b.time);
+
+    const scheduleEl = document.getElementById("today-schedule");
+    if (scheduleItems.length > 0) {
+      scheduleEl.innerHTML = scheduleItems.map(item => {
+        const timeStr = item.time.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+        const clientLink = item.clientId
+          ? `<a href="/greendoor/app/client-detail?id=${item.clientId}" class="gd-schedule-link">${item.subtitle}</a>`
+          : "";
+        return `
+          <div class="gd-schedule-item">
+            <div class="gd-schedule-dot ${item.type}"></div>
+            <span class="gd-schedule-time">${timeStr}</span>
+            <span class="gd-schedule-title">${item.title}</span>
+            ${clientLink}
+          </div>`;
+      }).join("");
+    }
+  } catch (e) {
+    console.error("Schedule error:", e);
   }
 
   document.getElementById("dashboard-loading").classList.add("gd-hidden");

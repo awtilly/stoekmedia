@@ -18,6 +18,7 @@
         <li class="nav-crm-divider"></li>
         <li><a href="/greendoor/app/dashboard" class="gd-nav-active">Dashboard</a></li>
         <li><a href="/greendoor/app/clients">Clients</a></li>
+        <li><a href="/greendoor/app/calendar">Calendar</a></li>
         <li id="nav-admin-tab" style="display:none;"><a href="/greendoor/app/admin">Admin</a></li>
         <li><a href="/greendoor/app/settings">Settings</a></li>
         <li class="nav-crm-divider"></li>
@@ -59,6 +60,20 @@
             <div class="gd-ai-briefing-loading">
               <div class="gd-spinner"></div>
               <span>Generating your daily briefing...</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Today's Schedule -->
+        <div class="gd-card gd-schedule-section">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <h3>Today's Schedule</h3>
+            <a href="/greendoor/app/calendar" class="gd-schedule-link">View full calendar &rarr;</a>
+          </div>
+          <div id="today-schedule" class="gd-schedule-timeline">
+            <div class="gd-empty">
+              <div class="gd-empty-icon">&#128197;</div>
+              <div class="gd-empty-text">Nothing scheduled today</div>
             </div>
           </div>
         </div>

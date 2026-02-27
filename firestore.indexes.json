@@ -58,6 +58,49 @@
         { "fieldPath": "clientId", "order": "ASCENDING" },
         { "fieldPath": "realtorId", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "showings",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "clientId", "order": "ASCENDING" },
+        { "fieldPath": "realtorId", "order": "ASCENDING" },
+        { "fieldPath": "showingDate", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "showings",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "realtorId", "order": "ASCENDING" },
+        { "fieldPath": "showingDate", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "followUps",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "clientId", "order": "ASCENDING" },
+        { "fieldPath": "realtorId", "order": "ASCENDING" },
+        { "fieldPath": "dueDate", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "followUps",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "realtorId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "dueDate", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "events",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "realtorId", "order": "ASCENDING" },
+        { "fieldPath": "startDate", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

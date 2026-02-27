@@ -18,6 +18,7 @@
         <li class="nav-crm-divider"></li>
         <li><a href="/greendoor/app/dashboard">Dashboard</a></li>
         <li><a href="/greendoor/app/clients" class="gd-nav-active">Clients</a></li>
+        <li><a href="/greendoor/app/calendar">Calendar</a></li>
         <li id="nav-admin-tab" style="display:none;"><a href="/greendoor/app/admin">Admin</a></li>
         <li><a href="/greendoor/app/settings">Settings</a></li>
         <li class="nav-crm-divider"></li>
@@ -71,6 +72,7 @@
         <div class="gd-tabs">
           <button class="gd-tab active" data-tab="overview">Overview</button>
           <button class="gd-tab" data-tab="activity">Activity</button>
+          <button class="gd-tab" data-tab="showings">Showings</button>
           <button class="gd-tab" data-tab="files">Files</button>
           <button class="gd-tab" data-tab="properties">Properties</button>
         </div>
@@ -222,10 +224,13 @@
 
         <!-- ===== ACTIVITY TAB ===== -->
         <div id="tab-activity" class="gd-tab-content">
+          <!-- Pending Follow-ups -->
+          <div id="followup-list" class="gd-followup-list gd-hidden"></div>
           <div class="gd-activity-actions">
             <button class="gd-btn gd-btn-sm" onclick="openActivityModal('note')">+ Add Note</button>
             <button class="gd-btn gd-btn-sm" onclick="openActivityModal('call')">+ Log Call</button>
             <button class="gd-btn gd-btn-sm gd-btn-email" onclick="openActivityModal('email')">&#9993; Send Email</button>
+            <button class="gd-btn gd-btn-sm" onclick="openFollowUpModal()">+ Follow-up</button>
           </div>
           <div id="activity-timeline" class="gd-timeline">
             <div class="gd-empty">
@@ -233,6 +238,24 @@
               <div class="gd-empty-text">No activities yet</div>
             </div>
           </div>
+        </div>
+
+        <!-- ===== SHOWINGS TAB ===== -->
+        <div id="tab-showings" class="gd-tab-content">
+          <div class="gd-showings-stats" id="showings-stats">
+            <div class="gd-showings-stat"><div class="num" id="ss-total">0</div><div class="lbl">Total</div></div>
+            <div class="gd-showings-stat"><div class="num" id="ss-upcoming">0</div><div class="lbl">Upcoming</div></div>
+            <div class="gd-showings-stat"><div class="num" id="ss-completed">0</div><div class="lbl">Completed</div></div>
+            <div class="gd-showings-stat"><div class="num" id="ss-avgrating">—</div><div class="lbl">Avg Rating</div></div>
+          </div>
+          <div class="gd-section-header">
+            <div></div>
+            <button class="gd-btn gd-btn-primary gd-btn-sm" onclick="openShowingModal()">+ Add Showing</button>
+          </div>
+          <div class="gd-showing-section-title">Upcoming</div>
+          <div id="showings-upcoming"></div>
+          <div class="gd-showing-section-title">Past</div>
+          <div id="showings-past"></div>
         </div>
 
         <!-- ===== FILES TAB ===== -->
@@ -262,6 +285,7 @@
             </div>
             <span id="file-name-display" class="gd-text-muted"></span>
             <button class="gd-btn gd-btn-primary gd-btn-sm" onclick="uploadFile()">Upload</button>
+            <button class="gd-btn gd-btn-sm" onclick="uploadAndSend()">Upload &amp; Send</button>
             <button class="gd-btn gd-btn-signature gd-btn-sm" onclick="openSignatureModal()">&#9997; Send for Signature</button>
           </div>
 
@@ -428,45 +452,54 @@
     </div>
   </div>
 
-  <!-- Signature Modal -->
+  <!-- Signature Modal (Multi-doc/signer) -->
   <div id="signature-modal" class="gd-modal-overlay">
-    <div class="gd-modal" style="max-width: 540px;">
+    <div class="gd-modal" style="max-width: 600px;">
       <div class="gd-modal-header">
         <h3>&#9997; Send for Signature</h3>
         <button class="gd-modal-close" onclick="closeSignatureModal()" aria-label="Close">&times;</button>
       </div>
       <div class="gd-modal-body">
         <div class="gd-form-group">
-          <label>Document Source</label><!-- no for attr — toggle buttons, not an input -->
-          <div class="gd-sig-toggle">
-            <button class="gd-sig-toggle-btn active" data-mode="existing" onclick="setSigMode('existing')">Select Existing File</button>
-            <button class="gd-sig-toggle-btn" data-mode="upload" onclick="setSigMode('upload')">Upload New Document</button>
+          <label for="sig-title">Envelope Title</label>
+          <input type="text" id="sig-title" class="gd-input" placeholder="e.g. Purchase Agreement">
+        </div>
+
+        <!-- Documents -->
+        <div class="gd-form-group">
+          <label>Documents</label>
+          <div id="sig-files-list" class="gd-sig-files-list"></div>
+          <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+            <select id="sig-add-existing" class="gd-input" style="flex:1;min-width:150px;">
+              <option value="">+ Add from existing files...</option>
+            </select>
+            <div class="gd-file-input-wrapper" style="flex-shrink:0;">
+              <button class="gd-btn gd-btn-sm">+ Upload New</button>
+              <input type="file" id="sig-file-input" accept=".pdf,.doc,.docx" multiple>
+            </div>
           </div>
         </div>
-        <div id="sig-existing-group" class="gd-form-group">
-          <label for="sig-file-select">Select File</label>
-          <select id="sig-file-select" class="gd-input">
-            <option value="">— Choose a file —</option>
-          </select>
+
+        <!-- Signers -->
+        <div class="gd-form-group">
+          <label>Signers</label>
+          <div id="sig-signers-list" class="gd-sig-signers-list"></div>
+          <button class="gd-btn gd-btn-sm" onclick="addSigner()">+ Add Signer</button>
         </div>
-        <div id="sig-upload-group" class="gd-form-group gd-hidden">
-          <label for="sig-file-input">Upload Document</label>
-          <div class="gd-file-input-wrapper">
-            <button class="gd-btn gd-btn-sm">Choose File</button>
-            <input type="file" id="sig-file-input" accept=".pdf,.doc,.docx">
-          </div>
-          <span id="sig-file-name" class="gd-text-muted"></span>
+
+        <!-- Options -->
+        <div class="gd-form-group">
+          <label for="sig-message">Message (optional)</label>
+          <textarea id="sig-message" class="gd-input" rows="2" placeholder="Please review and sign..."></textarea>
         </div>
-        <div class="gd-form-row">
-          <div class="gd-form-group">
-            <label for="sig-signer-name">Signer Name</label>
-            <input type="text" id="sig-signer-name" class="gd-input">
-          </div>
-          <div class="gd-form-group">
-            <label for="sig-signer-email">Signer Email</label>
-            <input type="email" id="sig-signer-email" class="gd-input">
-          </div>
+        <div class="gd-sig-option-row">
+          <input type="checkbox" id="sig-signing-order"> <label for="sig-signing-order">Enable signing order</label>
         </div>
+        <div class="gd-sig-option-row">
+          <label for="sig-expiry">Expiry (days):</label>
+          <input type="number" id="sig-expiry" class="gd-input" value="30" min="1" max="180" style="width:60px;">
+        </div>
+
         <div id="sig-progress" class="gd-hidden">
           <div class="gd-spinner"></div>
           <span class="gd-text-muted" id="sig-progress-text">Sending to BoldSign...</span>
@@ -475,6 +508,182 @@
       <div class="gd-modal-footer">
         <button class="gd-btn" onclick="closeSignatureModal()">Cancel</button>
         <button id="sig-send-btn" class="gd-btn gd-btn-signature" onclick="submitSignature()">&#9997; Send for Signature</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- File Selection Action Bar -->
+  <div id="file-action-bar" class="gd-file-action-bar">
+    <span id="file-action-count">0 selected</span>
+    <button class="gd-btn gd-btn-primary" onclick="openSendDocModal()">Send to Client</button>
+    <button class="gd-btn" onclick="openSignatureModalFromSelection()">Send for Signature</button>
+    <button class="gd-file-action-close" onclick="clearFileSelection()">&times;</button>
+  </div>
+
+  <!-- Send Document Modal -->
+  <div id="send-doc-modal" class="gd-modal-overlay">
+    <div class="gd-modal" style="max-width: 540px;">
+      <div class="gd-modal-header">
+        <h3>Send Documents</h3>
+        <button class="gd-modal-close" onclick="closeSendDocModal()" aria-label="Close">&times;</button>
+      </div>
+      <div class="gd-modal-body">
+        <div class="gd-form-group">
+          <label for="send-doc-to">To</label>
+          <input type="email" id="send-doc-to" class="gd-input">
+        </div>
+        <div class="gd-form-group">
+          <label for="send-doc-cc">CC (optional)</label>
+          <input type="email" id="send-doc-cc" class="gd-input">
+        </div>
+        <div class="gd-form-group">
+          <label for="send-doc-subject">Subject</label>
+          <input type="text" id="send-doc-subject" class="gd-input">
+        </div>
+        <div class="gd-form-group">
+          <label for="send-doc-message">Message</label>
+          <textarea id="send-doc-message" class="gd-input" rows="4"></textarea>
+        </div>
+        <div class="gd-form-group">
+          <label>Files</label>
+          <div id="send-doc-files" class="gd-sig-files-list"></div>
+        </div>
+        <div id="send-doc-progress" class="gd-hidden">
+          <div class="gd-spinner"></div>
+          <span class="gd-text-muted">Sending...</span>
+        </div>
+      </div>
+      <div class="gd-modal-footer">
+        <button class="gd-btn" onclick="closeSendDocModal()">Cancel</button>
+        <button id="send-doc-btn" class="gd-btn gd-btn-primary" onclick="submitSendDoc()">Send</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Showing Modal -->
+  <div id="showing-modal" class="gd-modal-overlay">
+    <div class="gd-modal" style="max-width: 540px;">
+      <div class="gd-modal-header">
+        <h3 id="showing-modal-title">Add Showing</h3>
+        <button class="gd-modal-close" onclick="closeShowingModal()" aria-label="Close">&times;</button>
+      </div>
+      <div class="gd-modal-body">
+        <div class="gd-form-group">
+          <label for="show-property">Property (from bookmarked)</label>
+          <select id="show-property" class="gd-input" onchange="fillShowingFromProperty()">
+            <option value="">— Manual entry —</option>
+          </select>
+        </div>
+        <div class="gd-form-group">
+          <label for="show-address">Address *</label>
+          <input type="text" id="show-address" class="gd-input">
+        </div>
+        <div class="gd-form-row">
+          <div class="gd-form-group">
+            <label for="show-mls">MLS Number</label>
+            <input type="text" id="show-mls" class="gd-input">
+          </div>
+          <div class="gd-form-group">
+            <label for="show-price">Listing Price</label>
+            <input type="number" id="show-price" class="gd-input">
+          </div>
+        </div>
+        <div class="gd-form-row">
+          <div class="gd-form-group">
+            <label for="show-date">Date &amp; Time *</label>
+            <input type="datetime-local" id="show-date" class="gd-input">
+          </div>
+          <div class="gd-form-group">
+            <label for="show-duration">Duration (min)</label>
+            <input type="number" id="show-duration" class="gd-input" value="60" min="15" step="15">
+          </div>
+        </div>
+        <div class="gd-form-group">
+          <label for="show-notes">Notes</label>
+          <textarea id="show-notes" class="gd-input" rows="2"></textarea>
+        </div>
+        <div class="gd-sig-option-row">
+          <input type="checkbox" id="show-followup"> <label for="show-followup">Create follow-up reminder after showing</label>
+        </div>
+      </div>
+      <div class="gd-modal-footer">
+        <button class="gd-btn" onclick="closeShowingModal()">Cancel</button>
+        <button class="gd-btn gd-btn-primary" onclick="saveShowing()">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Complete Showing Modal -->
+  <div id="complete-showing-modal" class="gd-modal-overlay">
+    <div class="gd-modal" style="max-width: 480px;">
+      <div class="gd-modal-header">
+        <h3>Complete Showing</h3>
+        <button class="gd-modal-close" onclick="closeCompleteShowingModal()" aria-label="Close">&times;</button>
+      </div>
+      <div class="gd-modal-body">
+        <div class="gd-form-group">
+          <label>Client Rating</label>
+          <div id="complete-stars" class="gd-stars">
+            <span class="gd-star clickable" data-rating="1">&#9733;</span>
+            <span class="gd-star clickable" data-rating="2">&#9733;</span>
+            <span class="gd-star clickable" data-rating="3">&#9733;</span>
+            <span class="gd-star clickable" data-rating="4">&#9733;</span>
+            <span class="gd-star clickable" data-rating="5">&#9733;</span>
+          </div>
+        </div>
+        <div class="gd-form-group">
+          <label for="complete-feedback">Client Feedback</label>
+          <textarea id="complete-feedback" class="gd-input" rows="3"></textarea>
+        </div>
+        <div class="gd-form-group">
+          <label for="complete-notes">Realtor Notes</label>
+          <textarea id="complete-notes" class="gd-input" rows="2"></textarea>
+        </div>
+        <div class="gd-sig-option-row">
+          <input type="checkbox" id="complete-followup" checked> <label for="complete-followup">Create follow-up reminder</label>
+        </div>
+      </div>
+      <div class="gd-modal-footer">
+        <button class="gd-btn" onclick="closeCompleteShowingModal()">Cancel</button>
+        <button class="gd-btn gd-btn-primary" onclick="submitCompleteShowing()">Complete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Follow-up Modal -->
+  <div id="followup-modal" class="gd-modal-overlay">
+    <div class="gd-modal" style="max-width: 480px;">
+      <div class="gd-modal-header">
+        <h3>Add Follow-up</h3>
+        <button class="gd-modal-close" onclick="closeFollowUpModal()" aria-label="Close">&times;</button>
+      </div>
+      <div class="gd-modal-body">
+        <div class="gd-form-group">
+          <label for="fu-title">Title *</label>
+          <input type="text" id="fu-title" class="gd-input" placeholder="Follow up after showing...">
+        </div>
+        <div class="gd-form-row">
+          <div class="gd-form-group">
+            <label for="fu-date">Due Date *</label>
+            <input type="date" id="fu-date" class="gd-input">
+          </div>
+          <div class="gd-form-group">
+            <label for="fu-priority">Priority</label>
+            <select id="fu-priority" class="gd-input">
+              <option value="low">Low</option>
+              <option value="medium" selected>Medium</option>
+              <option value="high">High</option>
+            </select>
+          </div>
+        </div>
+        <div class="gd-form-group">
+          <label for="fu-notes">Notes</label>
+          <textarea id="fu-notes" class="gd-input" rows="3"></textarea>
+        </div>
+      </div>
+      <div class="gd-modal-footer">
+        <button class="gd-btn" onclick="closeFollowUpModal()">Cancel</button>
+        <button class="gd-btn gd-btn-primary" onclick="saveFollowUp()">Save</button>
       </div>
     </div>
   </div>

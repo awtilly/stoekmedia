@@ -3,7 +3,7 @@ import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/fi
 import {
   doc, getDoc, updateDoc, deleteDoc, addDoc, getDocs,
   collection, query, where, orderBy, serverTimestamp, Timestamp,
-  getCountFromServer
+  getCountFromServer, limit
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import {
   ref, uploadBytesResumable, getDownloadURL
@@ -21,9 +21,17 @@ let editingPropertyId = null;
 let selectedRating = 0;
 let allProperties = [];
 let allFiles = [];
+let allShowings = [];
+let allFollowUps = [];
 let selectedCompare = new Set();
+let selectedFiles = new Set();
 let emailTemplates = [];
 let realtorProfile = null;
+let editingShowingId = null;
+let completingShowingId = null;
+let completeRating = 0;
+let sigFiles = [];
+let sigSigners = [];
 
 if (!clientId) {
   window.location.href = "/greendoor/app/clients";
@@ -34,6 +42,7 @@ const askAssistant = httpsCallable(functions, "askAssistant");
 const sendEmailFn = httpsCallable(functions, "sendEmail");
 const sendForSignatureFn = httpsCallable(functions, "sendForSignature");
 const checkSignatureStatusFn = httpsCallable(functions, "checkSignatureStatus");
+const shareDocumentFn = httpsCallable(functions, "shareDocument");
 
 /* --- Auth gate --- */
 onAuthStateChanged(auth, async (user) => {
@@ -74,7 +83,7 @@ async function loadClient(uid) {
     }
 
     populateOverview(clientData);
-    await Promise.all([loadActivities(uid), loadFiles(uid), loadProperties(uid), loadEnvelopes(uid)]);
+    await Promise.all([loadActivities(uid), loadFiles(uid), loadProperties(uid), loadEnvelopes(uid), loadShowings(uid), loadFollowUps(uid)]);
 
     document.getElementById("detail-loading").classList.add("gd-hidden");
     document.getElementById("detail-content").classList.remove("gd-hidden");
@@ -171,7 +180,7 @@ window.deleteClient = async function () {
   if (!user) return;
 
   try {
-    const collections = ["activities", "files", "bookmarkedProperties"];
+    const collections = ["activities", "files", "bookmarkedProperties", "showings", "followUps"];
     for (const col of collections) {
       const q = query(collection(db, col), where("clientId", "==", clientId), where("realtorId", "==", user.uid));
       const snap = await getDocs(q);
@@ -212,7 +221,7 @@ async function loadActivities(uid) {
 
     if (snap.empty) return;
 
-    const icons = { email: "&#128231;", call: "&#128222;", note: "&#128221;", sms: "&#128172;", file_share: "&#128193;", showing: "&#127968;" };
+    const icons = { email: "&#128231;", call: "&#128222;", note: "&#128221;", sms: "&#128172;", file_share: "&#128193;", showing: "&#127968;", followup: "&#128276;" };
 
     let html = "";
     snap.forEach(d => {
@@ -450,12 +459,15 @@ function renderFiles() {
 
   el.innerHTML = filtered.map(f => {
     const signedBadge = f.fileName.startsWith("SIGNED_") ? ' <span class="gd-badge-signed">&#9997; Signed</span>' : '';
+    const checked = selectedFiles.has(f.id) ? "checked" : "";
     return `
     <div class="gd-file-row">
+      <input type="checkbox" class="gd-file-check" data-id="${f.id}" ${checked} onclick="toggleFileSelect('${f.id}')">
       <span class="gd-file-name">${f.fileName}${signedBadge}</span>
       <span class="gd-badge gd-badge-${f.folder}">${f.folder}</span>
       <span class="gd-file-meta">${formatFileSize(f.fileSize)}</span>
       <span class="gd-file-meta">${formatDate(f.uploadedAt)}</span>
+      <button class="gd-btn gd-btn-sm gd-file-send-btn" onclick="sendSingleFile('${f.id}')">Send</button>
       <a href="${f.downloadUrl}" target="_blank" class="gd-file-download">Download</a>
     </div>`;
   }).join("");
@@ -529,105 +541,279 @@ window.uploadFile = async function () {
   );
 };
 
-/* ===== BOLDSIGN E-SIGNATURES ===== */
-let sigMode = "existing";
+/* ===== FILE SELECTION & SHARING ===== */
+
+window.toggleFileSelect = function (fileId) {
+  if (selectedFiles.has(fileId)) {
+    selectedFiles.delete(fileId);
+  } else {
+    selectedFiles.add(fileId);
+  }
+  updateFileActionBar();
+};
+
+function updateFileActionBar() {
+  const bar = document.getElementById("file-action-bar");
+  const count = selectedFiles.size;
+  if (count > 0) {
+    bar.classList.add("active");
+    document.getElementById("file-action-count").textContent = count + " selected";
+  } else {
+    bar.classList.remove("active");
+  }
+}
+
+window.clearFileSelection = function () {
+  selectedFiles.clear();
+  updateFileActionBar();
+  renderFiles();
+};
+
+window.sendSingleFile = function (fileId) {
+  selectedFiles.clear();
+  selectedFiles.add(fileId);
+  updateFileActionBar();
+  renderFiles();
+  openSendDocModal();
+};
+
+window.openSendDocModal = function () {
+  const files = allFiles.filter(f => selectedFiles.has(f.id));
+  if (files.length === 0) { showToast("Select files first.", "error"); return; }
+
+  document.getElementById("send-doc-to").value = clientData?.email || "";
+  document.getElementById("send-doc-cc").value = "";
+  document.getElementById("send-doc-subject").value = `Documents from ${realtorProfile?.fullName || "your realtor"}`;
+  document.getElementById("send-doc-message").value = `Hi ${clientData?.fullName || ""},\n\nPlease find the attached documents for your review.`;
+
+  const filesEl = document.getElementById("send-doc-files");
+  filesEl.innerHTML = files.map(f => `<div class="gd-sig-file-row"><span class="gd-sig-file-name">${f.fileName}</span></div>`).join("");
+
+  document.getElementById("send-doc-progress").classList.add("gd-hidden");
+  document.getElementById("send-doc-btn").disabled = false;
+  document.getElementById("send-doc-modal").classList.add("active");
+};
+
+window.closeSendDocModal = function () {
+  document.getElementById("send-doc-modal").classList.remove("active");
+};
+
+window.submitSendDoc = async function () {
+  const user = auth.currentUser;
+  if (!user) return;
+
+  const to = document.getElementById("send-doc-to").value.trim();
+  const cc = document.getElementById("send-doc-cc").value.trim();
+  const subject = document.getElementById("send-doc-subject").value.trim();
+  const message = document.getElementById("send-doc-message").value.trim();
+
+  if (!to || !subject) { showToast("To and Subject are required.", "error"); return; }
+
+  const files = allFiles.filter(f => selectedFiles.has(f.id)).map(f => ({
+    fileName: f.fileName,
+    downloadUrl: f.downloadUrl
+  }));
+
+  document.getElementById("send-doc-progress").classList.remove("gd-hidden");
+  document.getElementById("send-doc-btn").disabled = true;
+
+  try {
+    await shareDocumentFn({ clientId, files, to, cc, subject, message });
+    showToast("Documents sent!");
+    closeSendDocModal();
+    clearFileSelection();
+    await loadActivities(user.uid);
+  } catch (err) {
+    console.error("Share error:", err);
+    showToast(err.message || "Failed to send documents.", "error");
+    document.getElementById("send-doc-progress").classList.add("gd-hidden");
+    document.getElementById("send-doc-btn").disabled = false;
+  }
+};
+
+window.uploadAndSend = async function () {
+  const user = auth.currentUser;
+  if (!user) return;
+
+  const fileInput = document.getElementById("file-input");
+  const file = fileInput.files[0];
+  if (!file) { showToast("Select a file first.", "error"); return; }
+
+  const folder = document.getElementById("upload-folder").value;
+  const storagePath = `files/${user.uid}/${clientId}/${folder}/${file.name}`;
+  const storageRef = ref(storage, storagePath);
+
+  try {
+    showToast("Uploading...");
+    await uploadBytesResumable(storageRef, file);
+    const downloadUrl = await getDownloadURL(storageRef);
+    const docRef = await addDoc(collection(db, "files"), {
+      clientId, realtorId: user.uid, fileName: file.name, storagePath, downloadUrl,
+      folder, fileSize: file.size, mimeType: file.type, uploadedAt: serverTimestamp()
+    });
+    fileInput.value = "";
+    document.getElementById("file-name-display").textContent = "";
+    await loadFiles(user.uid);
+
+    // Open send modal with this file
+    selectedFiles.clear();
+    selectedFiles.add(docRef.id);
+    updateFileActionBar();
+    renderFiles();
+    openSendDocModal();
+  } catch (e) {
+    console.error("Upload error:", e);
+    showToast("Upload failed.", "error");
+  }
+};
+
+/* ===== BOLDSIGN E-SIGNATURES (Multi-doc/signer) ===== */
+
+function populateSigExistingDropdown() {
+  const select = document.getElementById("sig-add-existing");
+  select.innerHTML = '<option value="">+ Add from existing files...</option>';
+  allFiles.filter(f => ["contracts", "disclosures", "other"].includes(f.folder)).forEach(f => {
+    select.innerHTML += `<option value="${f.id}">${f.fileName} (${f.folder})</option>`;
+  });
+}
+
+function renderSigFiles() {
+  const el = document.getElementById("sig-files-list");
+  if (sigFiles.length === 0) {
+    el.innerHTML = '<div class="gd-text-muted" style="font-size:0.8rem;">No documents added yet</div>';
+    return;
+  }
+  el.innerHTML = sigFiles.map((f, i) => `
+    <div class="gd-sig-file-row">
+      <span class="gd-sig-file-name">${f.fileName}</span>
+      <button class="gd-sig-file-remove" onclick="removeSigFile(${i})">&times;</button>
+    </div>`).join("");
+}
+
+window.removeSigFile = function (idx) {
+  sigFiles.splice(idx, 1);
+  renderSigFiles();
+};
+
+function renderSigSigners() {
+  const el = document.getElementById("sig-signers-list");
+  el.innerHTML = sigSigners.map((s, i) => `
+    <div class="gd-sig-signer-row">
+      <span class="gd-sig-signer-order">${i + 1}</span>
+      <input type="text" class="gd-input" placeholder="Name" value="${s.name}" onchange="sigSigners[${i}].name=this.value">
+      <input type="email" class="gd-input" placeholder="Email" value="${s.email}" onchange="sigSigners[${i}].email=this.value">
+      ${sigSigners.length > 1 ? `<button class="gd-sig-file-remove" onclick="removeSigner(${i})">&times;</button>` : ""}
+    </div>`).join("");
+}
+
+window.addSigner = function () {
+  sigSigners.push({ name: "", email: "", order: sigSigners.length + 1 });
+  renderSigSigners();
+};
+
+window.removeSigner = function (idx) {
+  sigSigners.splice(idx, 1);
+  sigSigners.forEach((s, i) => s.order = i + 1);
+  renderSigSigners();
+};
 
 window.openSignatureModal = function () {
-  // Populate file dropdown with contracts + other files
-  const select = document.getElementById("sig-file-select");
-  select.innerHTML = '<option value="">— Choose a file —</option>';
-  allFiles.filter(f => f.folder === "contracts" || f.folder === "other" || f.folder === "disclosures").forEach(f => {
-    select.innerHTML += `<option value="${f.downloadUrl}" data-name="${f.fileName}">${f.fileName} (${f.folder})</option>`;
-  });
-
-  // Pre-fill signer info from client data
-  document.getElementById("sig-signer-name").value = clientData?.fullName || "";
-  document.getElementById("sig-signer-email").value = clientData?.email || "";
+  sigFiles = [];
+  sigSigners = [{ name: clientData?.fullName || "", email: clientData?.email || "", order: 1 }];
+  document.getElementById("sig-title").value = "";
+  document.getElementById("sig-message").value = "";
+  document.getElementById("sig-expiry").value = "30";
+  document.getElementById("sig-signing-order").checked = false;
   document.getElementById("sig-progress").classList.add("gd-hidden");
   document.getElementById("sig-send-btn").disabled = false;
   document.getElementById("sig-file-input").value = "";
-  document.getElementById("sig-file-name").textContent = "";
 
-  setSigMode("existing");
+  populateSigExistingDropdown();
+  renderSigFiles();
+  renderSigSigners();
   document.getElementById("signature-modal").classList.add("active");
+};
+
+window.openSignatureModalFromSelection = function () {
+  // Pre-populate with selected files
+  openSignatureModal();
+  const files = allFiles.filter(f => selectedFiles.has(f.id));
+  sigFiles = files.map(f => ({ fileUrl: f.downloadUrl, fileName: f.fileName }));
+  renderSigFiles();
+  clearFileSelection();
 };
 
 window.closeSignatureModal = function () {
   document.getElementById("signature-modal").classList.remove("active");
 };
 
-window.setSigMode = function (mode) {
-  sigMode = mode;
-  document.querySelectorAll(".gd-sig-toggle-btn").forEach(b => b.classList.toggle("active", b.dataset.mode === mode));
-  document.getElementById("sig-existing-group").classList.toggle("gd-hidden", mode !== "existing");
-  document.getElementById("sig-upload-group").classList.toggle("gd-hidden", mode !== "upload");
-};
+// Add existing file from dropdown
+document.getElementById("sig-add-existing").addEventListener("change", (e) => {
+  const fileId = e.target.value;
+  if (!fileId) return;
+  const f = allFiles.find(x => x.id === fileId);
+  if (f && !sigFiles.some(sf => sf.fileUrl === f.downloadUrl)) {
+    sigFiles.push({ fileUrl: f.downloadUrl, fileName: f.fileName });
+    renderSigFiles();
+  }
+  e.target.value = "";
+});
 
-document.getElementById("sig-file-input").addEventListener("change", (e) => {
-  document.getElementById("sig-file-name").textContent = e.target.files[0]?.name || "";
+// Upload new files for signature
+document.getElementById("sig-file-input").addEventListener("change", async (e) => {
+  const user = auth.currentUser;
+  if (!user) return;
+
+  const files = e.target.files;
+  if (!files.length) return;
+
+  const progressEl = document.getElementById("sig-progress");
+  const progressText = document.getElementById("sig-progress-text");
+  progressEl.classList.remove("gd-hidden");
+  progressText.textContent = "Uploading documents...";
+
+  for (const file of files) {
+    try {
+      const storagePath = `files/${user.uid}/${clientId}/contracts/${file.name}`;
+      const storageRef = ref(storage, storagePath);
+      await uploadBytesResumable(storageRef, file);
+      const downloadUrl = await getDownloadURL(storageRef);
+
+      await addDoc(collection(db, "files"), {
+        clientId, realtorId: user.uid, fileName: file.name, storagePath, downloadUrl,
+        folder: "contracts", fileSize: file.size, mimeType: file.type, uploadedAt: serverTimestamp()
+      });
+
+      sigFiles.push({ fileUrl: downloadUrl, fileName: file.name });
+    } catch (err) {
+      console.error("Upload error:", err);
+      showToast(`Failed to upload ${file.name}`, "error");
+    }
+  }
+
+  progressEl.classList.add("gd-hidden");
+  renderSigFiles();
+  await loadFiles(user.uid);
+  populateSigExistingDropdown();
+  e.target.value = "";
 });
 
 window.submitSignature = async function () {
   const user = auth.currentUser;
   if (!user) return;
 
-  const signerName = document.getElementById("sig-signer-name").value.trim();
-  const signerEmail = document.getElementById("sig-signer-email").value.trim();
+  // Read signer values from inputs
+  document.querySelectorAll("#sig-signers-list .gd-sig-signer-row").forEach((row, i) => {
+    const inputs = row.querySelectorAll("input");
+    sigSigners[i].name = inputs[0].value.trim();
+    sigSigners[i].email = inputs[1].value.trim();
+  });
 
-  if (!signerName || !signerEmail) {
-    showToast("Signer name and email are required.", "error");
-    return;
-  }
+  if (sigFiles.length === 0) { showToast("Add at least one document.", "error"); return; }
 
-  let fileUrl, fileName;
+  const invalidSigner = sigSigners.find(s => !s.name || !s.email);
+  if (invalidSigner) { showToast("All signers need a name and email.", "error"); return; }
 
-  if (sigMode === "existing") {
-    const select = document.getElementById("sig-file-select");
-    fileUrl = select.value;
-    fileName = select.selectedOptions[0]?.dataset?.name;
-    if (!fileUrl) { showToast("Select a file.", "error"); return; }
-  } else {
-    const fileInput = document.getElementById("sig-file-input");
-    const file = fileInput.files[0];
-    if (!file) { showToast("Choose a file to upload.", "error"); return; }
-
-    // Upload the file first
-    const progressEl = document.getElementById("sig-progress");
-    const progressText = document.getElementById("sig-progress-text");
-    progressEl.classList.remove("gd-hidden");
-    progressText.textContent = "Uploading document...";
-    document.getElementById("sig-send-btn").disabled = true;
-
-    const storagePath = `files/${user.uid}/${clientId}/contracts/${file.name}`;
-    const storageRef = ref(storage, storagePath);
-
-    try {
-      const snapshot = await uploadBytesResumable(storageRef, file);
-      fileUrl = await getDownloadURL(storageRef);
-      fileName = file.name;
-
-      // Create file record
-      await addDoc(collection(db, "files"), {
-        clientId,
-        realtorId: user.uid,
-        fileName: file.name,
-        storagePath,
-        downloadUrl: fileUrl,
-        folder: "contracts",
-        fileSize: file.size,
-        mimeType: file.type,
-        uploadedAt: serverTimestamp()
-      });
-    } catch (e) {
-      console.error("Upload error:", e);
-      showToast("File upload failed.", "error");
-      progressEl.classList.add("gd-hidden");
-      document.getElementById("sig-send-btn").disabled = false;
-      return;
-    }
-  }
-
-  // Send to BoldSign
   const progressEl = document.getElementById("sig-progress");
   const progressText = document.getElementById("sig-progress-text");
   progressEl.classList.remove("gd-hidden");
@@ -635,8 +821,15 @@ window.submitSignature = async function () {
   document.getElementById("sig-send-btn").disabled = true;
 
   try {
-    await sendForSignatureFn({ clientId, fileUrl, fileName, signerEmail, signerName });
-    showToast("Document sent for signature!");
+    await sendForSignatureFn({
+      clientId,
+      files: sigFiles,
+      signers: sigSigners,
+      title: document.getElementById("sig-title").value.trim() || undefined,
+      message: document.getElementById("sig-message").value.trim() || undefined,
+      expiryDays: parseInt(document.getElementById("sig-expiry").value) || 30
+    });
+    showToast("Documents sent for signature!");
     closeSignatureModal();
     await Promise.all([loadFiles(user.uid), loadEnvelopes(user.uid)]);
   } catch (err) {
@@ -675,15 +868,24 @@ async function loadEnvelopes(uid) {
       completed: "#22c55e", declined: "#ef4444", expired: "#6b7280", revoked: "#6b7280"
     };
 
-    list.innerHTML = pending.map(e => `
+    list.innerHTML = pending.map(e => {
+      const title = e.title || e.fileName;
+      let signerInfo = "";
+      if (e.signers && e.signers.length > 0) {
+        const signed = e.signers.filter(s => s.status === "completed" || s.status === "signed").length;
+        signerInfo = `<div class="gd-envelope-signers">${signed} of ${e.signers.length} signed</div>`;
+      } else {
+        signerInfo = `<span class="gd-envelope-signer">${e.signerName || ""}</span>`;
+      }
+      return `
       <div class="gd-envelope-row">
-        <span class="gd-envelope-name">${e.fileName}</span>
-        <span class="gd-envelope-signer">${e.signerName}</span>
+        <span class="gd-envelope-name">${title}</span>
+        ${signerInfo}
         <span class="gd-badge-esig" style="background: ${statusColors[e.status] || "#6b7280"}">${statusLabel(e.status)}</span>
         <span class="gd-file-meta">${formatDate(e.sentAt)}</span>
         <button class="gd-btn gd-btn-sm" onclick="checkEnvelopeStatus('${e.documentId}')">Check Status</button>
-      </div>
-    `).join("");
+      </div>`;
+    }).join("");
   } catch (e) {
     console.error("Load envelopes error:", e);
   }
@@ -905,6 +1107,436 @@ window.closeCompareModal = function () {
   document.getElementById("compare-modal").classList.remove("active");
 };
 
+/* ===== SHOWINGS TAB ===== */
+
+async function loadShowings(uid) {
+  try {
+    const q = query(
+      collection(db, "showings"),
+      where("clientId", "==", clientId),
+      where("realtorId", "==", uid),
+      orderBy("showingDate", "desc")
+    );
+    const snap = await getDocs(q);
+    allShowings = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderShowings();
+  } catch (e) {
+    console.error("Load showings error:", e);
+  }
+}
+
+function renderShowings() {
+  const now = new Date();
+  const upcoming = allShowings.filter(s => s.status === "scheduled" && s.showingDate?.toDate && s.showingDate.toDate() >= now);
+  const past = allShowings.filter(s => s.status !== "scheduled" || (s.showingDate?.toDate && s.showingDate.toDate() < now));
+  const completed = allShowings.filter(s => s.status === "completed");
+
+  document.getElementById("ss-total").textContent = allShowings.length;
+  document.getElementById("ss-upcoming").textContent = upcoming.length;
+  document.getElementById("ss-completed").textContent = completed.length;
+
+  const ratings = completed.filter(s => s.clientRating).map(s => s.clientRating);
+  document.getElementById("ss-avgrating").textContent = ratings.length
+    ? (ratings.reduce((a, b) => a + b, 0) / ratings.length).toFixed(1)
+    : "—";
+
+  const upEl = document.getElementById("showings-upcoming");
+  const pastEl = document.getElementById("showings-past");
+
+  if (upcoming.length === 0) {
+    upEl.innerHTML = '<div class="gd-text-muted" style="padding:0.5rem 0;">No upcoming showings</div>';
+  } else {
+    upEl.innerHTML = upcoming.map(s => renderShowingCard(s, true)).join("");
+  }
+
+  if (past.length === 0) {
+    pastEl.innerHTML = '<div class="gd-text-muted" style="padding:0.5rem 0;">No past showings</div>';
+  } else {
+    pastEl.innerHTML = past.map(s => renderShowingCard(s, false)).join("");
+  }
+}
+
+function renderShowingCard(s, isUpcoming) {
+  const date = s.showingDate?.toDate ? formatDateTime(s.showingDate) : "—";
+  const price = s.listingPrice ? formatCurrency(s.listingPrice) : "";
+  const stars = s.clientRating ? renderStars(s.clientRating) : "";
+  const statusBadge = `<span class="gd-badge gd-badge-${s.status}">${statusLabel(s.status)}</span>`;
+
+  let actions = "";
+  if (isUpcoming) {
+    actions = `
+      <button class="gd-btn gd-btn-sm" onclick="editShowing('${s.id}')">Edit</button>
+      <button class="gd-btn gd-btn-primary gd-btn-sm" onclick="openCompleteShowingModal('${s.id}')">Complete</button>
+      <button class="gd-btn gd-btn-sm" onclick="cancelShowing('${s.id}')">Cancel</button>`;
+  }
+
+  return `
+    <div class="gd-showing-card">
+      <div class="gd-showing-card-header">
+        <div class="gd-showing-card-address">${s.address || "—"}</div>
+        ${statusBadge}
+      </div>
+      <div class="gd-showing-card-meta">
+        <span>${date}</span>
+        ${price ? `<span>${price}</span>` : ""}
+        ${s.mlsNumber ? `<span>MLS: ${s.mlsNumber}</span>` : ""}
+        ${stars ? `<span class="gd-stars">${stars}</span>` : ""}
+      </div>
+      ${s.clientFeedback ? `<div style="font-size:0.8rem;color:#4b5563;margin-bottom:0.35rem;">${s.clientFeedback}</div>` : ""}
+      ${s.realtorNotes ? `<div style="font-size:0.8rem;color:#6b7280;font-style:italic;margin-bottom:0.35rem;">${s.realtorNotes}</div>` : ""}
+      ${actions ? `<div class="gd-showing-card-actions">${actions}</div>` : ""}
+    </div>`;
+}
+
+window.openShowingModal = function (showingId) {
+  editingShowingId = showingId || null;
+  document.getElementById("showing-modal-title").textContent = showingId ? "Edit Showing" : "Add Showing";
+
+  // Populate property dropdown
+  const select = document.getElementById("show-property");
+  select.innerHTML = '<option value="">— Manual entry —</option>';
+  allProperties.forEach(p => {
+    select.innerHTML += `<option value="${p.id}">${p.address} ${p.mlsNumber ? "(MLS: " + p.mlsNumber + ")" : ""}</option>`;
+  });
+
+  if (showingId) {
+    const s = allShowings.find(x => x.id === showingId);
+    if (s) {
+      document.getElementById("show-address").value = s.address || "";
+      document.getElementById("show-mls").value = s.mlsNumber || "";
+      document.getElementById("show-price").value = s.listingPrice || "";
+      document.getElementById("show-notes").value = s.realtorNotes || "";
+      document.getElementById("show-duration").value = 60;
+      document.getElementById("show-followup").checked = false;
+      if (s.showingDate) {
+        const d = s.showingDate.toDate ? s.showingDate.toDate() : new Date(s.showingDate);
+        const iso = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+        document.getElementById("show-date").value = iso;
+      }
+    }
+  } else {
+    document.getElementById("show-address").value = "";
+    document.getElementById("show-mls").value = "";
+    document.getElementById("show-price").value = "";
+    document.getElementById("show-date").value = "";
+    document.getElementById("show-duration").value = "60";
+    document.getElementById("show-notes").value = "";
+    document.getElementById("show-followup").checked = true;
+    document.getElementById("show-property").value = "";
+  }
+
+  document.getElementById("showing-modal").classList.add("active");
+};
+
+window.editShowing = function (id) { openShowingModal(id); };
+
+window.closeShowingModal = function () {
+  document.getElementById("showing-modal").classList.remove("active");
+};
+
+window.fillShowingFromProperty = function () {
+  const propId = document.getElementById("show-property").value;
+  if (!propId) return;
+  const p = allProperties.find(x => x.id === propId);
+  if (p) {
+    document.getElementById("show-address").value = p.address || "";
+    document.getElementById("show-mls").value = p.mlsNumber || "";
+    document.getElementById("show-price").value = p.listingPrice || "";
+  }
+};
+
+window.saveShowing = async function () {
+  const user = auth.currentUser;
+  if (!user) return;
+
+  const address = document.getElementById("show-address").value.trim();
+  if (!address) { showToast("Address is required.", "error"); return; }
+
+  const dateVal = document.getElementById("show-date").value;
+  if (!dateVal) { showToast("Date is required.", "error"); return; }
+
+  const startDate = new Date(dateVal);
+  const duration = parseInt(document.getElementById("show-duration").value) || 60;
+  const endDate = new Date(startDate.getTime() + duration * 60000);
+
+  const data = {
+    clientId,
+    realtorId: user.uid,
+    address,
+    mlsNumber: document.getElementById("show-mls").value.trim(),
+    listingPrice: Number(document.getElementById("show-price").value) || null,
+    showingDate: Timestamp.fromDate(startDate),
+    endDate: Timestamp.fromDate(endDate),
+    status: "scheduled",
+    realtorNotes: document.getElementById("show-notes").value.trim(),
+    propertyId: document.getElementById("show-property").value || null,
+    updatedAt: serverTimestamp()
+  };
+
+  try {
+    if (editingShowingId) {
+      await updateDoc(doc(db, "showings", editingShowingId), data);
+      showToast("Showing updated!");
+    } else {
+      data.createdAt = serverTimestamp();
+      data.clientRating = null;
+      data.clientFeedback = "";
+      data.disclosuresSent = false;
+      data.followUpId = null;
+      const showingRef = await addDoc(collection(db, "showings"), data);
+
+      // Log activity
+      await addDoc(collection(db, "activities"), {
+        clientId, realtorId: user.uid, type: "showing",
+        subject: `Showing scheduled: ${address}`,
+        body: `${formatDateTime(Timestamp.fromDate(startDate))}`,
+        timestamp: serverTimestamp()
+      });
+      await updateDoc(doc(db, "clients", clientId), { lastActivityDate: serverTimestamp() });
+
+      // Auto-create follow-up if checked
+      if (document.getElementById("show-followup").checked) {
+        const fuDate = new Date(startDate.getTime() + 86400000); // next day
+        await addDoc(collection(db, "followUps"), {
+          realtorId: user.uid, clientId,
+          title: `Follow up: ${address} showing`,
+          dueDate: Timestamp.fromDate(fuDate),
+          priority: "medium", status: "pending", notes: "",
+          sourceType: "showing", sourceId: showingRef.id,
+          createdAt: serverTimestamp()
+        });
+      }
+
+      showToast("Showing added!");
+    }
+    closeShowingModal();
+    await loadShowings(user.uid);
+  } catch (e) {
+    console.error("Save showing error:", e);
+    showToast("Failed to save showing.", "error");
+  }
+};
+
+window.cancelShowing = async function (id) {
+  if (!confirm("Cancel this showing?")) return;
+  const user = auth.currentUser;
+  if (!user) return;
+
+  try {
+    await updateDoc(doc(db, "showings", id), { status: "cancelled", updatedAt: serverTimestamp() });
+    showToast("Showing cancelled.");
+    await loadShowings(user.uid);
+  } catch (e) {
+    console.error("Cancel showing error:", e);
+    showToast("Failed to cancel.", "error");
+  }
+};
+
+/* --- Complete Showing Modal --- */
+
+document.getElementById("complete-stars").addEventListener("click", (e) => {
+  const star = e.target.closest(".gd-star");
+  if (!star) return;
+  completeRating = parseInt(star.dataset.rating);
+  document.querySelectorAll("#complete-stars .gd-star").forEach(s => {
+    s.classList.toggle("filled", parseInt(s.dataset.rating) <= completeRating);
+  });
+});
+
+window.openCompleteShowingModal = function (id) {
+  completingShowingId = id;
+  completeRating = 0;
+  document.querySelectorAll("#complete-stars .gd-star").forEach(s => s.classList.remove("filled"));
+  document.getElementById("complete-feedback").value = "";
+  document.getElementById("complete-notes").value = "";
+  document.getElementById("complete-followup").checked = true;
+  document.getElementById("complete-showing-modal").classList.add("active");
+};
+
+window.closeCompleteShowingModal = function () {
+  document.getElementById("complete-showing-modal").classList.remove("active");
+};
+
+window.submitCompleteShowing = async function () {
+  const user = auth.currentUser;
+  if (!user || !completingShowingId) return;
+
+  const showing = allShowings.find(s => s.id === completingShowingId);
+  if (!showing) return;
+
+  try {
+    await updateDoc(doc(db, "showings", completingShowingId), {
+      status: "completed",
+      clientRating: completeRating || null,
+      clientFeedback: document.getElementById("complete-feedback").value.trim(),
+      realtorNotes: document.getElementById("complete-notes").value.trim(),
+      updatedAt: serverTimestamp()
+    });
+
+    await addDoc(collection(db, "activities"), {
+      clientId, realtorId: user.uid, type: "showing",
+      subject: `Showing completed: ${showing.address}`,
+      body: completeRating ? `Rating: ${completeRating}/5` : "",
+      timestamp: serverTimestamp()
+    });
+    await updateDoc(doc(db, "clients", clientId), { lastActivityDate: serverTimestamp() });
+
+    if (document.getElementById("complete-followup").checked) {
+      const fuDate = new Date(Date.now() + 86400000);
+      await addDoc(collection(db, "followUps"), {
+        realtorId: user.uid, clientId,
+        title: `Follow up after showing: ${showing.address}`,
+        dueDate: Timestamp.fromDate(fuDate),
+        priority: "medium", status: "pending", notes: "",
+        sourceType: "showing", sourceId: completingShowingId,
+        createdAt: serverTimestamp()
+      });
+    }
+
+    showToast("Showing completed!");
+    closeCompleteShowingModal();
+    await Promise.all([loadShowings(user.uid), loadActivities(user.uid), loadFollowUps(user.uid)]);
+  } catch (e) {
+    console.error("Complete showing error:", e);
+    showToast("Failed to complete showing.", "error");
+  }
+};
+
+/* ===== FOLLOW-UPS ===== */
+
+async function loadFollowUps(uid) {
+  try {
+    const q = query(
+      collection(db, "followUps"),
+      where("clientId", "==", clientId),
+      where("realtorId", "==", uid),
+      orderBy("dueDate", "asc")
+    );
+    const snap = await getDocs(q);
+    allFollowUps = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderFollowUps();
+  } catch (e) {
+    console.error("Load follow-ups error:", e);
+  }
+}
+
+function renderFollowUps() {
+  const pending = allFollowUps.filter(f => f.status === "pending");
+  const el = document.getElementById("followup-list");
+
+  if (pending.length === 0) {
+    el.classList.add("gd-hidden");
+    return;
+  }
+
+  el.classList.remove("gd-hidden");
+  el.innerHTML = `<div class="gd-showing-section-title" style="margin-top:0;">Pending Follow-ups</div>` +
+    pending.map(f => {
+      const due = f.dueDate?.toDate ? formatDate(f.dueDate) : "—";
+      const isOverdue = f.dueDate?.toDate && f.dueDate.toDate() < new Date();
+      return `
+      <div class="gd-followup-item priority-${f.priority || "medium"}">
+        <div class="gd-followup-dot"></div>
+        <div class="gd-followup-info">
+          <div class="gd-followup-title">${f.title}</div>
+          <div class="gd-followup-due">${isOverdue ? "Overdue — " : ""}Due: ${due}</div>
+        </div>
+        <div class="gd-followup-actions">
+          <button class="gd-btn gd-btn-primary gd-btn-sm" onclick="completeFollowUp('${f.id}')">Done</button>
+          <button class="gd-btn gd-btn-sm" onclick="snoozeFollowUp('${f.id}')">Snooze</button>
+          <button class="gd-btn gd-btn-sm" onclick="dismissFollowUp('${f.id}')">Dismiss</button>
+        </div>
+      </div>`;
+    }).join("");
+}
+
+window.openFollowUpModal = function (sourceType, sourceId) {
+  document.getElementById("fu-title").value = "";
+  // Default due date = tomorrow
+  const tomorrow = new Date(Date.now() + 86400000);
+  document.getElementById("fu-date").value = tomorrow.toISOString().slice(0, 10);
+  document.getElementById("fu-priority").value = "medium";
+  document.getElementById("fu-notes").value = "";
+  document.getElementById("followup-modal").classList.add("active");
+  // Store source info on modal element
+  document.getElementById("followup-modal").dataset.sourceType = sourceType || "";
+  document.getElementById("followup-modal").dataset.sourceId = sourceId || "";
+};
+
+window.closeFollowUpModal = function () {
+  document.getElementById("followup-modal").classList.remove("active");
+};
+
+window.saveFollowUp = async function () {
+  const user = auth.currentUser;
+  if (!user) return;
+
+  const title = document.getElementById("fu-title").value.trim();
+  const dateVal = document.getElementById("fu-date").value;
+  if (!title || !dateVal) { showToast("Title and due date are required.", "error"); return; }
+
+  const modal = document.getElementById("followup-modal");
+
+  try {
+    await addDoc(collection(db, "followUps"), {
+      realtorId: user.uid, clientId, title,
+      dueDate: Timestamp.fromDate(new Date(dateVal)),
+      priority: document.getElementById("fu-priority").value,
+      status: "pending",
+      notes: document.getElementById("fu-notes").value.trim(),
+      sourceType: modal.dataset.sourceType || null,
+      sourceId: modal.dataset.sourceId || null,
+      createdAt: serverTimestamp()
+    });
+    showToast("Follow-up created!");
+    closeFollowUpModal();
+    await loadFollowUps(user.uid);
+  } catch (e) {
+    console.error("Save follow-up error:", e);
+    showToast("Failed to save follow-up.", "error");
+  }
+};
+
+window.completeFollowUp = async function (id) {
+  const user = auth.currentUser;
+  if (!user) return;
+  try {
+    await updateDoc(doc(db, "followUps", id), { status: "completed", completedAt: serverTimestamp() });
+    showToast("Follow-up completed!");
+    await loadFollowUps(user.uid);
+  } catch (e) {
+    showToast("Failed to update.", "error");
+  }
+};
+
+window.snoozeFollowUp = async function (id) {
+  const user = auth.currentUser;
+  if (!user) return;
+  const snoozeTo = new Date(Date.now() + 86400000); // +1 day
+  try {
+    await updateDoc(doc(db, "followUps", id), {
+      dueDate: Timestamp.fromDate(snoozeTo),
+      snoozedUntil: Timestamp.fromDate(snoozeTo)
+    });
+    showToast("Snoozed for 1 day.");
+    await loadFollowUps(user.uid);
+  } catch (e) {
+    showToast("Failed to snooze.", "error");
+  }
+};
+
+window.dismissFollowUp = async function (id) {
+  const user = auth.currentUser;
+  if (!user) return;
+  try {
+    await updateDoc(doc(db, "followUps", id), { status: "dismissed" });
+    showToast("Follow-up dismissed.");
+    await loadFollowUps(user.uid);
+  } catch (e) {
+    showToast("Failed to dismiss.", "error");
+  }
+};
+
 /* ===== AI CHAT PANEL ===== */
 let aiChatHistory = [];
 
@@ -998,7 +1630,11 @@ document.addEventListener("keydown", (e) => {
       { id: "activity-modal", close: () => closeActivityModal() },
       { id: "property-modal", close: () => closePropertyModal() },
       { id: "compare-modal", close: () => closeCompareModal() },
-      { id: "signature-modal", close: () => closeSignatureModal() }
+      { id: "signature-modal", close: () => closeSignatureModal() },
+      { id: "send-doc-modal", close: () => closeSendDocModal() },
+      { id: "showing-modal", close: () => closeShowingModal() },
+      { id: "complete-showing-modal", close: () => closeCompleteShowingModal() },
+      { id: "followup-modal", close: () => closeFollowUpModal() }
     ];
     for (const m of modals) {
       if (document.getElementById(m.id).classList.contains("active")) { m.close(); return; }
@@ -1023,6 +1659,14 @@ window.sendAiMessage = async function () {
     const result = await askAssistant({ question, clientId, context: "client_detail" });
     removeTypingIndicator();
     addAiMessage(result.data.response, "ai");
+
+    // If the AI performed actions, refresh client data so the UI reflects changes
+    if (result.data.actionsPerformed && result.data.actionsPerformed.length > 0) {
+      const user = auth.currentUser;
+      if (user) {
+        await loadClient(user.uid);
+      }
+    }
   } catch (err) {
     removeTypingIndicator();
     const msg = err.message || "Something went wrong. Please try again.";
