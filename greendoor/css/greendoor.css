@@ -1572,12 +1572,12 @@ textarea.gd-input {
 
 /* --- BoldSign Embed Modal --- */
 .gd-boldsign-embed-modal {
-  max-width: 1100px;
-  width: 95vw;
-  max-height: 95vh;
+  max-width: 1400px;
+  width: 98vw;
+  max-height: 98vh;
   display: flex;
   flex-direction: column;
-  min-height: 500px;
+  min-height: 600px;
 }
 
 .gd-boldsign-embed-body {
@@ -1598,7 +1598,7 @@ textarea.gd-input {
 
 .gd-boldsign-iframe {
   width: 100%;
-  height: 80vh;
+  height: 90vh;
   border: none;
   flex: 1;
 }

@@ -6,7 +6,7 @@ import {
   getCountFromServer, limit, onSnapshot
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import {
-  ref, uploadBytesResumable, getDownloadURL
+  ref, uploadBytesResumable, getDownloadURL, deleteObject
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
 import {
   getCurrentUser, showToast, formatCurrency, formatDate, formatDateTime,
@@ -481,9 +481,38 @@ function renderFiles() {
       <span class="gd-file-meta">${formatDate(f.uploadedAt)}</span>
       <button class="gd-btn gd-btn-sm gd-file-send-btn" onclick="event.stopPropagation(); sendSingleFile('${f.id}')">Send</button>
       <a href="${f.downloadUrl}" target="_blank" class="gd-file-download" onclick="event.stopPropagation()">Download</a>
+      <button class="gd-btn gd-btn-sm gd-btn-danger" onclick="event.stopPropagation(); deleteFile('${f.id}')" title="Delete file">&times;</button>
     </div>`;
   }).join("");
 }
+
+window.deleteFile = async function (fileId) {
+  if (!confirm("Delete this file? This cannot be undone.")) return;
+  const user = auth.currentUser;
+  if (!user) return;
+
+  const fileData = allFiles.find(f => f.id === fileId);
+  if (!fileData) return;
+
+  try {
+    // Delete from Storage if we have the path
+    if (fileData.storagePath) {
+      try {
+        await deleteObject(ref(storage, fileData.storagePath));
+      } catch (e) {
+        // File may already be gone from storage — continue with Firestore cleanup
+        console.warn("Storage delete:", e.message);
+      }
+    }
+    // Delete Firestore record
+    await deleteDoc(doc(db, "files", fileId));
+    showToast("File deleted.");
+    await loadFiles(user.uid);
+  } catch (err) {
+    console.error("Delete file error:", err);
+    showToast("Failed to delete file.", "error");
+  }
+};
 
 window.uploadFile = async function () {
   const user = auth.currentUser;
@@ -982,7 +1011,8 @@ async function loadEnvelopes(uid) {
         ${signerInfo}
         <span class="gd-badge-esig" style="background: ${statusColors[e.status] || "#6b7280"}">${statusLabel(e.status)}</span>
         <span class="gd-file-meta">${e.status === "draft" ? "Draft" : formatDate(e.sentAt)}</span>
-        <button class="gd-btn gd-btn-sm" onclick="checkEnvelopeStatus('${e.documentId}')">${e.status === "draft" ? "Check Status" : "Check Status"}</button>
+        <button class="gd-btn gd-btn-sm" onclick="checkEnvelopeStatus('${e.documentId}')">Check Status</button>
+        <button class="gd-btn gd-btn-sm gd-btn-danger" onclick="deleteEnvelope('${e.documentId}')" title="Delete">&times;</button>
       </div>`;
     }).join("");
   } catch (e) {
@@ -1002,6 +1032,21 @@ window.checkEnvelopeStatus = async function (documentId) {
   } catch (err) {
     console.error("Check status error:", err);
     showToast(err.message || "Failed to check status.", "error");
+  }
+};
+
+window.deleteEnvelope = async function (documentId) {
+  if (!confirm("Delete this signature request? This cannot be undone.")) return;
+  const user = auth.currentUser;
+  if (!user) return;
+
+  try {
+    await deleteDoc(doc(db, "envelopes", documentId));
+    showToast("Signature request deleted.");
+    await loadEnvelopes(user.uid);
+  } catch (err) {
+    console.error("Delete envelope error:", err);
+    showToast("Failed to delete.", "error");
   }
 };
 
