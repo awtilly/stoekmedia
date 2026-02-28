@@ -39,7 +39,7 @@ onAuthStateChanged(auth, async (user) => {
       collection(db, "activities"),
       where("realtorId", "==", uid),
       orderBy("timestamp", "desc"),
-      limit(10)
+      limit(3)
     );
     const actSnap = await getDocs(actQ);
     const feedEl = document.getElementById("activity-feed");
