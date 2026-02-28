@@ -4884,3 +4884,218 @@ body.gd-light .gd-support-icon {
 .gd-faq-answer strong {
   color: #4b5563;
 }
+
+/* ===== LANDING PAGE DASHBOARD MOCKUP ===== */
+.gd-mockup-wrapper {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.gd-mockup-browser {
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+.gd-mockup-toolbar {
+  background: #1e1e2e;
+  padding: 0.6rem 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.gd-mockup-dots {
+  display: flex;
+  gap: 6px;
+}
+
+.gd-mockup-dots span {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.gd-mockup-dots span:first-child { background: #ff5f57; }
+.gd-mockup-dots span:nth-child(2) { background: #febc2e; }
+.gd-mockup-dots span:nth-child(3) { background: #28c840; }
+
+.gd-mockup-url {
+  flex: 1;
+  text-align: center;
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.35);
+  font-family: var(--font-body);
+  letter-spacing: 0.02em;
+}
+
+.gd-mockup-screen {
+  background: #f8f9fa;
+  padding: 0;
+  position: relative;
+}
+
+/* Mock nav bar */
+.gd-mock-nav {
+  background: #ffffff;
+  border-bottom: 1px solid #e5e7eb;
+  padding: 0.6rem 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.gd-mock-logo {
+  font-family: var(--font-display);
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #1c1917;
+}
+
+.gd-mock-nav-links {
+  display: flex;
+  gap: 1rem;
+  font-size: 0.65rem;
+  color: #9ca3af;
+}
+
+.gd-mock-nav-active {
+  color: #22c55e;
+  font-weight: 600;
+}
+
+/* Mock content area */
+.gd-mock-content {
+  padding: 1.25rem;
+}
+
+.gd-mock-welcome {
+  font-size: 1rem;
+  color: #1c1917;
+  margin-bottom: 1rem;
+  font-family: var(--font-display);
+}
+
+.gd-mock-welcome strong {
+  font-style: italic;
+}
+
+/* Stats row */
+.gd-mock-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+}
+
+.gd-mock-stat {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 0.75rem;
+  text-align: center;
+}
+
+.gd-mock-stat-num {
+  font-size: 1.4rem;
+  font-weight: 700;
+  line-height: 1;
+  margin-bottom: 0.2rem;
+}
+
+.gd-mock-stat-label {
+  font-size: 0.55rem;
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* Cards row */
+.gd-mock-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+}
+
+.gd-mock-card {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 0.75rem;
+}
+
+.gd-mock-card-title {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #1c1917;
+  margin-bottom: 0.5rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.gd-mock-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.3rem 0;
+  font-size: 0.6rem;
+}
+
+.gd-mock-row + .gd-mock-row {
+  border-top: 1px solid #f9fafb;
+}
+
+.gd-mock-name {
+  color: #4b5563;
+  font-weight: 500;
+}
+
+.gd-mock-time {
+  color: #9ca3af;
+  font-size: 0.55rem;
+}
+
+.gd-mock-badge {
+  font-size: 0.5rem;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+.gd-mock-badge-green { background: #f0fdf4; color: #16a34a; }
+.gd-mock-badge-blue { background: #eff6ff; color: #2563eb; }
+.gd-mock-badge-amber { background: #fffbeb; color: #d97706; }
+
+/* AI FAB */
+.gd-mock-fab {
+  position: absolute;
+  bottom: 1rem;
+  right: 1rem;
+  width: 36px;
+  height: 36px;
+  background: #22c55e;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.4);
+}
+
+/* Responsive mockup */
+@media (max-width: 600px) {
+  .gd-mock-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .gd-mock-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .gd-mock-nav-links {
+    display: none;
+  }
+}

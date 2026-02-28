@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>GreenDoor — Real Estate CRM by Stoek Media</title>
-  <meta name="description" content="GreenDoor is a powerful, intuitive CRM built for real estate agents. Manage clients, track showings, organize files, and close more deals.">
+  <meta name="description" content="GreenDoor is a powerful, intuitive CRM built for real estate agents. Manage clients, track showings, send e-signatures, and close more deals — all with AI built in.">
   <link rel="stylesheet" href="/assets/css/style.css">
   <link rel="stylesheet" href="/greendoor/css/greendoor.css">
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='0.9em' font-size='90'>S</text></svg>">
@@ -38,7 +38,7 @@
     <div class="container">
       <div class="hero-content">
         <h1>The CRM Built<br>for <em style="color: #22c55e;">Real Estate.</em></h1>
-        <p class="hero-sub">GreenDoor gives agents a single place to manage clients, track showings, organize documents, and close deals faster. Simple, powerful, built for how you actually work.</p>
+        <p class="hero-sub">Manage clients, match listings, send e-signatures, schedule showings, and let AI handle the busywork. One platform built for how agents actually work.</p>
         <div class="hero-cta">
           <a href="/greendoor/app/login" class="btn btn-primary btn-arrow" style="background: #22c55e; border-color: #22c55e;">Agent Portal</a>
           <a href="#features" class="btn btn-arrow">See Features</a>
@@ -47,62 +47,108 @@
     </div>
   </section>
 
-  <!-- Features Overview -->
-  <section id="features" class="section-pad-lg">
+  <!-- Dashboard Mockup -->
+  <section class="section-pad-lg">
     <div class="container">
-      <div class="value-grid reveal">
-        <div class="value-text">
-          <span class="section-label" style="color: #22c55e;">Why GreenDoor</span>
-          <h2>Everything you need. <em style="color: #22c55e;">Nothing you don't.</em></h2>
-          <p>Most CRMs are bloated, expensive, and built for enterprise teams. GreenDoor is different — purpose-built for individual agents and small brokerages who want to stay organized without the overhead.</p>
-          <p>Track every client from first contact to closing day. Log calls, manage documents, compare properties, and never let a lead slip through the cracks.</p>
-        </div>
-        <div class="value-image" style="background: var(--color-bg-elevated); display: flex; align-items: center; justify-content: center;">
-          <div class="software-preview">
-            <span class="software-preview-icon" style="font-size: 4rem; color: #22c55e;">&#127968;</span>
-            <span class="software-preview-text">GreenDoor CRM</span>
+      <div class="gd-mockup-wrapper reveal">
+        <div class="gd-mockup-browser">
+          <div class="gd-mockup-toolbar">
+            <div class="gd-mockup-dots"><span></span><span></span><span></span></div>
+            <div class="gd-mockup-url">stoekmedia.com/greendoor/app/dashboard</div>
+          </div>
+          <div class="gd-mockup-screen">
+            <!-- Mock Nav -->
+            <div class="gd-mock-nav">
+              <div class="gd-mock-logo"><span style="color:#22c55e;">Green</span>Door</div>
+              <div class="gd-mock-nav-links">
+                <span class="gd-mock-nav-active">Dashboard</span>
+                <span>Clients</span>
+                <span>Calendar</span>
+                <span>Settings</span>
+              </div>
+            </div>
+            <!-- Mock Content -->
+            <div class="gd-mock-content">
+              <!-- Welcome + Stats -->
+              <div class="gd-mock-welcome">Welcome back, <strong>Jane</strong></div>
+              <div class="gd-mock-stats">
+                <div class="gd-mock-stat">
+                  <div class="gd-mock-stat-num" style="color:#22c55e;">12</div>
+                  <div class="gd-mock-stat-label">Active Clients</div>
+                </div>
+                <div class="gd-mock-stat">
+                  <div class="gd-mock-stat-num" style="color:#3b82f6;">5</div>
+                  <div class="gd-mock-stat-label">Showings This Week</div>
+                </div>
+                <div class="gd-mock-stat">
+                  <div class="gd-mock-stat-num" style="color:#f59e0b;">3</div>
+                  <div class="gd-mock-stat-label">Under Contract</div>
+                </div>
+                <div class="gd-mock-stat">
+                  <div class="gd-mock-stat-num" style="color:#8b5cf6;">2</div>
+                  <div class="gd-mock-stat-label">Pending Signatures</div>
+                </div>
+              </div>
+              <!-- Mock Cards Row -->
+              <div class="gd-mock-cards">
+                <div class="gd-mock-card">
+                  <div class="gd-mock-card-title">Recent Clients</div>
+                  <div class="gd-mock-row"><span class="gd-mock-name">Sarah Johnson</span><span class="gd-mock-badge gd-mock-badge-green">Active Buyer</span></div>
+                  <div class="gd-mock-row"><span class="gd-mock-name">Mike Chen</span><span class="gd-mock-badge gd-mock-badge-blue">Active Seller</span></div>
+                  <div class="gd-mock-row"><span class="gd-mock-name">Emily Davis</span><span class="gd-mock-badge gd-mock-badge-amber">Under Contract</span></div>
+                </div>
+                <div class="gd-mock-card">
+                  <div class="gd-mock-card-title">Upcoming Showings</div>
+                  <div class="gd-mock-row"><span class="gd-mock-name">455 W Oak St</span><span class="gd-mock-time">Thu 10:30 AM</span></div>
+                  <div class="gd-mock-row"><span class="gd-mock-name">1200 Elm Ave</span><span class="gd-mock-time">Fri 2:00 PM</span></div>
+                  <div class="gd-mock-row"><span class="gd-mock-name">89 Maple Dr</span><span class="gd-mock-time">Sat 11:00 AM</span></div>
+                </div>
+              </div>
+            </div>
+            <!-- Mock AI FAB -->
+            <div class="gd-mock-fab">&#10024;</div>
           </div>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- Feature Cards -->
-  <section class="section-pad-lg" style="background: var(--color-bg-elevated);">
+  <!-- Features Overview -->
+  <section id="features" class="section-pad-lg" style="background: var(--color-bg-elevated);">
     <div class="container">
       <span class="section-label reveal" style="color: #22c55e;">Features</span>
-      <h2 class="reveal" style="font-family: var(--font-display); font-size: clamp(2rem, 4vw, 3.2rem); font-weight: 500; line-height: 1.15; margin-bottom: var(--space-lg);">Built for the way <em style="font-family: var(--font-display); font-style: italic; color: #22c55e;">agents work.</em></h2>
+      <h2 class="reveal" style="font-family: var(--font-display); font-size: clamp(2rem, 4vw, 3.2rem); font-weight: 500; line-height: 1.15; margin-bottom: var(--space-lg);">Everything you need to <em style="font-family: var(--font-display); font-style: italic; color: #22c55e;">close deals.</em></h2>
 
       <div class="features-grid">
         <div class="feature-card reveal">
-          <div class="feature-icon" style="color: #22c55e; border-color: rgba(34, 197, 94, 0.3);">&#128100;</div>
+          <div class="feature-icon" style="color: #22c55e; border-color: rgba(34, 197, 94, 0.3);">&#128101;</div>
           <h3>Client Management</h3>
-          <p>Track every client with detailed profiles — budget, preferences, timeline, pre-approval status, and free-form notes. Never lose context on a deal.</p>
-        </div>
-        <div class="feature-card reveal">
-          <div class="feature-icon" style="color: #22c55e; border-color: rgba(34, 197, 94, 0.3);">&#128197;</div>
-          <h3>Activity Tracking</h3>
-          <p>Log calls, emails, notes, and showings. A complete timeline for every client so you always know where things stand.</p>
-        </div>
-        <div class="feature-card reveal">
-          <div class="feature-icon" style="color: #22c55e; border-color: rgba(34, 197, 94, 0.3);">&#128193;</div>
-          <h3>Document Storage</h3>
-          <p>Upload and organize contracts, disclosures, inspections, and financial docs. Everything in one place, organized by folder.</p>
+          <p>Full profiles with budget, preferences, timeline, pre-approval status, and notes. Track every client from first contact to closing day.</p>
         </div>
         <div class="feature-card reveal">
           <div class="feature-icon" style="color: #22c55e; border-color: rgba(34, 197, 94, 0.3);">&#127968;</div>
-          <h3>Property Tracking</h3>
-          <p>Bookmark properties for each client. Track showings, capture feedback, rate listings, and compare options side-by-side.</p>
+          <h3>Listings &amp; Smart Matching</h3>
+          <p>Add listings manually or paste a URL to auto-import details with AI. Match properties to clients with intelligent compatibility scoring.</p>
         </div>
         <div class="feature-card reveal">
-          <div class="feature-icon" style="color: #22c55e; border-color: rgba(34, 197, 94, 0.3);">&#128202;</div>
-          <h3>Dashboard Insights</h3>
-          <p>See your pipeline at a glance — active buyers, sellers, contracts, recent activity, and upcoming showings all in one view.</p>
+          <div class="feature-icon" style="color: #22c55e; border-color: rgba(34, 197, 94, 0.3);">&#128197;</div>
+          <h3>Showings &amp; Calendar</h3>
+          <p>Schedule property showings, manage your full calendar with month and week views, and capture client ratings and feedback after each visit.</p>
         </div>
         <div class="feature-card reveal">
-          <div class="feature-icon feature-icon--coming-soon" style="color: #22c55e; border-color: rgba(34, 197, 94, 0.3);">&#128640;</div>
-          <h3>More Coming Soon <span class="feature-badge" style="color: #22c55e; background: rgba(34, 197, 94, 0.15);">Soon</span></h3>
-          <p>Email integration, automated follow-ups, listing alerts, and team collaboration features are on the roadmap.</p>
+          <div class="feature-icon" style="color: #22c55e; border-color: rgba(34, 197, 94, 0.3);">&#9997;</div>
+          <h3>E-Signatures</h3>
+          <p>Send documents for electronic signature directly from client files. Add multiple signers, place fields visually, and track status in real time.</p>
+        </div>
+        <div class="feature-card reveal">
+          <div class="feature-icon" style="color: #22c55e; border-color: rgba(34, 197, 94, 0.3);">&#9993;</div>
+          <h3>Email &amp; Documents</h3>
+          <p>Send emails with templates and merge tags. Upload and organize contracts, disclosures, and inspections. Share files with clients in one click.</p>
+        </div>
+        <div class="feature-card reveal">
+          <div class="feature-icon" style="color: #22c55e; border-color: rgba(34, 197, 94, 0.3);">&#10024;</div>
+          <h3>AI Assistant</h3>
+          <p>Type or speak to your AI assistant. Draft emails, summarize clients, schedule showings, set follow-ups, and get intelligent next-step suggestions.</p>
         </div>
       </div>
     </div>
@@ -120,17 +166,17 @@
         <div class="booking-step">
           <div class="booking-step-number" style="color: #22c55e;">1</div>
           <h3>Get Your Account</h3>
-          <p>Your brokerage admin sets up your agent account — you get an email and password.</p>
+          <p>Your brokerage admin sets up your agent account. You get an email, set your password, and you're in.</p>
         </div>
         <div class="booking-step">
           <div class="booking-step-number" style="color: #22c55e;">2</div>
-          <h3>Add Your Clients</h3>
-          <p>Import your pipeline. Add client details, preferences, and status in seconds.</p>
+          <h3>Build Your Pipeline</h3>
+          <p>Add clients, import listings, and set up your document templates. The guided onboarding walks you through it.</p>
         </div>
         <div class="booking-step">
           <div class="booking-step-number" style="color: #22c55e;">3</div>
-          <h3>Stay Organized</h3>
-          <p>Log activity, upload docs, track properties. Everything in one place.</p>
+          <h3>Close More Deals</h3>
+          <p>Match listings, send contracts for signature, and let AI help you stay on top of every client relationship.</p>
         </div>
       </div>
     </div>
