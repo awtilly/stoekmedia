@@ -6,6 +6,7 @@ import {
 import { getCurrentUser, showToast } from "./auth.js";
 
 let currentStep = 1;
+const TOTAL_STEPS = 4;
 
 /* --- Pre-fill from invite data --- */
 onAuthStateChanged(auth, async (user) => {
@@ -26,7 +27,7 @@ onAuthStateChanged(auth, async (user) => {
 
 /* --- Step navigation --- */
 window.goToStep = function (step) {
-  if (step < 1 || step > 3) return;
+  if (step < 1 || step > TOTAL_STEPS) return;
 
   // Hide all steps
   document.querySelectorAll(".gd-onboard-step").forEach(el => el.classList.remove("active"));
@@ -35,7 +36,7 @@ window.goToStep = function (step) {
   });
 
   // Mark completed and active steps
-  for (let i = 1; i <= 3; i++) {
+  for (let i = 1; i <= TOTAL_STEPS; i++) {
     const stepEl = document.querySelector(`.gd-step[data-step="${i}"]`);
     if (i < step) stepEl.classList.add("completed");
     if (i === step) stepEl.classList.add("active");
@@ -44,6 +45,32 @@ window.goToStep = function (step) {
   // Show target step
   document.getElementById(`step-${step}`).classList.add("active");
   currentStep = step;
+};
+
+/* --- Validate Step 1 before proceeding --- */
+window.validateAndGoToStep = function (step) {
+  const name = document.getElementById("onboard-name").value.trim();
+  const phone = document.getElementById("onboard-phone").value.trim();
+
+  if (!name) {
+    showToast("Please enter your full name.", "error");
+    document.getElementById("onboard-name").focus();
+    return;
+  }
+  if (!phone) {
+    showToast("Please enter your phone number.", "error");
+    document.getElementById("onboard-phone").focus();
+    return;
+  }
+
+  // Auto-generate email signature if empty
+  const sigEl = document.getElementById("onboard-signature");
+  if (!sigEl.value.trim()) {
+    const company = document.getElementById("onboard-company").value.trim();
+    sigEl.value = `Best regards,\n${name}${company ? "\n" + company : ""}\n${phone}`;
+  }
+
+  goToStep(step);
 };
 
 /* --- Finish onboarding --- */

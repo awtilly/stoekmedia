@@ -1064,6 +1064,12 @@ exports.sendEmail = onCall(
       throw new HttpsError("invalid-argument", "Recipient, subject, and body are required.");
     }
 
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(to)) {
+      throw new HttpsError("invalid-argument", "Invalid recipient email address.");
+    }
+
     // Verify client ownership if clientId provided
     if (clientId) {
       const clientSnap = await db.doc(`clients/${clientId}`).get();
@@ -1236,6 +1242,15 @@ exports.shareDocument = onCall(
 
     if (!clientId || !to || !subject || !files || !files.length) {
       throw new HttpsError("invalid-argument", "Recipient, subject, and at least one file are required.");
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(to)) {
+      throw new HttpsError("invalid-argument", "Invalid recipient email address.");
+    }
+    if (cc && !emailRegex.test(cc)) {
+      throw new HttpsError("invalid-argument", "Invalid CC email address.");
     }
 
     // Validate all file URLs

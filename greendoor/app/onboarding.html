@@ -11,7 +11,7 @@
   <div class="gd-onboarding-page">
     <div class="gd-onboarding-card">
       <div class="gd-login-logo"><span class="gd-green">Green</span><span class="gd-door">Door</span></div>
-      <p class="gd-login-subtitle">Let's set up your account</p>
+      <p class="gd-login-subtitle">Welcome — let's get you set up</p>
 
       <!-- Stepper -->
       <div class="gd-stepper">
@@ -22,42 +22,50 @@
         <div class="gd-step-line"></div>
         <div class="gd-step" data-step="2">
           <div class="gd-step-dot">2</div>
-          <div class="gd-step-label">Company</div>
+          <div class="gd-step-label">Branding</div>
         </div>
         <div class="gd-step-line"></div>
         <div class="gd-step" data-step="3">
           <div class="gd-step-dot">3</div>
-          <div class="gd-step-label">Get Started</div>
+          <div class="gd-step-label">Tour</div>
+        </div>
+        <div class="gd-step-line"></div>
+        <div class="gd-step" data-step="4">
+          <div class="gd-step-dot">4</div>
+          <div class="gd-step-label">Go</div>
         </div>
       </div>
 
       <!-- Step 1: Profile -->
       <div class="gd-onboard-step active" id="step-1">
         <h2 class="gd-onboard-title">Your Profile</h2>
+        <p class="gd-onboard-desc">This information appears in client communications and your CRM profile.</p>
         <div class="gd-form-group">
-          <label for="onboard-name">Full Name</label>
-          <input type="text" id="onboard-name" class="gd-input" placeholder="Your full name">
+          <label for="onboard-name">Full Name *</label>
+          <input type="text" id="onboard-name" class="gd-input" placeholder="Jane Smith">
         </div>
         <div class="gd-form-group">
-          <label for="onboard-phone">Phone Number</label>
+          <label for="onboard-phone">Phone Number *</label>
           <input type="tel" id="onboard-phone" class="gd-input" placeholder="(555) 123-4567">
         </div>
         <div class="gd-onboard-nav">
           <div></div>
-          <button class="gd-btn gd-btn-primary" onclick="goToStep(2)">Continue</button>
+          <button class="gd-btn gd-btn-primary" onclick="validateAndGoToStep(2)">Continue</button>
         </div>
       </div>
 
-      <!-- Step 2: Company & Signature -->
+      <!-- Step 2: Company & Branding -->
       <div class="gd-onboard-step" id="step-2">
-        <h2 class="gd-onboard-title">Company & Signature</h2>
+        <h2 class="gd-onboard-title">Company &amp; Branding</h2>
+        <p class="gd-onboard-desc">Your company name and email signature are used in all outgoing emails and documents.</p>
         <div class="gd-form-group">
-          <label for="onboard-company">Company Name</label>
-          <input type="text" id="onboard-company" class="gd-input" placeholder="Your brokerage or company">
+          <label for="onboard-company">Company / Brokerage</label>
+          <input type="text" id="onboard-company" class="gd-input" placeholder="ABC Realty Group">
         </div>
         <div class="gd-form-group">
           <label for="onboard-signature">Email Signature</label>
-          <textarea id="onboard-signature" class="gd-input gd-signature-textarea" rows="4" placeholder="Jane Smith&#10;ABC Realty&#10;(555) 123-4567"></textarea>
+          <p class="gd-text-muted" style="margin: 0 0 0.25rem 0; font-size: 0.78rem;">Automatically appended to all outgoing emails. You can update this later in Settings.</p>
+          <textarea id="onboard-signature" class="gd-input gd-signature-textarea" rows="4" placeholder="Best regards,&#10;Jane Smith&#10;ABC Realty Group&#10;(555) 123-4567"></textarea>
         </div>
         <div class="gd-onboard-nav">
           <button class="gd-btn gd-btn-ghost" onclick="goToStep(1)">Back</button>
@@ -65,42 +73,93 @@
         </div>
       </div>
 
-      <!-- Step 3: Get Started -->
+      <!-- Step 3: Feature Tour -->
       <div class="gd-onboard-step" id="step-3">
-        <h2 class="gd-onboard-title">You're All Set</h2>
-        <p style="color: #6b7280; font-size: 0.9rem; margin-bottom: 1.5rem;">Here's what you can do with GreenDoor:</p>
+        <h2 class="gd-onboard-title">What You Can Do</h2>
+        <p class="gd-onboard-desc">GreenDoor is built for how realtors actually work. Here's what's at your fingertips.</p>
         <div class="gd-tour-grid">
           <div class="gd-tour-item">
             <div class="gd-tour-icon">&#128101;</div>
             <div>
-              <strong>Clients</strong>
-              <p>Track leads, buyers, and sellers in one place.</p>
+              <strong>Client Management</strong>
+              <p>Track leads, buyers, and sellers with full contact details, preferences, budgets, and timeline.</p>
             </div>
           </div>
           <div class="gd-tour-item">
             <div class="gd-tour-icon">&#127968;</div>
             <div>
-              <strong>Properties</strong>
-              <p>Bookmark listings, schedule showings, compare options.</p>
+              <strong>Listings &amp; Matching</strong>
+              <p>Add listings manually or paste a URL to auto-import details. Match properties to clients with smart scoring.</p>
             </div>
           </div>
           <div class="gd-tour-item">
-            <div class="gd-tour-icon">&#128196;</div>
+            <div class="gd-tour-icon">&#128197;</div>
             <div>
-              <strong>Documents</strong>
-              <p>Upload files, send for e-signature, stay organized.</p>
+              <strong>Showings &amp; Calendar</strong>
+              <p>Schedule property showings, manage your calendar, and track client feedback with ratings.</p>
             </div>
           </div>
           <div class="gd-tour-item">
-            <div class="gd-tour-icon">&#129302;</div>
+            <div class="gd-tour-icon">&#9997;</div>
+            <div>
+              <strong>Documents &amp; E-Signatures</strong>
+              <p>Upload files, create reusable templates, and send documents for electronic signature — all in one place.</p>
+            </div>
+          </div>
+          <div class="gd-tour-item">
+            <div class="gd-tour-icon">&#9993;</div>
+            <div>
+              <strong>Email &amp; Communication</strong>
+              <p>Send emails directly from each client's page with templates, merge tags, and full activity tracking.</p>
+            </div>
+          </div>
+          <div class="gd-tour-item">
+            <div class="gd-tour-icon">&#10024;</div>
             <div>
               <strong>AI Assistant</strong>
-              <p>Draft emails, get client insights, and more.</p>
+              <p>Type or speak to your AI assistant. Draft emails, summarize clients, schedule showings, and get intelligent suggestions.</p>
             </div>
           </div>
         </div>
         <div class="gd-onboard-nav">
           <button class="gd-btn gd-btn-ghost" onclick="goToStep(2)">Back</button>
+          <button class="gd-btn gd-btn-primary" onclick="goToStep(4)">Continue</button>
+        </div>
+      </div>
+
+      <!-- Step 4: Ready to Go -->
+      <div class="gd-onboard-step" id="step-4">
+        <h2 class="gd-onboard-title">You're Ready</h2>
+        <p class="gd-onboard-desc">Your account is set up. Here's how to get started.</p>
+
+        <div class="gd-getting-started-list">
+          <div class="gd-getting-started-item">
+            <span class="gd-getting-started-num">1</span>
+            <div>
+              <strong>Add your first client</strong>
+              <p>Click "+ New Client" on your dashboard to start building your pipeline.</p>
+            </div>
+          </div>
+          <div class="gd-getting-started-item">
+            <span class="gd-getting-started-num">2</span>
+            <div>
+              <strong>Add a listing</strong>
+              <p>Go to a client's Properties tab and click "+ Add Listing" — paste a URL to auto-fill the details.</p>
+            </div>
+          </div>
+          <div class="gd-getting-started-item">
+            <span class="gd-getting-started-num">3</span>
+            <div>
+              <strong>Upload document templates</strong>
+              <p>Head to Settings to upload your go-to contracts and disclosures for quick signature workflows.</p>
+            </div>
+          </div>
+        </div>
+
+        <p class="gd-onboard-help-note">Need help? Visit <a href="/greendoor/app/faq">FAQ</a> or email <a href="mailto:support@stoekmedia.com">support@stoekmedia.com</a></p>
+
+        <div class="gd-onboard-nav">
+          <button class="gd-btn gd-btn-ghost" onclick="goToStep(3)">Back</button>
           <button class="gd-btn gd-btn-primary" id="onboard-finish-btn" onclick="finishOnboarding()">Go to Dashboard</button>
         </div>
       </div>
