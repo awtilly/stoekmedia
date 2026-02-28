@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FAQ — GreenDoor</title>
+  <link rel="stylesheet" href="/assets/css/style.css">
+  <link rel="stylesheet" href="/greendoor/css/greendoor.css">
+</head>
+<body class="gd-light">
+
+  <!-- Navigation -->
+  <nav class="nav scrolled">
+    <div class="container">
+      <a href="/greendoor/app/dashboard" class="nav-logo gd-nav-logo"><span class="gd-green">Green</span><span class="gd-door">Door</span><small class="gd-by-line">by stoekmedia</small></a>
+      <ul class="nav-links">
+        <li><a href="/greendoor/app/dashboard">Dashboard</a></li>
+        <li><a href="/greendoor/app/clients">Clients</a></li>
+        <li><a href="/greendoor/app/calendar">Calendar</a></li>
+        <li id="nav-admin-tab" style="display:none;"><a href="/greendoor/app/admin">Admin</a></li>
+        <li><a href="/greendoor/app/settings">Settings</a></li>
+        <li class="nav-crm-divider"></li>
+        <li><span id="nav-user-name" class="nav-user-name"></span></li>
+        <li><button class="nav-logout-btn" onclick="handleLogout()">Logout</button></li>
+      </ul>
+      <button class="nav-toggle" aria-label="Menu">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+    </div>
+  </nav>
+
+  <div class="gd-page">
+    <div class="gd-content" style="max-width: 720px; margin: 0 auto;">
+
+      <div class="gd-welcome">
+        <h1>Frequently Asked Questions</h1>
+      </div>
+
+      <div class="gd-card gd-settings-card">
+        <div class="gd-faq-item">
+          <h4 class="gd-faq-question">How do I add a new client?</h4>
+          <p class="gd-faq-answer">Go to the <strong>Clients</strong> page and click <strong>"+ Add Client"</strong>. Fill in their name, contact info, and any known preferences. You can also add clients by speaking to the AI assistant on any client detail page.</p>
+        </div>
+
+        <div class="gd-faq-item">
+          <h4 class="gd-faq-question">How does the AI assistant work?</h4>
+          <p class="gd-faq-answer">Click the sparkle button in the bottom-right corner of any client detail page. You can type or speak naturally — ask it to summarize a client, draft emails, schedule showings, set follow-ups, or suggest next steps. The AI has full context on the client you're viewing.</p>
+        </div>
+
+        <div class="gd-faq-item">
+          <h4 class="gd-faq-question">How do I match a listing to a client?</h4>
+          <p class="gd-faq-answer">On a client's detail page, go to the <strong>Properties</strong> tab. Click <strong>"+ Match a Listing"</strong> to search existing listings, or <strong>"+ Add Listing"</strong> to create a new one. You can paste a URL from Zillow or Realtor.com to auto-import property details. Matched listings show a compatibility score based on the client's preferences.</p>
+        </div>
+
+        <div class="gd-faq-item">
+          <h4 class="gd-faq-question">How do I send documents for e-signature?</h4>
+          <p class="gd-faq-answer">On a client's <strong>Files</strong> tab, click <strong>"Send for Signature"</strong>. Add documents (upload new ones or select from existing files and templates), add signers with their email addresses, and click <strong>"Place Fields &amp; Send"</strong>. You'll be able to drag signature fields onto the document before sending.</p>
+        </div>
+
+        <div class="gd-faq-item">
+          <h4 class="gd-faq-question">How do I set up document templates?</h4>
+          <p class="gd-faq-answer">Go to <strong>Settings</strong> and scroll to <strong>Document Templates</strong>. Upload commonly used documents (purchase agreements, disclosures, etc.) and assign a category. These templates will then be available in the signature flow for any client.</p>
+        </div>
+
+        <div class="gd-faq-item">
+          <h4 class="gd-faq-question">How do I schedule a showing?</h4>
+          <p class="gd-faq-answer">On a client's detail page, go to the <strong>Showings</strong> tab and click <strong>"+ Add Showing"</strong>. If the client has matched listings, you can select one to auto-fill the address and price. You can also schedule showings by telling the AI assistant, e.g. "I have a showing with this client Thursday at 2pm at 123 Main St."</p>
+        </div>
+
+        <div class="gd-faq-item">
+          <h4 class="gd-faq-question">How do I send an email to a client?</h4>
+          <p class="gd-faq-answer">On a client's <strong>Activity</strong> tab, click <strong>"Send Email"</strong>. You can write from scratch or use a saved email template. Emails are sent from GreenDoor with your email as the Reply-To, so replies come directly to you.</p>
+        </div>
+
+        <div class="gd-faq-item">
+          <h4 class="gd-faq-question">Can I copy a listing to multiple clients?</h4>
+          <p class="gd-faq-answer">Yes. On any client's <strong>Properties</strong> tab, select one or more listings using the checkboxes, then click <strong>"Copy to Client"</strong> in the action bar. Search for the destination client and the listings will be matched to them with a recalculated compatibility score.</p>
+        </div>
+
+        <div class="gd-faq-item">
+          <h4 class="gd-faq-question">How do I contact support?</h4>
+          <p class="gd-faq-answer">Email us at <a href="mailto:support@stoekmedia.com">support@stoekmedia.com</a>. We typically respond within one business day.</p>
+        </div>
+      </div>
+
+      <div style="text-align: center; padding: 1.5rem 0;">
+        <a href="/greendoor/app/settings" class="gd-btn gd-btn-sm">&larr; Back to Settings</a>
+      </div>
+
+    </div>
+  </div>
+
+  <script src="/assets/js/main.js"></script>
+  <script type="module" src="/greendoor/js/auth.js"></script>
+</body>
+</html>
