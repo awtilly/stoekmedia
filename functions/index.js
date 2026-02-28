@@ -2155,3 +2155,117 @@ exports.inviteRealtor = onCall(
     }
   }
 );
+
+/* ================================================================
+   PARSE LISTING URL — Fetches a listing page and extracts details via Claude
+   ================================================================ */
+exports.parseListingUrl = onCall(
+  { secrets: [anthropicKey], region: "us-central1", maxInstances: 5 },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "Must be logged in.");
+
+    const { url } = request.data;
+    if (!url || typeof url !== "string") {
+      throw new HttpsError("invalid-argument", "URL is required.");
+    }
+
+    // Basic URL validation
+    let parsedUrl;
+    try {
+      parsedUrl = new URL(url);
+      if (!["http:", "https:"].includes(parsedUrl.protocol)) {
+        throw new Error("Invalid protocol");
+      }
+    } catch {
+      throw new HttpsError("invalid-argument", "Please provide a valid URL.");
+    }
+
+    try {
+      const fetch = require("node-fetch");
+
+      // Fetch the page HTML
+      const response = await fetch(url, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+          "Accept-Language": "en-US,en;q=0.5"
+        },
+        timeout: 15000,
+        redirect: "follow"
+      });
+
+      if (!response.ok) {
+        throw new HttpsError("unavailable", `Could not fetch the page (HTTP ${response.status}). The site may be blocking automated requests.`);
+      }
+
+      let html = await response.text();
+      // Truncate to ~50K chars to stay within Claude's limits
+      if (html.length > 50000) {
+        html = html.substring(0, 50000);
+      }
+
+      const Anthropic = require("@anthropic-ai/sdk");
+      const anthropicClient = new Anthropic({ apiKey: anthropicKey.value() });
+
+      const extractionPrompt = `Extract property listing details from this HTML. Return a JSON object with these fields (use null for any field you cannot find):
+
+{
+  "address": {
+    "full": "full address string",
+    "street": "street address",
+    "city": "city",
+    "state": "2-letter state code",
+    "zip": "zip code",
+    "county": "county if available",
+    "neighborhood": "neighborhood if available"
+  },
+  "listingPrice": number (just the number, no $ or commas),
+  "bedrooms": number,
+  "bathrooms": number (total: full + half*0.5),
+  "squareFeet": number,
+  "propertyType": "Single Family" | "Condo" | "Townhouse" | "Multi-Family" | "Land" | other,
+  "yearBuilt": number,
+  "lotSize": "string like 0.25 acres or 10,890 sqft",
+  "garageSpaces": number,
+  "stories": number,
+  "features": ["array", "of", "feature", "strings"],
+  "mlsNumber": "MLS number string",
+  "description": "property description text",
+  "status": "active" | "pending" | "sold" | "coming_soon",
+  "listingUrl": "${url}"
+}
+
+Return ONLY the JSON object, no markdown, no explanation.
+
+HTML:
+${html}`;
+
+      const aiResponse = await anthropicClient.messages.create({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 2000,
+        messages: [{ role: "user", content: extractionPrompt }]
+      });
+
+      const text = aiResponse.content[0]?.text || "{}";
+
+      // Parse the JSON from Claude's response
+      let parsed;
+      try {
+        // Handle case where Claude wraps in ```json blocks
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        parsed = JSON.parse(jsonMatch ? jsonMatch[0] : text);
+      } catch {
+        throw new HttpsError("internal", "Failed to parse listing details from the page.");
+      }
+
+      // Ensure listingUrl is set
+      parsed.listingUrl = url;
+
+      return { success: true, listing: parsed };
+    } catch (err) {
+      if (err instanceof HttpsError) throw err;
+      console.error("parseListingUrl error:", err);
+      throw new HttpsError("internal", "Failed to extract listing details. The site may not be accessible or the page format may not be supported.");
+    }
+  }
+);

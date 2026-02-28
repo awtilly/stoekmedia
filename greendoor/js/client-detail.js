@@ -37,6 +37,9 @@ let sigSigners = [];
 let embedUnsubscribe = null;
 let embedPollInterval = null;
 let allTemplateFiles = [];
+let copyClientsList = [];
+let selectedCopyClientId = null;
+let addListingFeatureTags = [];
 
 if (!clientId) {
   window.location.href = "/greendoor/app/clients";
@@ -49,6 +52,7 @@ const sendForSignatureFn = httpsCallable(functions, "sendForSignature");
 const checkSignatureStatusFn = httpsCallable(functions, "checkSignatureStatus");
 const createEmbeddedSignatureRequestFn = httpsCallable(functions, "createEmbeddedSignatureRequest");
 const shareDocumentFn = httpsCallable(functions, "shareDocument");
+const parseListingUrlFn = httpsCallable(functions, "parseListingUrl");
 
 /* --- Auth gate --- */
 onAuthStateChanged(auth, async (user) => {
@@ -1374,9 +1378,10 @@ window.toggleCompare = function (id) {
 function updateCompareBar() {
   const bar = document.getElementById("compare-bar");
   const count = selectedCompare.size;
-  if (count >= 2) {
+  if (count >= 1) {
     bar.classList.add("active");
     document.getElementById("compare-count").textContent = count + " selected";
+    document.getElementById("compare-btn").disabled = count < 2;
   } else {
     bar.classList.remove("active");
   }
@@ -1422,6 +1427,160 @@ window.showComparison = function () {
 
 window.closeCompareModal = function () {
   document.getElementById("compare-modal").classList.remove("active");
+};
+
+/* --- Copy to Client --- */
+window.openCopyToClientModal = async function () {
+  const summaryEl = document.getElementById("copy-property-summary");
+  const selected = allMatches.filter(m => selectedCompare.has(m.id));
+  summaryEl.innerHTML = selected.map(m => {
+    const addr = m.listing?.address?.full || "Unknown";
+    const price = m.listing?.listingPrice ? formatCurrency(m.listing.listingPrice) : "";
+    return `<div class="gd-copy-summary-item"><span>${addr}</span>${price ? `<span class="gd-text-muted">${price}</span>` : ""}</div>`;
+  }).join("");
+
+  document.getElementById("copy-client-search").value = "";
+  document.getElementById("copy-selected-client").classList.add("gd-hidden");
+  document.getElementById("copy-client-search-group").style.display = "";
+  document.getElementById("copy-client-list").innerHTML = '<div class="gd-text-muted" style="padding:1rem;">Loading clients...</div>';
+  document.getElementById("copy-client-btn").disabled = true;
+  document.getElementById("copy-progress").classList.add("gd-hidden");
+  selectedCopyClientId = null;
+
+  document.getElementById("copy-client-modal").classList.add("active");
+
+  try {
+    const user = auth.currentUser;
+    const q = query(collection(db, "clients"), where("realtorId", "==", user.uid), orderBy("fullName"));
+    const snap = await getDocs(q);
+    copyClientsList = snap.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .filter(c => c.id !== clientId);
+    renderCopyClientList(copyClientsList);
+  } catch (e) {
+    console.error("Load clients error:", e);
+    document.getElementById("copy-client-list").innerHTML = '<div class="gd-text-muted" style="padding:1rem;color:var(--gd-red);">Failed to load clients.</div>';
+  }
+};
+
+window.closeCopyToClientModal = function () {
+  document.getElementById("copy-client-modal").classList.remove("active");
+};
+
+window.filterCopyClients = function () {
+  const term = document.getElementById("copy-client-search").value.toLowerCase().trim();
+  if (!term) { renderCopyClientList(copyClientsList); return; }
+  const filtered = copyClientsList.filter(c =>
+    (c.fullName || "").toLowerCase().includes(term) ||
+    (c.email || "").toLowerCase().includes(term)
+  );
+  renderCopyClientList(filtered);
+};
+
+function renderCopyClientList(clients) {
+  const el = document.getElementById("copy-client-list");
+  if (!clients.length) {
+    el.innerHTML = '<div class="gd-text-muted" style="padding:1rem;">No clients found.</div>';
+    return;
+  }
+  el.innerHTML = clients.map(c => `
+    <div class="gd-copy-client-row" onclick="selectCopyClient('${c.id}')">
+      <div style="flex:1;min-width:0;">
+        <div style="font-weight:500;">${c.fullName || "Unnamed"}</div>
+        <div class="gd-text-muted">${c.email || "No email"}</div>
+      </div>
+      <span class="gd-badge gd-badge-${c.status || "lead"}">${statusLabel(c.status || "lead")}</span>
+    </div>
+  `).join("");
+}
+
+window.selectCopyClient = function (id) {
+  selectedCopyClientId = id;
+  const client = copyClientsList.find(c => c.id === id);
+  if (!client) return;
+  const el = document.getElementById("copy-selected-client");
+  el.innerHTML = `
+    <div style="display:flex;align-items:center;gap:0.5rem;">
+      <span style="font-weight:500;">${client.fullName || "Unnamed"}</span>
+      <span class="gd-badge gd-badge-${client.status || "lead"}">${statusLabel(client.status || "lead")}</span>
+      <button class="gd-modal-close" onclick="clearCopyClientSelection()" style="margin-left:auto;font-size:1.2rem;" aria-label="Clear">&times;</button>
+    </div>
+    <div class="gd-text-muted">${client.email || ""}</div>
+  `;
+  el.classList.remove("gd-hidden");
+  document.getElementById("copy-client-search-group").style.display = "none";
+  document.getElementById("copy-client-list").style.display = "none";
+  document.getElementById("copy-client-btn").disabled = false;
+};
+
+window.clearCopyClientSelection = function () {
+  selectedCopyClientId = null;
+  document.getElementById("copy-selected-client").classList.add("gd-hidden");
+  document.getElementById("copy-client-search-group").style.display = "";
+  document.getElementById("copy-client-list").style.display = "";
+  document.getElementById("copy-client-btn").disabled = true;
+};
+
+window.executeCopyToClient = async function () {
+  if (!selectedCopyClientId) return;
+  const user = auth.currentUser;
+  if (!user) return;
+
+  const btn = document.getElementById("copy-client-btn");
+  const progress = document.getElementById("copy-progress");
+  btn.disabled = true;
+  progress.classList.remove("gd-hidden");
+
+  try {
+    const destClient = copyClientsList.find(c => c.id === selectedCopyClientId);
+    const selectedMatches = allMatches.filter(m => selectedCompare.has(m.id));
+
+    // Get existing matches on destination client to check duplicates
+    const existingQ = query(
+      collection(db, "clientListingMatches"),
+      where("clientId", "==", selectedCopyClientId),
+      where("realtorId", "==", user.uid)
+    );
+    const existingSnap = await getDocs(existingQ);
+    const existingListingIds = new Set(existingSnap.docs.map(d => d.data().listingId));
+
+    let copied = 0;
+    let skipped = 0;
+
+    for (const match of selectedMatches) {
+      const lid = match.listingId || match.listing?.id;
+      if (!lid || existingListingIds.has(lid)) { skipped++; continue; }
+
+      const result = destClient ? calculateMatchScore(match.listing, destClient) : { score: 0, breakdown: {}, dealBreakerHits: [] };
+
+      await addDoc(collection(db, "clientListingMatches"), {
+        listingId: lid,
+        clientId: selectedCopyClientId,
+        realtorId: user.uid,
+        matchScore: result.score,
+        matchBreakdown: result.breakdown,
+        dealBreakerHits: result.dealBreakerHits,
+        status: "interested",
+        clientRating: null,
+        clientFeedback: "",
+        realtorNotes: "",
+        matchedAt: serverTimestamp()
+      });
+      copied++;
+    }
+
+    const name = destClient?.fullName || "client";
+    let msg = `Copied ${copied} propert${copied === 1 ? "y" : "ies"} to ${name}`;
+    if (skipped > 0) msg += ` (${skipped} already existed)`;
+    showToast(msg);
+    closeCopyToClientModal();
+  } catch (e) {
+    console.error("Copy to client error:", e);
+    showToast("Failed to copy properties.", "error");
+    btn.disabled = false;
+  } finally {
+    progress.classList.add("gd-hidden");
+  }
 };
 
 /* ===== SHOWINGS TAB ===== */
@@ -2062,15 +2221,235 @@ window.toggleVoiceInput = function () {
   recognition.start();
 };
 
+/* ===== ADD LISTING FROM CLIENT DETAIL ===== */
+const FEATURE_SUGGESTIONS = [
+  "Pool", "Garage", "Fireplace", "Hardwood Floors", "Open Floor Plan",
+  "Basement", "Deck", "Patio", "Fenced Yard", "Central Air",
+  "Updated Kitchen", "Stainless Appliances", "Granite Counters",
+  "Walk-in Closet", "Laundry Room", "Home Office", "Smart Home",
+  "Solar Panels", "Corner Lot", "Cul-de-sac", "New Roof",
+  "Finished Basement", "In-ground Pool", "Screened Porch"
+];
+
+window.openAddListingModal = function () {
+  // Clear all form fields
+  ["al-url", "al-address", "al-city", "al-state", "al-zip", "al-county", "al-neighborhood",
+   "al-price", "al-beds", "al-baths", "al-sqft", "al-yearBuilt", "al-lotSize",
+   "al-garage", "al-stories", "al-mls", "al-listingUrl", "al-description", "al-notes"
+  ].forEach(id => { const el = document.getElementById(id); if (el) el.value = ""; });
+  document.getElementById("al-type").value = "";
+  document.getElementById("al-status").value = "active";
+  document.getElementById("al-fetch-status").innerHTML = "";
+  document.getElementById("al-fetch-btn").disabled = false;
+  document.getElementById("al-fetch-btn").textContent = "Fetch";
+  document.getElementById("al-save-btn").disabled = false;
+  addListingFeatureTags = [];
+  renderAddListingTags();
+  renderAddListingTagSuggestions();
+  document.getElementById("add-listing-modal").classList.add("active");
+};
+
+window.closeAddListingModal = function () {
+  document.getElementById("add-listing-modal").classList.remove("active");
+};
+
+window.fetchListingFromUrl = async function () {
+  const url = document.getElementById("al-url").value.trim();
+  if (!url) { showToast("Enter a listing URL.", "error"); return; }
+
+  const btn = document.getElementById("al-fetch-btn");
+  const statusEl = document.getElementById("al-fetch-status");
+  btn.disabled = true;
+  btn.textContent = "Fetching...";
+  statusEl.innerHTML = '<div class="gd-spinner" style="display:inline-block;vertical-align:middle;margin-right:0.5rem;"></div> Extracting property details...';
+  statusEl.className = "gd-url-fetch-result gd-url-fetch-loading";
+
+  try {
+    const result = await parseListingUrlFn({ url });
+    const listing = result.data.listing;
+
+    // Populate form fields
+    if (listing.address) {
+      document.getElementById("al-address").value = listing.address.street || listing.address.full || "";
+      document.getElementById("al-city").value = listing.address.city || "";
+      document.getElementById("al-state").value = listing.address.state || "";
+      document.getElementById("al-zip").value = listing.address.zip || "";
+      document.getElementById("al-county").value = listing.address.county || "";
+      document.getElementById("al-neighborhood").value = listing.address.neighborhood || "";
+    }
+    if (listing.listingPrice) document.getElementById("al-price").value = listing.listingPrice;
+    if (listing.bedrooms != null) document.getElementById("al-beds").value = listing.bedrooms;
+    if (listing.bathrooms != null) document.getElementById("al-baths").value = listing.bathrooms;
+    if (listing.squareFeet) document.getElementById("al-sqft").value = listing.squareFeet;
+    if (listing.propertyType) document.getElementById("al-type").value = listing.propertyType;
+    if (listing.yearBuilt) document.getElementById("al-yearBuilt").value = listing.yearBuilt;
+    if (listing.lotSize) document.getElementById("al-lotSize").value = listing.lotSize;
+    if (listing.garageSpaces) document.getElementById("al-garage").value = listing.garageSpaces;
+    if (listing.stories) document.getElementById("al-stories").value = listing.stories;
+    if (listing.mlsNumber) document.getElementById("al-mls").value = listing.mlsNumber;
+    if (listing.status) document.getElementById("al-status").value = listing.status;
+    if (listing.description) document.getElementById("al-description").value = listing.description;
+    document.getElementById("al-listingUrl").value = url;
+
+    if (listing.features && Array.isArray(listing.features)) {
+      addListingFeatureTags = listing.features.slice(0, 30);
+      renderAddListingTags();
+      renderAddListingTagSuggestions();
+    }
+
+    statusEl.innerHTML = "&#10003; Property details extracted!";
+    statusEl.className = "gd-url-fetch-result gd-url-fetch-success";
+  } catch (err) {
+    console.error("Fetch listing error:", err);
+    statusEl.innerHTML = "&#10007; " + (err.message || "Failed to extract listing details.");
+    statusEl.className = "gd-url-fetch-result gd-url-fetch-error";
+  }
+  btn.disabled = false;
+  btn.textContent = "Fetch";
+};
+
+function renderAddListingTags() {
+  const el = document.getElementById("al-tag-list");
+  el.innerHTML = addListingFeatureTags.map((tag, i) =>
+    `<span class="gd-tag">${tag}<button class="gd-tag-remove" onclick="removeAddListingTag(${i})">&times;</button></span>`
+  ).join("");
+}
+
+function renderAddListingTagSuggestions() {
+  const el = document.getElementById("al-tag-suggestions");
+  const available = FEATURE_SUGGESTIONS.filter(s => !addListingFeatureTags.includes(s));
+  el.innerHTML = available.map(s =>
+    `<button class="gd-tag-suggestion" onclick="addAddListingTag('${s}')">${s}</button>`
+  ).join("");
+}
+
+window.addAddListingTag = function (tag) {
+  if (!addListingFeatureTags.includes(tag)) {
+    addListingFeatureTags.push(tag);
+    renderAddListingTags();
+    renderAddListingTagSuggestions();
+  }
+};
+
+window.removeAddListingTag = function (index) {
+  addListingFeatureTags.splice(index, 1);
+  renderAddListingTags();
+  renderAddListingTagSuggestions();
+};
+
+// Tag input: Enter to add custom tags
+document.getElementById("al-tag-input")?.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    const val = e.target.value.trim();
+    if (val && !addListingFeatureTags.includes(val)) {
+      addListingFeatureTags.push(val);
+      renderAddListingTags();
+      renderAddListingTagSuggestions();
+    }
+    e.target.value = "";
+  }
+});
+
+window.saveAndMatchListing = async function () {
+  const user = auth.currentUser;
+  if (!user || !clientData) return;
+
+  const addrFull = document.getElementById("al-address").value.trim();
+  if (!addrFull) { showToast("Street address is required.", "error"); return; }
+
+  const saveBtn = document.getElementById("al-save-btn");
+  saveBtn.disabled = true;
+  saveBtn.textContent = "Saving...";
+
+  const price = Number(document.getElementById("al-price").value) || null;
+  const sqft = Number(document.getElementById("al-sqft").value) || null;
+
+  const address = {
+    full: [addrFull, document.getElementById("al-city").value.trim(), document.getElementById("al-state").value.trim(), document.getElementById("al-zip").value.trim()].filter(Boolean).join(", "),
+    street: addrFull,
+    city: document.getElementById("al-city").value.trim(),
+    state: document.getElementById("al-state").value.trim(),
+    zip: document.getElementById("al-zip").value.trim(),
+    county: document.getElementById("al-county").value.trim(),
+    neighborhood: document.getElementById("al-neighborhood").value.trim(),
+    lat: null,
+    lng: null
+  };
+
+  const data = {
+    address,
+    listingPrice: price,
+    bedrooms: Number(document.getElementById("al-beds").value) || null,
+    bathrooms: Number(document.getElementById("al-baths").value) || null,
+    squareFeet: sqft,
+    propertyType: document.getElementById("al-type").value,
+    yearBuilt: Number(document.getElementById("al-yearBuilt").value) || null,
+    lotSize: document.getElementById("al-lotSize").value.trim(),
+    garageSpaces: Number(document.getElementById("al-garage").value) || null,
+    stories: Number(document.getElementById("al-stories").value) || null,
+    features: addListingFeatureTags,
+    mlsNumber: document.getElementById("al-mls").value.trim(),
+    status: document.getElementById("al-status").value,
+    listingUrl: document.getElementById("al-listingUrl").value.trim(),
+    description: document.getElementById("al-description").value.trim(),
+    notes: document.getElementById("al-notes").value.trim(),
+    photos: [],
+    addedBy: user.uid,
+    source: "manual",
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  };
+
+  if (price && sqft) {
+    data.pricePerSqft = Math.round(price / sqft);
+  }
+
+  try {
+    // 1. Save the listing
+    const docRef = await addDoc(collection(db, "listings"), data);
+
+    // 2. Calculate match score against current client
+    const listingForScore = { id: docRef.id, ...data };
+    const result = calculateMatchScore(listingForScore, clientData);
+
+    // 3. Create the match
+    await addDoc(collection(db, "clientListingMatches"), {
+      listingId: docRef.id,
+      clientId,
+      realtorId: user.uid,
+      matchScore: result.score,
+      matchBreakdown: result.breakdown,
+      dealBreakerHits: result.dealBreakerHits,
+      status: "interested",
+      clientRating: null,
+      clientFeedback: "",
+      realtorNotes: "",
+      matchedAt: serverTimestamp()
+    });
+
+    showToast("Listing added and matched!");
+    closeAddListingModal();
+    await loadMatches(user.uid);
+  } catch (e) {
+    console.error("Save listing error:", e);
+    showToast("Failed to save listing.", "error");
+    saveBtn.disabled = false;
+    saveBtn.textContent = "Save & Match";
+  }
+};
+
 // Close modals on Escape key
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
     const modals = [
       { id: "file-preview-modal", close: () => closePreview() },
       { id: "activity-modal", close: () => closeActivityModal() },
+      { id: "add-listing-modal", close: () => closeAddListingModal() },
       { id: "match-listing-modal", close: () => closeMatchListingPanel() },
       { id: "edit-match-modal", close: () => closeEditMatchModal() },
       { id: "compare-modal", close: () => closeCompareModal() },
+      { id: "copy-client-modal", close: () => closeCopyToClientModal() },
       { id: "signature-modal", close: () => closeSignatureModal() },
       { id: "send-doc-modal", close: () => closeSendDocModal() },
       { id: "showing-modal", close: () => closeShowingModal() },
