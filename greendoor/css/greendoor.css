@@ -2744,6 +2744,28 @@ textarea.gd-input {
   background: #22c55e;
 }
 
+/* --- Email Sender Row --- */
+
+.gd-email-sender-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.gd-email-sender-info {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.gd-email-sender-label {
+  font-size: 0.9rem;
+  color: #1f2937;
+}
+.gd-btn-sm {
+  padding: 0.3rem 0.75rem;
+  font-size: 0.8rem;
+}
+
 /* --- Diagnostics --- */
 
 .gd-diagnostics-results {

@@ -29,6 +29,7 @@ onAuthStateChanged(auth, async (user) => {
   }
 
   await loadTemplates(user.uid);
+  renderEmailSenderStatus(profile);
 
   document.getElementById("settings-loading").classList.add("gd-hidden");
   document.getElementById("settings-content").classList.remove("gd-hidden");
@@ -218,5 +219,112 @@ window.runBoldSignTest = async function () {
   } finally {
     btn.disabled = false;
     btn.textContent = "Run Diagnostics";
+  }
+};
+
+/* ===== EMAIL SENDER VERIFICATION ===== */
+
+function renderEmailSenderStatus(profile) {
+  const el = document.getElementById("email-sender-status");
+  if (!el) return;
+
+  const verified = profile.senderVerified === true;
+  const pending = profile.sendgridSenderId && !verified;
+  const userEmail = profile.email || auth.currentUser?.email || "";
+
+  if (verified) {
+    el.innerHTML = `
+      <div class="gd-email-sender-row">
+        <div class="gd-email-sender-info">
+          <span class="gd-settings-status-dot gd-connected"></span>
+          <div>
+            <div class="gd-email-sender-label">Sending as <strong>${userEmail}</strong></div>
+            <div class="gd-text-muted" style="font-size: 0.8rem;">Clients see your email address as the sender.</div>
+          </div>
+        </div>
+        <button class="gd-btn gd-btn-outline gd-btn-sm" onclick="removeSenderVerification()">Remove</button>
+      </div>`;
+  } else if (pending) {
+    el.innerHTML = `
+      <div class="gd-email-sender-row">
+        <div class="gd-email-sender-info">
+          <span class="gd-settings-status-dot" style="background: #f59e0b;"></span>
+          <div>
+            <div class="gd-email-sender-label">Verification pending for <strong>${userEmail}</strong></div>
+            <div class="gd-text-muted" style="font-size: 0.8rem;">Check your inbox and click the verification link from SendGrid.</div>
+          </div>
+        </div>
+        <div style="display: flex; gap: 0.5rem;">
+          <button class="gd-btn gd-btn-primary gd-btn-sm" onclick="checkVerificationStatus()">Check Status</button>
+          <button class="gd-btn gd-btn-outline gd-btn-sm" onclick="requestVerification()">Resend</button>
+        </div>
+      </div>`;
+  } else {
+    el.innerHTML = `
+      <div class="gd-email-sender-row">
+        <div class="gd-email-sender-info">
+          <span class="gd-settings-status-dot gd-connected"></span>
+          <div>
+            <div class="gd-email-sender-label">Sending from <strong>greendoor@stoekmedia.com</strong></div>
+            <div class="gd-text-muted" style="font-size: 0.8rem;">Your email (${userEmail}) is set as Reply-To. Verify your email to send directly from your address.</div>
+          </div>
+        </div>
+        <button class="gd-btn gd-btn-primary gd-btn-sm" onclick="requestVerification()">Verify My Email</button>
+      </div>`;
+  }
+}
+
+window.requestVerification = async function () {
+  try {
+    showToast("Sending verification email...");
+    const fn = httpsCallable(functions, "requestSenderVerification");
+    const { data } = await fn();
+
+    if (data.alreadyVerified) {
+      showToast("Your email is already verified!");
+    } else {
+      showToast("Verification email sent — check your inbox.");
+    }
+
+    const profile = await getCurrentUser();
+    if (profile) renderEmailSenderStatus(profile);
+  } catch (e) {
+    console.error("Request verification error:", e);
+    showToast("Failed to send verification email.", "error");
+  }
+};
+
+window.checkVerificationStatus = async function () {
+  try {
+    const fn = httpsCallable(functions, "checkSenderVerification");
+    const { data } = await fn();
+
+    if (data.verified) {
+      showToast("Email verified! Emails will now send from your address.");
+    } else {
+      showToast("Not yet verified. Check your inbox for the verification link.", "error");
+    }
+
+    const profile = await getCurrentUser();
+    if (profile) renderEmailSenderStatus(profile);
+  } catch (e) {
+    console.error("Check verification error:", e);
+    showToast("Failed to check verification status.", "error");
+  }
+};
+
+window.removeSenderVerification = async function () {
+  if (!confirm("Remove email verification? Emails will revert to sending from greendoor@stoekmedia.com.")) return;
+
+  try {
+    const fn = httpsCallable(functions, "removeSenderVerification");
+    await fn();
+    showToast("Sender verification removed.");
+
+    const profile = await getCurrentUser();
+    if (profile) renderEmailSenderStatus(profile);
+  } catch (e) {
+    console.error("Remove verification error:", e);
+    showToast("Failed to remove verification.", "error");
   }
 };

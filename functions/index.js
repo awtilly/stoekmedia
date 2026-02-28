@@ -1047,6 +1047,143 @@ ${showings.map(s => `  - ${s.date}: ${s.address} with ${s.clientName}`).join("\n
 );
 
 /* ================================================================
+   SENDGRID SENDER VERIFICATION
+   ================================================================ */
+
+exports.requestSenderVerification = onCall(
+  { secrets: [sendgridKey], region: "us-central1" },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "You must be logged in.");
+
+    const uid = request.auth.uid;
+    const userSnap = await db.doc(`users/${uid}`).get();
+    const userData = userSnap.exists ? userSnap.data() : {};
+    const email = userData.email || request.auth.token.email;
+    const fullName = userData.fullName || "Realtor";
+
+    if (!email) throw new HttpsError("failed-precondition", "No email address on your profile.");
+
+    const fetch = require("node-fetch");
+    // Check if already verified
+    const listRes = await fetch("https://api.sendgrid.com/v3/verified_senders", {
+      headers: { Authorization: `Bearer ${sendgridKey.value()}` }
+    });
+    const listData = await listRes.json();
+    const existing = (listData.results || []).find(s => s.from_email === email);
+
+    if (existing && existing.verified) {
+      await db.doc(`users/${uid}`).update({
+        senderVerified: true,
+        sendgridSenderId: existing.id
+      });
+      return { alreadyVerified: true };
+    }
+
+    // If pending, delete and re-create to resend verification email
+    if (existing && !existing.verified) {
+      await fetch(`https://api.sendgrid.com/v3/verified_senders/${existing.id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${sendgridKey.value()}` }
+      });
+    }
+
+    // Create new sender identity — triggers verification email
+    const createRes = await fetch("https://api.sendgrid.com/v3/verified_senders", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${sendgridKey.value()}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        nickname: `${fullName} (GreenDoor)`,
+        from_email: email,
+        from_name: fullName,
+        reply_to: email,
+        reply_to_name: fullName,
+        address: "123 Main St",
+        city: "New York",
+        state: "NY",
+        zip: "10001",
+        country: "US"
+      })
+    });
+
+    if (!createRes.ok) {
+      const errBody = await createRes.text();
+      console.error("SendGrid create sender error:", createRes.status, errBody);
+      throw new HttpsError("internal", "Failed to send verification email. Please try again.");
+    }
+
+    const created = await createRes.json();
+    await db.doc(`users/${uid}`).update({
+      senderVerified: false,
+      sendgridSenderId: created.id
+    });
+
+    return { success: true, email };
+  }
+);
+
+exports.checkSenderVerification = onCall(
+  { secrets: [sendgridKey], region: "us-central1" },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "You must be logged in.");
+
+    const uid = request.auth.uid;
+    const userSnap = await db.doc(`users/${uid}`).get();
+    const userData = userSnap.exists ? userSnap.data() : {};
+
+    if (!userData.sendgridSenderId) {
+      return { verified: false, noSender: true };
+    }
+
+    const fetch = require("node-fetch");
+    const listRes = await fetch("https://api.sendgrid.com/v3/verified_senders", {
+      headers: { Authorization: `Bearer ${sendgridKey.value()}` }
+    });
+    const listData = await listRes.json();
+    const sender = (listData.results || []).find(s => s.id === userData.sendgridSenderId);
+
+    if (!sender) {
+      await db.doc(`users/${uid}`).update({ senderVerified: false, sendgridSenderId: null });
+      return { verified: false, noSender: true };
+    }
+
+    if (sender.verified && !userData.senderVerified) {
+      await db.doc(`users/${uid}`).update({ senderVerified: true });
+    }
+
+    return { verified: sender.verified, email: sender.from_email };
+  }
+);
+
+exports.removeSenderVerification = onCall(
+  { secrets: [sendgridKey], region: "us-central1" },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "You must be logged in.");
+
+    const uid = request.auth.uid;
+    const userSnap = await db.doc(`users/${uid}`).get();
+    const userData = userSnap.exists ? userSnap.data() : {};
+
+    if (userData.sendgridSenderId) {
+      const fetch = require("node-fetch");
+      await fetch(`https://api.sendgrid.com/v3/verified_senders/${userData.sendgridSenderId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${sendgridKey.value()}` }
+      });
+    }
+
+    await db.doc(`users/${uid}`).update({
+      senderVerified: false,
+      sendgridSenderId: null
+    });
+
+    return { success: true };
+  }
+);
+
+/* ================================================================
    SEND EMAIL VIA SENDGRID
    ================================================================ */
 
@@ -1081,8 +1218,8 @@ exports.sendEmail = onCall(
     // Get realtor profile for reply-to and signature
     const userSnap = await db.doc(`users/${uid}`).get();
     const userData = userSnap.exists ? userSnap.data() : {};
-    const replyToEmail = userData.email || request.auth.token.email;
-    const replyToName = userData.fullName || "GreenDoor Realtor";
+    const realtorEmail = userData.email || request.auth.token.email;
+    const realtorName = userData.fullName || "GreenDoor Realtor";
 
     // Append email signature if set
     let htmlBody = body;
@@ -1090,17 +1227,27 @@ exports.sendEmail = onCall(
       htmlBody += `<br><br>--<br>${userData.emailSignature.replace(/\r\n|\r|\n/g, "<br>")}`;
     }
 
+    // If sender is verified, send from their email; otherwise use GreenDoor with reply-to
+    const fromEmail = userData.senderVerified ? realtorEmail : "greendoor@stoekmedia.com";
+    const fromName = userData.senderVerified ? realtorName : "GreenDoor";
+
     try {
       const sgMail = require("@sendgrid/mail");
       sgMail.setApiKey(sendgridKey.value());
 
-      await sgMail.send({
+      const msg = {
         to: { email: to, name: toName || "" },
-        from: { email: "greendoor@stoekmedia.com", name: "GreenDoor" },
-        replyTo: { email: replyToEmail, name: replyToName },
+        from: { email: fromEmail, name: fromName },
         subject,
         html: htmlBody
-      });
+      };
+
+      // Only add reply-to if sending from GreenDoor (not needed when from = realtor)
+      if (!userData.senderVerified) {
+        msg.replyTo = { email: realtorEmail, name: realtorName };
+      }
+
+      await sgMail.send(msg);
 
       // Log activity
       if (clientId) {
@@ -1269,8 +1416,8 @@ exports.shareDocument = onCall(
     // Get realtor profile
     const userSnap = await db.doc(`users/${uid}`).get();
     const userData = userSnap.exists ? userSnap.data() : {};
-    const replyToEmail = userData.email || request.auth.token.email;
-    const replyToName = userData.fullName || "GreenDoor Realtor";
+    const realtorEmail = userData.email || request.auth.token.email;
+    const realtorName = userData.fullName || "GreenDoor Realtor";
 
     // Build HTML email
     const fileLinks = files.map(f =>
@@ -1285,17 +1432,22 @@ exports.shareDocument = onCall(
       htmlBody += `<br>--<br>${userData.emailSignature.replace(/\r\n|\r|\n/g, "<br>")}`;
     }
 
+    const fromEmail = userData.senderVerified ? realtorEmail : "greendoor@stoekmedia.com";
+    const fromName = userData.senderVerified ? realtorName : "GreenDoor";
+
     try {
       const sgMail = require("@sendgrid/mail");
       sgMail.setApiKey(sendgridKey.value());
 
       const msg = {
         to: { email: to },
-        from: { email: "greendoor@stoekmedia.com", name: "GreenDoor" },
-        replyTo: { email: replyToEmail, name: replyToName },
+        from: { email: fromEmail, name: fromName },
         subject,
         html: htmlBody
       };
+      if (!userData.senderVerified) {
+        msg.replyTo = { email: realtorEmail, name: realtorName };
+      }
       if (cc) msg.cc = { email: cc };
 
       await sgMail.send(msg);
