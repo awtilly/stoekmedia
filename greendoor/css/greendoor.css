@@ -4,6 +4,14 @@
 
 /* ===== LIGHT THEME OVERRIDES ===== */
 body.gd-light {
+  --color-bg: #f8f9fa;
+  --color-bg-elevated: #ffffff;
+  --color-bg-card: #ffffff;
+  --color-surface: #f3f4f6;
+  --color-border: #e5e7eb;
+  --color-text-primary: #1c1917;
+  --color-text-secondary: #4b5563;
+  --color-text-muted: #9ca3af;
   background-color: #f8f9fa;
   color: #1c1917;
 }
@@ -752,6 +760,18 @@ textarea.gd-input {
 .gd-btn-danger:hover {
   background: var(--gd-red);
   color: #fff;
+}
+
+.gd-btn-ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--color-text-secondary);
+}
+
+.gd-btn-ghost:hover {
+  background: transparent;
+  border-color: transparent;
+  color: var(--color-text-primary);
 }
 
 .gd-btn-sm {
