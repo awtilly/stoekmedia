@@ -5099,3 +5099,210 @@ body.gd-light .gd-support-icon {
     display: none;
   }
 }
+
+/* ===== ADMIN PANEL STYLES ===== */
+
+/* Admin 3x2 stats grid */
+.gd-admin-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-md);
+  margin-bottom: var(--space-lg);
+}
+
+/* Admin bar chart */
+.gd-admin-bar-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-bottom: 0.6rem;
+}
+
+.gd-admin-bar-label {
+  font-size: 0.72rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-text-muted);
+  min-width: 80px;
+}
+
+.gd-admin-bar-track {
+  flex: 1;
+  height: 8px;
+  background: #f3f4f6;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+body.gd-light .gd-admin-bar-track {
+  background: #f3f4f6;
+}
+
+.gd-admin-bar-fill {
+  height: 100%;
+  background: var(--gd-green-500);
+  border-radius: 4px;
+  transition: width 0.5s ease;
+}
+
+.gd-admin-bar-count {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  min-width: 32px;
+  text-align: right;
+}
+
+/* Admin detail value display */
+.gd-admin-detail-value {
+  font-size: 0.9rem;
+  color: var(--color-text-primary);
+  padding: 0.5rem 0;
+  font-weight: 400;
+}
+
+/* Feature flags grid */
+.gd-admin-feature-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.gd-admin-feature-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 0.9rem;
+  color: var(--color-text-primary);
+  cursor: pointer;
+}
+
+.gd-admin-feature-row:last-child {
+  border-bottom: none;
+}
+
+/* Danger card */
+.gd-admin-danger-card {
+  border-color: var(--gd-red) !important;
+}
+
+body.gd-light .gd-admin-danger-card {
+  border-color: var(--gd-red) !important;
+}
+
+.gd-admin-danger-card h3 {
+  color: var(--gd-red) !important;
+}
+
+/* Offboard wizard steps */
+.gd-admin-wizard-steps {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-lg);
+  margin-bottom: var(--space-lg);
+  padding-bottom: var(--space-md);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.gd-admin-wizard-step {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  opacity: 0.35;
+  transition: opacity 0.3s;
+}
+
+.gd-admin-wizard-step.active {
+  opacity: 1;
+}
+
+.gd-admin-wizard-num {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #e5e7eb;
+  color: #6b7280;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.gd-admin-wizard-step.active .gd-admin-wizard-num {
+  background: var(--gd-green-500);
+  color: #fff;
+}
+
+.gd-admin-wizard-label {
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.gd-admin-wizard-step.active .gd-admin-wizard-label {
+  color: var(--color-text-primary);
+}
+
+/* Offboard checkbox rows */
+.gd-admin-checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 0.9rem;
+  color: var(--color-text-primary);
+  cursor: pointer;
+}
+
+.gd-admin-checkbox-row:last-child {
+  border-bottom: none;
+}
+
+.gd-admin-checkbox-row input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--gd-green-500);
+}
+
+/* Audit log badges */
+.gd-badge-audit-invite { background: #eff6ff; color: #2563eb; }
+.gd-badge-audit-activate { background: #f0fdf4; color: #16a34a; }
+.gd-badge-audit-deactivate { background: #fef2f2; color: #dc2626; }
+.gd-badge-audit-offboard { background: #fef2f2; color: #dc2626; }
+.gd-badge-audit-settings { background: #f5f3ff; color: #7c3aed; }
+.gd-badge-audit-reassign { background: #fffbeb; color: #d97706; }
+
+/* Offboarded badge */
+.gd-badge-offboarded { background: #fef2f2; color: #dc2626; }
+body.gd-light .gd-badge-offboarded { background: #fef2f2; color: #dc2626; }
+
+/* Onboarding / Pending / Complete badges (admin) */
+.gd-badge-onboarding { background: #fffbeb; color: #d97706; }
+.gd-badge-pending { background: rgba(209,213,219,0.2); color: #9ca3af; }
+.gd-badge-complete { background: #f0fdf4; color: #16a34a; }
+
+body.gd-light .gd-badge-onboarding { background: #fffbeb; color: #d97706; }
+body.gd-light .gd-badge-pending { background: #f3f4f6; color: #9ca3af; }
+body.gd-light .gd-badge-complete { background: #f0fdf4; color: #16a34a; }
+
+/* Admin responsive */
+@media (max-width: 768px) {
+  .gd-admin-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .gd-admin-wizard-steps {
+    gap: var(--space-sm);
+  }
+
+  .gd-admin-wizard-label {
+    display: none;
+  }
+}

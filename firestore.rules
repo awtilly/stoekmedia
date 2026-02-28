@@ -110,5 +110,16 @@ service cloud.firestore {
     match /rateLimits/{userId} {
       allow read, write: if isAuthenticated() && request.auth.uid == userId;
     }
+
+    match /adminAuditLog/{logId} {
+      allow read: if isAuthenticated() && isAdmin();
+      allow create: if isAuthenticated() && isAdmin();
+      // No update or delete — immutable audit trail
+    }
+
+    match /platformSettings/{settingId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && isAdmin();
+    }
   }
 }

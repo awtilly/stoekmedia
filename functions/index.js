@@ -2284,3 +2284,201 @@ ${html}`;
     }
   }
 );
+
+/* ================================================================
+   OFFBOARD REALTOR
+   ================================================================ */
+exports.offboardRealtor = onCall(
+  { region: "us-central1", timeoutSeconds: 540 },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "You must be logged in.");
+    }
+
+    const callerSnap = await db.doc(`users/${request.auth.uid}`).get();
+    if (!callerSnap.exists || callerSnap.data().role !== "admin") {
+      throw new HttpsError("permission-denied", "Only admins can offboard realtors.");
+    }
+
+    const { targetUid, clientDispositions, options } = request.data;
+
+    if (!targetUid || typeof targetUid !== "string") {
+      throw new HttpsError("invalid-argument", "Target user ID is required.");
+    }
+
+    const targetSnap = await db.doc(`users/${targetUid}`).get();
+    if (!targetSnap.exists) {
+      throw new HttpsError("not-found", "Target user not found.");
+    }
+
+    const targetData = targetSnap.data();
+    const adminName = callerSnap.data().fullName || request.auth.uid;
+
+    try {
+      // 1. Process client dispositions
+      if (clientDispositions && typeof clientDispositions === "object") {
+        const clientIds = Object.keys(clientDispositions);
+
+        for (let i = 0; i < clientIds.length; i += 400) {
+          const batch = db.batch();
+          const chunk = clientIds.slice(i, i + 400);
+
+          for (const clientId of chunk) {
+            const disp = clientDispositions[clientId];
+            const clientRef = db.doc(`clients/${clientId}`);
+
+            if (disp.action === "reassign" && disp.targetRealtorId) {
+              batch.update(clientRef, { realtorId: disp.targetRealtorId });
+
+              // Also reassign related docs
+              const relatedCollections = ["activities", "files", "showings", "followUps", "events", "bookmarkedProperties"];
+              for (const col of relatedCollections) {
+                const relSnap = await db.collection(col)
+                  .where("realtorId", "==", targetUid)
+                  .where("clientId", "==", clientId)
+                  .get();
+                relSnap.forEach(d => batch.update(d.ref, { realtorId: disp.targetRealtorId }));
+              }
+            } else if (disp.action === "delete") {
+              batch.delete(clientRef);
+            } else {
+              // unassign — clear realtorId
+              batch.update(clientRef, { realtorId: null });
+            }
+          }
+
+          await batch.commit();
+        }
+      }
+
+      // 2. Delete selected data
+      if (options?.deleteFiles) {
+        await deleteCollectionByRealtor("files", targetUid);
+        // Also delete from Storage
+        try {
+          const storage = getStorage();
+          const bucket = storage.bucket();
+          const [files] = await bucket.getFiles({ prefix: `greendoor/${targetUid}/` });
+          for (const file of files) {
+            await file.delete().catch(() => {});
+          }
+        } catch (e) {
+          console.warn("Storage cleanup error:", e.message);
+        }
+      }
+
+      if (options?.deleteActivities) {
+        await deleteCollectionByRealtor("activities", targetUid);
+        await deleteCollectionByRealtor("showings", targetUid);
+        await deleteCollectionByRealtor("followUps", targetUid);
+        await deleteCollectionByRealtor("events", targetUid);
+      }
+
+      if (options?.deleteEnvelopes) {
+        await deleteCollectionByRealtor("envelopes", targetUid);
+      }
+
+      // 3. Disable Auth account
+      if (options?.disableAuth) {
+        try {
+          const authAdmin = getAuth();
+          await authAdmin.updateUser(targetUid, { disabled: true });
+        } catch (e) {
+          console.warn("Auth disable error:", e.message);
+        }
+      }
+
+      // 4. Mark user doc as offboarded
+      await db.doc(`users/${targetUid}`).update({
+        isActive: false,
+        offboardedAt: FieldValue.serverTimestamp(),
+        offboardedBy: request.auth.uid
+      });
+
+      // 5. Write audit log
+      await db.collection("adminAuditLog").add({
+        action: "offboard",
+        targetUser: targetData.email || targetUid,
+        details: `Offboarded ${targetData.fullName || targetUid}. Files: ${options?.deleteFiles ? "deleted" : "kept"}, Activities: ${options?.deleteActivities ? "deleted" : "kept"}, Auth: ${options?.disableAuth ? "disabled" : "kept"}.`,
+        adminUid: request.auth.uid,
+        adminName,
+        timestamp: FieldValue.serverTimestamp()
+      });
+
+      return { success: true };
+    } catch (err) {
+      if (err instanceof HttpsError) throw err;
+      console.error("offboardRealtor error:", err);
+      throw new HttpsError("internal", "Offboarding failed. Please try again.");
+    }
+  }
+);
+
+async function deleteCollectionByRealtor(collectionName, realtorId) {
+  const snap = await db.collection(collectionName)
+    .where("realtorId", "==", realtorId)
+    .get();
+
+  const docs = snap.docs;
+  for (let i = 0; i < docs.length; i += 400) {
+    const batch = db.batch();
+    docs.slice(i, i + 400).forEach(d => batch.delete(d.ref));
+    await batch.commit();
+  }
+}
+
+/* ================================================================
+   RESEND INVITE
+   ================================================================ */
+exports.resendInvite = onCall(
+  { secrets: [sendgridKey], region: "us-central1" },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "You must be logged in.");
+    }
+
+    const callerSnap = await db.doc(`users/${request.auth.uid}`).get();
+    if (!callerSnap.exists || callerSnap.data().role !== "admin") {
+      throw new HttpsError("permission-denied", "Only admins can resend invites.");
+    }
+
+    const { targetUid } = request.data;
+    if (!targetUid || typeof targetUid !== "string") {
+      throw new HttpsError("invalid-argument", "Target user ID is required.");
+    }
+
+    const targetSnap = await db.doc(`users/${targetUid}`).get();
+    if (!targetSnap.exists) {
+      throw new HttpsError("not-found", "Target user not found.");
+    }
+
+    const targetData = targetSnap.data();
+
+    try {
+      const authAdmin = getAuth();
+      const resetLink = await authAdmin.generatePasswordResetLink(targetData.email, {
+        url: "https://stoekmedia.com/greendoor/app/login"
+      });
+
+      const sgMail = require("@sendgrid/mail");
+      sgMail.setApiKey(sendgridKey.value());
+
+      await sgMail.send({
+        to: { email: targetData.email, name: targetData.fullName },
+        from: { email: "greendoor@stoekmedia.com", name: "GreenDoor" },
+        subject: "GreenDoor — Set Your Password",
+        html: buildWelcomeEmail(targetData.fullName, resetLink)
+      });
+
+      await db.doc(`users/${targetUid}`).update({
+        lastInviteSentAt: FieldValue.serverTimestamp()
+      });
+
+      return { success: true };
+    } catch (err) {
+      if (err instanceof HttpsError) throw err;
+      console.error("resendInvite error:", err);
+      throw new HttpsError("internal", "Failed to resend invite.");
+    }
+  }
+);
