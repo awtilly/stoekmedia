@@ -75,6 +75,12 @@ window.validateAndGoToStep = function (step) {
 
 /* --- Finish onboarding --- */
 window.finishOnboarding = async function () {
+  const termsCheckbox = document.getElementById("terms-checkbox");
+  if (!termsCheckbox.checked) {
+    showToast("Please accept the Terms & Conditions.", "error");
+    return;
+  }
+
   const btn = document.getElementById("onboard-finish-btn");
   btn.disabled = true;
   btn.textContent = "Saving...";
@@ -94,7 +100,8 @@ window.finishOnboarding = async function () {
       company: company || undefined,
       emailSignature: emailSignature || undefined,
       onboardingComplete: true,
-      onboardingCompletedAt: serverTimestamp()
+      onboardingCompletedAt: serverTimestamp(),
+      termsAcceptedAt: serverTimestamp()
     }, { merge: true });
 
     window.location.href = "/greendoor/app/dashboard";
