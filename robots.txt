@@ -1,0 +1,21 @@
+# robots.txt for stoekmedia.com
+# Last updated: 2026-03-01
+
+User-agent: *
+Allow: /
+
+# Sitemap location
+Sitemap: https://stoekmedia.com/sitemap.xml
+
+# Block admin/utility paths if they exist
+Disallow: /admin/
+Disallow: /api/
+Disallow: /_functions/
+Disallow: /firebase-*/
+
+# Allow all crawlers to index assets
+User-agent: Googlebot
+Allow: /
+
+User-agent: Bingbot
+Allow: /

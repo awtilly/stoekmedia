@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
+
+  <!-- Homepage -->
+  <url>
+    <loc>https://stoekmedia.com/</loc>
+    <lastmod>2026-03-01</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+  </url>
+
+  <!-- Software Hub -->
+  <url>
+    <loc>https://stoekmedia.com/software/</loc>
+    <lastmod>2026-03-01</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+
+  <!-- GreenDoor CRM Landing Page -->
+  <url>
+    <loc>https://stoekmedia.com/greendoor/</loc>
+    <lastmod>2026-03-01</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+
+  <!-- ShopCaddie Landing Page -->
+  <url>
+    <loc>https://stoekmedia.com/software/shopcaddie/</loc>
+    <lastmod>2026-03-01</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <!-- Bookings / Contact -->
+  <url>
+    <loc>https://stoekmedia.com/bookings/</loc>
+    <lastmod>2026-03-01</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+
+  <!--
+    ADD NEW PAGES BELOW AS YOU CREATE THEM
+    Priority guide:
+    - 1.0: Homepage
+    - 0.9: Primary product pages (GreenDoor)
+    - 0.8: Category hubs (Software, Blog index)
+    - 0.7: Secondary products (ShopCaddie)
+    - 0.6: Utility pages (Contact, About)
+    - 0.5: Blog posts, comparison pages
+  -->
+
+</urlset>
