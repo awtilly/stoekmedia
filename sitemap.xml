@@ -42,15 +42,20 @@
     <priority>0.6</priority>
   </url>
 
-  <!--
-    ADD NEW PAGES BELOW AS YOU CREATE THEM
-    Priority guide:
-    - 1.0: Homepage
-    - 0.9: Primary product pages (GreenDoor)
-    - 0.8: Category hubs (Software, Blog index)
-    - 0.7: Secondary products (ShopCaddie)
-    - 0.6: Utility pages (Contact, About)
-    - 0.5: Blog posts, comparison pages
-  -->
+  <!-- About Page -->
+  <url>
+    <loc>https://stoekmedia.com/about/</loc>
+    <lastmod>2026-03-01</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+
+  <!-- GreenDoor vs Follow Up Boss -->
+  <url>
+    <loc>https://stoekmedia.com/greendoor/compare/follow-up-boss.html</loc>
+    <lastmod>2026-03-01</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
 
 </urlset>
