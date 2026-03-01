@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Blog — Stoek Media | Insights on SaaS, Real Estate Tech & Building Products</title>
+  <meta name="description" content="Insights from Stoek Media on building SaaS products, real estate technology, and digital ventures. Written by Joe Stoehner.">
+  <meta name="keywords" content="Stoek Media blog, SaaS insights, real estate technology, building products, GreenDoor CRM, Joe Stoehner">
+  <link rel="canonical" href="https://stoekmedia.com/blog/">
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Stoek Media">
+  <meta property="og:title" content="Blog — Stoek Media | Insights on SaaS, Real Estate Tech & Building Products">
+  <meta property="og:description" content="Insights from Stoek Media on building SaaS products, real estate technology, and digital ventures. Written by Joe Stoehner.">
+  <meta property="og:url" content="https://stoekmedia.com/blog/">
+  <meta property="og:image" content="https://stoekmedia.com/assets/images/stoek-media-og.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Blog — Stoek Media | Insights on SaaS, Real Estate Tech & Building Products">
+  <meta name="twitter:description" content="Insights from Stoek Media on building SaaS products, real estate technology, and digital ventures.">
+  <meta name="twitter:image" content="https://stoekmedia.com/assets/images/stoek-media-og.png">
+
+  <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large">
+  <meta name="author" content="Joe Stoehner">
+
+  <link rel="stylesheet" href="/assets/css/style.css">
+  <link rel="icon" type="image/png" href="/assets/images/favicon.png">
+
+  <!-- Structured Data: Breadcrumb -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      { "@type": "ListItem", "position": 1, "name": "Stoek Media", "item": "https://stoekmedia.com/" },
+      { "@type": "ListItem", "position": 2, "name": "Blog", "item": "https://stoekmedia.com/blog/" }
+    ]
+  }
+  </script>
+
+  <style>
+    .blog-list {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    .blog-card {
+      display: block;
+      padding: var(--space-md);
+      border: 1px solid var(--color-border);
+      background: var(--color-bg-card);
+      transition: border-color 0.4s ease, transform 0.4s ease;
+      margin-bottom: var(--space-md);
+    }
+
+    .blog-card:hover {
+      border-color: rgba(196, 68, 58, 0.3);
+      transform: translateY(-3px);
+    }
+
+    .blog-card-date {
+      font-family: var(--font-body);
+      font-size: 0.72rem;
+      font-weight: 500;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--color-accent);
+      margin-bottom: 0.5rem;
+      display: block;
+    }
+
+    .blog-card h3 {
+      font-family: var(--font-display);
+      font-size: 1.5rem;
+      font-weight: 500;
+      line-height: 1.3;
+      margin-bottom: 0.75rem;
+      color: var(--color-text-primary);
+    }
+
+    .blog-card p {
+      color: var(--color-text-secondary);
+      font-size: 0.95rem;
+      line-height: 1.75;
+      margin-bottom: var(--space-sm);
+    }
+
+    .blog-card .read-link {
+      font-family: var(--font-body);
+      font-size: 0.72rem;
+      font-weight: 500;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--color-accent);
+      transition: gap 0.3s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .blog-card:hover .read-link {
+      gap: 0.8rem;
+    }
+
+    .blog-placeholder {
+      text-align: center;
+      padding: var(--space-lg) var(--space-md);
+      border: 1px dashed var(--color-border);
+      margin-top: var(--space-md);
+    }
+
+    .blog-placeholder p {
+      color: var(--color-text-muted);
+      font-size: 0.92rem;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ===== NAVIGATION ===== -->
+  <nav class="nav">
+    <div class="container">
+      <a href="/" class="nav-logo">Stoek <span>Media</span></a>
+      <ul class="nav-links">
+        <li><a href="/#ventures">Ventures</a></li>
+        <li><a href="/#work">Work</a></li>
+        <li><a href="/software/">Software</a></li>
+        <li><a href="/about/">About</a></li>
+        <li><a href="/greendoor/" class="nav-greendoor"><span class="gd-green">Green</span><span class="gd-door">Door</span></a></li>
+        <li><a href="/bookings/" class="btn btn-primary" style="padding: 0.6rem 1.4rem;">Get in Touch</a></li>
+      </ul>
+      <button class="nav-toggle" aria-label="Menu">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- ===== HERO ===== -->
+  <section class="section-pad-lg" style="padding-top: 8rem;">
+    <div class="container">
+      <span class="section-label reveal">Blog</span>
+      <h1 class="reveal" style="font-family: var(--font-display); font-size: clamp(2.5rem, 6vw, 5rem); font-weight: 500; line-height: 1.1;">Blog</h1>
+      <p class="hero-sub reveal" style="max-width: 640px;">Insights on building software, real estate tech, and digital ventures.</p>
+    </div>
+  </section>
+
+  <!-- ===== BLOG POSTS ===== -->
+  <section class="section-pad" style="padding-top: 0;">
+    <div class="container">
+      <div class="blog-list">
+
+        <a href="/blog/why-we-built-greendoor.html" class="blog-card reveal">
+          <span class="blog-card-date">March 1, 2026</span>
+          <h3>Why We Built GreenDoor CRM From Scratch</h3>
+          <p>The real workflow problems we discovered talking to real estate agents, and why we decided to build GreenDoor CRM from the ground up instead of adapting an existing platform.</p>
+          <span class="read-link">Read Post &rarr;</span>
+        </a>
+
+        <!-- Future posts go here -->
+
+        <div class="blog-placeholder reveal">
+          <p>More posts coming soon. We write about building software, lessons from the field, and what we're working on at Stoek Media.</p>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== CTA BANNER ===== -->
+  <section class="section-pad-lg">
+    <div class="container">
+      <div class="cta-banner reveal">
+        <span class="section-label">Let's Connect</span>
+        <h2>Have a project or <em>idea?</em></h2>
+        <p>Whether you need a website, want to explore a partnership, or just want to say hello &mdash; let's talk.</p>
+        <a href="/bookings/" class="btn btn-primary btn-arrow">Get in Touch</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== FOOTER ===== -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand">Stoek <span>Media</span></div>
+        <ul class="footer-links">
+          <li><a href="/#ventures">Ventures</a></li>
+          <li><a href="/#work">Work</a></li>
+          <li><a href="/software/">Software</a></li>
+          <li><a href="/greendoor/">GreenDoor</a></li>
+          <li><a href="https://thecaddiechat.com" target="_blank">The Caddie Chat</a></li>
+          <li><a href="/about/">About</a></li>
+          <li><a href="/bookings/">Contact</a></li>
+        </ul>
+      </div>
+      <div class="footer-bottom">
+        <span class="footer-copy">&copy; 2026 Stoek Media. All Rights Reserved.</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="/assets/js/main.js"></script>
+</body>
+</html>

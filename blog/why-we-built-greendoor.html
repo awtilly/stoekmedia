@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Why We Built GreenDoor CRM From Scratch — Stoek Media Blog</title>
+  <meta name="description" content="The real workflow problems we discovered talking to real estate agents, and why we decided to build GreenDoor CRM from the ground up instead of adapting an existing platform.">
+  <meta name="keywords" content="GreenDoor CRM, real estate CRM, why we built GreenDoor, Stoek Media, real estate technology, CRM for agents">
+  <link rel="canonical" href="https://stoekmedia.com/blog/why-we-built-greendoor.html">
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Stoek Media">
+  <meta property="og:title" content="Why We Built GreenDoor CRM From Scratch">
+  <meta property="og:description" content="The real workflow problems we discovered talking to real estate agents, and why we decided to build GreenDoor CRM from the ground up instead of adapting an existing platform.">
+  <meta property="og:url" content="https://stoekmedia.com/blog/why-we-built-greendoor.html">
+  <meta property="og:image" content="https://stoekmedia.com/assets/images/stoek-media-og.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="article:published_time" content="2026-03-01">
+  <meta property="article:author" content="Joe Stoehner">
+  <meta property="article:section" content="Product">
+  <meta property="article:tag" content="GreenDoor CRM">
+  <meta property="article:tag" content="Real Estate Technology">
+  <meta property="article:tag" content="SaaS">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Why We Built GreenDoor CRM From Scratch">
+  <meta name="twitter:description" content="The real workflow problems we discovered talking to real estate agents, and why we decided to build GreenDoor CRM from the ground up instead of adapting an existing platform.">
+  <meta name="twitter:image" content="https://stoekmedia.com/assets/images/stoek-media-og.png">
+
+  <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large">
+  <meta name="author" content="Joe Stoehner">
+
+  <link rel="stylesheet" href="/assets/css/style.css">
+  <link rel="icon" type="image/png" href="/assets/images/favicon.png">
+
+  <!-- Structured Data: Article -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    "headline": "Why We Built GreenDoor CRM From Scratch",
+    "description": "The real workflow problems we discovered talking to real estate agents, and why we decided to build GreenDoor CRM from the ground up instead of adapting an existing platform.",
+    "datePublished": "2026-03-01",
+    "dateModified": "2026-03-01",
+    "author": {
+      "@type": "Person",
+      "name": "Joe Stoehner",
+      "url": "https://stoekmedia.com/about/",
+      "worksFor": { "@id": "https://stoekmedia.com/#organization" }
+    },
+    "publisher": {
+      "@type": "Organization",
+      "@id": "https://stoekmedia.com/#organization",
+      "name": "Stoek Media",
+      "url": "https://stoekmedia.com",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://stoekmedia.com/assets/images/stoek-media-logo.png"
+      }
+    },
+    "mainEntityOfPage": {
+      "@type": "WebPage",
+      "@id": "https://stoekmedia.com/blog/why-we-built-greendoor.html"
+    },
+    "image": "https://stoekmedia.com/assets/images/stoek-media-og.png",
+    "articleSection": "Product",
+    "keywords": ["GreenDoor CRM", "real estate CRM", "real estate technology", "SaaS", "Stoek Media"],
+    "wordCount": 950,
+    "url": "https://stoekmedia.com/blog/why-we-built-greendoor.html"
+  }
+  </script>
+
+  <!-- Structured Data: Breadcrumb -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      { "@type": "ListItem", "position": 1, "name": "Stoek Media", "item": "https://stoekmedia.com/" },
+      { "@type": "ListItem", "position": 2, "name": "Blog", "item": "https://stoekmedia.com/blog/" },
+      { "@type": "ListItem", "position": 3, "name": "Why We Built GreenDoor CRM From Scratch", "item": "https://stoekmedia.com/blog/why-we-built-greendoor.html" }
+    ]
+  }
+  </script>
+
+  <style>
+    .article-header {
+      max-width: 720px;
+      margin: 0 auto;
+    }
+
+    .article-meta {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      margin-top: var(--space-sm);
+      font-size: 0.85rem;
+      color: var(--color-text-muted);
+    }
+
+    .article-meta-divider {
+      width: 3px;
+      height: 3px;
+      border-radius: 50%;
+      background: var(--color-text-muted);
+    }
+
+    .article-body {
+      max-width: 720px;
+      margin: 0 auto;
+    }
+
+    .article-body h2 {
+      font-family: var(--font-display);
+      font-size: clamp(1.4rem, 3vw, 1.8rem);
+      font-weight: 500;
+      line-height: 1.25;
+      margin-top: var(--space-lg);
+      margin-bottom: var(--space-sm);
+      color: var(--color-text-primary);
+    }
+
+    .article-body p {
+      color: var(--color-text-secondary);
+      font-size: 1rem;
+      line-height: 1.85;
+      margin-bottom: var(--space-sm);
+    }
+
+    .article-body a {
+      color: var(--color-accent);
+      border-bottom: 1px solid rgba(196, 68, 58, 0.3);
+      transition: border-color 0.3s ease;
+    }
+
+    .article-body a:hover {
+      border-color: var(--color-accent);
+    }
+
+    .article-body ul {
+      list-style: none;
+      padding: 0;
+      margin-bottom: var(--space-sm);
+    }
+
+    .article-body ul li {
+      color: var(--color-text-secondary);
+      font-size: 1rem;
+      line-height: 1.85;
+      padding: 0.35rem 0;
+      padding-left: 1.4rem;
+      position: relative;
+    }
+
+    .article-body ul li::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 0.85rem;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--color-accent);
+    }
+
+    .article-body strong {
+      color: var(--color-text-primary);
+      font-weight: 500;
+    }
+
+    .article-back {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-family: var(--font-body);
+      font-size: 0.72rem;
+      font-weight: 500;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--color-text-secondary);
+      transition: color 0.3s ease;
+      margin-bottom: var(--space-md);
+    }
+
+    .article-back:hover {
+      color: var(--color-accent);
+    }
+
+    .article-footer {
+      max-width: 720px;
+      margin: 0 auto;
+      padding-top: var(--space-lg);
+      margin-top: var(--space-lg);
+      border-top: 1px solid var(--color-border);
+    }
+
+    .article-footer-author {
+      font-family: var(--font-body);
+      font-size: 0.85rem;
+      color: var(--color-text-muted);
+    }
+
+    .article-footer-author strong {
+      color: var(--color-text-primary);
+      font-weight: 500;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ===== NAVIGATION ===== -->
+  <nav class="nav">
+    <div class="container">
+      <a href="/" class="nav-logo">Stoek <span>Media</span></a>
+      <ul class="nav-links">
+        <li><a href="/#ventures">Ventures</a></li>
+        <li><a href="/#work">Work</a></li>
+        <li><a href="/software/">Software</a></li>
+        <li><a href="/about/">About</a></li>
+        <li><a href="/greendoor/" class="nav-greendoor"><span class="gd-green">Green</span><span class="gd-door">Door</span></a></li>
+        <li><a href="/bookings/" class="btn btn-primary" style="padding: 0.6rem 1.4rem;">Get in Touch</a></li>
+      </ul>
+      <button class="nav-toggle" aria-label="Menu">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- ===== ARTICLE ===== -->
+  <section class="section-pad-lg" style="padding-top: 8rem;">
+    <div class="container">
+      <div class="article-header">
+        <a href="/blog/" class="article-back reveal">&larr; Back to Blog</a>
+        <span class="section-label reveal">Product</span>
+        <h1 class="reveal" style="font-family: var(--font-display); font-size: clamp(2rem, 5vw, 3.2rem); font-weight: 500; line-height: 1.15;">Why We Built GreenDoor CRM From Scratch</h1>
+        <div class="article-meta reveal">
+          <span>Joe Stoehner</span>
+          <span class="article-meta-divider"></span>
+          <time datetime="2026-03-01">March 1, 2026</time>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section-pad" style="padding-top: 0;">
+    <div class="container">
+      <div class="article-body">
+
+        <p class="reveal">There are dozens of real estate CRMs on the market. Some of them are backed by hundreds of millions in venture capital. So the obvious question is: why build another one?</p>
+
+        <p class="reveal">The short answer is that none of them actually work the way agents work. The longer answer is what this post is about.</p>
+
+        <h2 class="reveal">The Problem</h2>
+
+        <p class="reveal">Before I started building <a href="/greendoor/">GreenDoor</a>, I spent time talking to real estate agents about their day-to-day workflow. Not their marketing strategy, not their growth plans &mdash; just how they actually get through a Tuesday. The answer was consistently frustrating to hear.</p>
+
+        <p class="reveal">A typical agent juggles five or more tools to do their job. One app for contacts. Another for document signing. A spreadsheet or notebook for tracking showings. An email platform for follow-ups. Maybe a separate calendar. And then a CRM on top of it all that's supposed to tie everything together but doesn't, because it was designed by people who have never scheduled a showing or chased down a seller's disclosure at 9 PM.</p>
+
+        <p class="reveal">The tools exist. The integrations sort of exist. But the actual experience of using all of it together is fragmented, slow, and full of friction. Every agent I talked to had developed their own duct-tape system of workarounds, and every single one of them said some version of the same thing: <strong>"I just need it all in one place."</strong></p>
+
+        <h2 class="reveal">What We Heard From Agents</h2>
+
+        <p class="reveal">I wasn't building a hypothetical product. I was collecting specific, concrete complaints from people doing the work. Here are the ones that came up the most:</p>
+
+        <ul class="reveal">
+          <li><strong>E-signatures cost extra.</strong> Nearly every CRM that offers document signing either charges a premium add-on or forces you into a separate tool like DocuSign. Agents already pay for their CRM. Paying another $25-40/month just to send a contract for signature feels like a shakedown. We integrated BoldSign directly into GreenDoor so e-signatures are a built-in feature, not a toll booth.</li>
+          <li><strong>There's no real listing matching.</strong> Most CRMs let you log a client's preferences and log listings, but they don't actually connect the two in a useful way. Agents told me they manually cross-reference what a buyer wants against what's available. That's exactly the kind of thing software should handle. GreenDoor scores every listing against every buyer using seven factors &mdash; price range, location, bedrooms, bathrooms, square footage, property type, and specific feature preferences &mdash; and surfaces the best matches automatically.</li>
+          <li><strong>AI is a gimmick in most platforms.</strong> The agents I talked to weren't anti-AI. They were anti-AI-that-doesn't-do-anything-useful. They'd seen the marketing from the big CRM vendors &mdash; "AI-powered insights!" &mdash; and found it was just a chatbot that could summarize information they already had. GreenDoor's AI assistant has 11 actual tools: it can draft emails, schedule showings, set follow-ups, look up client details, find matching listings, create calendar events, and more. It does real work, not just conversation.</li>
+          <li><strong>Showing management is an afterthought.</strong> Showings are the core activity of a buyer's agent, but most CRMs treat them like calendar entries. There's no way to capture client feedback after a showing, no rating system, no structured data about what the buyer liked or didn't like. GreenDoor tracks every showing with the client's rating, written feedback, and links it back to the listing and the client profile so you can see patterns over time.</li>
+          <li><strong>The tools feel like they were built for managers, not agents.</strong> Dashboard reporting, pipeline analytics, and team KPIs are fine for a brokerage owner. But the person in the car between showings needs something different. They need to pull up a client, see what's next, fire off a quick email, and move on. The agents I talked to wanted something fast, focused, and built around their daily rhythm.</li>
+        </ul>
+
+        <h2 class="reveal">The Decision to Build From Scratch</h2>
+
+        <p class="reveal">At Stoek Media, we considered the alternatives. We looked at building on top of an existing CRM platform. We looked at white-labeling. We looked at building a plugin layer for something like HubSpot or Salesforce.</p>
+
+        <p class="reveal">None of it made sense. The problems agents described weren't feature gaps in an otherwise solid product. They were architectural problems &mdash; the result of platforms that were built for generic sales workflows and then bolted on real estate features as an afterthought. You can't fix that with a plugin. You have to rethink the data model, the UI, and the workflow from the ground up.</p>
+
+        <p class="reveal">So that's what we did. GreenDoor is built on Firebase with a custom front end. Every screen, every interaction, every data relationship was designed specifically for how a real estate agent moves through their day. There's no generic CRM skeleton underneath. It's purpose-built.</p>
+
+        <h2 class="reveal">What GreenDoor Does Differently</h2>
+
+        <p class="reveal">I don't want to turn this into a feature list &mdash; you can see the full breakdown on the <a href="/greendoor/">GreenDoor product page</a>. But here's the philosophy behind the product decisions:</p>
+
+        <p class="reveal"><strong>Everything in one place.</strong> Clients, listings, showings, documents, e-signatures, emails, follow-ups, and AI assistance all live in a single platform. No tab-switching. No copy-pasting between apps.</p>
+
+        <p class="reveal"><strong>Smart defaults, not configuration.</strong> GreenDoor doesn't ask you to set up 47 custom fields before you can add a client. It knows what a real estate client record looks like &mdash; budget, pre-approval status, timeline, property preferences &mdash; and gives you a structure that works out of the box. Power users can go deeper, but the first experience is immediate.</p>
+
+        <p class="reveal"><strong>AI that does things, not just talks.</strong> The AI assistant isn't a novelty. It's wired into the actual system. Ask it to "draft a follow-up email for Sarah about the Oak Street showing" and it pulls up Sarah's profile, finds the showing record, reads the feedback, and writes a contextual email you can send in one click. Ask it to "find listings that match the Chen family" and it runs the seven-factor matching algorithm and gives you ranked results. It's a tool, not a toy.</p>
+
+        <p class="reveal"><strong>Built for speed.</strong> Agents spend half their day in a car. Stoek Media designed GreenDoor to be fast on any connection and usable on a phone between appointments. Pages load quickly, actions are immediate, and the interface stays out of the way.</p>
+
+        <h2 class="reveal">What's Next</h2>
+
+        <p class="reveal">GreenDoor is live and agents are using it. But we're not done. The roadmap includes automated MLS integration via SimplyRETS for real-time listing sync, team and brokerage management features, and expanded AI capabilities including voice commands and proactive follow-up suggestions.</p>
+
+        <p class="reveal">The guiding principle stays the same: talk to agents, understand what slows them down, and build exactly what they need. Nothing more, nothing less. That's how Stoek Media approaches every product we build, and it's how GreenDoor will continue to evolve.</p>
+
+        <p class="reveal">If you're an agent who's tired of fighting your CRM instead of using it, <a href="/greendoor/">take a look at GreenDoor</a>. And if you have feedback or feature requests, I want to hear them &mdash; <a href="/bookings/">get in touch</a>.</p>
+
+        <div class="article-footer reveal">
+          <p class="article-footer-author">Written by <strong>Joe Stoehner</strong>, Founder of Stoek Media</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== CTA BANNER ===== -->
+  <section class="section-pad-lg">
+    <div class="container">
+      <div class="cta-banner reveal">
+        <span class="section-label">Let's Connect</span>
+        <h2>Have a project or <em>idea?</em></h2>
+        <p>Whether you need a website, want to explore a partnership, or just want to say hello &mdash; let's talk.</p>
+        <a href="/bookings/" class="btn btn-primary btn-arrow">Get in Touch</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== FOOTER ===== -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand">Stoek <span>Media</span></div>
+        <ul class="footer-links">
+          <li><a href="/#ventures">Ventures</a></li>
+          <li><a href="/#work">Work</a></li>
+          <li><a href="/software/">Software</a></li>
+          <li><a href="/greendoor/">GreenDoor</a></li>
+          <li><a href="https://thecaddiechat.com" target="_blank">The Caddie Chat</a></li>
+          <li><a href="/about/">About</a></li>
+          <li><a href="/bookings/">Contact</a></li>
+        </ul>
+      </div>
+      <div class="footer-bottom">
+        <span class="footer-copy">&copy; 2026 Stoek Media. All Rights Reserved.</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="/assets/js/main.js"></script>
+</body>
+</html>
