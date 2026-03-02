@@ -110,6 +110,14 @@
     <priority>0.5</priority>
   </url>
 
+  <!-- GreenDoor Educational Content -->
+  <url>
+    <loc>https://stoekmedia.com/greendoor/what-is-real-estate-crm.html</loc>
+    <lastmod>2026-03-02</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+
   <!-- Blog -->
   <url>
     <loc>https://stoekmedia.com/blog/</loc>
