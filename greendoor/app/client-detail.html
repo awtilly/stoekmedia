@@ -898,33 +898,10 @@
     </div>
   </div>
 
-  <!-- AI Chat FAB -->
-  <button class="gd-ai-fab" onclick="toggleAiPanel()" title="GreenDoor AI" aria-label="Open AI assistant">&#10024;</button>
-
-  <!-- AI Chat Panel -->
-  <div id="ai-panel" class="gd-ai-panel">
-    <div class="gd-ai-panel-header">
-      <div class="gd-ai-panel-title"><span>&#10024;</span> GreenDoor AI</div>
-      <button class="gd-ai-panel-close" onclick="toggleAiPanel()" aria-label="Close AI panel">&times;</button>
-    </div>
-    <div class="gd-ai-quick-actions">
-      <button class="gd-ai-quick-btn" onclick="sendQuickAction('Summarize this client')">Summarize this client</button>
-      <button class="gd-ai-quick-btn" onclick="sendQuickAction('Draft follow-up email')">Draft follow-up email</button>
-      <button class="gd-ai-quick-btn" onclick="sendQuickAction('Draft showing recap email')">Draft showing recap email</button>
-      <button class="gd-ai-quick-btn" onclick="sendQuickAction('What should I know before calling?')">Before calling?</button>
-      <button class="gd-ai-quick-btn" onclick="sendQuickAction('Suggest next steps')">Suggest next steps</button>
-    </div>
-    <div id="ai-messages" class="gd-ai-messages"></div>
-    <div class="gd-ai-input-area">
-      <button id="ai-mic-btn" class="gd-ai-mic" onclick="toggleVoiceInput()" aria-label="Voice input" title="Speak to GreenDoor AI">&#127908;</button>
-      <input type="text" id="ai-input" class="gd-ai-input" placeholder="Ask or speak to your AI assistant..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendAiMessage();}">
-      <button id="ai-send-btn" class="gd-ai-send" onclick="sendAiMessage()" aria-label="Send message">&#10148;</button>
-    </div>
-  </div>
-
   <script src="/assets/js/main.js"></script>
   <script type="module" src="/greendoor/js/auth.js"></script>
   <script type="module" src="/greendoor/js/match-engine.js"></script>
   <script type="module" src="/greendoor/js/client-detail.js"></script>
+  <script type="module" src="/greendoor/js/chatbot.js"></script>
 </body>
 </html>

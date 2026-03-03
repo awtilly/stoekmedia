@@ -883,6 +883,44 @@ ${files.map(f => `- ${f.name} (${f.folder})`).join("\n") || "No files"}`;
 SHOWINGS (${showingsData.length}):
 ${showingsData.map(s => `- [ID: ${s.id}] ${s.address} | ${s.date} | ${s.status}${s.rating ? " | Rating: " + s.rating + "/5" : ""}${s.feedback ? " | " + s.feedback : ""}`).join("\n") || "No showings"}`;
 
+      } else if (context === "general") {
+        // Lightweight context for non-specific pages
+        const clientsSnap = await db.collection("clients")
+          .where("realtorId", "==", uid)
+          .get();
+
+        const statusCounts = {};
+        clientsSnap.forEach(d => {
+          const s = d.data().status || "lead";
+          statusCounts[s] = (statusCounts[s] || 0) + 1;
+        });
+
+        const now = Date.now();
+        const sevenDaysMs = 7 * 86400000;
+        const nowTs = Timestamp.now();
+        const weekFromNow = Timestamp.fromDate(new Date(now + sevenDaysMs));
+
+        const showingsSnap = await db.collection("showings")
+          .where("realtorId", "==", uid)
+          .where("showingDate", ">=", nowTs)
+          .where("showingDate", "<=", weekFromNow)
+          .get();
+
+        const clientMap = {};
+        clientsSnap.forEach(d => { clientMap[d.id] = d.data().fullName; });
+
+        const showings = showingsSnap.docs.map(d => {
+          const s = d.data();
+          return `  - ${s.showingDate.toDate().toISOString()}: ${s.address} with ${clientMap[s.clientId] || "Unknown"}`;
+        });
+
+        contextText = `
+GENERAL CONTEXT:
+- Total Clients: ${clientsSnap.size}
+- By Status: ${Object.entries(statusCounts).map(([s, n]) => `${s}: ${n}`).join(", ") || "none"}
+- Upcoming Showings This Week (${showings.length}):
+${showings.join("\n") || "  No showings scheduled"}`;
+
       } else if (context === "dashboard") {
         const clientsSnap = await db.collection("clients")
           .where("realtorId", "==", uid)
@@ -980,7 +1018,7 @@ ${showings.map(s => `  - ${s.date}: ${s.address} with ${s.clientName}`).join("\n
       let tools;
       if (context === "client_detail" && clientId) {
         tools = AI_TOOLS; // all tools
-      } else if (context === "dashboard") {
+      } else if (context === "dashboard" || context === "general") {
         tools = AI_TOOLS.filter(t => ["create_client", "search_clients", "create_event", "create_followup", "create_showing", "add_listing", "search_listings"].includes(t.name));
       } else {
         tools = [];

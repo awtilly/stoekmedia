@@ -46,7 +46,6 @@ if (!clientId) {
 }
 
 /* --- Cloud Functions --- */
-const askAssistant = httpsCallable(functions, "askAssistant");
 const sendEmailFn = httpsCallable(functions, "sendEmail");
 const sendForSignatureFn = httpsCallable(functions, "sendForSignature");
 const checkSignatureStatusFn = httpsCallable(functions, "checkSignatureStatus");
@@ -2069,49 +2068,10 @@ window.dismissFollowUp = async function (id) {
   }
 };
 
-/* ===== AI CHAT PANEL ===== */
-let aiChatHistory = [];
-
-function formatAiResponse(text) {
-  let html = text
-    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
-    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-    .replace(/^\s*[-*]\s+(.+)$/gm, "<li>$1</li>")
-    .replace(/\n/g, "<br>");
-  html = html.replace(/((?:<li>.*<\/li><br>?)+)/g, "<ul>$1</ul>");
-  html = html.replace(/<ul><br>/g, "<ul>").replace(/<br><\/ul>/g, "</ul>");
-  html = html.replace(/<br><li>/g, "<li>");
-  return html;
-}
-
-function addAiMessage(text, type) {
-  const el = document.getElementById("ai-messages");
-  const div = document.createElement("div");
-  if (type === "user") {
-    div.className = "gd-ai-msg gd-ai-msg-user";
-    div.textContent = text;
-  } else if (type === "error") {
-    div.className = "gd-ai-msg gd-ai-msg-error";
-    div.textContent = text;
-  } else {
-    div.className = "gd-ai-msg gd-ai-msg-ai";
-    div.innerHTML = formatAiResponse(text);
-
-    // If the response looks like an email draft, add "Open in Email" button
-    if (text.toLowerCase().includes("subject:") || text.toLowerCase().includes("dear ") || text.toLowerCase().includes("hi " + (clientData?.fullName?.split(" ")[0] || "").toLowerCase())) {
-      const btn = document.createElement("button");
-      btn.className = "gd-btn gd-btn-sm gd-btn-ai-email";
-      btn.textContent = "Open in Email";
-      btn.onclick = () => openAiDraftInEmail(text);
-      div.appendChild(btn);
-    }
-  }
-  el.appendChild(div);
-  el.scrollTop = el.scrollHeight;
-}
-
-function openAiDraftInEmail(aiText) {
-  // Try to extract subject line
+/* ===== AI EMAIL DRAFT HANDLER ===== */
+// Listen for email draft events from shared chatbot module
+document.addEventListener("ai-email-draft", (e) => {
+  const aiText = e.detail.text;
   let subject = "";
   let body = aiText;
   const subjectMatch = aiText.match(/(?:\*\*)?Subject:?\s*(?:\*\*)?\s*(.+?)(?:\n|$)/i);
@@ -2119,107 +2079,22 @@ function openAiDraftInEmail(aiText) {
     subject = subjectMatch[1].replace(/\*\*/g, "").trim();
     body = aiText.replace(subjectMatch[0], "").trim();
   }
-
-  // Clean up markdown formatting for the textarea
   body = body
     .replace(/\*\*(.+?)\*\*/g, "$1")
     .replace(/^\s*[-*]\s+/gm, "- ")
     .trim();
-
   openActivityModal("email");
   document.getElementById("act-subject").value = subject;
   document.getElementById("act-body").value = body;
-}
+});
 
-function showTypingIndicator() {
-  const el = document.getElementById("ai-messages");
-  const div = document.createElement("div");
-  div.className = "gd-ai-typing";
-  div.id = "ai-typing";
-  div.innerHTML = '<div class="gd-ai-typing-dot"></div><div class="gd-ai-typing-dot"></div><div class="gd-ai-typing-dot"></div>';
-  el.appendChild(div);
-  el.scrollTop = el.scrollHeight;
-}
-
-function removeTypingIndicator() {
-  const t = document.getElementById("ai-typing");
-  if (t) t.remove();
-}
-
-window.toggleAiPanel = function () {
-  document.getElementById("ai-panel").classList.toggle("open");
-};
-
-window.sendQuickAction = function (text) {
-  document.getElementById("ai-input").value = text;
-  sendAiMessage();
-};
-
-/* ===== VOICE INPUT ===== */
-let recognition = null;
-let isListening = false;
-
-window.toggleVoiceInput = function () {
-  const micBtn = document.getElementById("ai-mic-btn");
-
-  if (isListening) {
-    if (recognition) recognition.stop();
-    return;
+// Listen for AI actions that should refresh client data
+document.addEventListener("ai-actions-performed", async () => {
+  const user = auth.currentUser;
+  if (user) {
+    await loadClient(user.uid);
   }
-
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SpeechRecognition) {
-    showToast("Voice input not supported in this browser.", "error");
-    return;
-  }
-
-  recognition = new SpeechRecognition();
-  recognition.lang = "en-US";
-  recognition.interimResults = true;
-  recognition.continuous = false;
-  recognition.maxAlternatives = 1;
-
-  const input = document.getElementById("ai-input");
-
-  recognition.onstart = () => {
-    isListening = true;
-    micBtn.classList.add("listening");
-    input.placeholder = "Listening...";
-  };
-
-  recognition.onresult = (e) => {
-    let transcript = "";
-    for (let i = 0; i < e.results.length; i++) {
-      transcript += e.results[i][0].transcript;
-    }
-    input.value = transcript;
-
-    // Auto-send when speech is final
-    if (e.results[e.results.length - 1].isFinal) {
-      setTimeout(() => {
-        if (input.value.trim()) {
-          sendAiMessage();
-        }
-      }, 400);
-    }
-  };
-
-  recognition.onerror = (e) => {
-    console.error("Speech error:", e.error);
-    if (e.error !== "aborted" && e.error !== "no-speech") {
-      showToast("Couldn't hear you — try again.", "error");
-    }
-  };
-
-  recognition.onend = () => {
-    isListening = false;
-    micBtn.classList.remove("listening");
-    input.placeholder = "Ask or speak to your AI assistant...";
-    recognition = null;
-  };
-
-  recognition.start();
-};
+});
 
 /* ===== ADD LISTING FROM CLIENT DETAIL ===== */
 const FEATURE_SUGGESTIONS = [
@@ -2460,37 +2335,7 @@ document.addEventListener("keydown", (e) => {
       if (document.getElementById(m.id).classList.contains("active")) { m.close(); return; }
     }
     const aiPanel = document.getElementById("ai-panel");
-    if (aiPanel.classList.contains("open")) { toggleAiPanel(); }
+    if (aiPanel && aiPanel.classList.contains("open")) { window.toggleAiPanel(); }
   }
 });
 
-window.sendAiMessage = async function () {
-  const input = document.getElementById("ai-input");
-  const btn = document.getElementById("ai-send-btn");
-  const question = input.value.trim();
-  if (!question) return;
-
-  addAiMessage(question, "user");
-  input.value = "";
-  btn.disabled = true;
-  showTypingIndicator();
-
-  try {
-    const result = await askAssistant({ question, clientId, context: "client_detail" });
-    removeTypingIndicator();
-    addAiMessage(result.data.response, "ai");
-
-    // If the AI performed actions, refresh client data so the UI reflects changes
-    if (result.data.actionsPerformed && result.data.actionsPerformed.length > 0) {
-      const user = auth.currentUser;
-      if (user) {
-        await loadClient(user.uid);
-      }
-    }
-  } catch (err) {
-    removeTypingIndicator();
-    const msg = err.message || "Something went wrong. Please try again.";
-    addAiMessage(msg, "error");
-  }
-  btn.disabled = false;
-};
