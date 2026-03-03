@@ -733,7 +733,7 @@ exports.askAssistant = onCall(
     }
 
     const uid = request.auth.uid;
-    const { question, clientId, context } = request.data;
+    const { question, clientId, context, history } = request.data;
 
     if (!question || typeof question !== "string") {
       throw new HttpsError("invalid-argument", "A question is required.");
@@ -1024,8 +1024,17 @@ ${showings.map(s => `  - ${s.date}: ${s.address} with ${s.clientName}`).join("\n
         tools = [];
       }
 
-      // Agentic loop — up to 8 rounds (allows for tool use + follow-up questions)
-      const messages = [{ role: "user", content: userMessage }];
+      // Build messages with conversation history
+      const messages = [];
+      if (history && Array.isArray(history)) {
+        const safeHistory = history.slice(-20); // last 10 exchanges max
+        for (const msg of safeHistory) {
+          if (msg && (msg.role === "user" || msg.role === "assistant") && msg.content) {
+            messages.push({ role: msg.role, content: String(msg.content).slice(0, 4000) });
+          }
+        }
+      }
+      messages.push({ role: "user", content: userMessage });
       const actionsPerformed = [];
       const MAX_ROUNDS = 8;
 

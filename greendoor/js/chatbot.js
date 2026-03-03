@@ -179,6 +179,9 @@ window.sendQuickAction = function (text) {
   window.sendAiMessage();
 };
 
+/* ---------- conversation history ---------- */
+let chatHistory = [];
+
 /* ---------- send message ---------- */
 window.sendAiMessage = async function () {
   const page = detectPage();
@@ -195,13 +198,18 @@ window.sendAiMessage = async function () {
   showTypingIndicator();
 
   try {
-    const payload = { question, context };
+    const payload = { question, context, history: chatHistory };
     if (context === "client_detail" && clientId) {
       payload.clientId = clientId;
     }
     const result = await askAssistant(payload);
     removeTypingIndicator();
-    addAiMessage(result.data.response, "ai", page);
+    const response = result.data.response;
+    addAiMessage(response, "ai", page);
+
+    // Append to session history
+    chatHistory.push({ role: "user", content: question });
+    chatHistory.push({ role: "assistant", content: response });
 
     // If the AI performed actions on client-detail, notify page to refresh
     if (result.data.actionsPerformed && result.data.actionsPerformed.length > 0 && page === "client-detail") {
