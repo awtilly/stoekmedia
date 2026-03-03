@@ -4,6 +4,7 @@ import {
   collection, query, where, orderBy, limit, getDocs, getCountFromServer, Timestamp
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { getCurrentUser, timeAgo, formatDate, formatDateTime } from "./auth.js";
+import { startTour } from "./tour.js";
 
 const askAssistant = httpsCallable(functions, "askAssistant");
 const seedEmailTemplates = httpsCallable(functions, "seedEmailTemplates");
@@ -112,6 +113,11 @@ onAuthStateChanged(auth, async (user) => {
 
   document.getElementById("dashboard-loading").classList.add("gd-hidden");
   document.getElementById("dashboard-content").classList.remove("gd-hidden");
+
+  // Start interactive tour for new users
+  if (profile.showTour === true) {
+    setTimeout(() => startTour(), 600);
+  }
 
   // Seed email templates (no-op if already exist)
   seedEmailTemplates().catch(() => {});

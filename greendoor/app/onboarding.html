@@ -27,11 +27,6 @@
         <div class="gd-step-line" data-after="2"></div>
         <div class="gd-step" data-step="3">
           <div class="gd-step-dot">3</div>
-          <div class="gd-step-label">Tour</div>
-        </div>
-        <div class="gd-step-line" data-after="3"></div>
-        <div class="gd-step" data-step="4">
-          <div class="gd-step-dot">4</div>
           <div class="gd-step-label">Go</div>
         </div>
       </div>
@@ -92,142 +87,9 @@
         </div>
       </div>
 
-      <!-- Step 3: Feature Tour -->
+      <!-- Step 3: Ready to Go -->
       <div class="gd-onboard-step" id="step-3">
-        <h2 class="gd-onboard-title">What You Can Do</h2>
-        <p class="gd-onboard-desc">GreenDoor is built for how realtors actually work. Here's what's at your fingertips.</p>
-        <div class="gd-tour-grid">
-
-          <div class="gd-tour-item" onclick="toggleTourItem(this)">
-            <div class="gd-tour-item-header">
-              <div class="gd-tour-icon-circle" style="background:rgba(34,197,94,0.12);">
-                <svg viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-              </div>
-              <div>
-                <strong>Client Management</strong>
-                <p>Track leads, buyers, and sellers with full profiles.</p>
-              </div>
-              <svg class="gd-tour-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
-            </div>
-            <div class="gd-tour-details">
-              <ul>
-                <li>Contact details, budgets, timelines, and preferences</li>
-                <li>Activity log tracks every interaction automatically</li>
-                <li>Quick filters to sort by status, budget, or date</li>
-              </ul>
-            </div>
-          </div>
-
-          <div class="gd-tour-item" onclick="toggleTourItem(this)">
-            <div class="gd-tour-item-header">
-              <div class="gd-tour-icon-circle" style="background:rgba(59,130,246,0.12);">
-                <svg viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-              </div>
-              <div>
-                <strong>Listings &amp; Matching</strong>
-                <p>Add listings and match properties to clients.</p>
-              </div>
-              <svg class="gd-tour-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
-            </div>
-            <div class="gd-tour-details">
-              <ul>
-                <li>Paste a URL to auto-import listing details</li>
-                <li>Smart scoring matches properties to client preferences</li>
-                <li>Bookmark and organize favorites per client</li>
-              </ul>
-            </div>
-          </div>
-
-          <div class="gd-tour-item" onclick="toggleTourItem(this)">
-            <div class="gd-tour-item-header">
-              <div class="gd-tour-icon-circle" style="background:rgba(249,115,22,0.12);">
-                <svg viewBox="0 0 24 24" fill="none" stroke="#f97316" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-              </div>
-              <div>
-                <strong>Showings &amp; Calendar</strong>
-                <p>Schedule showings and manage your calendar.</p>
-              </div>
-              <svg class="gd-tour-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
-            </div>
-            <div class="gd-tour-details">
-              <ul>
-                <li>Month and week views with drag-and-drop scheduling</li>
-                <li>Collect client feedback and star ratings after showings</li>
-                <li>Automatic reminders so nothing slips through</li>
-              </ul>
-            </div>
-          </div>
-
-          <div class="gd-tour-item" onclick="toggleTourItem(this)">
-            <div class="gd-tour-item-header">
-              <div class="gd-tour-icon-circle" style="background:rgba(168,85,247,0.12);">
-                <svg viewBox="0 0 24 24" fill="none" stroke="#a855f7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-              </div>
-              <div>
-                <strong>Documents &amp; E-Signatures</strong>
-                <p>Upload, template, and send for signature.</p>
-              </div>
-              <svg class="gd-tour-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
-            </div>
-            <div class="gd-tour-details">
-              <ul>
-                <li>Create reusable templates for contracts and disclosures</li>
-                <li>Electronic signatures with full audit trail</li>
-                <li>Organize files per client with drag-and-drop upload</li>
-              </ul>
-            </div>
-          </div>
-
-          <div class="gd-tour-item" onclick="toggleTourItem(this)">
-            <div class="gd-tour-item-header">
-              <div class="gd-tour-icon-circle" style="background:rgba(20,184,166,0.12);">
-                <svg viewBox="0 0 24 24" fill="none" stroke="#14b8a6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-              </div>
-              <div>
-                <strong>Email &amp; Communication</strong>
-                <p>Send emails with templates and merge tags.</p>
-              </div>
-              <svg class="gd-tour-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
-            </div>
-            <div class="gd-tour-details">
-              <ul>
-                <li>Send directly from each client's page</li>
-                <li>Merge tags auto-fill client and property details</li>
-                <li>Full activity log tracks opens and replies</li>
-              </ul>
-            </div>
-          </div>
-
-          <div class="gd-tour-item" onclick="toggleTourItem(this)">
-            <div class="gd-tour-item-header">
-              <div class="gd-tour-icon-circle" style="background:linear-gradient(135deg,rgba(34,197,94,0.15),rgba(16,185,129,0.15));">
-                <svg viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-              </div>
-              <div>
-                <strong>AI Assistant</strong>
-                <p>Draft emails, summarize clients, and more.</p>
-              </div>
-              <svg class="gd-tour-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
-            </div>
-            <div class="gd-tour-details">
-              <ul>
-                <li>Type or speak commands to your AI assistant</li>
-                <li>Create clients, schedule showings, and draft emails hands-free</li>
-                <li>Get intelligent suggestions based on client data</li>
-              </ul>
-            </div>
-          </div>
-
-        </div>
-        <div class="gd-onboard-nav">
-          <button class="gd-btn gd-btn-ghost" onclick="goToStep(2)">Back</button>
-          <button class="gd-btn gd-btn-primary" onclick="goToStep(4)">Continue</button>
-        </div>
-      </div>
-
-      <!-- Step 4: Ready to Go -->
-      <div class="gd-onboard-step" id="step-4">
-        <h2 class="gd-onboard-title" id="step4-title">You're Ready</h2>
+        <h2 class="gd-onboard-title" id="step3-title">You're Ready</h2>
         <p class="gd-onboard-desc">Your account is set up. Here's how to get started.</p>
 
         <!-- Setup summary -->
@@ -265,7 +127,7 @@
         </label>
 
         <div class="gd-onboard-nav">
-          <button class="gd-btn gd-btn-ghost" onclick="goToStep(3)">Back</button>
+          <button class="gd-btn gd-btn-ghost" onclick="goToStep(2)">Back</button>
           <button class="gd-btn gd-btn-primary" id="onboard-finish-btn" onclick="finishOnboarding()">Go to Dashboard</button>
         </div>
       </div>

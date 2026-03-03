@@ -6100,3 +6100,114 @@ body.gd-light .gd-badge-complete { background: #f0fdf4; color: #16a34a; }
 .gd-pw-match.no-match {
   color: var(--gd-red);
 }
+
+/* ===== Interactive Product Tour ===== */
+.gd-tour-overlay {
+  position: absolute;
+  z-index: 9998;
+  border-radius: 12px;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.55);
+  transition: top 0.35s ease, left 0.35s ease, width 0.35s ease, height 0.35s ease;
+  pointer-events: none;
+}
+
+.gd-tour-tooltip {
+  position: absolute;
+  z-index: 9999;
+  width: 340px;
+  max-width: calc(100vw - 24px);
+  background: #fff;
+  border-radius: 14px;
+  padding: 1.25rem;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.gd-tour-tooltip.gd-tour-tooltip-enter {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.gd-tour-tooltip::before {
+  content: "";
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  background: #fff;
+  border-radius: 2px;
+  transform: rotate(45deg);
+}
+
+.gd-tour-tooltip[data-arrow="top"]::before {
+  top: -6px;
+  left: 50%;
+  margin-left: -7px;
+}
+
+.gd-tour-tooltip[data-arrow="bottom"]::before {
+  bottom: -6px;
+  left: 50%;
+  margin-left: -7px;
+}
+
+.gd-tour-tooltip-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.gd-tour-tooltip-title {
+  font-family: 'Outfit', sans-serif;
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: #1a1a2e;
+}
+
+.gd-tour-skip {
+  background: none;
+  border: none;
+  color: #888;
+  font-size: 0.82rem;
+  cursor: pointer;
+  padding: 0.2rem 0.5rem;
+  border-radius: 6px;
+  transition: background 0.15s;
+}
+
+.gd-tour-skip:hover {
+  background: rgba(0, 0, 0, 0.06);
+  color: #555;
+}
+
+.gd-tour-tooltip-desc {
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: #444;
+  margin: 0 0 1rem 0;
+}
+
+.gd-tour-tooltip-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.gd-tour-tooltip-counter {
+  font-size: 0.78rem;
+  color: #999;
+  font-weight: 500;
+}
+
+.gd-tour-tooltip-btns {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.gd-tour-tooltip-btns .gd-btn-sm {
+  padding: 0.35rem 0.9rem;
+  font-size: 0.82rem;
+  border-radius: 8px;
+}

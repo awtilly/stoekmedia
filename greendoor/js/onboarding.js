@@ -6,7 +6,7 @@ import {
 import { getCurrentUser, showToast } from "./auth.js";
 
 let currentStep = 1;
-const TOTAL_STEPS = 4;
+const TOTAL_STEPS = 3;
 
 /* --- Helpers --- */
 function getInitials(name) {
@@ -130,7 +130,6 @@ window.goToStep = function (step) {
     // Step-specific hooks
     if (step === 2) onEnterStep2();
     if (step === 3) onEnterStep3();
-    if (step === 4) onEnterStep4();
   }, 200);
 };
 
@@ -143,25 +142,14 @@ function onEnterStep2() {
   updateSigPreview();
 }
 
-/* --- Step 3: staggered tour card entrance --- */
+/* --- Step 3: personalized heading + setup summary --- */
 function onEnterStep3() {
-  const items = document.querySelectorAll('#step-3 .gd-tour-item');
-  items.forEach((item, i) => {
-    item.classList.remove('animate-in', 'expanded');
-    // Force reflow so re-entering step 3 re-triggers animation
-    void item.offsetWidth;
-    setTimeout(() => item.classList.add('animate-in'), i * 50);
-  });
-}
-
-/* --- Step 4: personalized heading + setup summary --- */
-function onEnterStep4() {
   const name = document.getElementById("onboard-name").value.trim();
   const company = document.getElementById("onboard-company").value.trim();
   const firstName = name ? name.split(/\s+/)[0] : '';
 
   // Personalized title
-  const title = document.getElementById("step4-title");
+  const title = document.getElementById("step3-title");
   title.textContent = firstName ? `You're all set, ${firstName}!` : "You're Ready";
 
   // Setup summary
@@ -182,20 +170,11 @@ function onEnterStep4() {
   `;
 
   // Celebration glow
-  const step4 = document.getElementById("step-4");
-  step4.classList.remove("celebrate");
-  void step4.offsetWidth;
-  step4.classList.add("celebrate");
+  const step3 = document.getElementById("step-3");
+  step3.classList.remove("celebrate");
+  void step3.offsetWidth;
+  step3.classList.add("celebrate");
 }
-
-/* --- Tour accordion --- */
-window.toggleTourItem = function (item) {
-  const wasExpanded = item.classList.contains('expanded');
-  // Collapse all
-  document.querySelectorAll('.gd-tour-item.expanded').forEach(el => el.classList.remove('expanded'));
-  // Toggle clicked
-  if (!wasExpanded) item.classList.add('expanded');
-};
 
 /* --- Validate Step 1 before proceeding --- */
 window.validateAndGoToStep = function (step) {
@@ -250,6 +229,7 @@ window.finishOnboarding = async function () {
       company: company || undefined,
       emailSignature: emailSignature || undefined,
       onboardingComplete: true,
+      showTour: true,
       onboardingCompletedAt: serverTimestamp(),
       termsAcceptedAt: serverTimestamp()
     }, { merge: true });
