@@ -47,7 +47,7 @@ Use markdown formatting: **bold** for emphasis, bullet points for lists. Be conc
 const AI_TOOLS = [
   {
     name: "create_client",
-    description: "Create a new client in the CRM. Use when the realtor asks to add a new lead or client.",
+    description: "Create a new client in the CRM with full profile details. Always extract structured data into the proper fields — never put budget, pre-approval, location, or property preferences into notes. Use notes only for truly unstructured info.",
     input_schema: {
       type: "object",
       properties: {
@@ -56,7 +56,21 @@ const AI_TOOLS = [
         phone: { type: "string", description: "Client's phone number" },
         status: { type: "string", enum: ["lead", "active_buyer", "active_seller", "under_contract", "closed", "inactive"], description: "Client status (default: lead)" },
         source: { type: "string", description: "How the client was acquired (e.g. referral, zillow, open_house)" },
-        notes: { type: "string", description: "Any initial notes about the client" }
+        timeline: { type: "string", description: "Buying/selling timeline (e.g. '1-3 months', 'ASAP', 'spring 2026')" },
+        budgetMin: { type: "number", description: "Minimum budget in dollars" },
+        budgetMax: { type: "number", description: "Maximum budget in dollars" },
+        preferredLocations: { type: "array", items: { type: "string" }, description: "Preferred cities, neighborhoods, or areas" },
+        propertyTypes: { type: "array", items: { type: "string" }, description: "Property types of interest (e.g. Single Family, Condo, Townhouse)" },
+        bedsMin: { type: "number", description: "Minimum bedrooms" },
+        bedsMax: { type: "number", description: "Maximum bedrooms" },
+        bathsMin: { type: "number", description: "Minimum bathrooms" },
+        bathsMax: { type: "number", description: "Maximum bathrooms" },
+        sqftMin: { type: "number", description: "Minimum square footage" },
+        sqftMax: { type: "number", description: "Maximum square footage" },
+        mustHaveFeatures: { type: "array", items: { type: "string" }, description: "Must-have features (e.g. pool, garage, fenced yard)" },
+        preApprovalStatus: { type: "string", description: "Pre-approval status (e.g. 'pre-approved', 'pre-qualified', 'not started', 'in progress')" },
+        preApprovalAmount: { type: "number", description: "Pre-approval amount in dollars" },
+        notes: { type: "string", description: "Any additional unstructured notes (do NOT put budget, pre-approval, or preferences here — use the dedicated fields)" }
       },
       required: ["fullName"]
     }
@@ -246,6 +260,20 @@ async function handleCreateClient(input, uid) {
     phone: input.phone || "",
     status: input.status || "lead",
     source: input.source || "",
+    timeline: input.timeline || "",
+    budgetMin: input.budgetMin || null,
+    budgetMax: input.budgetMax || null,
+    preferredLocations: input.preferredLocations || [],
+    propertyTypes: input.propertyTypes || [],
+    bedsMin: input.bedsMin || null,
+    bedsMax: input.bedsMax || null,
+    bathsMin: input.bathsMin || null,
+    bathsMax: input.bathsMax || null,
+    sqftMin: input.sqftMin || null,
+    sqftMax: input.sqftMax || null,
+    mustHaveFeatures: input.mustHaveFeatures || [],
+    preApprovalStatus: input.preApprovalStatus || "",
+    preApprovalAmount: input.preApprovalAmount || null,
     notes: input.notes || "",
     realtorId: uid,
     createdAt: FieldValue.serverTimestamp(),
