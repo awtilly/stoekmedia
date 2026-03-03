@@ -8,6 +8,7 @@ import {
   ref, uploadBytesResumable, getDownloadURL, deleteObject
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
 import { getCurrentUser, showToast, formatFileSize } from "./auth.js";
+import { checkAndResumeTour } from "./tour.js";
 
 let allTemplates = [];
 
@@ -33,6 +34,8 @@ onAuthStateChanged(auth, async (user) => {
 
   document.getElementById("settings-loading").classList.add("gd-hidden");
   document.getElementById("settings-content").classList.remove("gd-hidden");
+
+  setTimeout(() => checkAndResumeTour(), 400);
 });
 
 window.saveProfile = async function () {

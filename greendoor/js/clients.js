@@ -4,6 +4,7 @@ import {
   collection, query, where, orderBy, getDocs, addDoc, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { getCurrentUser, formatCurrency, timeAgo, statusLabel, showToast } from "./auth.js";
+import { checkAndResumeTour } from "./tour.js";
 
 const askAssistant = httpsCallable(functions, "askAssistant");
 
@@ -31,6 +32,8 @@ async function loadClients(uid) {
 
   document.getElementById("clients-loading").classList.add("gd-hidden");
   document.getElementById("clients-table-wrap").classList.remove("gd-hidden");
+
+  setTimeout(() => checkAndResumeTour(), 400);
 }
 
 function renderClients(clients) {

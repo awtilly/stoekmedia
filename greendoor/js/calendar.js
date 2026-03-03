@@ -5,6 +5,7 @@ import {
   doc, serverTimestamp, Timestamp
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { getCurrentUser, formatDateTime, showToast } from "./auth.js";
+import { checkAndResumeTour } from "./tour.js";
 
 let currentView = "week";
 let currentDate = new Date();
@@ -28,6 +29,8 @@ onAuthStateChanged(auth, async (user) => {
   document.getElementById("calendar-loading").classList.add("gd-hidden");
   document.getElementById("calendar-content").classList.remove("gd-hidden");
   render();
+
+  setTimeout(() => checkAndResumeTour(), 400);
 });
 
 async function loadCalendarData(uid) {
