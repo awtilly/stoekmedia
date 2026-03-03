@@ -2375,7 +2375,7 @@ exports.inviteRealtor = onCall(
 
       // Generate password reset link
       const resetLink = await auth.generatePasswordResetLink(email, {
-        url: "https://stoekmedia.com/greendoor/app/login"
+        url: "https://stoekmedia.com/greendoor/app/set-password"
       });
 
       // Send branded welcome email
@@ -2684,7 +2684,7 @@ exports.resendInvite = onCall(
     try {
       const authAdmin = getAuth();
       const resetLink = await authAdmin.generatePasswordResetLink(targetData.email, {
-        url: "https://stoekmedia.com/greendoor/app/login"
+        url: "https://stoekmedia.com/greendoor/app/set-password"
       });
 
       const sgMail = require("@sendgrid/mail");

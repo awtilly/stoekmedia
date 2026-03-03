@@ -5348,3 +5348,90 @@ body.gd-light .gd-badge-complete { background: #f0fdf4; color: #16a34a; }
     display: none;
   }
 }
+
+/* --- Set Password Page --- */
+.gd-pw-strength {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: var(--space-sm);
+}
+
+.gd-pw-strength-bar {
+  flex: 1;
+  height: 4px;
+  background: var(--color-border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.gd-pw-strength-fill {
+  height: 100%;
+  width: 0;
+  border-radius: 2px;
+  transition: width 0.3s ease, background 0.3s ease;
+}
+
+.gd-pw-strength-label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  min-width: 3rem;
+  text-align: right;
+}
+
+.gd-pw-requirements {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 var(--space-md) 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.35rem;
+}
+
+.gd-pw-requirements li {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  padding-left: 1.4rem;
+  position: relative;
+}
+
+.gd-pw-requirements li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 14px;
+  height: 14px;
+  border: 1.5px solid var(--color-border);
+  border-radius: 50%;
+}
+
+.gd-pw-requirements li.met {
+  color: #22c55e;
+}
+
+.gd-pw-requirements li.met::before {
+  content: "\2713";
+  border-color: #22c55e;
+  color: #22c55e;
+  font-size: 0.65rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.gd-pw-match {
+  font-size: 0.78rem;
+  min-height: 1.2rem;
+  margin-bottom: var(--space-sm);
+}
+
+.gd-pw-match.match {
+  color: #22c55e;
+}
+
+.gd-pw-match.no-match {
+  color: var(--gd-red);
+}

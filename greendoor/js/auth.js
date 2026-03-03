@@ -19,6 +19,7 @@ onAuthStateChanged(auth, async (user) => {
   const path = window.location.pathname;
   const isLoginPage = path.includes("/app/login");
   const isOnboardingPage = path.includes("/app/onboarding");
+  const isSetPasswordPage = path.includes("/app/set-password");
   const isCrmPage = path.includes("/greendoor/app/");
 
   if (user) {
@@ -49,7 +50,7 @@ onAuthStateChanged(auth, async (user) => {
     }
   } else {
     cachedProfile = null;
-    if (isCrmPage && !isLoginPage) {
+    if (isCrmPage && !isLoginPage && !isSetPasswordPage) {
       window.location.href = "/greendoor/app/login";
       return;
     }
@@ -111,7 +112,10 @@ window.handleForgotPassword = async function () {
   }
 
   try {
-    await sendPasswordResetEmail(auth, email);
+    await sendPasswordResetEmail(auth, email, {
+      url: "https://stoekmedia.com/greendoor/app/set-password",
+      handleCodeInApp: false
+    });
     errorEl.style.color = "#22c55e";
     errorEl.textContent = "Password reset email sent. Check your inbox.";
     errorEl.style.display = "block";
