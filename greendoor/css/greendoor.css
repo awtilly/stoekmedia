@@ -2943,7 +2943,8 @@ textarea.gd-input {
   display: none;
 }
 
-.gd-onboard-step.active {
+.gd-onboard-step.active,
+.gd-onboard-step.leaving {
   display: block;
 }
 
@@ -3068,6 +3069,265 @@ textarea.gd-input {
 
 .gd-onboard-help-note a {
   color: #16a34a;
+}
+
+/* --- Stepper enhancements --- */
+.gd-step-line {
+  position: relative;
+  overflow: hidden;
+}
+.gd-step-line::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0;
+  height: 100%;
+  width: 0;
+  background: #22c55e;
+  transition: width 0.4s ease;
+}
+.gd-step-line.filled::after {
+  width: 100%;
+}
+
+/* --- Initials avatar --- */
+.gd-onboard-avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 0.75rem;
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: 0.05em;
+  transition: transform 0.3s;
+}
+.gd-onboard-avatar:not(:empty) {
+  transform: scale(1);
+}
+.gd-onboard-avatar svg {
+  width: 28px;
+  height: 28px;
+  fill: #fff;
+}
+
+/* --- Live profile preview card --- */
+.gd-live-preview {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 0.75rem 1rem;
+  margin-top: 1rem;
+}
+.gd-live-preview-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #fff;
+  flex-shrink: 0;
+}
+.gd-live-preview-info {
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+.gd-live-preview-name {
+  font-weight: 600;
+  color: #1c1917;
+}
+.gd-live-preview-phone {
+  color: #6b7280;
+  font-size: 0.78rem;
+}
+.gd-live-preview-label {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #9ca3af;
+  margin-bottom: 0.35rem;
+}
+
+/* --- Signature preview --- */
+.gd-sig-preview {
+  background: #f3f4f6;
+  border-left: 3px solid #22c55e;
+  border-radius: 0 6px 6px 0;
+  padding: 0.75rem 1rem;
+  margin-top: 0.75rem;
+  white-space: pre-wrap;
+  font-size: 0.82rem;
+  color: #374151;
+  line-height: 1.5;
+  min-height: 2.5rem;
+}
+.gd-sig-preview-label {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #9ca3af;
+  margin: 0.75rem 0 0.25rem;
+}
+.gd-sig-reset {
+  display: inline-block;
+  font-size: 0.78rem;
+  color: #22c55e;
+  cursor: pointer;
+  margin-top: 0.25rem;
+  border: none;
+  background: none;
+  padding: 0;
+  text-decoration: underline;
+}
+.gd-sig-reset:hover {
+  color: #16a34a;
+}
+
+/* --- Tour accordion --- */
+.gd-tour-icon-circle {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.gd-tour-icon-circle svg {
+  width: 18px;
+  height: 18px;
+}
+.gd-tour-item {
+  cursor: pointer;
+  transition: box-shadow 0.2s, border-color 0.2s;
+  position: relative;
+  overflow: hidden;
+}
+.gd-tour-item:hover {
+  border-color: #d1d5db;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+.gd-tour-item-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+}
+.gd-tour-chevron {
+  margin-left: auto;
+  transition: transform 0.3s ease;
+  color: #9ca3af;
+  flex-shrink: 0;
+}
+.gd-tour-item.expanded .gd-tour-chevron {
+  transform: rotate(180deg);
+}
+.gd-tour-details {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.35s ease;
+  padding-left: calc(36px + 0.75rem);
+}
+.gd-tour-item.expanded .gd-tour-details {
+  max-height: 200px;
+}
+.gd-tour-details ul {
+  list-style: none;
+  padding: 0;
+  margin: 0.5rem 0 0;
+}
+.gd-tour-details li {
+  font-size: 0.76rem;
+  color: #6b7280;
+  padding: 0.2rem 0;
+  padding-left: 1rem;
+  position: relative;
+}
+.gd-tour-details li::before {
+  content: '\2022';
+  position: absolute;
+  left: 0;
+  color: #22c55e;
+}
+
+/* Tour entrance stagger */
+.gd-tour-item {
+  opacity: 0;
+  transform: translateY(10px);
+}
+.gd-tour-item.animate-in {
+  animation: tourItemIn 0.35s ease forwards;
+}
+@keyframes tourItemIn {
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* --- Step transitions --- */
+.gd-onboard-step {
+  opacity: 0;
+  transform: translateX(30px);
+  transition: opacity 0.25s ease, transform 0.25s ease;
+  pointer-events: none;
+}
+.gd-onboard-step.active {
+  opacity: 1;
+  transform: translateX(0);
+  pointer-events: auto;
+}
+.gd-onboard-step.leaving {
+  display: block !important;
+  opacity: 0;
+  transform: translateX(-30px);
+  pointer-events: none;
+}
+
+/* --- Setup summary (Step 4) --- */
+.gd-setup-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 10px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1.25rem;
+}
+.gd-setup-summary-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.82rem;
+  color: #1c1917;
+}
+.gd-setup-summary-check {
+  color: #22c55e;
+  font-weight: 700;
+  font-size: 0.9rem;
+  flex-shrink: 0;
+}
+.gd-setup-summary-muted {
+  color: #9ca3af;
+  font-style: italic;
+}
+
+/* --- Celebration glow (Step 4) --- */
+@keyframes celebrationGlow {
+  0% { box-shadow: 0 0 0 0 rgba(34,197,94,0.3); }
+  50% { box-shadow: 0 0 20px 8px rgba(34,197,94,0.15); }
+  100% { box-shadow: 0 0 0 0 rgba(34,197,94,0); }
+}
+.gd-onboard-step.celebrate {
+  animation: celebrationGlow 1.2s ease;
 }
 
 /* ============================================================
