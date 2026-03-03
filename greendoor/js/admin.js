@@ -101,7 +101,7 @@ async function loadOverviewTab() {
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const newUsers = allRealtors.filter(r => {
-      if (!r.createdAt) return false;
+      if (!r.createdAt || r.offboardedAt) return false;
       const d = r.createdAt.toDate ? r.createdAt.toDate() : new Date(r.createdAt);
       return d >= monthStart;
     });
@@ -123,7 +123,7 @@ async function loadOverviewTab() {
 
     // Recent Logins
     const loginSorted = [...allRealtors]
-      .filter(r => r.lastLogin)
+      .filter(r => r.lastLogin && !r.offboardedAt)
       .sort((a, b) => {
         const aDate = a.lastLogin?.toDate ? a.lastLogin.toDate() : new Date(a.lastLogin);
         const bDate = b.lastLogin?.toDate ? b.lastLogin.toDate() : new Date(b.lastLogin);

@@ -2373,10 +2373,12 @@ exports.inviteRealtor = onCall(
         invitedBy: request.auth.uid
       });
 
-      // Generate password reset link
-      const resetLink = await auth.generatePasswordResetLink(email, {
+      // Generate password reset link and redirect to custom branded page
+      const firebaseResetLink = await auth.generatePasswordResetLink(email, {
         url: "https://stoekmedia.com/greendoor/app/set-password"
       });
+      const oobCode = new URL(firebaseResetLink).searchParams.get("oobCode");
+      const resetLink = `https://stoekmedia.com/greendoor/app/set-password?oobCode=${oobCode}`;
 
       // Send branded welcome email
       const sgMail = require("@sendgrid/mail");
@@ -2683,9 +2685,11 @@ exports.resendInvite = onCall(
 
     try {
       const authAdmin = getAuth();
-      const resetLink = await authAdmin.generatePasswordResetLink(targetData.email, {
+      const firebaseResetLink = await authAdmin.generatePasswordResetLink(targetData.email, {
         url: "https://stoekmedia.com/greendoor/app/set-password"
       });
+      const oobCode = new URL(firebaseResetLink).searchParams.get("oobCode");
+      const resetLink = `https://stoekmedia.com/greendoor/app/set-password?oobCode=${oobCode}`;
 
       const sgMail = require("@sendgrid/mail");
       sgMail.setApiKey(sendgridKey.value());
