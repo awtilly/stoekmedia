@@ -121,5 +121,15 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow write: if isAuthenticated() && isAdmin();
     }
+
+    match /trialRequests/{requestId} {
+      // Anyone can submit a trial request (landing page form)
+      allow create: if request.resource.data.keys().hasAll(['firstName', 'lastName', 'email', 'createdAt', 'status'])
+                    && request.resource.data.email is string
+                    && request.resource.data.email.size() > 0
+                    && request.resource.data.email.size() < 255;
+      // Only admins can read/manage requests
+      allow read, update, delete: if isAuthenticated() && isAdmin();
+    }
   }
 }

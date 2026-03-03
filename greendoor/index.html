@@ -94,7 +94,7 @@
         <li><a href="#pricing">Pricing</a></li>
         <li><a href="#faq">FAQ</a></li>
         <li><a href="/greendoor/" class="nav-greendoor" style="color: var(--color-text-primary);"><span class="gd-green">Green</span><span class="gd-door">Door</span></a></li>
-        <li><a href="/greendoor/app/login" class="btn btn-primary" style="padding: 0.6rem 1.4rem; background: #22c55e; border-color: #22c55e;">Start Free Trial</a></li>
+        <li><a href="/greendoor/app/login" class="btn btn-primary" style="padding: 0.6rem 1.4rem; background: #22c55e; border-color: #22c55e;">Login</a></li>
       </ul>
       <button class="nav-toggle" aria-label="Menu">
         <span></span>
@@ -112,10 +112,9 @@
         <h1>The CRM Built<br>for <em style="color: #22c55e;">Realtors.</em></h1>
         <p class="hero-sub">Manage clients, match listings, send e-signatures, schedule showings, and let AI handle the busywork. One platform built for how agents actually work.</p>
         <div class="hero-cta">
-          <a href="/greendoor/app/login" class="btn btn-primary btn-arrow" style="background: #22c55e; border-color: #22c55e;">Start Free Trial</a>
+          <a href="/greendoor/app/login" class="btn btn-primary btn-arrow" style="background: #22c55e; border-color: #22c55e;">Log In to Your Account</a>
           <a href="#features" class="btn btn-arrow">See Features</a>
         </div>
-        <p class="gd-hero-subtext">14-day free trial. No credit card required.</p>
       </div>
     </div>
   </section>
@@ -367,7 +366,7 @@
             <li>Email templates &amp; merge tags</li>
             <li>Activity tracking</li>
           </ul>
-          <a href="/greendoor/app/login" class="btn btn-arrow" style="width: 100%; text-align: center; border-color: #22c55e; color: #22c55e;">Start Free Trial</a>
+          <a href="#free-trial" class="btn btn-arrow" style="width: 100%; text-align: center; border-color: #22c55e; color: #22c55e;">Request Free Trial</a>
         </div>
         <!-- Professional -->
         <div class="gd-pricing-card featured">
@@ -383,7 +382,7 @@
             <li>Automated follow-up suggestions</li>
             <li>Priority support</li>
           </ul>
-          <a href="/greendoor/app/login" class="btn btn-primary btn-arrow" style="width: 100%; text-align: center; background: #22c55e; border-color: #22c55e;">Start Free Trial</a>
+          <a href="#free-trial" class="btn btn-primary btn-arrow" style="width: 100%; text-align: center; background: #22c55e; border-color: #22c55e;">Request Free Trial</a>
         </div>
         <!-- Team -->
         <div class="gd-pricing-card">
@@ -398,7 +397,7 @@
             <li>Platform-level analytics</li>
             <li>Dedicated onboarding</li>
           </ul>
-          <a href="/greendoor/app/login" class="btn btn-arrow" style="width: 100%; text-align: center; border-color: #22c55e; color: #22c55e;">Start Free Trial</a>
+          <a href="#free-trial" class="btn btn-arrow" style="width: 100%; text-align: center; border-color: #22c55e; color: #22c55e;">Request Free Trial</a>
         </div>
       </div>
     </div>
@@ -485,17 +484,39 @@
     </div>
   </section>
 
-  <!-- Final CTA -->
-  <section class="section-pad-lg">
+  <!-- Free Trial Request -->
+  <section id="free-trial" class="section-pad-lg">
     <div class="container">
-      <div class="cta-banner reveal">
+      <div class="cta-banner reveal" style="max-width: 600px; margin: 0 auto;">
         <span class="section-label" style="color: #22c55e;">Get Started</span>
-        <h2>Ready to close more <em style="color: #22c55e;">deals?</em></h2>
-        <p>Start your free 14-day trial today. No credit card. No commitment. Cancel anytime.</p>
-        <div style="display: flex; gap: var(--space-sm); justify-content: center; flex-wrap: wrap;">
-          <a href="/greendoor/app/login" class="btn btn-primary btn-arrow" style="background: #22c55e; border-color: #22c55e;">Start Free Trial</a>
-          <a href="/bookings/" class="btn btn-arrow">Contact Us</a>
-        </div>
+        <h2>Request a free <em style="color: #22c55e;">trial.</em></h2>
+        <p>Fill out the form below and we'll get you set up with a 14-day free trial. No credit card required.</p>
+        <form id="trialRequestForm" style="display: flex; flex-direction: column; gap: var(--space-sm); text-align: left; margin-top: var(--space-md);">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-sm);">
+            <div>
+              <label for="trial-first" style="font-size: 0.82rem; color: var(--color-text-secondary); margin-bottom: 0.25rem; display: block;">First Name</label>
+              <input type="text" id="trial-first" name="firstName" required placeholder="Jane" style="width: 100%; padding: 0.7rem 0.9rem; background: var(--color-bg); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: var(--color-text-primary); font-size: 0.9rem;">
+            </div>
+            <div>
+              <label for="trial-last" style="font-size: 0.82rem; color: var(--color-text-secondary); margin-bottom: 0.25rem; display: block;">Last Name</label>
+              <input type="text" id="trial-last" name="lastName" required placeholder="Smith" style="width: 100%; padding: 0.7rem 0.9rem; background: var(--color-bg); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: var(--color-text-primary); font-size: 0.9rem;">
+            </div>
+          </div>
+          <div>
+            <label for="trial-email" style="font-size: 0.82rem; color: var(--color-text-secondary); margin-bottom: 0.25rem; display: block;">Email</label>
+            <input type="email" id="trial-email" name="email" required placeholder="jane@example.com" style="width: 100%; padding: 0.7rem 0.9rem; background: var(--color-bg); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: var(--color-text-primary); font-size: 0.9rem;">
+          </div>
+          <div>
+            <label for="trial-phone" style="font-size: 0.82rem; color: var(--color-text-secondary); margin-bottom: 0.25rem; display: block;">Phone <span style="opacity: 0.5;">(optional)</span></label>
+            <input type="tel" id="trial-phone" name="phone" placeholder="(555) 123-4567" style="width: 100%; padding: 0.7rem 0.9rem; background: var(--color-bg); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: var(--color-text-primary); font-size: 0.9rem;">
+          </div>
+          <div>
+            <label for="trial-brokerage" style="font-size: 0.82rem; color: var(--color-text-secondary); margin-bottom: 0.25rem; display: block;">Brokerage <span style="opacity: 0.5;">(optional)</span></label>
+            <input type="text" id="trial-brokerage" name="brokerage" placeholder="Keller Williams, RE/MAX, etc." style="width: 100%; padding: 0.7rem 0.9rem; background: var(--color-bg); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: var(--color-text-primary); font-size: 0.9rem;">
+          </div>
+          <button type="submit" class="btn btn-primary btn-arrow" style="background: #22c55e; border-color: #22c55e; width: 100%; text-align: center; margin-top: 0.5rem; padding: 0.8rem;">Request Free Trial</button>
+        </form>
+        <p id="trialSuccess" style="display: none; color: #22c55e; font-weight: 500; margin-top: var(--space-md); text-align: center;">Thanks! We'll be in touch shortly to get you started.</p>
       </div>
     </div>
   </section>
@@ -562,5 +583,43 @@
   </footer>
 
   <script src="/assets/js/main.js"></script>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+    const app = initializeApp({
+      apiKey: "AIzaSyDEPiHPEURzn_gtiTaR-rbCGg06JYUSlQY",
+      authDomain: "greendoor-2da47.firebaseapp.com",
+      projectId: "greendoor-2da47",
+      storageBucket: "greendoor-2da47.firebasestorage.app",
+      messagingSenderId: "975315709404",
+      appId: "1:975315709404:web:c03a1663f999eb49783319"
+    });
+    const db = getFirestore(app);
+
+    document.getElementById('trialRequestForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = e.target.querySelector('button[type="submit"]');
+      btn.disabled = true;
+      btn.textContent = 'Submitting…';
+      try {
+        await addDoc(collection(db, 'trialRequests'), {
+          firstName: e.target.firstName.value.trim(),
+          lastName: e.target.lastName.value.trim(),
+          email: e.target.email.value.trim(),
+          phone: e.target.phone.value.trim(),
+          brokerage: e.target.brokerage.value.trim(),
+          createdAt: serverTimestamp(),
+          status: 'new'
+        });
+        e.target.style.display = 'none';
+        document.getElementById('trialSuccess').style.display = 'block';
+      } catch (err) {
+        btn.disabled = false;
+        btn.textContent = 'Request Free Trial';
+        alert('Something went wrong. Please try again or email joe@stoekmedia.com.');
+      }
+    });
+  </script>
 </body>
 </html>
