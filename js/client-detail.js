@@ -932,7 +932,9 @@ function renderFiles() {
   }
 
   el.innerHTML = filtered.map(f => {
-    const signedBadge = f.fileName.startsWith("SIGNED_") ? ' <span class="gd-badge-signed">&#9997; Signed</span>' : '';
+    const signedBadge = f.signedSource
+      ? ` <span class="gd-badge-signed">Signed${f.signedAt ? " &mdash; " + formatDate(f.signedAt) : ""}</span>`
+      : "";
     const checked = selectedFiles.has(f.id) ? "checked" : "";
     const folderName = allFolders.find(fd => fd.id === f.folderId)?.name || "Root";
     return `
