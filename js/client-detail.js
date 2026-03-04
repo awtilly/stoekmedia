@@ -2939,6 +2939,278 @@ function wireComplianceBulkSelect() {
   }
 }
 
+/**
+ * openSendDialog
+ *
+ * Opens the compliance confirm dialog for a single template. Populates
+ * recipient info, document name, listing selector, and resolved merge
+ * field preview.
+ */
+async function openSendDialog(templateId) {
+  const template = complianceTemplates.find(t => t.id === templateId);
+  if (!template) return;
+
+  pendingSendTemplateId = templateId;
+
+  // Populate recipient
+  const recipientEl = document.getElementById("compliance-confirm-recipient");
+  recipientEl.textContent = `${clientData.fullName || "Client"} (${clientData.email || "no email"})`;
+
+  // Populate document name
+  document.getElementById("compliance-confirm-docname").textContent = template.name;
+
+  // Populate listing selector
+  const listingSelect = document.getElementById("compliance-confirm-listing");
+  listingSelect.innerHTML = '<option value="">No listing selected</option>';
+
+  try {
+    // Query client listing matches to get linked listings
+    const user = auth.currentUser;
+    if (user) {
+      const matchesSnap = await getDocs(
+        query(collection(db, "clientListingMatches"),
+          where("clientId", "==", clientId),
+          where("realtorId", "==", user.uid))
+      );
+
+      const listingIds = [];
+      matchesSnap.forEach(d => {
+        const data = d.data();
+        if (data.listingId) listingIds.push(data.listingId);
+      });
+
+      for (const lid of listingIds) {
+        const lSnap = await getDoc(doc(db, "listings", lid));
+        if (lSnap.exists()) {
+          const lData = lSnap.data();
+          const addr = lData.address?.full || lData.address?.street || lid;
+          listingSelect.innerHTML += `<option value="${escapeHtml(lid)}">${escapeHtml(addr)}</option>`;
+        }
+      }
+
+      if (listingIds.length === 0) {
+        listingSelect.innerHTML = '<option value="">No listings linked -- property fields will be blank</option>';
+      } else {
+        // Default to first listing
+        listingSelect.selectedIndex = 1;
+      }
+    }
+  } catch (err) {
+    console.error("Error loading listings for compliance confirm:", err);
+    listingSelect.innerHTML = '<option value="">No listings linked -- property fields will be blank</option>';
+  }
+
+  // Resolve and display merge fields
+  await updateComplianceConfirmFields(template);
+
+  // Listen for listing changes to re-resolve fields
+  listingSelect.onchange = () => updateComplianceConfirmFields(template);
+
+  // Show the modal
+  document.getElementById("compliance-confirm-modal").classList.add("active");
+}
+
+/**
+ * updateComplianceConfirmFields
+ *
+ * Resolves merge fields based on the currently selected listing and
+ * updates the confirm dialog's field list and missing warning.
+ */
+async function updateComplianceConfirmFields(template) {
+  const listingSelect = document.getElementById("compliance-confirm-listing");
+  const fieldListEl = document.getElementById("compliance-confirm-field-list");
+  const missingEl = document.getElementById("compliance-confirm-missing");
+  const missingTextEl = document.getElementById("compliance-confirm-missing-text");
+
+  let listingData = null;
+  const selectedListingId = listingSelect.value;
+
+  if (selectedListingId) {
+    try {
+      const lSnap = await getDoc(doc(db, "listings", selectedListingId));
+      if (lSnap.exists()) {
+        listingData = lSnap.data();
+      }
+    } catch (err) {
+      console.error("Error loading listing for merge fields:", err);
+    }
+  }
+
+  // Build merge fields using the compliance.js utility
+  const agentProfile = realtorProfile || {};
+  const { existingFormFields, missing } = buildMergeFields(template, clientData, listingData, agentProfile);
+
+  // Render field rows
+  let fieldsHtml = "";
+  for (const field of existingFormFields) {
+    const isEmpty = !field.value;
+    fieldsHtml += `<div class="gd-confirm-field-row">
+      <span class="gd-confirm-field-name">${escapeHtml(field.id)}</span>
+      <span class="gd-confirm-field-value ${isEmpty ? 'gd-missing' : ''}">${isEmpty ? '(empty)' : escapeHtml(field.value)}</span>
+    </div>`;
+  }
+  fieldListEl.innerHTML = fieldsHtml;
+
+  // Show/hide missing warning
+  if (missing.length > 0) {
+    missingTextEl.textContent = `${missing.length} field(s) will be blank: ${missing.join(", ")}`;
+    missingEl.classList.remove("gd-hidden");
+  } else {
+    missingEl.classList.add("gd-hidden");
+  }
+}
+
+/**
+ * confirmAndSendCompliance
+ *
+ * Called when the user clicks "Send for Signature" in the confirm dialog.
+ * Calls the sendComplianceDoc Cloud Function.
+ */
+async function confirmAndSendCompliance() {
+  const sendBtn = document.getElementById("compliance-confirm-send-btn");
+  const originalText = sendBtn.textContent;
+  sendBtn.disabled = true;
+  sendBtn.textContent = "Sending...";
+
+  const listingSelect = document.getElementById("compliance-confirm-listing");
+  const listingId = listingSelect.value || null;
+
+  try {
+    await sendComplianceDocFn({
+      templateId: pendingSendTemplateId,
+      clientId: clientId,
+      listingId: listingId
+    });
+
+    showToast("Document sent for signature");
+    closeComplianceConfirm();
+    // The onSnapshot listener will automatically update the row status
+  } catch (err) {
+    console.error("sendComplianceDoc error:", err);
+    showToast(err.message || "Failed to send document.", "error");
+    sendBtn.disabled = false;
+    sendBtn.textContent = originalText;
+  }
+}
+
+/**
+ * closeComplianceConfirm
+ *
+ * Closes the compliance confirm dialog and clears pending state.
+ */
+function closeComplianceConfirm() {
+  document.getElementById("compliance-confirm-modal").classList.remove("active");
+  pendingSendTemplateId = null;
+}
+
+/**
+ * handleBulkComplianceSend
+ *
+ * Collects selected template IDs and sends them as a single BoldSign
+ * envelope via sendBulkComplianceDocsFn. Falls back gracefully if
+ * envelope bundling is unavailable.
+ */
+async function handleBulkComplianceSend() {
+  const checked = document.querySelectorAll(".gd-compliance-check:checked");
+  if (checked.length === 0) return;
+
+  const templateIds = [];
+  checked.forEach(cb => templateIds.push(cb.dataset.templateId));
+
+  // Open confirm dialog in bulk mode
+  pendingSendTemplateId = null; // null signals bulk mode
+
+  const recipientEl = document.getElementById("compliance-confirm-recipient");
+  recipientEl.textContent = `${clientData.fullName || "Client"} (${clientData.email || "no email"})`;
+
+  document.getElementById("compliance-confirm-docname").textContent =
+    `${templateIds.length} document(s) -- will be bundled into a single signing session`;
+
+  // Populate listing selector
+  const listingSelect = document.getElementById("compliance-confirm-listing");
+  listingSelect.innerHTML = '<option value="">No listing selected</option>';
+
+  try {
+    const user = auth.currentUser;
+    if (user) {
+      const matchesSnap = await getDocs(
+        query(collection(db, "clientListingMatches"),
+          where("clientId", "==", clientId),
+          where("realtorId", "==", user.uid))
+      );
+
+      const listingIds = [];
+      matchesSnap.forEach(d => {
+        const data = d.data();
+        if (data.listingId) listingIds.push(data.listingId);
+      });
+
+      for (const lid of listingIds) {
+        const lSnap = await getDoc(doc(db, "listings", lid));
+        if (lSnap.exists()) {
+          const lData = lSnap.data();
+          const addr = lData.address?.full || lData.address?.street || lid;
+          listingSelect.innerHTML += `<option value="${escapeHtml(lid)}">${escapeHtml(addr)}</option>`;
+        }
+      }
+
+      if (listingIds.length > 0) {
+        listingSelect.selectedIndex = 1;
+      }
+    }
+  } catch (err) {
+    console.error("Error loading listings for bulk compliance confirm:", err);
+  }
+
+  // Hide merge field preview for bulk mode (too complex to preview all)
+  document.getElementById("compliance-confirm-field-list").innerHTML =
+    '<div class="gd-text-muted" style="font-size:0.85rem;">Merge fields will be resolved for each document at send time.</div>';
+  document.getElementById("compliance-confirm-missing").classList.add("gd-hidden");
+
+  // Override the send button for bulk
+  const sendBtn = document.getElementById("compliance-confirm-send-btn");
+  sendBtn.textContent = `Send ${templateIds.length} Documents`;
+  sendBtn.onclick = async () => {
+    sendBtn.disabled = true;
+    sendBtn.textContent = `Sending ${templateIds.length} documents...`;
+
+    const listingId = listingSelect.value || null;
+
+    try {
+      const result = await sendBulkComplianceDocsFn({
+        templateIds: templateIds,
+        clientId: clientId,
+        listingId: listingId
+      });
+
+      if (result.data && result.data.mode === "sequential") {
+        showToast("Documents sent individually (envelope bundling unavailable).");
+      } else {
+        showToast(`${templateIds.length} compliance documents sent as one signing session`);
+      }
+
+      closeComplianceConfirm();
+    } catch (err) {
+      console.error("sendBulkComplianceDocs error:", err);
+      showToast(err.message || "Failed to send documents.", "error");
+      sendBtn.disabled = false;
+      sendBtn.textContent = `Send ${templateIds.length} Documents`;
+    }
+  };
+
+  // Reset the send button when closing
+  const originalConfirmClose = closeComplianceConfirm;
+  document.getElementById("compliance-confirm-modal").classList.add("active");
+}
+
+// Wire the bulk send button
+document.getElementById("compliance-bulk-send")?.addEventListener("click", handleBulkComplianceSend);
+
+/* --- Expose compliance window functions --- */
+window.openSendDialog = openSendDialog;
+window.closeComplianceConfirm = closeComplianceConfirm;
+window.confirmAndSendCompliance = confirmAndSendCompliance;
+
 // Cleanup listeners on page unload
 window.addEventListener("beforeunload", () => {
   if (complianceUnsubscribe) complianceUnsubscribe();
