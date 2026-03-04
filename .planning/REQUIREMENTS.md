@@ -9,10 +9,10 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### BoldSign Sender
 
-- [ ] **BSND-01**: Document signature emails show the realtor's display name as the sender name
-- [ ] **BSND-02**: Document signature emails show the realtor's email address as the sender/reply-to
-- [ ] **BSND-03**: Sender name and email are fetched from the realtor's Firestore profile (users/{uid})
-- [ ] **BSND-04**: If Firestore profile email is missing, fall back to Firebase Auth email
+- [x] **BSND-01**: Document signature emails show the realtor's display name as the sender name
+- [x] **BSND-02**: Document signature emails show the realtor's email address as the sender/reply-to
+- [x] **BSND-03**: Sender name and email are fetched from the realtor's Firestore profile (users/{uid})
+- [x] **BSND-04**: If Firestore profile email is missing, fall back to Firebase Auth email
 
 ### File Folders
 
@@ -148,10 +148,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | FLDR-05 | Phase 1 | Complete |
 | FLDR-06 | Phase 1 | Complete |
 | FLDR-07 | Phase 1 | Complete |
-| BSND-01 | Phase 2 | Pending |
-| BSND-02 | Phase 2 | Pending |
-| BSND-03 | Phase 2 | Pending |
-| BSND-04 | Phase 2 | Pending |
+| BSND-01 | Phase 2 | Complete |
+| BSND-02 | Phase 2 | Complete |
+| BSND-03 | Phase 2 | Complete |
+| BSND-04 | Phase 2 | Complete |
 | COMP-01 | Phase 2 | Complete |
 | COMP-02 | Phase 2 | Complete |
 | COMP-03 | Phase 2 | Complete |
