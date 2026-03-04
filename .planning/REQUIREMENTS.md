@@ -139,13 +139,73 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| — | — | — |
+| TXTP-01 | Phase 1 | Pending |
+| TXTP-02 | Phase 1 | Pending |
+| FLDR-01 | Phase 1 | Pending |
+| FLDR-02 | Phase 1 | Pending |
+| FLDR-03 | Phase 1 | Pending |
+| FLDR-04 | Phase 1 | Pending |
+| FLDR-05 | Phase 1 | Pending |
+| FLDR-06 | Phase 1 | Pending |
+| FLDR-07 | Phase 1 | Pending |
+| BSND-01 | Phase 2 | Pending |
+| BSND-02 | Phase 2 | Pending |
+| BSND-03 | Phase 2 | Pending |
+| BSND-04 | Phase 2 | Pending |
+| COMP-01 | Phase 2 | Pending |
+| COMP-02 | Phase 2 | Pending |
+| COMP-03 | Phase 2 | Pending |
+| COMP-04 | Phase 2 | Pending |
+| COMP-05 | Phase 2 | Pending |
+| COMP-06 | Phase 2 | Pending |
+| COMP-07 | Phase 2 | Pending |
+| COMP-08 | Phase 2 | Pending |
+| COMP-09 | Phase 2 | Pending |
+| COMP-10 | Phase 2 | Pending |
+| WHBK-01 | Phase 3 | Pending |
+| WHBK-02 | Phase 3 | Pending |
+| WHBK-03 | Phase 3 | Pending |
+| WHBK-04 | Phase 3 | Pending |
+| WHBK-05 | Phase 3 | Pending |
+| WHBK-06 | Phase 3 | Pending |
+| WHBK-07 | Phase 3 | Pending |
+| WHBK-08 | Phase 3 | Pending |
+| WHBK-09 | Phase 3 | Pending |
+| WHBK-10 | Phase 3 | Pending |
+| SDUI-01 | Phase 3 | Pending |
+| SDUI-02 | Phase 3 | Pending |
+| CHKL-01 | Phase 4 | Pending |
+| CHKL-02 | Phase 4 | Pending |
+| CHKL-03 | Phase 4 | Pending |
+| CHKL-04 | Phase 4 | Pending |
+| CHKL-05 | Phase 4 | Pending |
+| CHKL-06 | Phase 4 | Pending |
+| CHKL-07 | Phase 4 | Pending |
+| AICX-01 | Phase 4 | Pending |
+| AICX-02 | Phase 4 | Pending |
+| AICX-03 | Phase 4 | Pending |
+| AICX-04 | Phase 4 | Pending |
+| AICX-05 | Phase 4 | Pending |
+| AICX-06 | Phase 4 | Pending |
+| SHWT-01 | Phase 5 | Pending |
+| SHWT-02 | Phase 5 | Pending |
+| SHWT-03 | Phase 5 | Pending |
+| SHWT-04 | Phase 5 | Pending |
+| SHWT-05 | Phase 5 | Pending |
+| SHWT-06 | Phase 5 | Pending |
+| SHWT-07 | Phase 5 | Pending |
+| SHWT-08 | Phase 5 | Pending |
+| SHWT-09 | Phase 5 | Pending |
+| SHWT-10 | Phase 5 | Pending |
+| SHWT-11 | Phase 5 | Pending |
 
 **Coverage:**
-- v1 requirements: 48 total
-- Mapped to phases: 0
-- Unmapped: 48
+- v1 requirements: 59 total
+- Mapped to phases: 59
+- Unmapped: 0
+
+**Note:** Original requirement count in this file said 48; actual count from requirement IDs is 59 (BSND: 4, FLDR: 7, TXTP: 2, COMP: 10, WHBK: 10, CHKL: 7, AICX: 6, SHWT: 11, SDUI: 2).
 
 ---
 *Requirements defined: 2026-03-04*
-*Last updated: 2026-03-04 after initial definition*
+*Last updated: 2026-03-04 after roadmap creation — traceability populated*
