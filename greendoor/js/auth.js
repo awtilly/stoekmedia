@@ -215,6 +215,13 @@ export function statusLabel(status) {
   return status.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
 }
 
+export function sanitizeUrl(url) {
+  if (!url) return "";
+  const trimmed = String(url).trim();
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  return "";
+}
+
 export function escapeHtml(str) {
   if (!str) return "";
   return String(str)

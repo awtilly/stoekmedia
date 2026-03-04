@@ -514,6 +514,7 @@
             <label for="trial-brokerage" style="font-size: 0.82rem; color: var(--color-text-secondary); margin-bottom: 0.25rem; display: block;">Brokerage <span style="opacity: 0.5;">(optional)</span></label>
             <input type="text" id="trial-brokerage" name="brokerage" placeholder="Keller Williams, RE/MAX, etc." style="width: 100%; padding: 0.7rem 0.9rem; background: var(--color-bg); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: var(--color-text-primary); font-size: 0.9rem;">
           </div>
+          <input type="text" name="website" id="trial-hp" style="position:absolute;left:-9999px;opacity:0;pointer-events:none;" tabindex="-1" autocomplete="off">
           <button type="submit" class="btn btn-primary btn-arrow" style="background: #22c55e; border-color: #22c55e; width: 100%; text-align: center; margin-top: 0.5rem; padding: 0.8rem;">Request Free Trial</button>
         </form>
         <p id="trialSuccess" style="display: none; color: #22c55e; font-weight: 500; margin-top: var(--space-md); text-align: center;">Thanks! We'll be in touch shortly to get you started.</p>
@@ -602,6 +603,23 @@
       const btn = e.target.querySelector('button[type="submit"]');
       btn.disabled = true;
       btn.textContent = 'Submitting…';
+
+      // Honeypot check — bots fill hidden fields, humans don't
+      if (e.target.querySelector('#trial-hp').value) {
+        e.target.style.display = 'none';
+        document.getElementById('trialSuccess').style.display = 'block';
+        return;
+      }
+
+      // Cooldown check — block resubmission for 1 hour
+      const lastSubmit = localStorage.getItem('gd_trial_ts');
+      if (lastSubmit && Date.now() - Number(lastSubmit) < 3600000) {
+        alert('You already submitted a request. Please wait before trying again.');
+        btn.disabled = false;
+        btn.textContent = 'Request Free Trial';
+        return;
+      }
+
       try {
         await addDoc(collection(db, 'trialRequests'), {
           firstName: e.target.firstName.value.trim(),
@@ -612,6 +630,7 @@
           createdAt: serverTimestamp(),
           status: 'new'
         });
+        localStorage.setItem('gd_trial_ts', String(Date.now()));
         e.target.style.display = 'none';
         document.getElementById('trialSuccess').style.display = 'block';
       } catch (err) {

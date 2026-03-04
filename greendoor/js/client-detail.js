@@ -10,7 +10,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
 import {
   getCurrentUser, showToast, formatCurrency, formatDate, formatDateTime,
-  timeAgo, formatFileSize, statusLabel, escapeHtml
+  timeAgo, formatFileSize, statusLabel, escapeHtml, sanitizeUrl
 } from "./auth.js";
 import { calculateMatchScore, matchScoreColor, matchScoreLabel } from "./match-engine.js";
 
@@ -1192,7 +1192,7 @@ window.renderMatches = function () {
           <span class="gd-stars">${stars}</span>
         </div>
         ${m.dealBreakerHits?.length ? `<div class="gd-match-dealbreaker">Deal breaker: ${escapeHtml(m.dealBreakerHits.join(", "))}</div>` : ""}
-        ${l.listingUrl ? `<a href="${l.listingUrl}" target="_blank" class="gd-property-link" onclick="event.stopPropagation()">View Listing &rarr;</a>` : ""}
+        ${l.listingUrl ? `<a href="${sanitizeUrl(l.listingUrl)}" target="_blank" class="gd-property-link" onclick="event.stopPropagation()">View Listing &rarr;</a>` : ""}
       </div>`;
   }).join("");
 };

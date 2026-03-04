@@ -22,6 +22,15 @@ service cloud.firestore {
       return request.resource.data.realtorId == resource.data.realtorId;
     }
 
+    function addedByUnchanged() {
+      return request.resource.data.addedBy == resource.data.addedBy;
+    }
+
+    function sourceUnchanged() {
+      return resource.data.source == null
+          || request.resource.data.source == resource.data.source;
+    }
+
     match /users/{userId} {
       allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
 
@@ -103,8 +112,19 @@ service cloud.firestore {
 
     match /listings/{listingId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow update: if isAuthenticated() && (resource.data.addedBy == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated()
+        && request.resource.data.keys().hasAll(['address', 'addedBy', 'createdAt'])
+        && request.resource.data.addedBy == request.auth.uid
+        && (request.resource.data.listingUrl == null
+            || request.resource.data.listingUrl == ""
+            || request.resource.data.listingUrl.matches('^https?://.*'));
+      allow update: if isAuthenticated()
+        && (resource.data.addedBy == request.auth.uid || isAdmin())
+        && addedByUnchanged()
+        && sourceUnchanged()
+        && (request.resource.data.listingUrl == null
+            || request.resource.data.listingUrl == ""
+            || request.resource.data.listingUrl.matches('^https?://.*'));
       allow delete: if isAuthenticated() && ((resource.data.addedBy == request.auth.uid && resource.data.source != "mls_sync") || isAdmin());
     }
 

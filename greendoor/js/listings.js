@@ -7,7 +7,7 @@ import {
 import {
   ref, uploadBytesResumable, getDownloadURL, deleteObject
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
-import { getCurrentUser, showToast, formatCurrency, formatDate, statusLabel, escapeHtml } from "./auth.js";
+import { getCurrentUser, showToast, formatCurrency, formatDate, statusLabel, escapeHtml, sanitizeUrl } from "./auth.js";
 import { calculateMatchScore, matchScoreColor, matchScoreLabel } from "./match-engine.js";
 import { initAddressAutocomplete } from "./address-autocomplete.js";
 
@@ -303,7 +303,7 @@ window.removeFeatureTag = function (tag) {
 function renderTags() {
   const el = document.getElementById("lst-features-tags");
   el.innerHTML = featureTags.map(t =>
-    `<span class="gd-tag">${t}<button type="button" class="gd-tag-remove" onclick="removeFeatureTag('${t}')">&times;</button></span>`
+    `<span class="gd-tag">${escapeHtml(t)}<button type="button" class="gd-tag-remove" onclick="removeFeatureTag('${escapeHtml(t)}')">&times;</button></span>`
   ).join("");
 }
 
@@ -560,13 +560,13 @@ window.openListingDetail = function (id) {
       ${listing.lotSize ? `<div class="gd-detail-spec"><span class="num">${listing.lotSize}</span><span class="lbl">Lot</span></div>` : ""}
       ${listing.garageSpaces ? `<div class="gd-detail-spec"><span class="num">${listing.garageSpaces}</span><span class="lbl">Garage</span></div>` : ""}
     </div>
-    ${listing.propertyType ? `<div class="gd-detail-field"><strong>Type:</strong> ${listing.propertyType}</div>` : ""}
-    ${listing.features?.length ? `<div class="gd-detail-field"><strong>Features:</strong> ${listing.features.map(f => `<span class="gd-tag">${f}</span>`).join(" ")}</div>` : ""}
-    ${listing.schoolDistrict ? `<div class="gd-detail-field"><strong>School:</strong> ${listing.schoolDistrict}${listing.schoolRating ? ` (${listing.schoolRating}/10)` : ""}</div>` : ""}
-    ${listing.description ? `<div class="gd-detail-field"><strong>Description:</strong> ${listing.description}</div>` : ""}
-    ${listing.notes ? `<div class="gd-detail-field"><strong>Notes:</strong> ${listing.notes}</div>` : ""}
-    ${listing.listingUrl ? `<div class="gd-detail-field"><a href="${listing.listingUrl}" target="_blank" class="gd-property-link">View Original Listing &rarr;</a></div>` : ""}
-    ${listing.virtualTourUrl ? `<div class="gd-detail-field"><a href="${listing.virtualTourUrl}" target="_blank" class="gd-property-link">Virtual Tour &rarr;</a></div>` : ""}
+    ${listing.propertyType ? `<div class="gd-detail-field"><strong>Type:</strong> ${escapeHtml(listing.propertyType)}</div>` : ""}
+    ${listing.features?.length ? `<div class="gd-detail-field"><strong>Features:</strong> ${listing.features.map(f => `<span class="gd-tag">${escapeHtml(f)}</span>`).join(" ")}</div>` : ""}
+    ${listing.schoolDistrict ? `<div class="gd-detail-field"><strong>School:</strong> ${escapeHtml(listing.schoolDistrict)}${listing.schoolRating ? ` (${listing.schoolRating}/10)` : ""}</div>` : ""}
+    ${listing.description ? `<div class="gd-detail-field"><strong>Description:</strong> ${escapeHtml(listing.description)}</div>` : ""}
+    ${listing.notes ? `<div class="gd-detail-field"><strong>Notes:</strong> ${escapeHtml(listing.notes)}</div>` : ""}
+    ${listing.listingUrl ? `<div class="gd-detail-field"><a href="${sanitizeUrl(listing.listingUrl)}" target="_blank" class="gd-property-link">View Original Listing &rarr;</a></div>` : ""}
+    ${listing.virtualTourUrl ? `<div class="gd-detail-field"><a href="${sanitizeUrl(listing.virtualTourUrl)}" target="_blank" class="gd-property-link">Virtual Tour &rarr;</a></div>` : ""}
   `;
 
   // Client Matches tab
@@ -600,9 +600,9 @@ function renderDetailMatches(listing) {
         <span>${m.score}%</span>
       </div>
       <div class="gd-match-info">
-        <a href="/greendoor/app/client-detail?id=${m.client.id}" class="gd-match-name">${m.client.fullName || "Unknown"}</a>
+        <a href="/greendoor/app/client-detail?id=${m.client.id}" class="gd-match-name">${escapeHtml(m.client.fullName) || "Unknown"}</a>
         <span class="gd-text-muted">${matchScoreLabel(m.score)}</span>
-        ${m.dealBreakerHits.length > 0 ? `<span class="gd-match-dealbreaker">Deal breaker: ${m.dealBreakerHits.join(", ")}</span>` : ""}
+        ${m.dealBreakerHits.length > 0 ? `<span class="gd-match-dealbreaker">Deal breaker: ${escapeHtml(m.dealBreakerHits.join(", "))}</span>` : ""}
       </div>
       <button class="gd-btn gd-btn-sm" onclick="matchListingToClient('${listing.id}', '${m.client.id}')">Match</button>
     </div>
