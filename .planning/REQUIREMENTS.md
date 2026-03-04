@@ -26,8 +26,8 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### Transaction Type
 
-- [ ] **TXTP-01**: Client detail page has a transaction type selector (SFH/Condo/Multi-Family/Land x Buyer/Seller)
-- [ ] **TXTP-02**: Selected transaction type saves to client's Firestore document (client.transactionType)
+- [x] **TXTP-01**: Client detail page has a transaction type selector (SFH/Condo/Multi-Family/Land x Buyer/Seller)
+- [x] **TXTP-02**: Selected transaction type saves to client's Firestore document (client.transactionType)
 
 ### Compliance Documents
 
@@ -139,8 +139,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| TXTP-01 | Phase 1 | Pending |
-| TXTP-02 | Phase 1 | Pending |
+| TXTP-01 | Phase 1 | Complete |
+| TXTP-02 | Phase 1 | Complete |
 | FLDR-01 | Phase 1 | Pending |
 | FLDR-02 | Phase 1 | Pending |
 | FLDR-03 | Phase 1 | Pending |
