@@ -50,9 +50,9 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 02-01-PLAN.md — BoldSign sender identity Cloud Function + sendComplianceDoc callable shell (BSND-01 through BSND-04)
-- [ ] 02-02-PLAN.md — Compliance template library: documentTemplates schema, MO form seed data, buildMergeFields utility (COMP-01 through COMP-03)
-- [ ] 02-03-PLAN.md — Compliance Docs tab UI, send-for-signature flow with confirm dialog, Cloud Function implementation, real-time status (COMP-04 through COMP-10)
+- [x] 02-01-PLAN.md — BoldSign sender identity Cloud Function + sendComplianceDoc callable shell (BSND-01 through BSND-04)
+- [x] 02-02-PLAN.md — Compliance template library: documentTemplates schema, MO form seed data, buildMergeFields utility (COMP-01 through COMP-03)
+- [x] 02-03-PLAN.md — Compliance Docs tab UI, send-for-signature flow with confirm dialog, Cloud Function implementation, real-time status (COMP-04 through COMP-10)
 
 ### Phase 3: Webhook Pipeline
 **Goal**: When a client signs a compliance document, the signed PDF automatically appears in their Closing Documents folder and the document status updates to "signed" — without any manual action from the realtor
@@ -64,12 +64,11 @@ Plans:
   3. Files in Closing Documents with a signed source display a green "Signed" badge in the file list
   4. A duplicate BoldSign event (re-delivery) does not create a second copy of the PDF or double-update status
   5. Forged or invalid webhook requests are rejected with a 401 before any data is written
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 03-01: Webhook Cloud Function — WHBK-01 through WHBK-05, HTTP onRequest, HMAC verification, idempotency
-- [ ] 03-02: Auto-save + status update — WHBK-06 through WHBK-10, Storage upload, Firestore writes, 200 response
-- [ ] 03-03: Signed document UI — SDUI-01, SDUI-02, status display on Compliance Docs tab and file badges
+- [ ] 03-01-PLAN.md — Complete boldSignWebhook Cloud Function: HMAC verification, event filtering, collectionGroup lookup, PDF download, Storage upload, Firestore file record + status update, idempotency (WHBK-01 through WHBK-10)
+- [ ] 03-02-PLAN.md — Signed document UI badges: field-based signedSource detection in renderFiles(), CSS refinement (SDUI-01, SDUI-02)
 
 ### Phase 4: AI Closing Checklist
 **Goal**: Realtors have a per-client closing checklist seeded to their transaction type, with items auto-completing when compliance docs are signed and an AI assistant available to summarize progress and suggest next actions
@@ -113,6 +112,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 (Phase 5 depends only
 |-------|----------------|--------|-----------|
 | 1. Foundations | 3/3 | Complete | 2026-03-04 |
 | 2. Compliance Documents | 3/3 | Complete   | 2026-03-04 |
-| 3. Webhook Pipeline | 0/3 | Not started | - |
+| 3. Webhook Pipeline | 0/2 | Not started | - |
 | 4. AI Closing Checklist | 0/3 | Not started | - |
 | 5. ShowingTime Sync | 0/2 | Not started | - |
