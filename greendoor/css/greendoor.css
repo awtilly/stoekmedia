@@ -2082,6 +2082,7 @@ textarea.gd-input {
   right: -420px;
   width: 400px;
   height: 100vh;
+  height: 100dvh;
   background: #ffffff;
   border-left: 1px solid #e5e7eb;
   box-shadow: -4px 0 24px rgba(0, 0, 0, 0.08);
@@ -2089,6 +2090,7 @@ textarea.gd-input {
   display: flex;
   flex-direction: column;
   transition: right 0.3s ease;
+  overflow: hidden;
 }
 
 .gd-ai-panel.open {
@@ -2252,6 +2254,7 @@ textarea.gd-input {
   display: flex;
   gap: 0.5rem;
   padding: var(--space-sm) var(--space-md);
+  padding-bottom: calc(var(--space-sm) + env(safe-area-inset-bottom, 0px));
   border-top: 1px solid #e5e7eb;
   background: #f9fafb;
   flex-shrink: 0;
@@ -4108,6 +4111,8 @@ textarea.gd-input {
   .gd-ai-panel {
     width: 100%;
     right: -100%;
+    height: 100vh;
+    height: 100dvh;
   }
 
   .gd-ai-popover {

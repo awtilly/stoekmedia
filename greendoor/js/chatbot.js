@@ -288,10 +288,40 @@ window.toggleVoiceInput = function () {
   recognition.start();
 };
 
+/* ---------- Safari mobile keyboard fix ---------- */
+function initMobileKeyboardFix() {
+  if (!window.visualViewport) return;
+
+  const panel = document.getElementById("ai-panel");
+  if (!panel) return;
+
+  const update = () => {
+    const vvh = window.visualViewport.height;
+    const offset = window.visualViewport.offsetTop;
+    panel.style.height = `${vvh}px`;
+    panel.style.top = `${offset}px`;
+  };
+
+  window.visualViewport.addEventListener("resize", update);
+  window.visualViewport.addEventListener("scroll", update);
+
+  // Scroll messages to bottom when input is focused (keyboard opens)
+  const input = document.getElementById("ai-input");
+  if (input) {
+    input.addEventListener("focus", () => {
+      setTimeout(() => {
+        const msgs = document.getElementById("ai-messages");
+        if (msgs) msgs.scrollTop = msgs.scrollHeight;
+      }, 300);
+    });
+  }
+}
+
 /* ---------- auto-init on auth ---------- */
 onAuthStateChanged(auth, (user) => {
   if (user && !document.getElementById("ai-panel")) {
     const page = detectPage();
     injectChatHTML(page);
+    initMobileKeyboardFix();
   }
 });
