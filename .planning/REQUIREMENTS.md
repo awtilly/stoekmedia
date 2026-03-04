@@ -22,7 +22,7 @@ Requirements for this milestone. Each maps to roadmap phases.
 - [x] **FLDR-04**: Folder cards display above the file list with name and file count
 - [x] **FLDR-05**: User can click a folder to filter files; breadcrumb navigates back to root
 - [x] **FLDR-06**: User can move a file to a folder or back to root via context menu
-- [ ] **FLDR-07**: A "Closing Documents" system folder auto-creates per client on page load
+- [x] **FLDR-07**: A "Closing Documents" system folder auto-creates per client on page load
 
 ### Transaction Type
 
@@ -147,7 +147,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | FLDR-04 | Phase 1 | Complete |
 | FLDR-05 | Phase 1 | Complete |
 | FLDR-06 | Phase 1 | Complete |
-| FLDR-07 | Phase 1 | Pending |
+| FLDR-07 | Phase 1 | Complete |
 | BSND-01 | Phase 2 | Pending |
 | BSND-02 | Phase 2 | Pending |
 | BSND-03 | Phase 2 | Pending |

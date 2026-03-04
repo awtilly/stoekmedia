@@ -12,7 +12,7 @@ This milestone extends the existing GreenDoor CRM with four tightly coupled capa
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Foundations** - Transaction type field on client record + file folder management with auto-created Closing Documents folder
+- [x] **Phase 1: Foundations** - Transaction type field on client record + file folder management with auto-created Closing Documents folder
 - [ ] **Phase 2: Compliance Documents** - BoldSign sender customization, compliance template library, send-for-signature flow, and real-time status tracking
 - [ ] **Phase 3: Webhook Pipeline** - BoldSign webhook receives completion events, verifies HMAC, auto-saves signed PDFs to Closing Documents folder, and marks docs signed
 - [ ] **Phase 4: AI Closing Checklist** - AI-seeded per-client closing checklist with manual/auto completion, progress tracking, and contextual AI check-in chat
@@ -33,9 +33,9 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans**: 3 plans
 
 Plans:
-- [ ] 01-01-PLAN.md — Transaction type selector on Overview tab with immediate Firestore save
-- [ ] 01-02-PLAN.md — Folder CRUD, navigation, file context menus, drag-and-drop, bulk move, migration
-- [ ] 01-03-PLAN.md — Auto-created Closing Documents system folder + end-to-end verification checkpoint
+- [x] 01-01-PLAN.md — Transaction type selector on Overview tab with immediate Firestore save
+- [x] 01-02-PLAN.md — Folder CRUD, navigation, file context menus, drag-and-drop, bulk move, migration
+- [x] 01-03-PLAN.md — Auto-created Closing Documents system folder + end-to-end verification checkpoint
 
 ### Phase 2: Compliance Documents
 **Goal**: Realtors can send Missouri compliance documents for e-signature directly from a client's record, with merge fields auto-filled from client/listing/agent data and the realtor's name shown as sender
@@ -111,7 +111,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 (Phase 5 depends only
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundations | 0/3 | Not started | - |
+| 1. Foundations | 3/3 | Complete | 2026-03-04 |
 | 2. Compliance Documents | 0/3 | Not started | - |
 | 3. Webhook Pipeline | 0/3 | Not started | - |
 | 4. AI Closing Checklist | 0/3 | Not started | - |
