@@ -34,13 +34,13 @@ Requirements for this milestone. Each maps to roadmap phases.
 - [x] **COMP-01**: Firestore `documentTemplates` collection stores template metadata (name, transaction types, BoldSign template ID, merge fields, category, required flag, order)
 - [x] **COMP-02**: Template library seeded with MO residential forms as stubs (Purchase Agreement, Listing Agreement, Agency Disclosure, Lead Paint Disclosure, HOA Addendum, Seller's Disclosure, Buyer Representation Agreement)
 - [x] **COMP-03**: Utility function `buildMergeFields(template, client, listing)` resolves field mappings from client, listing, and agent data
-- [ ] **COMP-04**: New "Compliance Docs" tab on client detail page
-- [ ] **COMP-05**: Compliance docs tab shows templates filtered by client's transaction type, grouped by category
-- [ ] **COMP-06**: Each template row shows name, category badge, required indicator, and status (not sent / sent / signed)
-- [ ] **COMP-07**: "Send for Signature" button calls Cloud Function that autofills BoldSign template with merge fields and sends to client
-- [ ] **COMP-08**: Cloud Function sets senderDetail to realtor's name and email from Firestore profile
-- [ ] **COMP-09**: Sent document ID and status saved to clients/{clientId}/complianceDocs/{templateId}
-- [ ] **COMP-10**: Real-time status display updates from Firestore (not sent / awaiting signature / signed)
+- [x] **COMP-04**: New "Compliance Docs" tab on client detail page
+- [x] **COMP-05**: Compliance docs tab shows templates filtered by client's transaction type, grouped by category
+- [x] **COMP-06**: Each template row shows name, category badge, required indicator, and status (not sent / sent / signed)
+- [x] **COMP-07**: "Send for Signature" button calls Cloud Function that autofills BoldSign template with merge fields and sends to client
+- [x] **COMP-08**: Cloud Function sets senderDetail to realtor's name and email from Firestore profile
+- [x] **COMP-09**: Sent document ID and status saved to clients/{clientId}/complianceDocs/{templateId}
+- [x] **COMP-10**: Real-time status display updates from Firestore (not sent / awaiting signature / signed)
 
 ### BoldSign Webhook
 
@@ -155,13 +155,13 @@ Which phases cover which requirements. Updated during roadmap creation.
 | COMP-01 | Phase 2 | Complete |
 | COMP-02 | Phase 2 | Complete |
 | COMP-03 | Phase 2 | Complete |
-| COMP-04 | Phase 2 | Pending |
-| COMP-05 | Phase 2 | Pending |
-| COMP-06 | Phase 2 | Pending |
-| COMP-07 | Phase 2 | Pending |
-| COMP-08 | Phase 2 | Pending |
-| COMP-09 | Phase 2 | Pending |
-| COMP-10 | Phase 2 | Pending |
+| COMP-04 | Phase 2 | Complete |
+| COMP-05 | Phase 2 | Complete |
+| COMP-06 | Phase 2 | Complete |
+| COMP-07 | Phase 2 | Complete |
+| COMP-08 | Phase 2 | Complete |
+| COMP-09 | Phase 2 | Complete |
+| COMP-10 | Phase 2 | Complete |
 | WHBK-01 | Phase 3 | Pending |
 | WHBK-02 | Phase 3 | Pending |
 | WHBK-03 | Phase 3 | Pending |
