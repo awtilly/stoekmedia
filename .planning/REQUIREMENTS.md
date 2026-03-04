@@ -44,16 +44,16 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### BoldSign Webhook
 
-- [ ] **WHBK-01**: HTTP Cloud Function at /boldSignWebhook receives BoldSign completion events
-- [ ] **WHBK-02**: Webhook verifies HMAC signature using req.rawBody and BOLDSIGN_WEBHOOK_SECRET
-- [ ] **WHBK-03**: Only processes events where type === "document.completed"
-- [ ] **WHBK-04**: Looks up matching GreenDoor record by BoldSign document ID
-- [ ] **WHBK-05**: Downloads signed PDF from BoldSign API
-- [ ] **WHBK-06**: Uploads signed PDF to Firebase Storage under client's closing path
-- [ ] **WHBK-07**: Saves file metadata to Firestore with folderId pointing to client's Closing Documents folder
-- [ ] **WHBK-08**: Updates complianceDocs status to "signed" with signedAt timestamp
-- [ ] **WHBK-09**: Webhook is idempotent (duplicate events don't create duplicate files)
-- [ ] **WHBK-10**: Returns 200 OK to BoldSign after processing
+- [x] **WHBK-01**: HTTP Cloud Function at /boldSignWebhook receives BoldSign completion events
+- [x] **WHBK-02**: Webhook verifies HMAC signature using req.rawBody and BOLDSIGN_WEBHOOK_SECRET
+- [x] **WHBK-03**: Only processes events where type === "document.completed"
+- [x] **WHBK-04**: Looks up matching GreenDoor record by BoldSign document ID
+- [x] **WHBK-05**: Downloads signed PDF from BoldSign API
+- [x] **WHBK-06**: Uploads signed PDF to Firebase Storage under client's closing path
+- [x] **WHBK-07**: Saves file metadata to Firestore with folderId pointing to client's Closing Documents folder
+- [x] **WHBK-08**: Updates complianceDocs status to "signed" with signedAt timestamp
+- [x] **WHBK-09**: Webhook is idempotent (duplicate events don't create duplicate files)
+- [x] **WHBK-10**: Returns 200 OK to BoldSign after processing
 
 ### Closing Checklist
 
@@ -90,8 +90,8 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### Signed Document UI
 
-- [ ] **SDUI-01**: Compliance Docs tab shows "Signed" with date when status === "signed"
-- [ ] **SDUI-02**: Files in Closing Documents folder with signed: true display a green "Signed" badge
+- [x] **SDUI-01**: Compliance Docs tab shows "Signed" with date when status === "signed"
+- [x] **SDUI-02**: Files in Closing Documents folder with signed: true display a green "Signed" badge
 
 ## v2 Requirements
 
@@ -162,18 +162,18 @@ Which phases cover which requirements. Updated during roadmap creation.
 | COMP-08 | Phase 2 | Complete |
 | COMP-09 | Phase 2 | Complete |
 | COMP-10 | Phase 2 | Complete |
-| WHBK-01 | Phase 3 | Pending |
-| WHBK-02 | Phase 3 | Pending |
-| WHBK-03 | Phase 3 | Pending |
-| WHBK-04 | Phase 3 | Pending |
-| WHBK-05 | Phase 3 | Pending |
-| WHBK-06 | Phase 3 | Pending |
-| WHBK-07 | Phase 3 | Pending |
-| WHBK-08 | Phase 3 | Pending |
-| WHBK-09 | Phase 3 | Pending |
-| WHBK-10 | Phase 3 | Pending |
-| SDUI-01 | Phase 3 | Pending |
-| SDUI-02 | Phase 3 | Pending |
+| WHBK-01 | Phase 3 | Complete |
+| WHBK-02 | Phase 3 | Complete |
+| WHBK-03 | Phase 3 | Complete |
+| WHBK-04 | Phase 3 | Complete |
+| WHBK-05 | Phase 3 | Complete |
+| WHBK-06 | Phase 3 | Complete |
+| WHBK-07 | Phase 3 | Complete |
+| WHBK-08 | Phase 3 | Complete |
+| WHBK-09 | Phase 3 | Complete |
+| WHBK-10 | Phase 3 | Complete |
+| SDUI-01 | Phase 3 | Complete |
+| SDUI-02 | Phase 3 | Complete |
 | CHKL-01 | Phase 4 | Pending |
 | CHKL-02 | Phase 4 | Pending |
 | CHKL-03 | Phase 4 | Pending |

@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: completed
-stopped_at: Phase 3 context gathered
-last_updated: "2026-03-04T22:11:39.733Z"
-last_activity: 2026-03-04 — Completed 02-03 Compliance Docs Tab UI
+status: executing
+stopped_at: Completed 03-01-PLAN.md
+last_updated: "2026-03-04T22:36:33.999Z"
+last_activity: 2026-03-04 — Completed 03-02 Signed Document UI
 progress:
   total_phases: 5
-  completed_phases: 2
-  total_plans: 6
-  completed_plans: 6
+  completed_phases: 3
+  total_plans: 8
+  completed_plans: 8
   percent: 100
 ---
 
@@ -21,23 +21,23 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-04)
 
 **Core value:** Realtors can manage their entire client-to-close workflow in one place — from lead intake through document signing to closing — without switching between tools.
-**Current focus:** Phase 2 -- Compliance Documents (sender identity + template library + send flow)
+**Current focus:** Phase 3 -- Webhook Pipeline (BoldSign webhook handler + signed document UI)
 
 ## Current Position
 
-Phase: 2 of 5 (Compliance Documents)
-Plan: 3 of 3 in current phase (02-01, 02-02, 02-03 done)
-Status: Phase 2 Complete
-Last activity: 2026-03-04 — Completed 02-03 Compliance Docs Tab UI
+Phase: 3 of 5 (Webhook Pipeline)
+Plan: 2 of 2 in current phase (03-01, 03-02 done)
+Status: Phase 3 Complete
+Last activity: 2026-03-04 — Completed 03-01 BoldSign Webhook Pipeline
 
 Progress: [██████████] 100%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 6
-- Average duration: 4.2m
-- Total execution time: 0.42 hours
+- Total plans completed: 8
+- Average duration: 3.5m
+- Total execution time: 0.47 hours
 
 **By Phase:**
 
@@ -50,9 +50,12 @@ Progress: [██████████] 100%
 | 02 | P02 | 2m | 2 | 2 |
 | 02 | P03 | 12m | 4 | 4 |
 
+| 03 | P01 | 2m | 1 | 1 |
+| 03 | P02 | 1m | 2 | 2 |
+
 **Recent Trend:**
-- Last 5 plans: 4m, 3m, 2m, 2m, 12m
-- Trend: increasing (02-03 was larger scope)
+- Last 5 plans: 2m, 2m, 12m, 1m, 2m
+- Trend: fast execution (webhook function was single focused task)
 
 *Updated after each plan completion*
 
@@ -79,6 +82,11 @@ Recent decisions affecting current work:
 - [Phase 02]: Bulk send bundles into single BoldSign envelope via mergeAndSend; auto-falls back to sequential sends if endpoint rejects
 - [Phase 02]: Server-side merge field resolution mirrors client-side buildMergeFields for security
 - [Phase 02]: No transaction type shows all forms dimmed with warning banner rather than hiding them
+- [Phase 03]: formatDate() reused for signedAt display -- already handles Firestore Timestamps
+- [Phase 03]: No SDUI-01 code changes needed -- formatComplianceStatus() already renders signed badge from webhook data
+- [Phase 03]: HMAC verification uses hex buffer comparison with crypto.timingSafeEqual to prevent timing attacks
+- [Phase 03]: Always return 200 to BoldSign even on internal errors to prevent retry loops on permanently failing requests
+- [Phase 03]: Deterministic file doc ID pattern (clientId_signed_templateId) for natural webhook idempotency via setDoc
 
 ### Pending Todos
 
@@ -93,6 +101,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-04T22:11:39.728Z
-Stopped at: Phase 3 context gathered
-Resume file: .planning/phases/03-webhook-pipeline/03-CONTEXT.md
+Last session: 2026-03-04T22:36:33.993Z
+Stopped at: Completed 03-01-PLAN.md
+Resume file: None
