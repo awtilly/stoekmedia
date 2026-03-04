@@ -30,12 +30,12 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. Realtor can click a folder to view only files inside it, with a breadcrumb back to the root file list
   4. Realtor can move a file into a folder or back to root via a context menu on each file
   5. Every client's file section automatically shows a "Closing Documents" system folder that cannot be deleted
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 01-01: Transaction type field — add TXTP-01/TXTP-02, extend client schema, deploy Firestore indexes
-- [ ] 01-02: Folder CRUD — FLDR-01 through FLDR-06, folders collection, UI in client-detail.js
-- [ ] 01-03: Auto-created Closing Documents folder — FLDR-07, system folder on page load, cascade delete extension
+- [ ] 01-01-PLAN.md — Transaction type selector on Overview tab with immediate Firestore save
+- [ ] 01-02-PLAN.md — Folder CRUD, navigation, file context menus, drag-and-drop, bulk move, migration
+- [ ] 01-03-PLAN.md — Auto-created Closing Documents system folder + end-to-end verification checkpoint
 
 ### Phase 2: Compliance Documents
 **Goal**: Realtors can send Missouri compliance documents for e-signature directly from a client's record, with merge fields auto-filled from client/listing/agent data and the realtor's name shown as sender
