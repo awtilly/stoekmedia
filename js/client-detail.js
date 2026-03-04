@@ -1,7 +1,7 @@
 import { auth, db, storage, functions, httpsCallable } from "./firebase-config.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import {
-  doc, getDoc, updateDoc, deleteDoc, addDoc, getDocs,
+  doc, getDoc, setDoc, updateDoc, deleteDoc, addDoc, getDocs,
   collection, query, where, orderBy, serverTimestamp, Timestamp,
   getCountFromServer, limit, onSnapshot, writeBatch
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
@@ -99,6 +99,11 @@ async function loadClient(uid) {
     renderFolderCards();
     renderBreadcrumb();
 
+    // Auto-create Closing Documents folder if client already has a transaction type
+    if (clientData.transactionType) {
+      await ensureClosingDocumentsFolder(clientId, uid);
+    }
+
     document.getElementById("detail-loading").classList.add("gd-hidden");
     document.getElementById("detail-content").classList.remove("gd-hidden");
   } catch (e) {
@@ -146,6 +151,10 @@ document.getElementById("ov-transactionType").addEventListener("change", async (
     await updateDoc(doc(db, "clients", clientId), { transactionType: value });
     clientData.transactionType = value;
     showToast("Transaction type updated.");
+    // Auto-create Closing Documents folder when transaction type is set
+    if (value) {
+      await ensureClosingDocumentsFolder(clientId, user.uid);
+    }
   } catch (err) {
     console.error("Transaction type save error:", err);
     showToast("Failed to update transaction type.", "error");
@@ -462,6 +471,46 @@ async function loadFolders(uid) {
     allFolders = snap.docs.map(d => ({ id: d.id, ...d.data() }));
   } catch (e) {
     console.error("Load folders error:", e);
+  }
+}
+
+async function ensureClosingDocumentsFolder(clientId, uid) {
+  // Check if a system folder already exists for this client
+  const existing = allFolders.find(f => f.isSystem === true);
+  if (existing) return; // Already exists — idempotent
+
+  // Use a deterministic document ID to prevent race conditions
+  // (two tabs setting transaction type simultaneously)
+  const deterministicId = `${clientId}_closing_documents`;
+  const folderRef = doc(db, "folders", deterministicId);
+
+  try {
+    // Check Firestore directly (in case allFolders is stale)
+    const snap = await getDoc(folderRef);
+    if (snap.exists()) {
+      // Already exists in Firestore but not in local state — reload
+      await loadFolders(uid);
+      renderFolderCards();
+      return;
+    }
+
+    // Create the system folder with deterministic ID
+    await setDoc(folderRef, {
+      name: "Closing Documents",
+      clientId: clientId,
+      realtorId: uid,
+      isSystem: true,
+      createdAt: serverTimestamp()
+    });
+
+    // Reload folders to pick up the new system folder
+    await loadFolders(uid);
+    renderFolderCards();
+    showToast("Closing Documents folder created.");
+  } catch (err) {
+    console.error("Ensure Closing Documents folder error:", err);
+    // Don't show error toast — this is a background operation
+    // The folder may have been created by another tab (duplicate key error is OK)
   }
 }
 
