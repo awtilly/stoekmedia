@@ -31,9 +31,9 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### Compliance Documents
 
-- [ ] **COMP-01**: Firestore `documentTemplates` collection stores template metadata (name, transaction types, BoldSign template ID, merge fields, category, required flag, order)
-- [ ] **COMP-02**: Template library seeded with MO residential forms as stubs (Purchase Agreement, Listing Agreement, Agency Disclosure, Lead Paint Disclosure, HOA Addendum, Seller's Disclosure, Buyer Representation Agreement)
-- [ ] **COMP-03**: Utility function `buildMergeFields(template, client, listing)` resolves field mappings from client, listing, and agent data
+- [x] **COMP-01**: Firestore `documentTemplates` collection stores template metadata (name, transaction types, BoldSign template ID, merge fields, category, required flag, order)
+- [x] **COMP-02**: Template library seeded with MO residential forms as stubs (Purchase Agreement, Listing Agreement, Agency Disclosure, Lead Paint Disclosure, HOA Addendum, Seller's Disclosure, Buyer Representation Agreement)
+- [x] **COMP-03**: Utility function `buildMergeFields(template, client, listing)` resolves field mappings from client, listing, and agent data
 - [ ] **COMP-04**: New "Compliance Docs" tab on client detail page
 - [ ] **COMP-05**: Compliance docs tab shows templates filtered by client's transaction type, grouped by category
 - [ ] **COMP-06**: Each template row shows name, category badge, required indicator, and status (not sent / sent / signed)
@@ -152,9 +152,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | BSND-02 | Phase 2 | Pending |
 | BSND-03 | Phase 2 | Pending |
 | BSND-04 | Phase 2 | Pending |
-| COMP-01 | Phase 2 | Pending |
-| COMP-02 | Phase 2 | Pending |
-| COMP-03 | Phase 2 | Pending |
+| COMP-01 | Phase 2 | Complete |
+| COMP-02 | Phase 2 | Complete |
+| COMP-03 | Phase 2 | Complete |
 | COMP-04 | Phase 2 | Pending |
 | COMP-05 | Phase 2 | Pending |
 | COMP-06 | Phase 2 | Pending |
