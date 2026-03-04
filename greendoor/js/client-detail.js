@@ -563,7 +563,7 @@ window.uploadFile = async function () {
     },
     async () => {
       try {
-        const downloadUrl = await getDownloadURL(storageRef);
+        const downloadUrl = await getDownloadURL(task.snapshot.ref);
         await addDoc(collection(db, "files"), {
           clientId,
           realtorId: user.uid,
@@ -588,10 +588,15 @@ window.uploadFile = async function () {
         fileInput.value = "";
         progressBar.classList.remove("active");
         await loadFiles(user.uid);
-        const c = await getCountFromServer(query(collection(db, "files"), where("clientId", "==", clientId), where("realtorId", "==", user.uid)));
-        document.getElementById("qs-files").textContent = c.data().count;
+        // Update file count badge — non-critical, don't let failures here show misleading error
+        try {
+          const c = await getCountFromServer(query(collection(db, "files"), where("clientId", "==", clientId), where("realtorId", "==", user.uid)));
+          document.getElementById("qs-files").textContent = c.data().count;
+        } catch (countErr) {
+          console.warn("File count update failed:", countErr);
+        }
       } catch (e) {
-        console.error("File doc error:", e);
+        console.error("File record error:", e);
         showToast("Upload succeeded but failed to save record.", "error");
         progressBar.classList.remove("active");
       }
@@ -703,8 +708,8 @@ window.uploadAndSend = async function () {
 
   try {
     showToast("Uploading...");
-    await uploadBytesResumable(storageRef, file);
-    const downloadUrl = await getDownloadURL(storageRef);
+    const snap = await uploadBytesResumable(storageRef, file);
+    const downloadUrl = await getDownloadURL(snap.ref);
     const docRef = await addDoc(collection(db, "files"), {
       clientId, realtorId: user.uid, fileName: file.name, storagePath, downloadUrl,
       folder, fileSize: file.size, mimeType: file.type, uploadedAt: serverTimestamp()
