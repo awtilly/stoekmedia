@@ -1,7 +1,9 @@
-const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const { onCall, onRequest, HttpsError } = require("firebase-functions/v2/https");
 const { initializeApp } = require("firebase-admin/app");
 const { getFirestore } = require("firebase-admin/firestore");
+const { getStorage } = require("firebase-admin/storage");
 const { getAuth } = require("firebase-admin/auth");
+const crypto = require("crypto");
 
 initializeApp();
 const db = getFirestore();
@@ -477,5 +479,183 @@ exports.sendBulkComplianceDocs = onCall({ region: "us-central1" }, async (reques
     }
     console.error("sendBulkComplianceDocs error:", error);
     throw new HttpsError("internal", `Failed to send bulk compliance documents: ${error.message}`);
+  }
+});
+
+/* ------------------------------------------------------------------ */
+/*  HMAC signature verification for BoldSign webhooks                 */
+/* ------------------------------------------------------------------ */
+
+function verifyBoldSignSignature(signatureHeader, rawBody, secret) {
+  if (!signatureHeader || !secret) return false;
+
+  // Parse header: "t=1668693823, s0=abc123def"
+  const parts = {};
+  signatureHeader.split(",").forEach(segment => {
+    const trimmed = segment.trim();
+    const eqIdx = trimmed.indexOf("=");
+    if (eqIdx > 0) {
+      parts[trimmed.substring(0, eqIdx)] = trimmed.substring(eqIdx + 1);
+    }
+  });
+
+  const timestamp = parts["t"];
+  const signature = parts["s0"];
+  if (!timestamp || !signature) return false;
+
+  // Signed payload: timestamp + "." + rawBody (as UTF-8 string)
+  const signedPayload = timestamp + "." + (Buffer.isBuffer(rawBody) ? rawBody.toString("utf8") : rawBody);
+  const computed = crypto.createHmac("sha256", secret).update(signedPayload, "utf8").digest("hex");
+
+  // Constant-time comparison to prevent timing attacks
+  try {
+    return crypto.timingSafeEqual(Buffer.from(computed, "hex"), Buffer.from(signature, "hex"));
+  } catch {
+    return false;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/*  boldSignWebhook                                                    */
+/*                                                                     */
+/*  Receives BoldSign completion events, verifies HMAC signature,      */
+/*  downloads the signed PDF, uploads it to Firebase Storage under      */
+/*  the client's closing-documents path, creates a Firestore file       */
+/*  record, and updates the compliance doc status to "signed".          */
+/* ------------------------------------------------------------------ */
+
+exports.boldSignWebhook = onRequest({ region: "us-central1" }, async (req, res) => {
+  // Step 1 -- Method guard: only accept POST
+  if (req.method !== "POST") {
+    return res.status(405).send("Method not allowed");
+  }
+
+  // Step 2 -- HMAC verification (WHBK-02)
+  const sigHeader = req.headers["x-boldsign-signature"];
+  if (!sigHeader || !verifyBoldSignSignature(sigHeader, req.rawBody, process.env.BOLDSIGN_WEBHOOK_SECRET)) {
+    console.error("Webhook signature verification failed");
+    return res.status(401).send("Invalid signature");
+  }
+
+  // Step 3 -- Event filtering (WHBK-03): only process "Completed" events
+  const body = req.body;
+  const eventType = body?.event?.eventType;
+  if (eventType !== "Completed") {
+    return res.status(200).send("OK");
+  }
+
+  // Steps 4-8 wrapped in try/catch -- always return 200 to prevent BoldSign retries
+  try {
+    const documentId = body?.data?.documentId;
+    if (!documentId) {
+      console.warn("boldSignWebhook: Completed event missing data.documentId");
+      return res.status(200).send("OK");
+    }
+
+    // Step 4 -- Document lookup (WHBK-04)
+    const snapshot = await db.collectionGroup("complianceDocs")
+      .where("boldSignDocumentId", "==", documentId)
+      .limit(1)
+      .get();
+
+    if (snapshot.empty) {
+      console.warn("boldSignWebhook: No matching complianceDocs record for documentId:", documentId);
+      return res.status(200).send("OK");
+    }
+
+    const docSnap = snapshot.docs[0];
+    const templateId = docSnap.id;
+    const clientId = docSnap.ref.parent.parent.id;
+    const complianceData = docSnap.data();
+    const realtorId = complianceData.sentBy;
+
+    // Step 5 -- Idempotency check (WHBK-09)
+    const fileDocId = `${clientId}_signed_${templateId}`;
+    const existingFile = await db.doc(`files/${fileDocId}`).get();
+    if (existingFile.exists) {
+      // Duplicate event -- already processed
+      return res.status(200).send("OK");
+    }
+
+    // Read template name for filename construction
+    let templateName = templateId;
+    const templateSnap = await db.doc(`documentTemplates/${templateId}`).get();
+    if (templateSnap.exists && templateSnap.data().name) {
+      templateName = templateSnap.data().name;
+    }
+
+    // Step 6 -- Download signed PDF (WHBK-05)
+    const apiKey = process.env.BOLDSIGN_API_KEY;
+    if (!apiKey) {
+      console.error("boldSignWebhook: BOLDSIGN_API_KEY not configured");
+      return res.status(200).send("OK");
+    }
+
+    const downloadResponse = await fetch(
+      `https://api.boldsign.com/v1/document/download?documentId=${encodeURIComponent(documentId)}`,
+      {
+        method: "GET",
+        headers: { "X-API-KEY": apiKey }
+      }
+    );
+
+    if (!downloadResponse.ok) {
+      const errText = await downloadResponse.text();
+      console.error(`boldSignWebhook: PDF download failed (${downloadResponse.status}):`, errText);
+      return res.status(200).send("OK");
+    }
+
+    const pdfBuffer = Buffer.from(await downloadResponse.arrayBuffer());
+
+    // Step 7 -- Upload to Storage (WHBK-06)
+    const dateStr = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+    const safeTemplateName = templateName.replace(/\s+/g, "_");
+    const fileName = `${safeTemplateName}_signed_${dateStr}.pdf`;
+    const storagePath = `clients/${clientId}/closing-documents/${fileName}`;
+
+    const bucket = getStorage().bucket();
+    const file = bucket.file(storagePath);
+    await file.save(pdfBuffer, { contentType: "application/pdf" });
+
+    const [signedUrl] = await file.getSignedUrl({
+      action: "read",
+      expires: "2030-01-01"
+    });
+
+    // Step 8 -- Write Firestore records (WHBK-07, WHBK-08)
+    const FieldValue = require("firebase-admin/firestore").FieldValue;
+
+    await Promise.all([
+      // File record with deterministic ID for idempotency
+      db.doc(`files/${fileDocId}`).set({
+        clientId: clientId,
+        realtorId: realtorId,
+        fileName: fileName,
+        storagePath: storagePath,
+        downloadUrl: signedUrl,
+        folderId: `${clientId}_closing_documents`,
+        fileSize: pdfBuffer.length,
+        mimeType: "application/pdf",
+        signedSource: true,
+        signedAt: FieldValue.serverTimestamp(),
+        complianceTemplateId: templateId,
+        boldSignDocumentId: documentId,
+        uploadedAt: FieldValue.serverTimestamp()
+      }),
+      // Status update on complianceDocs record
+      db.doc(`clients/${clientId}/complianceDocs/${templateId}`).update({
+        status: "signed",
+        signedAt: FieldValue.serverTimestamp()
+      })
+    ]);
+
+    console.log(`boldSignWebhook: Processed signed document for client ${clientId}, template ${templateId}`);
+
+    // Step 9 -- Respond (WHBK-10)
+    return res.status(200).send("OK");
+
+  } catch (error) {
+    console.error("boldSignWebhook error:", error);
+    return res.status(200).send("OK");
   }
 });
