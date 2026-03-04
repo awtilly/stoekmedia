@@ -277,25 +277,10 @@
 
         <!-- ===== FILES TAB ===== -->
         <div id="tab-files" class="gd-tab-content">
-          <div class="gd-folder-filters" id="folder-filters">
-            <button class="gd-folder-btn active" data-folder="all">All</button>
-            <button class="gd-folder-btn" data-folder="contracts">Contracts</button>
-            <button class="gd-folder-btn" data-folder="disclosures">Disclosures</button>
-            <button class="gd-folder-btn" data-folder="inspections">Inspections</button>
-            <button class="gd-folder-btn" data-folder="financial">Financial</button>
-            <button class="gd-folder-btn" data-folder="photos">Photos</button>
-            <button class="gd-folder-btn" data-folder="other">Other</button>
-          </div>
+          <div id="folder-breadcrumb" class="gd-breadcrumb gd-hidden"></div>
+          <div id="folder-cards" class="gd-folder-cards"></div>
 
           <div class="gd-file-controls">
-            <select id="upload-folder" class="gd-input" style="min-width: 140px; max-width: 180px;">
-              <option value="contracts">Contracts</option>
-              <option value="disclosures">Disclosures</option>
-              <option value="inspections">Inspections</option>
-              <option value="financial">Financial</option>
-              <option value="photos">Photos</option>
-              <option value="other">Other</option>
-            </select>
             <button class="gd-upload-circle" onclick="document.getElementById('file-input').click()" title="Upload file">+</button>
             <input type="file" id="file-input" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.xlsx,.csv" style="display:none;">
             <button class="gd-btn gd-btn-signature gd-btn-sm" onclick="openSignatureModal()">&#9997; Send for Signature</button>
@@ -613,6 +598,7 @@
     <span id="file-action-count">0 selected</span>
     <button class="gd-btn gd-btn-primary" onclick="openSendDocModal()">Send to Client</button>
     <button class="gd-btn" onclick="openSignatureModalFromSelection()">Send for Signature</button>
+    <button class="gd-btn" onclick="openBulkMoveMenu(this)">Move to...</button>
     <button class="gd-file-action-close" onclick="clearFileSelection()">&times;</button>
   </div>
 

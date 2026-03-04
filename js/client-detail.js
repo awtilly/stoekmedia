@@ -3,7 +3,7 @@ import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/fi
 import {
   doc, getDoc, updateDoc, deleteDoc, addDoc, getDocs,
   collection, query, where, orderBy, serverTimestamp, Timestamp,
-  getCountFromServer, limit, onSnapshot
+  getCountFromServer, limit, onSnapshot, writeBatch
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import {
   ref, uploadBytesResumable, getDownloadURL, deleteObject
@@ -23,6 +23,8 @@ let selectedRating = 0;
 let allMatches = []; // clientListingMatches joined with listing data
 let allListingsCache = []; // all listings for match-a-listing panel
 let allFiles = [];
+let allFolders = [];
+let currentFolderId = null;
 let allShowings = [];
 let allFollowUps = [];
 let selectedCompare = new Set();
@@ -92,7 +94,10 @@ async function loadClient(uid) {
     }
 
     populateOverview(clientData);
-    await Promise.all([loadActivities(uid), loadFiles(uid), loadTemplateFiles(uid), loadMatches(uid), loadEnvelopes(uid), loadShowings(uid), loadFollowUps(uid)]);
+    await Promise.all([loadActivities(uid), loadFiles(uid), loadFolders(uid), loadTemplateFiles(uid), loadMatches(uid), loadEnvelopes(uid), loadShowings(uid), loadFollowUps(uid)]);
+    await migrateExistingFolders(uid);
+    renderFolderCards();
+    renderBreadcrumb();
 
     document.getElementById("detail-loading").classList.add("gd-hidden");
     document.getElementById("detail-content").classList.remove("gd-hidden");
@@ -443,17 +448,378 @@ window.saveAsTemplate = async function () {
   }
 };
 
-/* ===== FILES TAB ===== */
-let currentFileFolder = "all";
+/* ===== FOLDER MANAGEMENT ===== */
 
-document.getElementById("folder-filters").addEventListener("click", (e) => {
-  const btn = e.target.closest(".gd-folder-btn");
-  if (!btn) return;
-  document.querySelectorAll(".gd-folder-btn").forEach(b => b.classList.remove("active"));
-  btn.classList.add("active");
-  currentFileFolder = btn.dataset.folder;
+async function loadFolders(uid) {
+  try {
+    const q = query(
+      collection(db, "folders"),
+      where("clientId", "==", clientId),
+      where("realtorId", "==", uid),
+      orderBy("createdAt", "asc")
+    );
+    const snap = await getDocs(q);
+    allFolders = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  } catch (e) {
+    console.error("Load folders error:", e);
+  }
+}
+
+function renderFolderCards() {
+  const container = document.getElementById("folder-cards");
+  const breadcrumbEl = document.getElementById("folder-breadcrumb");
+  if (!container) return;
+
+  // If inside a folder, hide folder cards and show breadcrumb
+  if (currentFolderId) {
+    container.classList.add("gd-hidden");
+    return;
+  }
+
+  container.classList.remove("gd-hidden");
+
+  let html = allFolders.map(f => {
+    const count = allFiles.filter(file => file.folderId === f.id).length;
+    const isSystem = f.isSystem === true;
+    const systemClass = isSystem ? " gd-folder-card--system" : "";
+    const icon = isSystem ? "&#128274;" : "&#128193;";
+    const kebab = isSystem ? "" : `
+      <button class="gd-folder-kebab" onclick="event.stopPropagation(); toggleFolderMenu('${f.id}')" title="Folder options">&#8942;</button>
+      <div id="folder-menu-${f.id}" class="gd-folder-menu gd-hidden">
+        <button onclick="event.stopPropagation(); renameFolder('${f.id}')">Rename</button>
+        <button onclick="event.stopPropagation(); deleteFolder('${f.id}')">Delete</button>
+      </div>`;
+    return `
+    <div class="gd-folder-card${systemClass}" onclick="enterFolder('${f.id}')"
+      ondragover="event.preventDefault(); this.classList.add('gd-folder-card--dragover')"
+      ondragleave="this.classList.remove('gd-folder-card--dragover')"
+      ondrop="event.preventDefault(); this.classList.remove('gd-folder-card--dragover'); dropFileOnFolder(event, '${f.id}')">
+      <span class="gd-folder-card-icon">${icon}</span>
+      <span class="gd-folder-card-name">${escapeHtml(f.name)}</span>
+      <span class="gd-folder-card-count">${count}</span>
+      ${kebab}
+    </div>`;
+  }).join("");
+
+  // Add "+ New Folder" card
+  html += `
+    <div class="gd-folder-card gd-folder-card--add" onclick="createNewFolder()">
+      <span class="gd-folder-card-icon">+</span>
+      <span class="gd-folder-card-name">New Folder</span>
+    </div>`;
+
+  container.innerHTML = html;
+}
+
+function renderBreadcrumb() {
+  const el = document.getElementById("folder-breadcrumb");
+  if (!el) return;
+
+  if (currentFolderId) {
+    const folder = allFolders.find(f => f.id === currentFolderId);
+    const folderName = folder ? escapeHtml(folder.name) : "Folder";
+    el.innerHTML = `
+      <span class="gd-breadcrumb-link" onclick="exitFolder()">Files</span>
+      <span class="gd-breadcrumb-sep">&rsaquo;</span>
+      <span class="gd-breadcrumb-current">${folderName}</span>`;
+    el.classList.remove("gd-hidden");
+  } else {
+    el.classList.add("gd-hidden");
+    el.innerHTML = "";
+  }
+}
+
+window.enterFolder = function (folderId) {
+  currentFolderId = folderId;
+  renderFolderCards();
   renderFiles();
+  renderBreadcrumb();
+};
+
+window.exitFolder = function () {
+  currentFolderId = null;
+  renderFolderCards();
+  renderFiles();
+  renderBreadcrumb();
+};
+
+window.createNewFolder = async function () {
+  const user = auth.currentUser;
+  if (!user) return;
+
+  const name = prompt("Folder name:");
+  if (!name || !name.trim()) return;
+
+  try {
+    await addDoc(collection(db, "folders"), {
+      name: name.trim(),
+      clientId,
+      realtorId: user.uid,
+      isSystem: false,
+      createdAt: serverTimestamp()
+    });
+    await loadFolders(user.uid);
+    renderFolderCards();
+    showToast("Folder created.");
+  } catch (e) {
+    console.error("Create folder error:", e);
+    showToast("Failed to create folder.", "error");
+  }
+};
+
+window.renameFolder = async function (folderId) {
+  const user = auth.currentUser;
+  if (!user) return;
+
+  const folder = allFolders.find(f => f.id === folderId);
+  if (!folder || folder.isSystem) return;
+
+  const newName = prompt("New folder name:", folder.name);
+  if (!newName || !newName.trim() || newName.trim() === folder.name) return;
+
+  try {
+    await updateDoc(doc(db, "folders", folderId), { name: newName.trim() });
+    await loadFolders(user.uid);
+    renderFolderCards();
+    renderBreadcrumb();
+    showToast("Folder renamed.");
+  } catch (e) {
+    console.error("Rename folder error:", e);
+    showToast("Failed to rename folder.", "error");
+  }
+};
+
+window.deleteFolder = async function (folderId) {
+  const user = auth.currentUser;
+  if (!user) return;
+
+  const folder = allFolders.find(f => f.id === folderId);
+  if (!folder || folder.isSystem) return;
+
+  if (!confirm("Delete this folder? Files inside will be moved to root.")) return;
+
+  try {
+    const batch = writeBatch(db);
+    // Move all files in this folder to root
+    const filesInFolder = allFiles.filter(f => f.folderId === folderId);
+    for (const f of filesInFolder) {
+      batch.update(doc(db, "files", f.id), { folderId: null });
+    }
+    // Delete the folder doc
+    batch.delete(doc(db, "folders", folderId));
+    await batch.commit();
+
+    // If user was inside this folder, exit
+    if (currentFolderId === folderId) {
+      currentFolderId = null;
+    }
+
+    await Promise.all([loadFolders(user.uid), loadFiles(user.uid)]);
+    renderFolderCards();
+    renderFiles();
+    renderBreadcrumb();
+    showToast("Folder deleted. Files moved to root.");
+  } catch (e) {
+    console.error("Delete folder error:", e);
+    showToast("Failed to delete folder.", "error");
+  }
+};
+
+window.toggleFolderMenu = function (folderId) {
+  // Close all other folder menus first
+  document.querySelectorAll(".gd-folder-menu").forEach(m => {
+    if (m.id !== "folder-menu-" + folderId) {
+      m.classList.add("gd-hidden");
+    }
+  });
+  const menu = document.getElementById("folder-menu-" + folderId);
+  if (menu) {
+    menu.classList.toggle("gd-hidden");
+  }
+};
+
+// Close menus on outside click
+document.addEventListener("click", (e) => {
+  if (!e.target.closest(".gd-folder-kebab") && !e.target.closest(".gd-folder-menu")) {
+    document.querySelectorAll(".gd-folder-menu").forEach(m => m.classList.add("gd-hidden"));
+  }
+  if (!e.target.closest(".gd-file-kebab") && !e.target.closest(".gd-file-menu")) {
+    document.querySelectorAll(".gd-file-menu").forEach(m => m.classList.add("gd-hidden"));
+  }
 });
+
+/* --- File Move Functions --- */
+
+window.moveFileToFolder = async function (fileId, folderId) {
+  const user = auth.currentUser;
+  if (!user) return;
+
+  try {
+    await updateDoc(doc(db, "files", fileId), { folderId: folderId || null });
+    // Update in memory
+    const file = allFiles.find(f => f.id === fileId);
+    if (file) file.folderId = folderId || null;
+    renderFolderCards();
+    renderFiles();
+    showToast("File moved.");
+  } catch (e) {
+    console.error("Move file error:", e);
+    showToast("Failed to move file.", "error");
+  }
+};
+
+window.bulkMoveToFolder = async function (folderId) {
+  const user = auth.currentUser;
+  if (!user) return;
+
+  const ids = Array.from(selectedFiles);
+  if (ids.length === 0) return;
+
+  try {
+    const batch = writeBatch(db);
+    for (const fileId of ids) {
+      batch.update(doc(db, "files", fileId), { folderId: folderId || null });
+    }
+    await batch.commit();
+
+    // Update in memory
+    for (const fileId of ids) {
+      const file = allFiles.find(f => f.id === fileId);
+      if (file) file.folderId = folderId || null;
+    }
+
+    clearFileSelection();
+    renderFolderCards();
+    renderFiles();
+    showToast(ids.length + " file" + (ids.length > 1 ? "s" : "") + " moved.");
+  } catch (e) {
+    console.error("Bulk move error:", e);
+    showToast("Failed to move files.", "error");
+  }
+};
+
+window.dropFileOnFolder = function (event, folderId) {
+  const fileId = event.dataTransfer.getData("text/plain");
+  if (fileId) {
+    moveFileToFolder(fileId, folderId);
+  }
+};
+
+window.showFileMoveMenu = function (fileId, event) {
+  event.stopPropagation();
+  // Close any existing file move menus
+  document.querySelectorAll(".gd-file-move-popover").forEach(m => m.remove());
+
+  const btn = event.currentTarget;
+  const rect = btn.getBoundingClientRect();
+
+  let html = '<div class="gd-file-move-popover" style="position:fixed;top:' + (rect.bottom + 4) + 'px;left:' + rect.left + 'px;z-index:2100;">';
+  html += '<div class="gd-file-menu">';
+  html += '<button onclick="moveFileToFolder(\'' + fileId + '\', null); this.closest(\'.gd-file-move-popover\').remove()">Root (no folder)</button>';
+  for (const f of allFolders) {
+    html += '<button onclick="moveFileToFolder(\'' + fileId + '\', \'' + f.id + '\'); this.closest(\'.gd-file-move-popover\').remove()">' + escapeHtml(f.name) + '</button>';
+  }
+  html += '</div></div>';
+
+  document.body.insertAdjacentHTML("beforeend", html);
+
+  // Close on outside click
+  setTimeout(() => {
+    const handler = (e) => {
+      if (!e.target.closest(".gd-file-move-popover")) {
+        document.querySelectorAll(".gd-file-move-popover").forEach(m => m.remove());
+        document.removeEventListener("click", handler);
+      }
+    };
+    document.addEventListener("click", handler);
+  }, 10);
+};
+
+window.openBulkMoveMenu = function (btn) {
+  // Close any existing bulk move menus
+  document.querySelectorAll(".gd-file-move-popover").forEach(m => m.remove());
+
+  const rect = btn.getBoundingClientRect();
+
+  let html = '<div class="gd-file-move-popover" style="position:fixed;top:' + (rect.top - 4) + 'px;left:' + rect.left + 'px;transform:translateY(-100%);z-index:2100;">';
+  html += '<div class="gd-file-menu">';
+  html += '<button onclick="bulkMoveToFolder(null); this.closest(\'.gd-file-move-popover\').remove()">Root (no folder)</button>';
+  for (const f of allFolders) {
+    html += '<button onclick="bulkMoveToFolder(\'' + f.id + '\'); this.closest(\'.gd-file-move-popover\').remove()">' + escapeHtml(f.name) + '</button>';
+  }
+  html += '</div></div>';
+
+  document.body.insertAdjacentHTML("beforeend", html);
+
+  setTimeout(() => {
+    const handler = (e) => {
+      if (!e.target.closest(".gd-file-move-popover")) {
+        document.querySelectorAll(".gd-file-move-popover").forEach(m => m.remove());
+        document.removeEventListener("click", handler);
+      }
+    };
+    document.addEventListener("click", handler);
+  }, 10);
+};
+
+/* --- Migration --- */
+
+async function migrateExistingFolders(uid) {
+  // Only migrate if no folders exist yet and files have old string folder fields
+  if (allFolders.length > 0) return;
+
+  const filesWithStringFolder = allFiles.filter(f => f.folder && typeof f.folder === "string" && !f.folderId);
+  if (filesWithStringFolder.length === 0) return;
+
+  const folderMap = {
+    contracts: "Contracts",
+    disclosures: "Disclosures",
+    other: "Other",
+    inspections: "Inspections",
+    financial: "Financial",
+    photos: "Photos"
+  };
+
+  // Collect unique folder strings
+  const uniqueFolders = [...new Set(filesWithStringFolder.map(f => f.folder))];
+
+  try {
+    const batch = writeBatch(db);
+    const folderIdMap = {};
+
+    // Create folder docs
+    for (const folderKey of uniqueFolders) {
+      const folderName = folderMap[folderKey] || folderKey;
+      const folderRef = doc(collection(db, "folders"));
+      batch.set(folderRef, {
+        name: folderName,
+        clientId,
+        realtorId: uid,
+        isSystem: false,
+        createdAt: serverTimestamp()
+      });
+      folderIdMap[folderKey] = folderRef.id;
+    }
+
+    // Update file docs with folderId
+    for (const f of filesWithStringFolder) {
+      const folderId = folderIdMap[f.folder];
+      if (folderId) {
+        batch.update(doc(db, "files", f.id), { folderId });
+      }
+    }
+
+    await batch.commit();
+
+    // Reload folders and files after migration
+    await Promise.all([loadFolders(uid), loadFiles(uid)]);
+    console.log("Folder migration complete: created", uniqueFolders.length, "folders, updated", filesWithStringFolder.length, "files");
+  } catch (e) {
+    console.error("Folder migration error:", e);
+  }
+}
+
+/* ===== FILES TAB ===== */
 
 document.getElementById("file-input").addEventListener("change", (e) => {
   if (e.target.files[0]) {
@@ -494,32 +860,53 @@ async function loadTemplateFiles(uid) {
 function renderFiles() {
   const el = document.getElementById("files-list");
   let filtered = allFiles;
-  if (currentFileFolder !== "all") {
-    filtered = filtered.filter(f => f.folder === currentFileFolder);
+
+  // Inside a folder: show only that folder's files. At root: show all files.
+  if (currentFolderId) {
+    filtered = filtered.filter(f => f.folderId === currentFolderId);
   }
 
   if (filtered.length === 0) {
-    el.innerHTML = `<div class="gd-empty"><div class="gd-empty-icon">&#128193;</div><div class="gd-empty-text">No files${currentFileFolder !== "all" ? " in this folder" : ""}</div></div>`;
+    el.innerHTML = `<div class="gd-empty"><div class="gd-empty-icon">&#128193;</div><div class="gd-empty-text">No files${currentFolderId ? " in this folder" : " uploaded yet"}</div></div>`;
     return;
   }
 
   el.innerHTML = filtered.map(f => {
     const signedBadge = f.fileName.startsWith("SIGNED_") ? ' <span class="gd-badge-signed">&#9997; Signed</span>' : '';
     const checked = selectedFiles.has(f.id) ? "checked" : "";
+    const folderName = allFolders.find(fd => fd.id === f.folderId)?.name || "Root";
     return `
-    <div class="gd-file-row" onclick="openPreview('${f.id}')">
+    <div class="gd-file-row" draggable="true" ondragstart="event.dataTransfer.setData('text/plain', '${f.id}')" onclick="openPreview('${f.id}')">
       <input type="checkbox" class="gd-file-check" data-id="${f.id}" ${checked} onclick="event.stopPropagation(); toggleFileSelect('${f.id}')">
       <span class="gd-file-preview-icon">&#128065;</span>
       <span class="gd-file-name">${escapeHtml(f.fileName)}${signedBadge}</span>
-      <span class="gd-badge gd-badge-${f.folder}">${f.folder}</span>
+      <span class="gd-badge">${escapeHtml(folderName)}</span>
       <span class="gd-file-meta">${formatFileSize(f.fileSize)}</span>
       <span class="gd-file-meta">${formatDate(f.uploadedAt)}</span>
       <button class="gd-btn gd-btn-sm gd-file-send-btn" onclick="event.stopPropagation(); sendSingleFile('${f.id}')">Send</button>
-      <a href="${f.downloadUrl}" target="_blank" class="gd-file-download" onclick="event.stopPropagation()">Download</a>
-      <button class="gd-btn gd-btn-sm gd-btn-danger" onclick="event.stopPropagation(); deleteFile('${f.id}')" title="Delete file">&times;</button>
+      <button class="gd-file-kebab" onclick="event.stopPropagation(); toggleFileRowMenu('${f.id}', event)" title="File options">&#8942;</button>
+      <div id="file-menu-${f.id}" class="gd-file-menu gd-hidden">
+        <button onclick="event.stopPropagation(); showFileMoveMenu('${f.id}', event)">Move to folder</button>
+        <a href="${f.downloadUrl}" target="_blank" onclick="event.stopPropagation();" style="display:block;padding:0.5rem 0.75rem;font-size:0.82rem;text-decoration:none;color:inherit;">Download</a>
+        <button onclick="event.stopPropagation(); deleteFile('${f.id}')">Delete</button>
+      </div>
     </div>`;
   }).join("");
 }
+
+window.toggleFileRowMenu = function (fileId, event) {
+  event.stopPropagation();
+  // Close all other file menus first
+  document.querySelectorAll(".gd-file-menu").forEach(m => {
+    if (m.id !== "file-menu-" + fileId) {
+      m.classList.add("gd-hidden");
+    }
+  });
+  const menu = document.getElementById("file-menu-" + fileId);
+  if (menu) {
+    menu.classList.toggle("gd-hidden");
+  }
+};
 
 window.deleteFile = async function (fileId) {
   if (!confirm("Delete this file? This cannot be undone.")) return;
@@ -557,7 +944,7 @@ window.uploadFile = async function () {
   const file = fileInput.files[0];
   if (!file) { showToast("Select a file first.", "error"); return; }
 
-  const folder = document.getElementById("upload-folder").value;
+  const folder = currentFolderId ? (allFolders.find(f => f.id === currentFolderId)?.name || "general") : "general";
   const storagePath = `files/${user.uid}/${clientId}/${folder}/${file.name}`;
   const storageRef = ref(storage, storagePath);
 
@@ -588,6 +975,7 @@ window.uploadFile = async function () {
           storagePath,
           downloadUrl,
           folder,
+          folderId: currentFolderId || null,
           fileSize: file.size,
           mimeType: file.type,
           uploadedAt: serverTimestamp()
@@ -718,7 +1106,7 @@ window.uploadAndSend = async function () {
   const file = fileInput.files[0];
   if (!file) { showToast("Select a file first.", "error"); return; }
 
-  const folder = document.getElementById("upload-folder").value;
+  const folder = currentFolderId ? (allFolders.find(f => f.id === currentFolderId)?.name || "general") : "general";
   const storagePath = `files/${user.uid}/${clientId}/${folder}/${file.name}`;
   const storageRef = ref(storage, storagePath);
 
@@ -728,7 +1116,7 @@ window.uploadAndSend = async function () {
     const downloadUrl = await getDownloadURL(snap.ref);
     const docRef = await addDoc(collection(db, "files"), {
       clientId, realtorId: user.uid, fileName: file.name, storagePath, downloadUrl,
-      folder, fileSize: file.size, mimeType: file.type, uploadedAt: serverTimestamp()
+      folder, folderId: currentFolderId || null, fileSize: file.size, mimeType: file.type, uploadedAt: serverTimestamp()
     });
     fileInput.value = "";
     await loadFiles(user.uid);
