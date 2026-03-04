@@ -7,7 +7,7 @@ import {
 import {
   ref, uploadBytesResumable, getDownloadURL, deleteObject
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
-import { getCurrentUser, showToast, formatCurrency, formatDate, statusLabel } from "./auth.js";
+import { getCurrentUser, showToast, formatCurrency, formatDate, statusLabel, escapeHtml } from "./auth.js";
 import { calculateMatchScore, matchScoreColor, matchScoreLabel } from "./match-engine.js";
 import { initAddressAutocomplete } from "./address-autocomplete.js";
 
@@ -178,7 +178,7 @@ function renderGrid() {
         </div>
         <div class="gd-listing-card-body">
           <div class="gd-listing-price">${l.listingPrice ? formatCurrency(l.listingPrice) : "—"}</div>
-          <div class="gd-listing-address">${addr}</div>
+          <div class="gd-listing-address">${escapeHtml(addr)}</div>
           <div class="gd-listing-meta">
             ${l.bedrooms != null ? `<span>${l.bedrooms} bd</span>` : ""}
             ${l.bathrooms != null ? `<span>${l.bathrooms} ba</span>` : ""}
@@ -208,7 +208,7 @@ function renderList() {
     return `
       <tr onclick="openListingDetail('${l.id}')" style="cursor:pointer;">
         <td>
-          ${addr}
+          ${escapeHtml(addr)}
           ${qm ? `<span class="gd-match-badge-inline" style="background:${qm.color}">${qm.score}%</span>` : ""}
         </td>
         <td>${l.listingPrice ? formatCurrency(l.listingPrice) : "—"}</td>

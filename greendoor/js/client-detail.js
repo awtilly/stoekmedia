@@ -10,7 +10,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
 import {
   getCurrentUser, showToast, formatCurrency, formatDate, formatDateTime,
-  timeAgo, formatFileSize, statusLabel
+  timeAgo, formatFileSize, statusLabel, escapeHtml
 } from "./auth.js";
 import { calculateMatchScore, matchScoreColor, matchScoreLabel } from "./match-engine.js";
 
@@ -246,8 +246,8 @@ async function loadActivities(uid) {
         <div class="gd-timeline-item">
           <div class="gd-timeline-dot ${a.type}">${icons[a.type] || ""}</div>
           <div class="gd-timeline-date">${formatDateTime(a.timestamp)}</div>
-          <div class="gd-timeline-subject">${a.subject || ""}</div>
-          ${body ? `<div class="gd-timeline-body ${truncated ? "truncated" : ""}" onclick="this.classList.toggle('truncated')">${body}</div>` : ""}
+          <div class="gd-timeline-subject">${escapeHtml(a.subject)}</div>
+          ${body ? `<div class="gd-timeline-body ${truncated ? "truncated" : ""}" onclick="this.classList.toggle('truncated')">${escapeHtml(body)}</div>` : ""}
         </div>`;
     });
     el.innerHTML = html;
@@ -493,7 +493,7 @@ function renderFiles() {
     <div class="gd-file-row" onclick="openPreview('${f.id}')">
       <input type="checkbox" class="gd-file-check" data-id="${f.id}" ${checked} onclick="event.stopPropagation(); toggleFileSelect('${f.id}')">
       <span class="gd-file-preview-icon">&#128065;</span>
-      <span class="gd-file-name">${f.fileName}${signedBadge}</span>
+      <span class="gd-file-name">${escapeHtml(f.fileName)}${signedBadge}</span>
       <span class="gd-badge gd-badge-${f.folder}">${f.folder}</span>
       <span class="gd-file-meta">${formatFileSize(f.fileSize)}</span>
       <span class="gd-file-meta">${formatDate(f.uploadedAt)}</span>
@@ -645,7 +645,7 @@ window.openSendDocModal = function () {
   document.getElementById("send-doc-message").value = `Hi ${clientData?.fullName || ""},\n\nPlease find the attached documents for your review.`;
 
   const filesEl = document.getElementById("send-doc-files");
-  filesEl.innerHTML = files.map(f => `<div class="gd-sig-file-row"><span class="gd-sig-file-name">${f.fileName}</span></div>`).join("");
+  filesEl.innerHTML = files.map(f => `<div class="gd-sig-file-row"><span class="gd-sig-file-name">${escapeHtml(f.fileName)}</span></div>`).join("");
 
   document.getElementById("send-doc-progress").classList.add("gd-hidden");
   document.getElementById("send-doc-btn").disabled = false;
@@ -1050,11 +1050,11 @@ async function loadEnvelopes(uid) {
         const signed = e.signers.filter(s => s.status === "completed" || s.status === "signed").length;
         signerInfo = `<div class="gd-envelope-signers">${signed} of ${e.signers.length} signed</div>`;
       } else {
-        signerInfo = `<span class="gd-envelope-signer">${e.signerName || ""}</span>`;
+        signerInfo = `<span class="gd-envelope-signer">${escapeHtml(e.signerName)}</span>`;
       }
       return `
       <div class="gd-envelope-row">
-        <span class="gd-envelope-name">${title}</span>
+        <span class="gd-envelope-name">${escapeHtml(title)}</span>
         ${signerInfo}
         <span class="gd-badge-esig" style="background: ${statusColors[e.status] || "#6b7280"}">${statusLabel(e.status)}</span>
         <span class="gd-file-meta">${e.status === "draft" ? "Draft" : formatDate(e.sentAt)}</span>
@@ -1182,7 +1182,7 @@ window.renderMatches = function () {
       <div class="gd-property-card" data-id="${m.id}" onclick="openEditMatchModal('${m.id}')">
         <input type="checkbox" class="gd-property-check" data-id="${m.id}" onclick="event.stopPropagation(); toggleCompare('${m.id}')">
         <div class="gd-match-score-badge" style="border-color:${color}; color:${color}">${score}%</div>
-        <div class="gd-property-address">${addr}</div>
+        <div class="gd-property-address">${escapeHtml(addr)}</div>
         <div class="gd-property-price">${l.listingPrice ? formatCurrency(l.listingPrice) : "—"}</div>
         <div class="gd-property-meta">
           <span class="gd-badge gd-badge-${m.status || "interested"}">${statusLabel(m.status || "interested")}</span>
@@ -1191,7 +1191,7 @@ window.renderMatches = function () {
           ${l.squareFeet ? `<span>${Number(l.squareFeet).toLocaleString()}sqft</span>` : ""}
           <span class="gd-stars">${stars}</span>
         </div>
-        ${m.dealBreakerHits?.length ? `<div class="gd-match-dealbreaker">Deal breaker: ${m.dealBreakerHits.join(", ")}</div>` : ""}
+        ${m.dealBreakerHits?.length ? `<div class="gd-match-dealbreaker">Deal breaker: ${escapeHtml(m.dealBreakerHits.join(", "))}</div>` : ""}
         ${l.listingUrl ? `<a href="${l.listingUrl}" target="_blank" class="gd-property-link" onclick="event.stopPropagation()">View Listing &rarr;</a>` : ""}
       </div>`;
   }).join("");
@@ -1485,8 +1485,8 @@ function renderCopyClientList(clients) {
   el.innerHTML = clients.map(c => `
     <div class="gd-copy-client-row" onclick="selectCopyClient('${c.id}')">
       <div style="flex:1;min-width:0;">
-        <div style="font-weight:500;">${c.fullName || "Unnamed"}</div>
-        <div class="gd-text-muted">${c.email || "No email"}</div>
+        <div style="font-weight:500;">${escapeHtml(c.fullName) || "Unnamed"}</div>
+        <div class="gd-text-muted">${escapeHtml(c.email) || "No email"}</div>
       </div>
       <span class="gd-badge gd-badge-${c.status || "lead"}">${statusLabel(c.status || "lead")}</span>
     </div>
@@ -1500,11 +1500,11 @@ window.selectCopyClient = function (id) {
   const el = document.getElementById("copy-selected-client");
   el.innerHTML = `
     <div style="display:flex;align-items:center;gap:0.5rem;">
-      <span style="font-weight:500;">${client.fullName || "Unnamed"}</span>
+      <span style="font-weight:500;">${escapeHtml(client.fullName) || "Unnamed"}</span>
       <span class="gd-badge gd-badge-${client.status || "lead"}">${statusLabel(client.status || "lead")}</span>
       <button class="gd-modal-close" onclick="clearCopyClientSelection()" style="margin-left:auto;font-size:1.2rem;" aria-label="Clear">&times;</button>
     </div>
-    <div class="gd-text-muted">${client.email || ""}</div>
+    <div class="gd-text-muted">${escapeHtml(client.email)}</div>
   `;
   el.classList.remove("gd-hidden");
   document.getElementById("copy-client-search-group").style.display = "none";
@@ -1648,7 +1648,7 @@ function renderShowingCard(s, isUpcoming) {
   return `
     <div class="gd-showing-card">
       <div class="gd-showing-card-header">
-        <div class="gd-showing-card-address">${s.address || "—"}</div>
+        <div class="gd-showing-card-address">${escapeHtml(s.address) || "—"}</div>
         ${statusBadge}
       </div>
       <div class="gd-showing-card-meta">
@@ -1657,8 +1657,8 @@ function renderShowingCard(s, isUpcoming) {
         ${s.mlsNumber ? `<span>MLS: ${s.mlsNumber}</span>` : ""}
         ${stars ? `<span class="gd-stars">${stars}</span>` : ""}
       </div>
-      ${s.clientFeedback ? `<div style="font-size:0.8rem;color:#4b5563;margin-bottom:0.35rem;">${s.clientFeedback}</div>` : ""}
-      ${s.realtorNotes ? `<div style="font-size:0.8rem;color:#6b7280;font-style:italic;margin-bottom:0.35rem;">${s.realtorNotes}</div>` : ""}
+      ${s.clientFeedback ? `<div style="font-size:0.8rem;color:#4b5563;margin-bottom:0.35rem;">${escapeHtml(s.clientFeedback)}</div>` : ""}
+      ${s.realtorNotes ? `<div style="font-size:0.8rem;color:#6b7280;font-style:italic;margin-bottom:0.35rem;">${escapeHtml(s.realtorNotes)}</div>` : ""}
       ${actions ? `<div class="gd-showing-card-actions">${actions}</div>` : ""}
     </div>`;
 }
@@ -1674,7 +1674,7 @@ window.openShowingModal = function (showingId) {
     const l = m.listing;
     if (!l) return;
     const addr = l.address?.full || l.address?.street || "—";
-    select.innerHTML += `<option value="${l.id}">${addr} ${l.mlsNumber ? "(MLS: " + l.mlsNumber + ")" : ""}</option>`;
+    select.innerHTML += `<option value="${l.id}">${escapeHtml(addr)} ${l.mlsNumber ? "(MLS: " + escapeHtml(l.mlsNumber) + ")" : ""}</option>`;
   });
 
   if (showingId) {
@@ -1969,7 +1969,7 @@ function renderFollowUps() {
       <div class="gd-followup-item priority-${f.priority || "medium"}">
         <div class="gd-followup-dot"></div>
         <div class="gd-followup-info">
-          <div class="gd-followup-title">${f.title}</div>
+          <div class="gd-followup-title">${escapeHtml(f.title)}</div>
           <div class="gd-followup-due">${isOverdue ? "Overdue — " : ""}Due: ${due}</div>
         </div>
         <div class="gd-followup-actions">
@@ -2186,7 +2186,7 @@ window.fetchListingFromUrl = async function () {
 function renderAddListingTags() {
   const el = document.getElementById("al-tag-list");
   el.innerHTML = addListingFeatureTags.map((tag, i) =>
-    `<span class="gd-tag">${tag}<button class="gd-tag-remove" onclick="removeAddListingTag(${i})">&times;</button></span>`
+    `<span class="gd-tag">${escapeHtml(tag)}<button class="gd-tag-remove" onclick="removeAddListingTag(${i})">&times;</button></span>`
   ).join("");
 }
 

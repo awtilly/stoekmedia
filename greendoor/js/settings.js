@@ -7,7 +7,7 @@ import {
 import {
   ref, uploadBytesResumable, getDownloadURL, deleteObject
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
-import { getCurrentUser, showToast, formatFileSize } from "./auth.js";
+import { getCurrentUser, showToast, formatFileSize, escapeHtml } from "./auth.js";
 import { checkAndResumeTour } from "./tour.js";
 
 let allTemplates = [];
@@ -218,7 +218,7 @@ window.runBoldSignTest = async function () {
     resultsEl.innerHTML = html;
   } catch (e) {
     console.error("Stress test error:", e);
-    resultsEl.innerHTML = `<div class="gd-diag-row"><span class="gd-diag-badge gd-diag-fail">ERROR</span> ${e.message}</div>`;
+    resultsEl.innerHTML = `<div class="gd-diag-row"><span class="gd-diag-badge gd-diag-fail">ERROR</span> ${escapeHtml(e.message)}</div>`;
   } finally {
     btn.disabled = false;
     btn.textContent = "Run Diagnostics";
@@ -241,7 +241,7 @@ function renderEmailSenderStatus(profile) {
         <div class="gd-email-sender-info">
           <span class="gd-settings-status-dot gd-connected"></span>
           <div>
-            <div class="gd-email-sender-label">Sending as <strong>${userEmail}</strong></div>
+            <div class="gd-email-sender-label">Sending as <strong>${escapeHtml(userEmail)}</strong></div>
             <div class="gd-text-muted" style="font-size: 0.8rem;">Clients see your email address as the sender.</div>
           </div>
         </div>
@@ -253,7 +253,7 @@ function renderEmailSenderStatus(profile) {
         <div class="gd-email-sender-info">
           <span class="gd-settings-status-dot" style="background: #f59e0b;"></span>
           <div>
-            <div class="gd-email-sender-label">Verification pending for <strong>${userEmail}</strong></div>
+            <div class="gd-email-sender-label">Verification pending for <strong>${escapeHtml(userEmail)}</strong></div>
             <div class="gd-text-muted" style="font-size: 0.8rem;">Check your inbox and click the verification link from SendGrid.</div>
           </div>
         </div>
@@ -269,7 +269,7 @@ function renderEmailSenderStatus(profile) {
           <span class="gd-settings-status-dot gd-connected"></span>
           <div>
             <div class="gd-email-sender-label">Sending from <strong>greendoor@stoekmedia.com</strong></div>
-            <div class="gd-text-muted" style="font-size: 0.8rem;">Your email (${userEmail}) is set as Reply-To. Verify your email to send directly from your address.</div>
+            <div class="gd-text-muted" style="font-size: 0.8rem;">Your email (${escapeHtml(userEmail)}) is set as Reply-To. Verify your email to send directly from your address.</div>
           </div>
         </div>
         <button class="gd-btn gd-btn-primary gd-btn-sm" onclick="requestVerification()">Verify My Email</button>

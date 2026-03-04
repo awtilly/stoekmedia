@@ -3,7 +3,7 @@ import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/fi
 import {
   collection, query, where, orderBy, limit, getDocs, getCountFromServer, Timestamp
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-import { getCurrentUser, timeAgo, formatDate, formatDateTime } from "./auth.js";
+import { getCurrentUser, timeAgo, formatDate, formatDateTime, escapeHtml } from "./auth.js";
 import { startTour, checkAndResumeTour } from "./tour.js";
 
 const askAssistant = httpsCallable(functions, "askAssistant");
@@ -66,7 +66,7 @@ onAuthStateChanged(auth, async (user) => {
             <div class="gd-activity-icon">${icon}</div>
             <div class="gd-activity-body">
               <div class="gd-activity-subject">
-                <a href="/greendoor/app/client-detail?id=${a.clientId}">${clientName}</a> — ${a.subject || "Activity"}
+                <a href="/greendoor/app/client-detail?id=${a.clientId}">${escapeHtml(clientName)}</a> — ${escapeHtml(a.subject) || "Activity"}
               </div>
               <div class="gd-activity-meta">${timeAgo(a.timestamp)}</div>
             </div>
@@ -102,8 +102,8 @@ onAuthStateChanged(auth, async (user) => {
       rows.push(`
         <div class="gd-showing-item">
           <span class="gd-showing-date">${formatDateTime(s.showingDate)}</span>
-          <span class="gd-showing-address">${s.address || "—"}</span>
-          <span class="gd-showing-client">${clientCache[s.clientId] || "—"}</span>
+          <span class="gd-showing-address">${escapeHtml(s.address) || "—"}</span>
+          <span class="gd-showing-client">${escapeHtml(clientCache[s.clientId]) || "—"}</span>
         </div>`);
     });
     if (rows.length > 0) showEl.innerHTML = rows.join("");

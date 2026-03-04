@@ -18,63 +18,87 @@ service cloud.firestore {
       return request.resource.data.realtorId == request.auth.uid;
     }
 
+    function realtorIdUnchanged() {
+      return request.resource.data.realtorId == resource.data.realtorId;
+    }
+
     match /users/{userId} {
       allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
-      allow write: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+
+      // Users can only update their own doc, and only safe fields
+      allow update: if isAuthenticated() && request.auth.uid == userId
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                         'fullName', 'phone', 'company', 'emailSignature',
+                         'showTour', 'onboardingComplete', 'onboardingCompletedAt',
+                         'termsAcceptedAt', 'lastLogin'
+                       ]);
+
+      // Admins can do anything
+      allow create, delete: if isAuthenticated() && isAdmin();
+      allow update: if isAuthenticated() && isAdmin();
     }
 
     match /clients/{clientId} {
       allow read: if isAuthenticated() && (isOwner(resource.data.realtorId) || isAdmin());
       allow create: if isAuthenticated() && incomingRealtorIdMatchesAuth();
-      allow update, delete: if isAuthenticated() && (isOwner(resource.data.realtorId) || isAdmin());
+      allow update: if isAuthenticated() && (isOwner(resource.data.realtorId) || isAdmin()) && realtorIdUnchanged();
+      allow delete: if isAuthenticated() && (isOwner(resource.data.realtorId) || isAdmin());
     }
 
     match /activities/{activityId} {
       allow read: if isAuthenticated() && (isOwner(resource.data.realtorId) || isAdmin());
       allow create: if isAuthenticated() && incomingRealtorIdMatchesAuth();
-      allow update, delete: if isAuthenticated() && (isOwner(resource.data.realtorId) || isAdmin());
+      allow update: if isAuthenticated() && (isOwner(resource.data.realtorId) || isAdmin()) && realtorIdUnchanged();
+      allow delete: if isAuthenticated() && (isOwner(resource.data.realtorId) || isAdmin());
     }
 
     match /files/{fileId} {
       allow read: if isAuthenticated() && (isOwner(resource.data.realtorId) || isAdmin());
       allow create: if isAuthenticated() && incomingRealtorIdMatchesAuth();
-      allow update, delete: if isAuthenticated() && (isOwner(resource.data.realtorId) || isAdmin());
+      allow update: if isAuthenticated() && (isOwner(resource.data.realtorId) || isAdmin()) && realtorIdUnchanged();
+      allow delete: if isAuthenticated() && (isOwner(resource.data.realtorId) || isAdmin());
     }
 
     match /templateFiles/{templateId} {
       allow read: if isAuthenticated() && (isOwner(resource.data.realtorId) || isAdmin());
       allow create: if isAuthenticated() && incomingRealtorIdMatchesAuth();
-      allow update, delete: if isAuthenticated() && (isOwner(resource.data.realtorId) || isAdmin());
+      allow update: if isAuthenticated() && (isOwner(resource.data.realtorId) || isAdmin()) && realtorIdUnchanged();
+      allow delete: if isAuthenticated() && (isOwner(resource.data.realtorId) || isAdmin());
     }
 
     match /bookmarkedProperties/{propertyId} {
       allow read: if isAuthenticated() && (isOwner(resource.data.realtorId) || isAdmin());
       allow create: if isAuthenticated() && incomingRealtorIdMatchesAuth();
-      allow update, delete: if isAuthenticated() && (isOwner(resource.data.realtorId) || isAdmin());
+      allow update: if isAuthenticated() && (isOwner(resource.data.realtorId) || isAdmin()) && realtorIdUnchanged();
+      allow delete: if isAuthenticated() && (isOwner(resource.data.realtorId) || isAdmin());
     }
 
     match /envelopes/{envelopeId} {
       allow read: if isAuthenticated() && (isOwner(resource.data.realtorId) || isAdmin());
       allow create: if isAuthenticated() && incomingRealtorIdMatchesAuth();
-      allow update, delete: if isAuthenticated() && (isOwner(resource.data.realtorId) || isAdmin());
+      allow update: if isAuthenticated() && (isOwner(resource.data.realtorId) || isAdmin()) && realtorIdUnchanged();
+      allow delete: if isAuthenticated() && (isOwner(resource.data.realtorId) || isAdmin());
     }
 
     match /showings/{showingId} {
       allow read: if isAuthenticated() && (isOwner(resource.data.realtorId) || isAdmin());
       allow create: if isAuthenticated() && incomingRealtorIdMatchesAuth();
-      allow update, delete: if isAuthenticated() && (isOwner(resource.data.realtorId) || isAdmin());
+      allow update: if isAuthenticated() && (isOwner(resource.data.realtorId) || isAdmin()) && realtorIdUnchanged();
+      allow delete: if isAuthenticated() && (isOwner(resource.data.realtorId) || isAdmin());
     }
 
     match /followUps/{followUpId} {
       allow read: if isAuthenticated() && (isOwner(resource.data.realtorId) || isAdmin());
       allow create: if isAuthenticated() && incomingRealtorIdMatchesAuth();
-      allow update, delete: if isAuthenticated() && (isOwner(resource.data.realtorId) || isAdmin());
+      allow update: if isAuthenticated() && (isOwner(resource.data.realtorId) || isAdmin()) && realtorIdUnchanged();
+      allow delete: if isAuthenticated() && (isOwner(resource.data.realtorId) || isAdmin());
     }
 
     match /events/{eventId} {
       allow read: if isAuthenticated() && (isOwner(resource.data.realtorId) || isAdmin());
       allow create: if isAuthenticated() && incomingRealtorIdMatchesAuth();
-      allow update, delete: if isAuthenticated() && (isOwner(resource.data.realtorId) || isAdmin());
+      allow update: if isAuthenticated() && (isOwner(resource.data.realtorId) || isAdmin()) && realtorIdUnchanged();
+      allow delete: if isAuthenticated() && (isOwner(resource.data.realtorId) || isAdmin());
     }
 
     match /listings/{listingId} {
@@ -87,7 +111,8 @@ service cloud.firestore {
     match /clientListingMatches/{matchId} {
       allow read: if isAuthenticated() && (isOwner(resource.data.realtorId) || isAdmin());
       allow create: if isAuthenticated() && incomingRealtorIdMatchesAuth();
-      allow update, delete: if isAuthenticated() && (isOwner(resource.data.realtorId) || isAdmin());
+      allow update: if isAuthenticated() && (isOwner(resource.data.realtorId) || isAdmin()) && realtorIdUnchanged();
+      allow delete: if isAuthenticated() && (isOwner(resource.data.realtorId) || isAdmin());
     }
 
     match /searchHistory/{searchId} {
@@ -98,7 +123,8 @@ service cloud.firestore {
     match /listingAlerts/{alertId} {
       allow read: if isAuthenticated() && (isOwner(resource.data.realtorId) || isAdmin());
       allow create: if isAuthenticated() && incomingRealtorIdMatchesAuth();
-      allow update, delete: if isAuthenticated() && (isOwner(resource.data.realtorId) || isAdmin());
+      allow update: if isAuthenticated() && (isOwner(resource.data.realtorId) || isAdmin()) && realtorIdUnchanged();
+      allow delete: if isAuthenticated() && (isOwner(resource.data.realtorId) || isAdmin());
     }
 
     match /emailTemplates/{templateId} {

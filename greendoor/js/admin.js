@@ -5,7 +5,7 @@ import {
   doc, updateDoc, setDoc, addDoc, orderBy, limit, startAfter,
   Timestamp
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-import { getCurrentUser, formatDate, showToast } from "./auth.js";
+import { getCurrentUser, formatDate, showToast, escapeHtml } from "./auth.js";
 
 /* ================================================================
    STATE
@@ -112,7 +112,7 @@ async function loadOverviewTab() {
     } else {
       newUsersEl.innerHTML = newUsers.map(u => `
         <div style="display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid var(--color-border);">
-          <span style="font-weight: 500; color: var(--color-text-primary);">${u.fullName || "—"}</span>
+          <span style="font-weight: 500; color: var(--color-text-primary);">${escapeHtml(u.fullName) || "—"}</span>
           <span style="font-size: 0.78rem; color: var(--color-text-muted);">${formatDate(u.createdAt)}</span>
         </div>
       `).join("");
@@ -137,8 +137,8 @@ async function loadOverviewTab() {
     } else {
       loginsTbody.innerHTML = loginSorted.map(r => `
         <tr>
-          <td style="color: var(--color-text-primary); font-weight: 500;">${r.fullName || "—"}</td>
-          <td>${r.email || "—"}</td>
+          <td style="color: var(--color-text-primary); font-weight: 500;">${escapeHtml(r.fullName) || "—"}</td>
+          <td>${escapeHtml(r.email) || "—"}</td>
           <td>${formatDate(r.lastLogin)}</td>
         </tr>
       `).join("");
@@ -260,9 +260,9 @@ function renderRealtorTable() {
     const isOffboarded = status === "offboarded";
     return `
     <tr>
-      <td style="color: var(--color-text-primary); font-weight: 500;">${r.fullName || "—"}</td>
-      <td>${r.email || "—"}</td>
-      <td>${r.company || "—"}</td>
+      <td style="color: var(--color-text-primary); font-weight: 500;">${escapeHtml(r.fullName) || "—"}</td>
+      <td>${escapeHtml(r.email) || "—"}</td>
+      <td>${escapeHtml(r.company) || "—"}</td>
       <td>${getStatusBadge(status)}</td>
       <td>
         <label class="gd-toggle">

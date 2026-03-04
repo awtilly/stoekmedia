@@ -214,3 +214,13 @@ export function statusLabel(status) {
   if (!status) return "";
   return status.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
 }
+
+export function escapeHtml(str) {
+  if (!str) return "";
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}

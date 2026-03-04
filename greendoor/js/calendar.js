@@ -4,7 +4,7 @@ import {
   collection, query, where, orderBy, getDocs, addDoc, updateDoc, deleteDoc,
   doc, serverTimestamp, Timestamp
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-import { getCurrentUser, formatDateTime, showToast } from "./auth.js";
+import { getCurrentUser, formatDateTime, showToast, escapeHtml } from "./auth.js";
 import { checkAndResumeTour } from "./tour.js";
 
 let currentView = "week";
@@ -99,7 +99,7 @@ async function loadCalendarData(uid) {
   const select = document.getElementById("ev-client");
   select.innerHTML = '<option value="">— None —</option>';
   Object.entries(allClients).forEach(([id, c]) => {
-    select.innerHTML += `<option value="${id}">${c.fullName}</option>`;
+    select.innerHTML += `<option value="${id}">${escapeHtml(c.fullName)}</option>`;
   });
 }
 
@@ -165,7 +165,7 @@ function renderMonth() {
       const clickHandler = ev.type === "event"
         ? `event.stopPropagation();editEvent('${ev.id}')`
         : `event.stopPropagation();showPopover('${ev.id}',this)`;
-      html += `<div class="gd-cal-event-dot ${ev.type}" draggable="true" ondragstart="onEventDragStart(event,'${ev.id}')" onclick="${clickHandler}">${ev.title}</div>`;
+      html += `<div class="gd-cal-event-dot ${ev.type}" draggable="true" ondragstart="onEventDragStart(event,'${ev.id}')" onclick="${clickHandler}">${escapeHtml(ev.title)}</div>`;
     });
 
     if (dayEvents.length > maxShow) {

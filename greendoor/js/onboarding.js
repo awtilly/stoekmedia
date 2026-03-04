@@ -3,7 +3,7 @@ import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/fi
 import {
   doc, setDoc, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-import { getCurrentUser, showToast } from "./auth.js";
+import { getCurrentUser, showToast, escapeHtml } from "./auth.js";
 
 let currentStep = 1;
 const TOTAL_STEPS = 3;
@@ -157,11 +157,11 @@ function onEnterStep3() {
   summary.innerHTML = `
     <div class="gd-setup-summary-item">
       <span class="gd-setup-summary-check">&#10003;</span>
-      <span>Profile: <strong>${name || 'Not set'}</strong></span>
+      <span>Profile: <strong>${escapeHtml(name) || 'Not set'}</strong></span>
     </div>
     <div class="gd-setup-summary-item">
       <span class="gd-setup-summary-check">&#10003;</span>
-      <span>Company: ${company ? '<strong>' + company + '</strong>' : '<span class="gd-setup-summary-muted">Not set</span>'}</span>
+      <span>Company: ${company ? '<strong>' + escapeHtml(company) + '</strong>' : '<span class="gd-setup-summary-muted">Not set</span>'}</span>
     </div>
     <div class="gd-setup-summary-item">
       <span class="gd-setup-summary-check">&#10003;</span>

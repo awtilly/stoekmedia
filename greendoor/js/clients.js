@@ -3,7 +3,7 @@ import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/fi
 import {
   collection, query, where, orderBy, getDocs, addDoc, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-import { getCurrentUser, formatCurrency, timeAgo, statusLabel, showToast } from "./auth.js";
+import { getCurrentUser, formatCurrency, timeAgo, statusLabel, showToast, escapeHtml } from "./auth.js";
 import { checkAndResumeTour } from "./tour.js";
 
 const askAssistant = httpsCallable(functions, "askAssistant");
@@ -52,7 +52,7 @@ function renderClients(clients) {
 
   tbody.innerHTML = clients.map(c => `
     <tr>
-      <td><a href="/greendoor/app/client-detail?id=${c.id}">${c.fullName || "—"}</a></td>
+      <td><a href="/greendoor/app/client-detail?id=${c.id}">${escapeHtml(c.fullName) || "—"}</a></td>
       <td><span class="gd-badge gd-badge-${c.status || "lead"}">${statusLabel(c.status || "lead")}</span></td>
       <td>${c.budgetMin || c.budgetMax ? formatCurrency(c.budgetMin) + " — " + formatCurrency(c.budgetMax) : "—"}</td>
       <td>${c.preferredLocations && c.preferredLocations.length ? c.preferredLocations[0] : "—"}</td>
