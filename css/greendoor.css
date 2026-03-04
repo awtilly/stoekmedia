@@ -2933,12 +2933,13 @@ body.gd-light .gd-breadcrumb-current {
   display: inline-block;
   background: #dcfce7;
   color: #16a34a;
-  padding: 0.1rem 0.4rem;
+  padding: 0.15rem 0.5rem;
   border-radius: 10px;
   font-size: 0.7rem;
   font-weight: 600;
   margin-left: 0.3rem;
   vertical-align: middle;
+  white-space: nowrap;
 }
 
 /* ================================================================
