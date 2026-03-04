@@ -5,180 +5,230 @@
 ## Directory Layout
 
 ```
-/Users/joestoehner/Desktop/GitHub/stoekmedia/
-├── functions/               # Firebase Cloud Functions (backend)
-│   ├── index.js            # All Cloud Functions, AI tools, business logic
-│   ├── package.json        # Node.js dependencies (Firebase, Anthropic, SendGrid, etc.)
-│   └── node_modules/       # Installed dependencies
-├── greendoor/              # Real estate CRM application
-│   ├── app/                # HTML page templates (11 pages)
-│   ├── js/                 # JavaScript modules (one per page + utilities)
-│   ├── css/                # Stylesheets
-│   └── index.html          # Main landing/marketing page
-├── .planning/              # GSD planning documents
-│   └── codebase/           # Architecture/structure/conventions docs
-├── assets/                 # Shared images, CSS, JS (global)
-├── blog/                   # Blog content
-├── about/                  # About page
-├── bookings/               # Bookings/scheduling related
-├── software/               # Software product pages
-├── firebase.json           # Firebase hosting config
-├── firestore.rules         # Firestore security rules
-├── storage.rules           # Cloud Storage security rules
-├── firestore.indexes.json  # Firestore index definitions
-└── index.html              # Website homepage
+greendoor/
+├── app/                        # CRM application pages (server-side HTML)
+├── js/                         # Client-side JavaScript modules
+├── css/                        # Stylesheets
+├── features/                   # Marketing feature pages (HTML only)
+├── compare/                    # Comparison pages
+├── .planning/                  # GSD planning documents
+├── .git/                       # Version control
+├── index.html                  # Marketing homepage
+├── best-real-estate-crm.html   # Marketing landing page
+├── what-is-real-estate-crm.html # Content page
+├── terms.html                  # Legal/terms page
+└── greendoor.html              # (legacy or alternate entry)
 ```
 
 ## Directory Purposes
 
-**functions/:**
-- Purpose: Serverless backend for all business logic and external integrations
-- Contains: Node.js Cloud Functions, AI assistant implementation, database operations
-- Key files: `index.js` (300+ lines, all functions and AI tools)
-
-**greendoor/app/:**
-- Purpose: HTML templates for 11 pages in the CRM application
-- Contains: HTML pages for login, dashboard, clients, client-detail, calendar, listings, settings, admin, onboarding, FAQ, etc.
-- Key files: `dashboard.html`, `client-detail.html`, `calendar.html`, `admin.html`, `login.html`
-
-**greendoor/js/:**
-- Purpose: JavaScript module for each CRM page, plus utilities
-- Contains: Page-scoped initialization, event handlers, UI rendering, Firestore listeners
+**`app/` — CRM Application Pages**
+- Purpose: Server-side rendered HTML pages for authenticated users
+- Contains: HTML structure, semantic markup, element ID targets for JavaScript
 - Key files:
-  - `firebase-config.js` - Firebase SDK initialization
-  - `auth.js` - Authentication and global auth listener
-  - `dashboard.js` - Dashboard page logic
-  - `client-detail.js` - Client detail page logic (largest: 90KB)
-  - `calendar.js` - Calendar page logic
-  - `chatbot.js` - AI assistant UI and integration
-  - `clients.js` - Clients list page logic
-  - `admin.js` - Admin panel logic
-  - `listings.js` - Listings management
-  - `settings.js` - User settings
-  - `onboarding.js` - Onboarding flow
-  - `set-password.js` - Password reset form
-  - `tour.js` - Guided tour UI
-  - Utilities: `address-autocomplete.js`, `match-engine.js`
+  - `admin.html` — Admin dashboard for platform management
+  - `calendar.html` — Showing/appointment calendar
+  - `client-detail.html` — Comprehensive client workspace
+  - `clients.html` — Client roster and quick-add
+  - `dashboard.html` — Realtor home page (stats, activity, briefing)
+  - `faq.html` — FAQ content page
+  - `listings.html` — Property listing management
+  - `login.html` — Authentication entry point
+  - `onboarding.html` — First-time user setup
+  - `set-password.html` — Password reset page
+  - `settings.html` — User preferences and profile
 
-**greendoor/css/:**
-- Purpose: Styling for CRM application
-- Contains: CSS stylesheets
+**`js/` — Client-Side Business Logic**
+- Purpose: ES6 modules implementing feature logic and data operations
+- Contains: Firestore queries, state management, event handlers, utility functions
+- Key files:
+  - `firebase-config.js` — Firebase app initialization (central dependency)
+  - `auth.js` — Auth state, login/logout, utility exports (used by all modules)
+  - `dashboard.js` — Dashboard data aggregation (largest: ~7KB)
+  - `clients.js` — Client list operations (~8KB)
+  - `client-detail.js` — Client workspace (largest: ~91KB, ~2000 lines)
+  - `listings.js` — Listing CRUD and matching (~34KB)
+  - `calendar.js` — Showing calendar (~19KB)
+  - `admin.js` — Admin panel operations (~36KB)
+  - `settings.js` — User preferences (~12KB)
+  - `onboarding.js` — Onboarding workflow (~9KB)
+  - `match-engine.js` — Listing-to-client scoring algorithm (~6KB)
+  - `address-autocomplete.js` — Google Places integration (~3KB)
+  - `tour.js` — Interactive guided tours (~1KB, utility)
+  - `chatbot.js` — AI assistant chat (~11KB)
 
-**assets/:**
-- Purpose: Global assets shared across website and app
-- Contains: Images, global CSS, global JavaScript
+**`css/` — Stylesheets**
+- Purpose: Design system and component styles
+- Contains: Single consolidated stylesheet
+- Key files:
+  - `greendoor.css` — All GreenDoor CRM styles (116KB, monolithic)
 
-**firestore.rules:**
-- Purpose: Security rules for Firestore database access
-- Contains: Role-based access control rules
+**`features/` — Marketing Feature Pages**
+- Purpose: Content marketing pages (not part of CRM application)
+- Contains: HTML-only pages describing product features
+- Key files:
+  - `ai-assistant.html`
+  - `e-signatures.html`
+  - `email-automation.html`
+  - `listing-matching.html`
+  - `showing-management.html`
+
+**`compare/` — Comparison Pages**
+- Purpose: CRM feature comparison tables
+- Contains: Marketing comparison content
+
+**Root HTML Files**
+- `index.html` — Marketing homepage (~40KB, SEO landing page)
+- `best-real-estate-crm.html` — Comparison/features page (~26KB)
+- `what-is-real-estate-crm.html` — Educational content (~17KB)
+- `terms.html` — Terms of service
 
 ## Key File Locations
 
 **Entry Points:**
-
-- `greendoor/app/login.html`: Login page — initial entry point
-- `greendoor/app/dashboard.html`: Main dashboard after login
-- `functions/index.js`: Cloud Function handlers invoked by frontend
+- `app/login.html` — Auth entry (unauthenticated users)
+- `app/dashboard.html` — Authenticated entry (post-login redirect)
+- `index.html` — Marketing homepage
 
 **Configuration:**
-
-- `greendoor/js/firebase-config.js`: Firebase project config, SDK initialization
-- `firebase.json`: Firebase hosting and functions configuration
-- `functions/package.json`: Backend dependencies
-- `firestore.rules`: Database access control rules
+- `js/firebase-config.js` — Firebase SDK setup, app initialization, exports (auth, db, storage, functions)
 
 **Core Logic:**
-
-- `functions/index.js`: All Cloud Functions (AI assistant, CRUD operations, integrations)
-- `greendoor/js/auth.js`: Authentication state and login/logout handlers
-- `greendoor/js/chatbot.js`: AI assistant UI and message flow
+- `js/auth.js` — Authentication state, user profile fetching, shared utilities
+- `js/client-detail.js` — Primary feature (largest file, handles complex operations)
+- `js/listings.js` — Listing management and cross-client matching
+- `js/admin.js` — Platform administration
 
 **Testing:**
-
-- Not detected — no test files in codebase
+- None detected (no test files found)
 
 ## Naming Conventions
 
 **Files:**
 
-- HTML pages: kebab-case (e.g., `client-detail.html`, `set-password.html`)
-- JavaScript modules: kebab-case matching HTML page names (e.g., `client-detail.js`, `set-password.js`)
-- Utility files: kebab-case describing function (e.g., `address-autocomplete.js`, `match-engine.js`)
-- Config files: kebab-case (e.g., `firebase-config.js`)
+- **Page HTML:** Kebab-case feature name: `dashboard.html`, `client-detail.html`, `login.html`
+- **JavaScript modules:** Kebab-case feature name: `client-detail.js`, `match-engine.js`, `address-autocomplete.js`
+- **Stylesheets:** Single file `greendoor.css` for all CRM styles
+- **Marketing pages:** Kebab-case descriptive: `best-real-estate-crm.html`, `what-is-real-estate-crm.html`
 
 **Directories:**
 
-- Simple lowercase (e.g., `app`, `js`, `css`, `functions`, `assets`)
-
-**JavaScript Functions:**
-
-- camelCase for regular functions: `loadClients()`, `renderClients()`, `handleLogin()`
-- camelCase for exported handler functions: `handleLogin`, `handleForgotPassword`
-- UPPERCASE for constants: `SYSTEM_PROMPT`, `AI_TOOLS`, `DAYS`, `MONTHS`, `WEIGHTS`
-
-**Variables:**
-
-- camelCase for standard variables: `cachedProfile`, `userDoc`, `showingDate`
-- Suffixes for elements: `-El` for DOM elements (e.g., `nameEl`, `errorEl`, `formEl`)
-- Prefixes for functions tied to buttons: `handle-` (e.g., `handleLogin`, `handleForgotPassword`)
-
-**Firestore Collections & Documents:**
-
-- Lowercase plural for collections: `users`, `clients`, `showings`, `calendar_events`, `listings`, `activities`
-- Document IDs: auto-generated by Firestore or meaningful strings
-- Subcollections: lowercase, nested under parent (e.g., `clients/{clientId}/activities`)
+- Lowercase single words: `app/`, `js/`, `css/`, `features/`
 
 ## Where to Add New Code
 
-**New Feature (e.g., new CRM capability):**
+**New Feature Page (e.g., "Reports"):**
+- Primary code: `app/reports.html` (page structure)
+- Logic: `js/reports.js` (ES6 module with import statements)
+- Pattern: Import from `js/firebase-config.js`, `js/auth.js`, and utility exports
+- Example:
+  ```javascript
+  import { auth, db, functions, httpsCallable } from "./firebase-config.js";
+  import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+  import { getCurrentUser, showToast, formatDate } from "./auth.js";
 
-- Backend logic: Add to `functions/index.js` as new Cloud Function or extend existing one
-- Frontend logic: Create `greendoor/js/new-feature.js`
-- HTML page: Create `greendoor/app/new-feature.html`
-- Add httpsCallable import to JS: `const newFeature = httpsCallable(functions, "newFeatureName")`
-- If AI-accessible: Add tool definition to `AI_TOOLS` array in `functions/index.js`
+  onAuthStateChanged(auth, async (user) => {
+    if (!user) return;
+    const profile = await getCurrentUser();
+    // Feature logic here
+  });
+  ```
 
-**New Cloud Function:**
+**New Component (e.g., "Client Filter Modal"):**
+- If reusable: Extract to `js/components/client-filter.js` (create `components/` subdirectory as needed)
+- If single-use: Keep inline in feature module (e.g., in `client-detail.js`)
+- Pattern: Export as function, call from parent module
 
-- Add handler function to `functions/index.js` using `exports.functionName = onCall(...)` or `onRequest(...)`
-- Define input schema in function docstring or as const
-- Use `db`, `auth`, and service clients to interact with Firebase/external APIs
-- Return response object with data or error
+**New Utility Function (e.g., "Calculate Revenue"):**
+- Location: Add to `js/auth.js` under utility exports section (lines 136+)
+- Pattern: `export function calculateRevenue(...) { ... }`
+- Import in feature modules: `import { calculateRevenue } from "./auth.js"`
 
-**New Page/Module:**
+**New Firestore Collection (e.g., "Reports"):**
+- Firestore path: `/reports/{reportId}`
+- Access pattern: `collection(db, "reports")`
+- Scope: Typically linked to realtor via `realtorId` field (unless platform-wide data)
+- Query pattern:
+  ```javascript
+  const q = query(
+    collection(db, "reports"),
+    where("realtorId", "==", uid),
+    orderBy("createdAt", "desc")
+  );
+  ```
 
-- Create `greendoor/app/page-name.html` with content and script import
-- Create `greendoor/js/page-name.js` with initialization, listeners, and UI handlers
-- Import Firebase config: `import { db, auth, functions, httpsCallable } from "./firebase-config.js"`
-- Export window-level handlers: `window.handleAction = async function () { ... }`
+**New Cloud Function (e.g., "Generate Report"):**
+- Invoked from feature module:
+  ```javascript
+  const generateReportFn = httpsCallable(functions, "generateReport");
+  const result = await generateReportFn({ clientId, period: "monthly" });
+  ```
+- Deploy to Firebase Functions (backend, not in this repo)
 
-**New Utility/Helper:**
-
-- Create `greendoor/js/util-name.js` with export/import of helper functions
-- Import in relevant modules as needed
-
-**Firestore Data:**
-
-- Add collection references to `functions/index.js` where data is written
-- Add security rules to `firestore.rules` for new collections
-- Run `firebase deploy --only firestore:rules` to apply
+**Styling New Component:**
+- Add to `css/greendoor.css` (currently monolithic)
+- Convention: Use `.gd-` class prefix (e.g., `.gd-report-card`)
+- Follow existing variable naming (`--space-sm`, `--space-lg`, color vars)
 
 ## Special Directories
 
-**functions/node_modules/:**
-- Purpose: Installed npm dependencies for Cloud Functions
-- Generated: Yes (via npm install)
-- Committed: No (excluded by .gitignore)
+**`.planning/`**
+- Purpose: GSD (Get Stuff Done) analysis documents
+- Contains: Codebase documentation (ARCHITECTURE.md, STRUCTURE.md, CONVENTIONS.md, TESTING.md, CONCERNS.md, INTEGRATIONS.md, STACK.md)
+- Generated: Yes (created by GSD automation)
+- Committed: Yes (tracked in git)
 
-**.planning/codebase/:**
-- Purpose: Architecture and structure documentation (GSD planning)
-- Generated: Manually created by codebase mapper
+**`compare/` and `features/`**
+- Purpose: Marketing content (not deployed to CRM)
+- Generated: No
 - Committed: Yes
+- Note: Separate from core application logic
 
-**.firebase/:**
-- Purpose: Firebase local development cache and config
-- Generated: Yes (by Firebase CLI)
-- Committed: No
+**`.git/`**
+- Purpose: Version control metadata
+- Generated: Yes (git repository)
+- Committed: N/A (hidden)
+
+## Import Pattern & Module Dependencies
+
+**Dependency chain (bottom-up):**
+
+1. **Firebase Config** (`firebase-config.js`)
+   - Initialization only
+   - No dependencies within codebase
+
+2. **Auth & Utilities** (`auth.js`)
+   - Depends on: `firebase-config.js`
+   - Exports: `getCurrentUser()`, `showToast()`, formatters, validators
+
+3. **Supporting Modules** (`match-engine.js`, `address-autocomplete.js`, `tour.js`)
+   - Depend on: `firebase-config.js` (mostly), `auth.js` (utilities)
+   - Used by: Feature modules
+
+4. **Feature Modules** (all others)
+   - Depend on: `firebase-config.js`, `auth.js`, supporting modules, Firebase SDK
+
+**Import pattern in feature modules:**
+```javascript
+// 1. Cloud config
+import { auth, db, storage, functions, httpsCallable } from "./firebase-config.js";
+
+// 2. Firebase SDK (direct from CDN)
+import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+import { collection, query, where, ... } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+// 3. Local utilities and modules
+import { getCurrentUser, showToast, formatDate } from "./auth.js";
+import { calculateMatchScore } from "./match-engine.js";
+```
+
+## Module Organization Principles
+
+- **One page = one module:** Each `app/*.html` has a corresponding `js/*.js` file
+- **Functional cohesion:** Module encapsulates all logic for its feature (queries, event handlers, renders)
+- **Minimal sharing:** Shared code extracted to `auth.js`; cross-feature data access via Firestore (no direct module imports between features)
+- **State isolation:** Each module maintains its own local state variables
+- **Page-load pattern:** `onAuthStateChanged()` listener initiates page-specific logic
 
 ---
 

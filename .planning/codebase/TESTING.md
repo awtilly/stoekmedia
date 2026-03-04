@@ -4,178 +4,263 @@
 
 ## Test Framework
 
-**Status:** No testing framework detected
+**Runner:**
+- No test runner detected
+- No test configuration files found (no `jest.config.js`, `vitest.config.js`, `karma.conf.js`, etc.)
+- No test files in codebase (no `*.test.js` or `*.spec.js` files)
 
-- No Jest, Vitest, Mocha, or other test runner configured
-- No test scripts in `package.json`
-- No test files (*.test.js or *.spec.js) in project source code
-- Firebase Functions deployed without automated test coverage
+**Assertion Library:**
+- None detected; no testing framework installed
+
+**Current State:**
+- **Manual testing only** — No automated test suite
+- All testing done by running HTML pages in browser
+- Requires Firebase project and credentials to test (integration test only)
+
+## Test File Organization
+
+**Location:**
+- No dedicated test directory
+- No test files present in codebase
+
+**Naming:**
+- Not applicable; no tests exist
+
+**Structure:**
+- Not applicable; no tests exist
+
+## Test Structure
+
+**Manual Testing Approach:**
+- Load HTML file in browser with proper Firebase config
+- Use browser DevTools console to verify behavior
+- Click through UI to test features
+- Check browser Network tab for API calls and Firebase operations
+
+**Entry Points for Testing:**
+- `app/login.html` — Test authentication flow
+- `app/dashboard.html` — Test data loading and UI rendering
+- `app/clients.html` — Test client CRUD operations
+- `app/listings.html` — Test listing matching and filtering
+- `app/client-detail.html` — Test complex client workflows
+
+## Key Areas Difficult to Test
+
+**Authentication:**
+- Firebase auth state requires real Firebase project
+- `onAuthStateChanged()` listener fires async
+- Redirect logic makes unit testing impractical
+
+**Database Operations:**
+- All Firestore queries require live database
+- No mocking layer exists
+- Data mutations affect shared state
+
+**Async Operations:**
+- Many operations wrapped in `try-catch` with `console.error()`
+- No promise tracking or timeout handling
+- Silent failures in non-critical paths
+
+**DOM Rendering:**
+- HTML generation happens in template literals
+- No virtual DOM or component abstraction
+- Direct DOM manipulation makes assertions difficult
+
+## What Could Be Tested
+
+**Utility Functions (if isolated):**
+```javascript
+// From auth.js — these COULD be unit tested
+calculateMatchScore(listing, prefs)  // Pure function
+formatCurrency(num)                   // Pure function
+formatDate(ts)                        // Pure function
+timeAgo(ts)                           // Pure function
+escapeHtml(str)                       // Pure function
+sanitizeUrl(url)                      // Pure function
+statusLabel(status)                   // Pure function
+matchScoreColor(score)                // Pure function
+matchScoreLabel(score)                // Pure function
+```
+
+**Example Test Pattern (if Jest were added):**
+```javascript
+describe("match-engine.js", () => {
+  test("calculateMatchScore returns high score for perfect match", () => {
+    const listing = { listingPrice: 500000, bedrooms: 3, bathrooms: 2 };
+    const client = { budgetMin: 400000, budgetMax: 600000, bedsMin: 3, bedsMax: 4, bathsMin: 2, bathsMax: 3 };
+    const result = calculateMatchScore(listing, client);
+    expect(result.score).toBeGreaterThan(80);
+  });
+
+  test("escapeHtml prevents XSS", () => {
+    const input = '<script>alert("xss")</script>';
+    expect(escapeHtml(input)).toBe('&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;');
+  });
+
+  test("formatCurrency formats numbers correctly", () => {
+    expect(formatCurrency(1000000)).toBe("$1,000,000");
+    expect(formatCurrency(null)).toBe("—");
+  });
+});
+```
+
+## Mocking
+
+**Framework:**
+- Not used; no test framework installed
+
+**What Would Need Mocking (if tests added):**
+- `firebase-config.js` exports: `auth`, `db`, `storage`, `functions`
+- `onAuthStateChanged()` callback
+- `httpsCallable()` responses
+- `Timestamp.now()` for time-dependent tests
 
 **Current Approach:**
-- Manual testing via Firebase Cloud Function deployment
-- Integration tests via live Firebase project only
+- No mocks; Firebase integration required
+- Real database changes during manual testing
 
-## Package Dependencies
+## Coverage
 
-**Testing-Related:**
-- None installed
+**Requirements:**
+- No coverage requirements or tooling
+- Not measured
 
-**Current Dependencies** (`/Users/joestoehner/Desktop/GitHub/stoekmedia/functions/package.json`):
-- `@anthropic-ai/sdk` - Claude AI integration
-- `@sendgrid/mail` - Email service
-- `firebase-admin` - Backend SDK
-- `firebase-functions` - Cloud Functions framework
-- `form-data` - HTTP form encoding
-- `node-fetch` - HTTP client
+**Current Coverage:**
+- Estimated 0% (no automated tests)
 
-## Test Types Currently Missing
+**Critical Gaps:**
+- Authentication flows not tested
+- Database operations not tested
+- Complex filtering/matching logic untested
+- Error handling branches untested
+- UI rendering untested
+
+## Test Types
 
 **Unit Tests:**
-- No unit tests for individual handler functions:
-  - `handleCreateClient()`
-  - `handleUpdateClient()`
-  - `handleCreateShowing()`
-  - `handleCreateFollowUp()`
-  - etc.
+- Not implemented
+- Would focus on: `match-engine.js` utilities, `auth.js` formatting functions
+- Scope: Single functions with pure inputs/outputs
 
 **Integration Tests:**
-- No integration tests for Firestore interactions
-- No tests for AI tool execution pipeline
-- No tests for email/SendGrid integration
-
-**Error Handling Tests:**
-- No tests for `HttpsError` scenarios:
-  - Unauthenticated requests
-  - Invalid arguments
-  - Missing resources
-  - Permission denied
-- No tests for malformed inputs to tool handlers
-- No tests for Firestore access denied conditions
-
-**Authentication Tests:**
-- No tests for Firebase Auth context validation
-- No tests for user ID validation
-- No tests for access control (e.g., users can only access their own clients)
+- Implicit in manual browser testing
+- Covers: Auth → Firebase → UI rendering pipeline
+- Requires: Real Firebase project, real user flows
 
 **E2E Tests:**
 - Not implemented
-- Would need Firebase Emulator Suite
+- Would benefit most from: Cypress, Playwright, or Selenium
+- Critical paths: Login → Add Client → Create Listing → Match → Email
 
-## Key Testable Areas
+## Patterns for Manual Testing
 
-**AI Integration (`askAI` function):**
-- Tool call parsing from Claude response
-- Context window building (client/showing details)
-- Daily rate limiting (50 requests/day)
-- Error handling for Anthropic API failures
-
-**CRUD Operations:**
-- Client creation with schema validation
-- Client updates with allowlist enforcement (`UPDATE_CLIENT_ALLOWLIST`)
-- Showing creation with date parsing
-- Follow-up and event creation with relative date resolution
-
-**Business Logic:**
-- Client-to-listing matching algorithm
-- Fuzzy name matching for client search
-- Date resolution ("Thursday", "next Monday", "tomorrow")
-- Listing auto-import from showing creation
-
-**Data Validation:**
-- Email format validation
-- Phone number format validation
-- Budget range validation (min <= max)
-- Date string parsing and validation
-
-## Recommendations for Test Implementation
-
-### Phase 1: Unit Tests
-
-Set up Jest and test individual handler functions:
-
+**Quick Verification (Console):**
 ```javascript
-// Example structure (not in codebase yet)
-describe('handleCreateClient', () => {
-  it('should create client with required fields', async () => {
-    const input = { fullName: 'John Smith' };
-    const result = await handleCreateClient(input, 'test-uid');
-    expect(result.success).toBe(true);
-  });
+// Test calculateMatchScore directly
+import { calculateMatchScore } from "./match-engine.js";
+const listing = { listingPrice: 500000, bedrooms: 3 };
+const client = { budgetMin: 400000, budgetMax: 600000, bedsMin: 3 };
+calculateMatchScore(listing, client);  // Check result in console
 
-  it('should reject missing fullName', async () => {
-    const input = { email: 'john@example.com' };
-    const result = await handleCreateClient(input, 'test-uid');
-    expect(result.success).toBe(false);
-    expect(result.error).toContain('fullName');
-  });
-});
+// Test formatting
+import { formatCurrency } from "./auth.js";
+formatCurrency(1500000);  // "$1,500,000"
 ```
 
-### Phase 2: Firestore Integration Tests
+**Browser Testing Checklist:**
 
-Use Firebase Emulator for local testing without hitting production database.
+**Auth Flow:**
+- [ ] Login with valid credentials → redirect to dashboard
+- [ ] Login with invalid email → error message
+- [ ] Login with wrong password → error message
+- [ ] Too many login attempts → rate limit message
+- [ ] Forgot password → email sent message
+- [ ] Logout → redirect to login
 
-### Phase 3: AI Pipeline Tests
+**Client Management:**
+- [ ] Load clients list → displays all clients
+- [ ] Search clients → filters by name/email/phone
+- [ ] Filter by status → shows only selected status
+- [ ] Add new client → modal opens, can save
+- [ ] View client detail → all info populated
+- [ ] Edit client → updates persist
+- [ ] Delete client → confirms before deleting
 
-Mock Claude API and test tool call execution:
+**Listings:**
+- [ ] Load listings → displays grid and list views
+- [ ] Toggle view → switches grid ↔ list
+- [ ] Search by address → filters correctly
+- [ ] Filter by price range → boundaries respected
+- [ ] Filter by beds/baths → numeric filtering works
+- [ ] Add listing → modal opens, photos upload
+- [ ] Quick match → calculates scores correctly
+- [ ] Match listing to client → creates association
 
+**Match Engine:**
+- [ ] High budget match → returns high score
+- [ ] Low budget match → returns low score
+- [ ] Wrong location → returns low score
+- [ ] All preferences match → returns 90%+ score
+- [ ] Deal breaker matches → noted in results
+
+## Browser DevTools Testing
+
+**Console Checks:**
 ```javascript
-// Pseudo-code structure
-jest.mock('@anthropic-ai/sdk');
-describe('AI tool pipeline', () => {
-  it('should execute create_client tool when AI calls it', async () => {
-    // Mock Claude response with tool_use block
-    // Call askAI with matching input
-    // Verify client created in Firestore
-  });
-});
+// Verify auth state
+import { getCurrentUser } from "./auth.js";
+const user = await getCurrentUser();
+console.log(user);  // Should show { uid, email, fullName, role }
+
+// Check cached data
+import { allClients } from "./clients.js";  // Not exported, but check window if added
+console.log(allClients);  // Verify populated
+
+// Test error handling
+// Trigger network error manually in DevTools Network tab → offline
+// Verify showToast("Failed...") appears
 ```
 
-## Test Coverage Gaps
+**Network Tab Checks:**
+- Firestore queries return expected data shapes
+- Cloud Function calls receive correct parameters
+- Upload operations send files correctly
+- No 4xx/5xx errors on successful operations
 
-**Critical (High Priority):**
-- Error handling paths for all handler functions
-- Firestore access control validation
-- Date parsing edge cases ("Thursday" when today is Friday, "next week" boundaries)
-- Client ID context handling in multi-client operations
+**Performance Notes:**
+- Large client lists (100+) render slowly
+- Match calculation is synchronous and blocking
+- No virtual scrolling or pagination
+- Dashboard loads in ~1-2 seconds on fast network
 
-**Important (Medium Priority):**
-- Fuzzy name matching algorithm accuracy
-- Tool input validation against JSON schemas
-- Rate limiting logic
-- Timestamp and timezone handling
+## Adding Tests (Recommended Path)
 
-**Nice to Have (Low Priority):**
-- Success path logging
-- API response formatting
-- List pagination (limit: 10 in search results)
-
-## Running Tests (When Implemented)
-
+**Phase 1: Install Jest**
 ```bash
-# Install test framework (not currently installed)
-npm install --save-dev jest firebase-testing-library
-
-# Run all tests
-npm test
-
-# Watch mode
-npm test -- --watch
-
-# Coverage report
-npm test -- --coverage
+npm install --save-dev jest @babel/preset-env babel-jest
 ```
 
-**Note:** Current `package.json` has no test scripts. Would need to add:
-```json
-{
-  "scripts": {
-    "test": "jest",
-    "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage"
-  }
-}
+**Phase 2: Test Pure Functions**
+- Start with `match-engine.js` (no dependencies)
+- Add `auth.js` formatting functions
+- Cover edge cases (null, undefined, invalid input)
+
+**Phase 3: Mock Firebase**
+```javascript
+jest.mock('./firebase-config.js', () => ({
+  auth: {},
+  db: {},
+  httpsCallable: jest.fn()
+}));
 ```
+
+**Phase 4: Integration Tests**
+- Use Firebase Emulator Suite
+- Test full workflows (client CRUD, listing matching)
+
+**Phase 5: E2E Tests (Optional)**
+- Use Playwright for critical user journeys
+- Test across browsers (Chrome, Safari, Firefox)
 
 ---
 

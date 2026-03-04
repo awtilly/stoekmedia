@@ -4,168 +4,285 @@
 
 ## Pattern Overview
 
-**Overall:** Multi-tier web application with serverless backend and static frontend. Real estate CRM (GreenDoor) built with Firebase backend, vanilla JavaScript frontend, and AI-powered assistant using Claude via Firebase Cloud Functions.
+**Overall:** Single-page application (SPA) with real-time data synchronization via Firebase.
 
 **Key Characteristics:**
-- Client-server architecture with serverless functions handling business logic
-- Event-driven AI assistant integrated throughout the UI
-- Firestore document database with role-based access control
-- Static HTML/CSS/JS frontend deployed via Firebase Hosting
-- Real-time data synchronization via Firestore listeners
+- Client-side rendered HTML pages with server-side imports of JavaScript modules
+- Firebase Firestore as primary data store with real-time listeners
+- ES6 module imports with Firebase SDK from CDN
+- Role-based access control (realtor vs. admin)
+- Feature-driven page architecture (dashboard, clients, listings, calendar, admin, settings)
 
 ## Layers
 
-**Frontend Layer:**
-- Purpose: User interface for real estate professionals to manage clients, showings, calendar, and listings
-- Location: `greendoor/app/` (HTML), `greendoor/js/` (JavaScript), `greendoor/css/` (Stylesheets)
-- Contains: Page templates, module scripts, styles
-- Depends on: Firebase SDK, Cloud Functions via httpsCallable
-- Used by: End users (realtors)
+**Presentation Layer:**
+- Purpose: Server HTML pages that structure the UI and define layout
+- Location: `app/` directory (`admin.html`, `clients.html`, `client-detail.html`, `dashboard.html`, `calendar.html`, `listings.html`, `settings.html`, `login.html`, `onboarding.html`, `faq.html`)
+- Contains: HTML structure, semantic markup, data binding targets via element IDs
+- Depends on: CSS (`css/greendoor.css`), JavaScript modules in `js/`
+- Used by: Browser rendering engine; consumed by JavaScript modules
 
-**Backend/Functions Layer:**
-- Purpose: Server-side business logic, AI assistant, integrations with external services
-- Location: `functions/index.js`
-- Contains: Cloud Functions, AI tool definitions, Firestore operations, email/SMS sending, document signing
-- Depends on: Firebase Admin SDK, Anthropic Claude API, SendGrid, BoldSign
-- Used by: Frontend via httpsCallable, webhooks from external services
+**Data Access Layer:**
+- Purpose: Firestore client initialization and connection configuration
+- Location: `js/firebase-config.js`
+- Contains: Firebase app initialization, auth/db/storage/functions exports
+- Depends on: Firebase SDK (10.8.0 from CDN)
+- Used by: All feature modules for database operations
 
-**Data Layer:**
-- Purpose: Persistent storage of user profiles, clients, showings, events, listings, activities
-- Location: Firestore database (cloud-hosted)
-- Contains: Collections for users, clients, showings, calendar_events, listings, activities, email_templates, etc.
-- Depends on: Firebase Admin SDK
-- Used by: Cloud Functions, frontend via Firestore listeners
+**Business Logic Layer:**
+- Purpose: Feature-specific functionality and state management
+- Location: `js/` directory with feature files:
+  - `auth.js` — Auth state, login/logout, user profile fetching, utility exports
+  - `dashboard.js` — Dashboard data aggregation, activity feeds, AI briefing
+  - `clients.js` — Client list loading, filtering, search
+  - `client-detail.js` — Comprehensive client operations (activities, files, matches, showings, follow-ups, envelopes)
+  - `listings.js` — Listing CRUD, filtering, photo uploads, client-listing matching
+  - `calendar.js` — Showing calendar management
+  - `admin.js` — Admin panel, user management, audit logs, platform stats
+  - `settings.js` — User preferences and profile management
+  - `onboarding.js` — New user onboarding workflow
+  - `match-engine.js` — Scoring algorithm for listing-to-client matching
+  - `address-autocomplete.js` — Google Places integration for address input
+  - `tour.js` — Interactive guided tours
+  - `chatbot.js` — AI assistant interactions
+- Depends on: `firebase-config.js`, Cloud Functions, external APIs
+- Used by: HTML pages via direct imports
 
-**Authentication Layer:**
-- Purpose: User identity and access control
-- Location: `greendoor/js/auth.js`, Firebase Authentication
-- Contains: Login/logout, password reset, role-based nav visibility, session management
-- Depends on: Firebase Authentication, Firestore user documents
-- Used by: All other layers via onAuthStateChanged listener
+**Integration Layer:**
+- Purpose: Cloud Functions and external API calls
+- Location: Cloud Functions invoked via `httpsCallable`:
+  - `askAssistant()` — AI briefing and client summaries
+  - `sendEmail()` — Email delivery
+  - `sendForSignature()` — BoldSign e-signature requests
+  - `checkSignatureStatus()` — Poll signature envelope status
+  - `createEmbeddedSignatureRequest()` — Embedded signing workflows
+  - `shareDocument()` — Document sharing
+  - `parseListingUrl()` — URL-based listing parsing
+- Location: Firebase Functions deployed in `us-central1`
+- Contains: Serverless business logic, external API communication
+- Depends on: Third-party APIs (BoldSign, Google Places, OpenAI)
+
+**Utilities Layer:**
+- Purpose: Shared helper functions
+- Location: `js/auth.js` exports:
+  - `getCurrentUser()` — Fetch authenticated user profile from Firestore
+  - `showToast()` — Toast notifications
+  - `formatCurrency()`, `formatDate()`, `formatDateTime()`, `timeAgo()` — Date/time formatting
+  - `formatFileSize()` — File size display
+  - `statusLabel()`, `escapeHtml()`, `sanitizeUrl()` — Data formatting and security
+- Used by: All feature modules
 
 ## Data Flow
 
-**User Login Flow:**
+**Authentication Flow:**
 
-1. User visits `/greendoor/app/login` and submits email/password
-2. `auth.js` calls `signInWithEmailAndPassword()` (Firebase Authentication)
-3. `onAuthStateChanged` listener triggers automatically
-4. Fetches user document from Firestore `users` collection
-5. Loads `cachedProfile` with user's role, settings, etc.
-6. Redirects to dashboard if onboarding complete, else to onboarding
+1. User navigates to `/greendoor/app/login`
+2. `auth.js` runs `onAuthStateChanged()` listener on every page load
+3. If user is logged in:
+   - Fetch user profile from `users/{uid}` collection
+   - Check `onboardingComplete` flag; redirect to `/greendoor/app/onboarding` if false
+   - Render user name in navigation
+   - Show admin tab if `role === "admin"`
+4. If user is not logged in and on CRM page:
+   - Redirect to `/greendoor/app/login`
+5. `handleLogin()` sends email/password to Firebase Auth, creates auth session
+6. `handleLogout()` signs out and redirects to login page
 
-**AI Assistant Flow (Chat/Voice):**
+**Client Data Flow (Dashboard/Clients Page):**
 
-1. User types/speaks in chatbot UI on any page (`greendoor/js/chatbot.js`)
-2. Frontend detects page context (dashboard, clients, client-detail, calendar, listings)
-3. Calls `askAssistant()` Cloud Function via httpsCallable with user message + context
-4. Cloud Function (`functions/index.js`) passes message to Claude API with:
-   - System prompt defining GreenDoor AI behavior
-   - AI_TOOLS array (create_client, update_client, log_activity, create_showing, etc.)
-   - Current user context (clients, calendar, listings data)
-5. Claude processes message, potentially invokes tools
-6. Cloud Function executes Firestore writes based on tool calls
-7. Returns assistant response to frontend
-8. Frontend displays response and refreshes UI if data changed
+1. Page loads: `dashboard.html` or `clients.html`
+2. Auth listener triggers `onAuthStateChanged()` in corresponding `.js` file
+3. Feature module calls Firestore query: `query(collection(db, "clients"), where("realtorId", "==", uid))`
+4. Results mapped to local state array
+5. Render functions transform data to HTML (with escapeHtml for XSS prevention)
+6. Filters/search apply client-side array operations (no re-query)
+7. User interactions (create/update/delete) call Firestore write operations
+8. Real-time listeners update UI if used
 
-**Client Management Flow:**
+**Listing-Client Matching Flow:**
 
-1. Frontend loads clients list via `loadClients()` → queries Firestore `clients` collection
-2. User can filter by status/name via UI
-3. Clicking client opens `/greendoor/app/client-detail` with `clientId` in URL/query
-4. Detail page loads all client data: profile, showings, activities, calendar events
-5. User can update via form or via AI assistant
-6. Updates sync to Firestore and refresh UI
+1. On client-detail page, `match-engine.js` exports `calculateMatchScore(listing, clientPrefs)`
+2. Weighting algorithm compares:
+   - Price (30% weight): Budget min/max vs. listing price
+   - Location (25%): Preferred locations vs. address fields
+   - Property type (10%): Exact match
+   - Beds/baths/sqft (10% each): Range matching with penalties
+   - Features (5%): Presence in listing features/description
+   - Deal breakers: Filtered out if present
+3. Score 0-100 returned with breakdown and color code
+4. User can manually create matches in `clientListingMatches` collection
+5. Matches appear in client detail with match score and comparison UI
 
-**Showing Scheduling Flow:**
+**File Upload/Download Flow:**
 
-1. User says "schedule showing at 455 W Oak Thursday at 10am" to AI
-2. AI extracts: address, date (resolves "Thursday"), time, client context
-3. Calls `create_showing` tool
-4. Cloud Function creates document in `showings` collection with status "scheduled"
-5. Auto-creates follow-up reminder for next day if enabled
-6. Frontend notifies user, calendar refreshes to show new showing
+1. User uploads file on client-detail page
+2. `uploadFile()` creates resumable upload to Firebase Storage
+3. Reference saved to `files/{fileId}` Firestore doc with metadata
+4. Progress bar tracks upload
+5. Download URL retrieved and rendered as link
+6. User can delete file (removes from Storage and Firestore)
+
+**E-Signature Flow:**
+
+1. User uploads document or references template file
+2. User selects signers and calls Cloud Function `sendForSignatureFn()`
+3. Function calls BoldSign API to create signature request (envelope)
+4. Returns envelope ID, saved to `envelopes/{envelopeId}` in Firestore
+5. User can poll status with `checkSignatureStatusFn()` (updates `envelopes` doc)
+6. When complete, can download signed document
+7. Activity logged as "document signed"
 
 **State Management:**
 
-- Frontend: Minimal state — mostly reads from Firestore via real-time listeners
-- `cachedProfile` in auth.js stores current user info (role, name, settings)
-- Page-specific state in module scope (clients list, calendar data, etc.)
-- Firestore is source of truth; frontend listens to changes and re-renders
+- Page-level state stored in module variables (e.g., `let allClients = []` in `clients.js`)
+- Session state in `sessionStorage` (e.g., AI briefing cache)
+- User profile cached in `auth.js` as `cachedProfile`
+- Firestore provides authoritative state; no Redux/Vuex pattern used
 
 ## Key Abstractions
 
-**AI Assistant System:**
+**User Profile:**
+- Purpose: Represents authenticated user (realtor or admin)
+- Location: `users/{uid}` Firestore collection
+- Pattern: Loaded once per session via `getCurrentUser()` in `auth.js`
+- Fields: `email`, `fullName`, `role`, `isActive`, `subscription`, `onboardingComplete`, `showTour`, `lastLogin`, etc.
 
-- Purpose: Natural language interface to all CRM operations
-- Examples: `functions/index.js` lines 47-300+ (AI_TOOLS array)
-- Pattern: Tool-calling LLM with Firestore side effects. System prompt defines behavior constraints. Each tool maps to CRUD operation or business logic.
+**Client:**
+- Purpose: Represents buyer/seller/lead contact
+- Location: `clients/{clientId}` Firestore collection
+- Pattern: Each client linked to realtor via `realtorId` field
+- Fields: `fullName`, `email`, `phone`, `status`, `budget`, `preferredLocations`, `createdAt`, `lastActivityDate`, etc.
 
-**Firebase Modular Pattern:**
+**Listing:**
+- Purpose: Represents property
+- Location: `listings/{listingId}` Firestore collection
+- Pattern: Shared across all realtors (no `realtorId` field); any realtor can view and match
+- Fields: `address`, `listingPrice`, `propertyType`, `bedrooms`, `bathrooms`, `squareFeet`, `features`, `status`, `photos`, `createdAt`, etc.
 
-- Purpose: Structured initialization of Firebase services
-- Examples: `greendoor/js/firebase-config.js`, individual module imports in each page script
-- Pattern: Each module imports specific Firestore/Auth/Functions methods only as needed
+**ClientListingMatch:**
+- Purpose: Represents a listing-to-client match/opportunity
+- Location: `clientListingMatches/{matchId}` Firestore collection
+- Pattern: Captures match score, user rating, and match quality
+- Fields: `clientId`, `listingId`, `matchScore`, `userRating`, `notes`, `createdAt`, `status`, etc.
 
-**Page-Scoped Modules:**
+**Activity:**
+- Purpose: Event log for client interactions (email, call, note, showing, etc.)
+- Location: `activities/{activityId}` Firestore collection
+- Pattern: Scoped to realtor (`realtorId`) and client (`clientId`)
+- Fields: `type` ("email", "call", "note", "sms", "file_share", "showing"), `subject`, `notes`, `timestamp`, etc.
 
-- Purpose: Organize code by UI surface (page = module)
-- Examples: `greendoor/js/dashboard.js`, `greendoor/js/client-detail.js`, `greendoor/js/calendar.js`
-- Pattern: Each module initializes on page load, sets up listeners, handles UI interactions. HTML imports corresponding JS module.
+**File:**
+- Purpose: Document storage reference
+- Location: `files/{fileId}` Firestore doc + Firebase Storage object
+- Pattern: User-uploaded or template file
+- Fields: `clientId`, `realtorId`, `name`, `size`, `mimeType`, `storageUrl`, `createdAt`, etc.
 
-**Activity Logging:**
+**Envelope (E-Signature):**
+- Purpose: BoldSign signature request wrapper
+- Location: `envelopes/{envelopeId}` Firestore collection
+- Pattern: Tracks signature request status and metadata
+- Fields: `documentId`, `boldSignId`, `signers`, `status`, `createdAt`, `completedAt`, etc.
 
-- Purpose: Immutable audit trail of all client interactions
-- Examples: `log_activity` tool in Cloud Function
-- Pattern: Each activity (call, email, showing, note) creates document in `activities` subcollection under client, with timestamp and type enum
+**Showing:**
+- Purpose: Scheduled property showing
+- Location: `showings/{showingId}` Firestore collection
+- Pattern: Linked to client and listing
+- Fields: `clientId`, `listingId`, `realtorId`, `address`, `showingDate`, `status`, `notes`, `rating`, etc.
+
+**EmailTemplate:**
+- Purpose: Reusable email draft templates
+- Location: `emailTemplates/{templateId}` Firestore collection
+- Pattern: Per-realtor or shared system templates
+- Fields: `name`, `subject`, `body`, `createdAt`, `realtorId`, etc.
 
 ## Entry Points
 
-**Web Application Entry:**
+**CRM Pages:**
 
-- Location: `greendoor/app/login.html` → `greendoor/app/dashboard.html` (if authenticated)
-- Triggers: User opens https://stoekmedia.com/greendoor/app/*
-- Responsibilities: Route authentication, load Firebase config, initialize auth listener
+**Dashboard (`/greendoor/app/dashboard`):**
+- Location: `app/dashboard.html` + `js/dashboard.js`
+- Triggers: Direct navigation; redirected from login on auth success
+- Responsibilities: Load user stats (client counts by status), activity feed, upcoming showings, AI daily briefing, quick action links
 
-**Cloud Functions Entry:**
+**Clients (`/greendoor/app/clients`):**
+- Location: `app/clients.html` + `js/clients.js`
+- Triggers: Navigation link or new client workflow
+- Responsibilities: List all clients for realtor, search, filter by status, quick action (AI summary), create new client
 
-- Location: `functions/index.js`
-- Triggers: Frontend httpsCallable invocations, webhook calls from BoldSign/SendGrid
-- Responsibilities: Business logic, AI processing, database writes, external API calls
+**Client Detail (`/greendoor/app/client-detail?id={clientId}`):**
+- Location: `app/client-detail.html` + `js/client-detail.js` (largest module at ~2000 lines)
+- Triggers: Click client row, deep linking
+- Responsibilities: Comprehensive client data management — activities, files, e-signatures, showings, matches, follow-ups, email templates, notes
 
-**Onboarding Entry:**
+**Listings (`/greendoor/app/listings`):**
+- Location: `app/listings.html` + `js/listings.js`
+- Triggers: Navigation link
+- Responsibilities: Browse all listings (shared pool), filter/search, add new listing, upload photos, match listing to client, quick match scoring
 
-- Location: `greendoor/app/onboarding.html` → `greendoor/js/onboarding.js`
-- Triggers: New user with `onboardingComplete === false`
-- Responsibilities: Collect user profile, signature, avatar, preferences. Set onboardingComplete flag.
+**Calendar (`/greendoor/app/calendar`):**
+- Location: `app/calendar.html` + `js/calendar.js`
+- Triggers: Navigation link
+- Responsibilities: View scheduled showings in calendar format, create/edit/cancel showings
 
-**Password Reset Entry:**
+**Admin (`/greendoor/app/admin`):**
+- Location: `app/admin.html` + `js/admin.js`
+- Triggers: Navigation link (visible only to admin role)
+- Responsibilities: Platform-wide analytics, user management, audit logs, invitations, platform settings
 
-- Location: `greendoor/app/set-password.html` → `greendoor/js/set-password.js`
-- Triggers: User clicks password reset link in email
-- Responsibilities: Validate oobCode, accept new password, update auth
+**Settings (`/greendoor/app/settings`):**
+- Location: `app/settings.html` + `js/settings.js`
+- Triggers: Navigation link
+- Responsibilities: User profile edit, notification preferences, subscription management, etc.
+
+**Login (`/greendoor/app/login`):**
+- Location: `app/login.html` + `js/auth.js`
+- Triggers: Unauthenticated user navigates to CRM, or logout
+- Responsibilities: Email/password form, call Firebase Auth, handle errors (invalid creds, too many attempts)
+
+**Onboarding (`/greendoor/app/onboarding`):**
+- Location: `app/onboarding.html` + `js/onboarding.js`
+- Triggers: First login (redirected if `onboardingComplete !== true`)
+- Responsibilities: MLS account linking, user profile completion, email template seeding, initial setup wizard
 
 ## Error Handling
 
-**Strategy:** Try-catch at Cloud Function level, error messages displayed in UI, logging to console
+**Strategy:** Try-catch blocks around async operations with user-facing toast notifications.
 
 **Patterns:**
 
-- Cloud Functions wrap operations in try-catch, return error object to frontend
-- Frontend shows toast/alert with user-friendly error messages
-- Auth errors (wrong password, not found, too many requests) handled with specific messaging in `auth.js`
-- Missing required fields in AI tool calls → Claude re-prompts user for clarification
-- Firestore permission errors → redirect to login
+- Firestore errors caught and logged to console with `console.error()`
+- User-facing message shown via `showToast("message", "error")`
+- Example: `catch (e) { console.error("Load clients error:", e); showToast("Failed to load clients.", "error"); }`
+- Auth errors handled with specific messages (e.g., "auth/user-not-found" → "Invalid email or password")
+- Cloud Function errors catch and display generic "Failed to..." message to user
+- Loading spinners hidden on error; content remains visible for retry
 
 ## Cross-Cutting Concerns
 
-**Logging:** Console.log throughout modules; production logging via Cloud Functions logs
+**Logging:**
+- Uses browser `console.error()` for diagnostic logging
+- No centralized logging service
+- Errors logged during data operations and API calls
+- Example: `console.error("Stats error:", e)`
 
-**Validation:** Input validation in Cloud Functions before Firestore writes; frontend form validation for UX feedback
+**Validation:**
+- Form inputs validated before Firestore writes
+- Email validation on login/signup
+- Budget/bed/bath inputs parsed as numbers with fallback to 0 or empty
+- HTML escaping applied on all user-generated content display via `escapeHtml()`
+- URL sanitization with `sanitizeUrl()` before rendering links
 
-**Authentication:** `onAuthStateChanged` listener in `auth.js` enforces authentication on all CRM pages; redirects unauthenticated users to login
+**Authentication:**
+- Firebase Auth session managed automatically
+- `onAuthStateChanged()` listener provides auth state on every page
+- Role-based access via `profile.role === "admin"` checks
+- Admin panel hidden from realtors (CSS + server-side check on page load)
+- Redirect to login if not authenticated
 
-**Authorization:** Role-based checks (e.g., admin role shows admin tab); Firestore security rules enforce document-level access control
+**Real-Time Sync:**
+- No real-time listeners configured in current code (all one-time queries)
+- State refreshed on user action or page navigation
+- Future opportunity for `onSnapshot()` to keep client/listing lists live
 
 ---
 

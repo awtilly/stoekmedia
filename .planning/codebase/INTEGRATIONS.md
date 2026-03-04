@@ -4,117 +4,149 @@
 
 ## APIs & External Services
 
-**AI Assistant:**
-- Anthropic Claude API - AI-powered voice-first assistant for CRM operations
-  - SDK/Client: @anthropic-ai/sdk v0.39.0
-  - Auth: `ANTHROPIC_API_KEY` environment variable
-  - Features: Tool calling, natural language understanding, email drafting
+**AI & Chatbot:**
+- Firebase Cloud Functions (`askAssistant`) - Powers the GreenDoor AI assistant
+  - SDK/Client: `firebase-functions` 10.8.0
+  - Purpose: Processes user questions, provides context-aware responses, drafts emails, and manages document actions
+  - Located in: `js/chatbot.js`
+  - Invocation: `httpsCallable(functions, "askAssistant")`
 
 **Email & Communication:**
 - SendGrid - Email delivery service
-  - SDK/Client: @sendgrid/mail v8.1.0
-  - Auth: `SENDGRID_API_KEY` environment variable
-  - Used for: Client notifications, email campaigns
+  - Purpose: Sends transactional emails (client follow-ups, confirmations)
+  - Invocation: via `sendEmail` Cloud Function
+  - Email verification: Uses SendGrid verification links for sender email validation
+  - Located in: `js/settings.js` (configuration/testing), `js/client-detail.js` (send operations)
 
-**Document Management & E-Signatures:**
-- BoldSign - Document signing and management
-  - Auth: `BOLDSIGN_API_KEY` environment variable
-  - Webhook Secret: `BOLDSIGN_WEBHOOK_SECRET` environment variable
-  - Used for: Document signing workflows, signature verification
+**Address & Maps:**
+- Google Maps Places Autocomplete API
+  - Purpose: Address autocomplete when adding clients, listings, and properties
+  - Key: `AIzaSyDEPiHPEURzn_gtiTaR-rbCGg06JYUSlQY`
+  - Biased region: Missouri/Illinois (36.0-40.6°N, -95.8°W to -89.0°W)
+  - SDK/Client: Native `google.maps.places.Autocomplete`
+  - Located in: `js/address-autocomplete.js`
+  - Features: Structured address parsing (street, city, state, zip, county, neighborhood, lat/lng)
+
+**Document & E-Signatures:**
+- BoldSign - Electronic signature service
+  - Purpose: Send documents for signature, manage signing workflows, embedded signing UI
+  - SDK/Client: Cloud Functions calling BoldSign API
+  - Functions involved:
+    - `sendForSignature` - Initiate signature request
+    - `checkSignatureStatus` - Poll signature completion status
+    - `createEmbeddedSignatureRequest` - Create embedded signing experience
+  - Embed: Opens in modal with `openBoldSignEmbed()` function
+  - Testing: `stressTestBoldSign` Cloud Function (diagnostics)
+  - Located in: `js/client-detail.js` (signature workflows), `js/settings.js` (testing)
 
 ## Data Storage
 
 **Databases:**
-- Firestore (Firebase)
-  - Connection: Implicit via `firebase-admin/app` initialization
-  - Client: Firebase Admin SDK v12.0.0
-  - Usage: Primary database for clients, showings, follow-ups, activities, events
-  - Collections: clients, showings, followups, activities, events, documents
+- Firebase Firestore
+  - Connection: `const db = getFirestore(app)` (firebase-config.js)
+  - Client: `firebase-firestore` 10.8.0 SDK
+  - Collections:
+    - `users` - Realtor profiles (fullName, email, role, onboardingComplete, emailSignature, lastLogin, etc.)
+    - `clients` - Client records per realtor (fullName, email, phone, status, budget range, preferences, etc.)
+    - `listings` - Property listings (address, price, bedrooms, bathrooms, features, MLS number, etc.)
+    - `clientListingMatches` - Smart match scores between clients and listings
+    - `activities` - Client interactions (notes, calls, emails, file shares, showings, follow-ups)
+    - `files` - Uploaded documents and attachments
+    - `envelopes` - E-signature requests and tracking
+    - `showings` - Property showings and viewing schedules
+    - `followUps` - Automated and scheduled follow-up tasks
+    - `emailTemplates` - Saved email templates per realtor
+    - `settings` - User preferences and configuration
+    - `trialRequests` - Trial signup form submissions
+  - Real-time subscriptions: `onSnapshot()` used for live updates on client detail page
 
 **File Storage:**
 - Firebase Storage
-  - Client: Firebase Admin SDK v12.0.0 (`getStorage()`)
-  - Usage: Document uploads and file storage
+  - Purpose: Store client documents, listing photos, file attachments, signatures
+  - Client: `firebase-storage` 10.8.0 SDK
+  - Operations: `uploadBytesResumable()`, `getDownloadURL()`, `deleteObject()`
+  - Located in: `js/client-detail.js` (file uploads/management), `js/listings.js` (photo uploads)
 
 **Caching:**
-- None detected
+- In-memory JavaScript objects (arrays and caches)
+  - `allClients` - Cached client list in `js/clients.js`
+  - `allMatches` - Cached listing matches in `js/client-detail.js`
+  - `emailTemplates` - Cached templates in `js/client-detail.js`
+  - `allListings` - Cached listings in `js/listings.js`
+  - Session-based: Chat history stored in `chatHistory` array in `js/chatbot.js`
 
 ## Authentication & Identity
 
 **Auth Provider:**
 - Firebase Authentication
-  - Implementation: Firebase Admin SDK v12.0.0 (`getAuth()`)
-  - Used for: User authentication, ID token validation in HTTP requests
-  - Methods: Token-based authentication via Firebase ID tokens
-
-**Webhook Verification:**
-- BoldSign webhooks
-  - Auth: HMAC-SHA256 signature validation
-  - Secret: `BOLDSIGN_WEBHOOK_SECRET` used for verifying webhook authenticity
-  - Implementation: Crypto-based signature verification in webhook handlers
+  - Implementation: Email/password authentication
+  - Methods:
+    - `signInWithEmailAndPassword()` - User login
+    - `sendPasswordResetEmail()` - Password recovery with custom reset URL
+    - `signOut()` - User logout
+  - Auth gating: `onAuthStateChanged()` listener guards all CRM pages
+  - Redirect logic: Unauthenticated users → login page; incomplete onboarding → onboarding page
+  - Located in: `js/auth.js` (core auth flows), all app pages use `onAuthStateChanged`
 
 ## Monitoring & Observability
 
 **Error Tracking:**
-- None detected (Firebase Functions logs to Google Cloud Logging)
+- Not detected - errors logged to browser console only (`console.error()`)
 
 **Logs:**
-- Google Cloud Logging (implicit via Firebase Functions)
-- Console logging via standard Node.js `console` methods
+- Browser console logging via `console.error()` and `console.warn()`
+  - Examples: "Load client error:", "Speech error:", "Google Maps Places API not loaded"
+  - No remote logging infrastructure detected
+
+**Application-level Feedback:**
+- Toast notifications (`showToast()` function in `js/auth.js`)
+  - Success messages: Green color (#22c55e)
+  - Error messages: Red color (#ef4444)
+  - Used throughout for user feedback on operations
 
 ## CI/CD & Deployment
 
 **Hosting:**
-- Google Cloud Functions (Firebase Functions)
-- Deployment: Firebase CLI or Google Cloud Build
+- Firebase Hosting (inferred from Firebase setup and project name `greendoor-2da47`)
+- Static site hosting for HTML/CSS/JS files
+- Cloud Functions deployment through Firebase Console
 
 **CI Pipeline:**
-- None detected in codebase
+- Not detected - no build configuration or CI files found
 
 ## Environment Configuration
 
 **Required env vars:**
-- `ANTHROPIC_API_KEY` - Anthropic API authentication
-- `SENDGRID_API_KEY` - SendGrid email service authentication
-- `BOLDSIGN_API_KEY` - BoldSign document signing authentication
-- `BOLDSIGN_WEBHOOK_SECRET` - HMAC secret for webhook verification
+- Not used in codebase - Firebase config is hardcoded in `firebase-config.js`
+- Google Maps API key: `AIzaSyDEPiHPEURzn_gtiTaR-rbCGg06JYUSlQY` (hardcoded in firebase-config.js and index.html)
 
 **Secrets location:**
-- Firebase Functions secret parameters (`firebase-functions/params`)
-- Define via `firebase functions:secrets:set` command
-- Runtime access via `defineSecret()` in `functions/index.js`
+- Hardcoded in source files (not ideal for production):
+  - Firebase config: `js/firebase-config.js` (lines 7-14)
+  - Google Maps key: `js/firebase-config.js` (line 8)
+  - BoldSign API key: Configured server-side in Cloud Functions (not visible in client code)
+  - SendGrid API key: Configured server-side in Cloud Functions (not visible in client code)
 
 ## Webhooks & Callbacks
 
 **Incoming:**
-- BoldSign webhooks for signature events and document status updates
-- Handler: `onRequest` HTTP endpoint for webhook processing
-- Verification: HMAC-SHA256 signature validation using `BOLDSIGN_WEBHOOK_SECRET`
+- Trial form submissions: Written to Firestore `trialRequests` collection
+  - Endpoint: POST to `/` (form submission in index.html)
+  - Data: firstName, lastName, email, phone, brokerage, createdAt, status
 
 **Outgoing:**
-- Email callbacks via SendGrid (delivery status, bounce handling)
-- Webhook callbacks to external systems for document events (via BoldSign integration)
+- Email notifications via SendGrid (Firebase Cloud Functions):
+  - Client follow-ups
+  - Email template sending
+  - Password reset emails (via Firebase Auth)
+- E-signature workflows via BoldSign:
+  - Signature request sent to client
+  - Signature status callbacks checked via `checkSignatureStatus` function
+  - Document download URLs generated after signing
 
-## Data Flow
-
-**Client Management Flow:**
-1. Firebase Authentication validates user
-2. HTTP request routed to appropriate function via Cloud Functions
-3. Claude AI processes natural language intent
-4. Tools execute CRUD operations on Firestore
-5. Results returned to client
-
-**Email Workflow:**
-1. Claude AI generates email content
-2. SendGrid API called to send message
-3. Email delivery logged to Firestore activity timeline
-
-**Document Signing Workflow:**
-1. Document uploaded to Firebase Storage
-2. BoldSign API called to initiate signing
-3. BoldSign webhook sends status updates
-4. HMAC signature verified before processing
-5. Document status updated in Firestore
+**Real-time Updates:**
+- Firestore listeners (`onSnapshot()`) for live data sync on client detail page
+- Activity feeds update in real-time as notes/calls/emails are logged
 
 ---
 

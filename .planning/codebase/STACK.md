@@ -5,79 +5,81 @@
 ## Languages
 
 **Primary:**
-- JavaScript (Node.js) - Cloud Functions implementation
-- Firebase Functions - Serverless compute layer
+- JavaScript (ES6+) - Client-side frontend logic for CRM application
+- HTML5 - Markup for landing pages and application pages
 
 **Secondary:**
-- JSON - Configuration and data serialization
+- CSS3 - Styling for UI components and layouts
 
 ## Runtime
 
 **Environment:**
-- Node.js 20
+- Browser-based web application (no Node.js backend visible in codebase)
+- Requires modern browser with ES6 module support
 
 **Package Manager:**
-- npm
-- Lockfile: `package-lock.json` (present)
+- Not detected - no package.json file found in project root
+- External libraries loaded via CDN (Firebase, Google Maps)
 
 ## Frameworks
 
 **Core:**
-- Firebase Functions v5.0.0 - Serverless HTTP and background triggers
-- Firebase Admin SDK v12.0.0 - Database, authentication, and storage access
+- Firebase 10.8.0 - Backend services (Authentication, Firestore, Storage, Functions)
+  - Firebase Authentication - User login/logout and password reset
+  - Firestore - NoSQL database for all application data
+  - Firebase Storage - Document and file upload storage
+  - Firebase Functions - Cloud functions for backend operations (sendEmail, e-signature workflows, etc.)
 
-**AI/LLM:**
-- Anthropic SDK @anthropic-ai/sdk v0.39.0 - Claude API integration for AI assistant
+**Frontend Libraries:**
+- Google Maps JavaScript API - Address autocomplete and mapping functionality (loaded conditionally)
+- Web Speech API - Voice input for AI chatbot (browser native)
 
-**Communication:**
-- SendGrid @sendgrid/mail v8.1.0 - Email delivery service
-
-**Document Handling:**
-- BoldSign (via API) - E-signature and document management
-
-**HTTP:**
-- node-fetch v2.7.0 - HTTP client for external API calls
-- form-data v4.0.0 - Multipart form encoding for file uploads
+**Build/Dev:**
+- Module imports via ES6 `import` statements (native browser modules)
+- No build tool detected (direct script loading)
 
 ## Key Dependencies
 
 **Critical:**
-- firebase-admin v12.0.0 - Firebase backend SDK for database, auth, storage operations
-- @anthropic-ai/sdk v0.39.0 - Claude AI for voice-first assistant functionality (tool calling)
-- @sendgrid/mail v8.1.0 - Email service for client communication
+- Firebase SDK 10.8.0 (`https://www.gstatic.com/firebasejs/10.8.0/`) - All core application functionality
+  - `firebase-app.js` - Firebase initialization
+  - `firebase-auth.js` - Authentication system
+  - `firebase-firestore.js` - Database operations
+  - `firebase-storage.js` - File uploads and storage
+  - `firebase-functions.js` - Cloud function invocation
 
-**Infrastructure:**
-- firebase-functions v5.0.0 - Function deployment and request handling
-- crypto (built-in) - Token generation and HMAC validation for webhooks
+**External Services:**
+- Google Maps Places Autocomplete API - Address parsing and validation
+  - Biased toward Missouri/Illinois region (lat/lng bounds: 36.0 to 40.6 N, -95.8 to -89.0 W)
+- BoldSign - Electronic signature service (invoked via Firebase Cloud Functions)
+- SendGrid - Email delivery service (invoked via Firebase Cloud Functions)
+- Google Cloud - Hosting and infrastructure provider
 
 ## Configuration
 
 **Environment:**
-- Secret parameters managed via `firebase-functions/params`:
-  - `ANTHROPIC_API_KEY` - Anthropic API key for Claude
-  - `SENDGRID_API_KEY` - SendGrid API key for email
-  - `BOLDSIGN_API_KEY` - BoldSign API key for e-signatures
-  - `BOLDSIGN_WEBHOOK_SECRET` - BoldSign webhook HMAC secret
+- Firebase project: `greendoor-2da47`
+- Firebase region: `us-central1` (for Cloud Functions)
+- All configuration loaded from `firebase-config.js` at `js/firebase-config.js`
 
 **Build:**
-- No build step required - JavaScript deployed directly to Firebase Functions
-- Entry point: `index.js` in functions directory
-- Firebase configuration: Implicit via `initializeApp()`
+- No build configuration detected
+- Direct HTML file serving with inline ES6 module scripts
+- CSS loaded from `/greendoor/css/greendoor.css` and `/assets/css/style.css`
 
 ## Platform Requirements
 
 **Development:**
-- Node.js 20
-- npm dependencies installed
-- Firebase CLI for local testing and deployment
-- Google Cloud SDK credentials for deployment
+- Modern web browser with ES6 module support
+- Internet connection for Firebase and external APIs
+- Google Maps API key (already embedded in firebase-config.js: `AIzaSyDEPiHPEURzn_gtiTaR-rbCGg06JYUSlQY`)
 
 **Production:**
-- Google Cloud Functions (Firebase Functions backend)
-- Firestore for database
-- Firebase Authentication service
-- Firebase Storage for file uploads
-- External APIs: Anthropic, SendGrid, BoldSign
+- Static web hosting (Firebase Hosting or other static host)
+- Firebase backend services enabled
+- BoldSign API credentials configured in backend
+- SendGrid API credentials configured in backend
+- Google Maps API key with Places Autocomplete service enabled
 
 ---
 

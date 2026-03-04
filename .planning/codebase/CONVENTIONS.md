@@ -5,142 +5,207 @@
 ## Naming Patterns
 
 **Files:**
-- Flat structure with single-word or camelCase naming: `index.js`
-- No sub-directory organization within functions codebase
+- Lowercase with hyphens: `auth.js`, `match-engine.js`, `client-detail.js`, `firebase-config.js`
+- One module per file
+- Purpose-driven names reflecting primary responsibility
 
 **Functions:**
-- Async handler functions use `handle` prefix: `handleCreateClient()`, `handleUpdateClient()`, `handleLogActivity()`, `handleCreateShowing()`
-- Internal utility functions use `camelCase`: `searchClients()`, `createFollowUp()`, `createEvent()`
-- Exported functions use `camelCase`: `askAI()`, `matchClientToListing()`, `syncMlsListings()`
+- camelCase for exported functions: `calculateMatchScore()`, `getCurrentUser()`, `formatCurrency()`
+- camelCase for internal functions: `renderClients()`, `loadClients()`, `applyFilters()`
+- Window-attached functions: `window.handleLogin`, `window.saveClient`, `window.openAddModal`
+- Functions prefixed with verb: `load*`, `render*`, `format*`, `show*`, `close*`, `save*`, `open*`
 
 **Variables:**
-- Use `camelCase` consistently: `clientId`, `showingDate`, `budgetMin`, `budgetMax`, `preferredLocations`
-- Query result variables use abbreviations: `snap` for Firestore snapshots, `q` for queries, `ref` for document references
-- Configuration/constant arrays use descriptive names: `UPDATE_CLIENT_ALLOWLIST`
-- Temporary variables are concise: `d` for document, `l` for listing, `results` for arrays
+- camelCase: `allClients`, `filteredListings`, `cachedProfile`, `currentDetailListing`
+- All-caps for constants: `TOUR_PAGES`, `FEATURE_SUGGESTIONS`, `WEIGHTS`, `PAGE_URLS`, `TOUR_STEPS`
+- Module-level state: `let allClients = [];`, `let editingListingId = null;`
+- Prefix with "is" or "has" for booleans: `isLoginPage`, `onlyMatches`, `isEmpty`
 
 **Types:**
-- No TypeScript - JavaScript only
-- Complex input objects passed to handlers use descriptive property names from Firebase tool schemas
-- Return objects use `{ success: boolean, error?: string, data?: object }` pattern for consistency
-
-**Constants:**
-- All-caps for immutable constants: `SYSTEM_PROMPT`, `AI_TOOLS`, `UPDATE_CLIENT_ALLOWLIST`
+- Classes/constructors: Not heavily used; Firebase objects used as-is
+- Object property names: camelCase, descriptive: `fullName`, `listingPrice`, `preferredLocations`, `realtorId`
 
 ## Code Style
 
 **Formatting:**
-- 2-space indentation throughout
-- Single quotes for most strings, template literals for multi-line AI prompts
-- Opening braces on same line (K&R style)
+- No explicit formatter detected (no `.prettierrc` found)
+- 2-space indentation observed
+- Semicolons required at end of statements
+- Single quotes for strings (where consistent): `"string"` (double quotes used in codebase)
+- Arrow functions for callbacks: `(e) => { ... }`
+- Template literals for HTML generation: `` `<div>${escapeHtml(name)}</div>` ``
 
 **Linting:**
-- No ESLint or Prettier configuration detected
-- Manual consistency through code review
-
-**Comments:**
-- Section headers use comment blocks with equals signs: `/* ===== SECTION NAME ===== */`
-- Inline comments rare - code is generally self-documenting through function names
+- No `.eslintrc` found; no linter rules enforced
+- Code follows loose conventions but not enforced by tooling
+- Some inconsistency in style across files (acceptable)
 
 ## Import Organization
 
 **Order:**
-1. Firebase SDK imports (`firebase-functions`, `firebase-admin`)
-2. Standard Node modules (`crypto`)
-3. External packages (`@anthropic-ai/sdk`, `@sendgrid/mail`)
+1. Firebase imports from `firebase-config.js`
+2. Firebase CDN imports (auth, firestore, storage, functions)
+3. Utility imports from `auth.js` (helpers: `formatCurrency`, `escapeHtml`, etc.)
+4. Domain-specific imports (`match-engine.js`, `tour.js`, `address-autocomplete.js`)
+5. Function declarations if using httpsCallable
 
 **Pattern:**
 ```javascript
-const { onCall, onRequest, HttpsError } = require("firebase-functions/v2/https");
-const { defineSecret } = require("firebase-functions/params");
-const { initializeApp } = require("firebase-admin/app");
-const { getFirestore, Timestamp, FieldValue } = require("firebase-admin/firestore");
-const { getAuth } = require("firebase-admin/auth");
-const { getStorage } = require("firebase-admin/storage");
-const crypto = require("crypto");
+import { auth, db, storage, functions, httpsCallable } from "./firebase-config.js";
+import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+import {
+  collection, query, where, orderBy, getDocs, addDoc, serverTimestamp
+} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { getCurrentUser, showToast, formatCurrency } from "./auth.js";
+import { calculateMatchScore } from "./match-engine.js";
 ```
 
-**Destructuring:** Imports use destructuring to extract specific functions/classes
+**Path Aliases:**
+- None used; relative imports only: `"./firebase-config.js"`, `"./auth.js"`
 
 ## Error Handling
 
-**Patterns:**
-- Firebase HTTPS functions use `HttpsError` with error code and message
-- Tool handlers return `{ success: false, error: "message" }` objects
-- Try-catch blocks used for non-critical operations (e.g., auto-import listing attempts)
-- Errors logged with `console.warn()` for recoverable failures
+**Try-Catch Blocks:**
+- Used extensively for Firebase operations, network calls, and async functions
+- Errors logged to console: `console.error("Operation name:", e);`
+- User-facing errors via `showToast("Failed to...", "error")`
+- Silent failures acceptable for non-critical operations (e.g., search logging)
 
-**Error Types:**
+**Pattern:**
 ```javascript
-throw new HttpsError("unauthenticated", "You must be logged in.");
-throw new HttpsError("invalid-argument", "A question is required.");
-throw new HttpsError("resource-exhausted", "Daily AI limit reached (50 requests). Try again tomorrow.");
-throw new HttpsError("permission-denied", "You do not have access to this client.");
-throw new HttpsError("not-found", "Client not found.");
-```
-
-**Tool Handler Pattern:**
-```javascript
-if (!input.clientId) {
-  return { success: false, error: "No client specified. Which client is this showing for?" };
-}
-const clientSnap = await db.doc(`clients/${clientId}`).get();
-if (!clientSnap.exists) {
-  return { success: false, error: "Client not found or access denied." };
+try {
+  const snap = await getDocs(q);
+  // process data
+} catch (e) {
+  console.error("Load clients error:", e);
+  showToast("Failed to load clients.", "error");
 }
 ```
+
+**Error Messages:**
+- User-friendly copy: "Failed to save client."
+- Specific error codes handled for auth: `err.code === "auth/user-not-found"` → "Invalid email or password."
+- Business logic errors checked before operations: `if (!email || !password) { showToast("...") }`
 
 ## Logging
 
-**Framework:** Console-based logging only
+**Framework:** `console` only
 
 **Patterns:**
-- `console.warn()` used for non-critical failures and warnings
-- Limited use of logging - focus on returning structured error objects instead
+- `console.error()` for errors: `console.error("Context:", error)`
+- `console.log()` rarely used; no debug logging in production code
+- No custom logging service
+- Silent failures in non-critical paths (e.g., `catch(() => {})` for optional updates)
 
-## Data Access
+**When to Log:**
+- All catch blocks log errors with context
+- Database operations that fail
+- Network calls that error
 
-**Firestore Patterns:**
-- Collection names: lowercase (`clients`, `showings`, `followUps`, `events`, `listings`, `activities`, `clientListingMatches`)
-- Document references use path notation: `db.doc('clients/${clientId}')`
-- Collection queries use `db.collection('name')`
-- Results iterated with `.forEach(doc => { const data = doc.data(); })`
+## Comments
 
-**Field Updates:**
-- Use `FieldValue.serverTimestamp()` for `updatedAt` fields
-- Create update objects before applying: `const updates = {}; updates[field] = value;`
+**When to Comment:**
+- Section separators: `/* ===== SECTION NAME ===== */`
+- State machine transitions and complex logic
+- Sparse inline comments; code is generally self-documenting
+
+**JSDoc/TSDoc:**
+- Minimal use; found in `match-engine.js` for exported functions
+- Pattern: `@param`, `@returns` for complex functions
+
+**Example:**
+```javascript
+/**
+ * Calculate a match score between a listing and client preferences.
+ * @param {Object} listing — Firestore listing doc data
+ * @param {Object} prefs  — Client preference fields from clients doc
+ * @returns {{ score: number, breakdown: Object, dealBreakerHits: string[] }}
+ */
+export function calculateMatchScore(listing, prefs) { ... }
+```
 
 ## Function Design
 
-**Size:** Handlers range from 30-80 lines, keeping single responsibility
+**Size:**
+- Small functions preferred: 10-50 lines typical
+- Larger functions acceptable for complex workflows (up to 100+ lines for client-detail.js)
+- Functions split by responsibility: `loadClients()`, `renderClients()`, `applyFilters()`
 
 **Parameters:**
-- Handlers receive `(input, uid, contextId?)` where input is parsed tool call, uid is user ID, contextId is optional client/showing context
-- Tool definitions include full `input_schema` with type definitions and descriptions
+- 1-3 parameters typical
+- Objects passed rather than many positional args
+- Optional parameters: use falsy checks (`id || null`)
 
 **Return Values:**
-- Tool handlers: `{ success: true/false, error?: string, [dataField]: value }`
-- Firebase functions: throw `HttpsError` for client errors, return data for success
+- Explicit returns required
+- Promises returned from async functions
+- Object returns for complex results: `{ score, breakdown, dealBreakerHits }`
 
 ## Module Design
 
 **Exports:**
-- Single file exports multiple functions via `exports.functionName = onCall(...)`
-- All business logic handlers are internal functions (`handleCreateClient`, etc.)
-- Export wrapper adds authentication and context handling
+- Named exports only: `export function`, `export { constant }`
+- No default exports
+- Mixed exports: functions + re-exports in main modules
 
-**Patterns:**
+**Pattern:**
 ```javascript
-exports.askAI = onCall(
-  { region: "us-central1", maxInstances: 10, timeoutSeconds: 60 },
-  async (request) => {
-    if (!request.auth) {
-      throw new HttpsError("unauthenticated", "You must be logged in.");
-    }
-    // ... handler logic
-  }
-);
+export function getCurrentUser() { ... }
+export function showToast(message, type = "success") { ... }
+export function formatCurrency(num) { ... }
 ```
+
+**Barrel Files:**
+- Not used; imports pull directly from source files
+- `firebase-config.js` acts as central export for Firebase instances
+
+**Module State:**
+- Top-level `let` declarations for shared state: `let cachedProfile = null;`
+- Global event listeners: `onAuthStateChanged()`, `addEventListener()`
+- Lazy loading: data fetched on-demand in event handlers
+
+## HTML Integration
+
+**Script Tags:**
+- Non-module scripts first (utilities): `<script src="/assets/js/main.js"></script>`
+- Module scripts after: `<script type="module" src="/greendoor/js/auth.js"></script>`
+- Multiple modules per page acceptable
+- Load order: auth first, then specific page module
+
+**HTML IDs:**
+- Prefixed with context: `login-email`, `add-modal`, `filter-address`, `client-name`
+- Kebab-case: `welcome-name`, `admin-tab`, `activity-feed`
+- Abbreviated form inputs: `lst-address`, `ov-fullName` (lst=listing, ov=overview)
+
+**DOM Queries:**
+- `document.getElementById()` for direct access (fast)
+- `document.querySelectorAll()` for filtering/iteration
+- Simple selectors preferred over complex CSS selectors
+
+## HTML/CSS Output
+
+**HTML Escape:**
+- User data escaped via `escapeHtml()` utility: `${escapeHtml(name)}`
+- Used in all template literals that interpolate data
+- Prevents XSS vulnerabilities
+
+**URL Sanitization:**
+- URLs validated via `sanitizeUrl()`: checks for `http://` or `https://` prefix
+- Used before `href` attributes: `href="${sanitizeUrl(url)}"`
+
+## API/Cloud Function Calls
+
+**Pattern:**
+```javascript
+const askAssistant = httpsCallable(functions, "askAssistant");
+const result = await askAssistant({ question, context });
+const text = result.data.response;
+```
+
+**Data Shape:**
+- Request: Plain objects `{ key: value }`
+- Response: Nested data access `result.data.*`
+- No error-specific handling; falls through to catch block
 
 ---
 
