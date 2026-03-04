@@ -55,6 +55,7 @@ const createEmbeddedSignatureRequestFn = httpsCallable(functions, "createEmbedde
 const shareDocumentFn = httpsCallable(functions, "shareDocument");
 const parseListingUrlFn = httpsCallable(functions, "parseListingUrl");
 const sendComplianceDocFn = httpsCallable(functions, "sendComplianceDoc");
+const sendBulkComplianceDocsFn = httpsCallable(functions, "sendBulkComplianceDocs");
 const createSenderIdentityFn = httpsCallable(functions, "createSenderIdentity");
 
 /* --- Auth gate --- */

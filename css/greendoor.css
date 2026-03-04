@@ -6482,3 +6482,168 @@ body.gd-light .gd-badge-complete { background: #f0fdf4; color: #16a34a; }
   font-size: 0.82rem;
   border-radius: 8px;
 }
+
+/* ===== Compliance Docs Tab ===== */
+.gd-compliance-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: 0.5rem;
+  color: #d97706;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+}
+body.gd-light .gd-compliance-banner {
+  background: #fffbeb;
+  border-color: #fde68a;
+  color: #92400e;
+}
+
+.gd-compliance-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.5rem 0;
+  margin-bottom: 0.5rem;
+}
+.gd-compliance-select-all {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.85rem;
+  color: #9ca3af;
+  cursor: pointer;
+}
+body.gd-light .gd-compliance-select-all { color: #6b7280; }
+
+.gd-compliance-row {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  font-size: 0.9rem;
+}
+body.gd-light .gd-compliance-row {
+  border-bottom-color: #e5e7eb;
+}
+.gd-compliance-row:hover {
+  background: rgba(255,255,255,0.03);
+}
+body.gd-light .gd-compliance-row:hover {
+  background: #f9fafb;
+}
+.gd-compliance-row.gd-disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.gd-compliance-check {
+  flex-shrink: 0;
+  width: 1rem;
+  height: 1rem;
+}
+.gd-compliance-name {
+  flex: 1;
+  font-weight: 500;
+}
+.gd-required-asterisk {
+  color: #ef4444;
+  font-weight: bold;
+  margin-left: -0.25rem;
+}
+
+/* Compliance status badges */
+.gd-badge-compliance-notsent {
+  display: inline-block;
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  background: rgba(107,114,128,0.2);
+  color: #9ca3af;
+}
+.gd-badge-compliance-sent {
+  display: inline-block;
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  background: rgba(245,158,11,0.15);
+  color: #fbbf24;
+}
+.gd-badge-compliance-signed {
+  display: inline-block;
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  background: rgba(34,197,94,0.15);
+  color: #4ade80;
+}
+body.gd-light .gd-badge-compliance-notsent { background: #f3f4f6; color: #6b7280; }
+body.gd-light .gd-badge-compliance-sent { background: #fffbeb; color: #d97706; }
+body.gd-light .gd-badge-compliance-signed { background: #f0fdf4; color: #16a34a; }
+
+/* Compliance category header */
+.gd-compliance-category-header {
+  padding: 0.5rem 0.75rem 0.25rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #6b7280;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  margin-top: 0.5rem;
+}
+body.gd-light .gd-compliance-category-header {
+  color: #374151;
+  border-bottom-color: #e5e7eb;
+}
+
+/* Confirm dialog sections */
+.gd-confirm-section {
+  margin-bottom: 0.75rem;
+}
+.gd-confirm-section label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #9ca3af;
+  margin-bottom: 0.25rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+body.gd-light .gd-confirm-section label { color: #6b7280; }
+.gd-confirm-section div {
+  font-size: 0.9rem;
+}
+
+.gd-confirm-field-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.25rem 0;
+  font-size: 0.85rem;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+body.gd-light .gd-confirm-field-row { border-bottom-color: #f3f4f6; }
+.gd-confirm-field-name { color: #9ca3af; }
+body.gd-light .gd-confirm-field-name { color: #6b7280; }
+.gd-confirm-field-value { font-weight: 500; }
+.gd-confirm-field-value.gd-missing { color: #ef4444; font-style: italic; }
+
+.gd-confirm-warning {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.5rem 0.75rem;
+  background: rgba(245,158,11,0.1);
+  border-radius: 0.375rem;
+  color: #d97706;
+  font-size: 0.85rem;
+  margin-top: 0.5rem;
+}
+body.gd-light .gd-confirm-warning { background: #fffbeb; color: #92400e; }
