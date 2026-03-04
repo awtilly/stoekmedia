@@ -47,12 +47,12 @@ Plans:
   3. Realtor can click "Send for Signature" and the document is sent via BoldSign with client/listing/agent fields pre-filled
   4. Signature request emails show the realtor's display name and email address, not BoldSign defaults
   5. Status updates from the Firestore record appear in real time without a page refresh
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 02-01: BoldSign sender customization — BSND-01 through BSND-04, senderDetail fields from Firestore profile
-- [ ] 02-02: Compliance template library — COMP-01, COMP-02, COMP-03, seed complianceTemplates collection with MO stubs
-- [ ] 02-03: Compliance tab UI + send flow — COMP-04 through COMP-10, compliance.js, sendComplianceDoc Cloud Function
+- [ ] 02-01-PLAN.md — BoldSign sender identity Cloud Function + sendComplianceDoc callable shell (BSND-01 through BSND-04)
+- [ ] 02-02-PLAN.md — Compliance template library: documentTemplates schema, MO form seed data, buildMergeFields utility (COMP-01 through COMP-03)
+- [ ] 02-03-PLAN.md — Compliance Docs tab UI, send-for-signature flow with confirm dialog, Cloud Function implementation, real-time status (COMP-04 through COMP-10)
 
 ### Phase 3: Webhook Pipeline
 **Goal**: When a client signs a compliance document, the signed PDF automatically appears in their Closing Documents folder and the document status updates to "signed" — without any manual action from the realtor
