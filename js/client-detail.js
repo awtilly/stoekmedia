@@ -13,6 +13,7 @@ import {
   timeAgo, formatFileSize, statusLabel, escapeHtml, sanitizeUrl
 } from "./auth.js";
 import { calculateMatchScore, matchScoreColor, matchScoreLabel } from "./match-engine.js";
+import { buildMergeFields, MO_FORM_STUBS, COMPLIANCE_STATUSES, COMPLIANCE_CATEGORIES, formatComplianceStatus } from "./compliance.js";
 
 const params = new URLSearchParams(window.location.search);
 const clientId = params.get("id");
@@ -42,6 +43,10 @@ let allTemplateFiles = [];
 let copyClientsList = [];
 let selectedCopyClientId = null;
 let addListingFeatureTags = [];
+let complianceTemplates = [];
+let complianceDocs = {};
+let complianceUnsubscribe = null;
+let pendingSendTemplateId = null;
 
 if (!clientId) {
   window.location.href = "/greendoor/app/clients";
@@ -97,7 +102,8 @@ async function loadClient(uid) {
     }
 
     populateOverview(clientData);
-    await Promise.all([loadActivities(uid), loadFiles(uid), loadFolders(uid), loadTemplateFiles(uid), loadMatches(uid), loadEnvelopes(uid), loadShowings(uid), loadFollowUps(uid)]);
+    await Promise.all([loadActivities(uid), loadFiles(uid), loadFolders(uid), loadTemplateFiles(uid), loadMatches(uid), loadEnvelopes(uid), loadShowings(uid), loadFollowUps(uid), loadComplianceTemplates(uid)]);
+    startComplianceListener(clientId);
     await migrateExistingFolders(uid);
     renderFolderCards();
     renderBreadcrumb();
@@ -158,6 +164,8 @@ document.getElementById("ov-transactionType").addEventListener("change", async (
     if (value) {
       await ensureClosingDocumentsFolder(clientId, user.uid);
     }
+    // Re-filter compliance templates for the new transaction type
+    loadComplianceTemplates(user.uid);
   } catch (err) {
     console.error("Transaction type save error:", err);
     showToast("Failed to update transaction type.", "error");
@@ -2775,10 +2783,172 @@ window.saveAndMatchListing = async function () {
   }
 };
 
+/* ================================================================== */
+/*  COMPLIANCE DOCS TAB                                               */
+/* ================================================================== */
+
+/**
+ * loadComplianceTemplates
+ *
+ * Queries Firestore documentTemplates collection and filters client-side
+ * by the client's transaction type. If no transaction type is set, loads
+ * all templates but marks them as disabled.
+ */
+async function loadComplianceTemplates(uid) {
+  try {
+    const templatesSnap = await getDocs(
+      query(collection(db, "documentTemplates"), orderBy("sortOrder"))
+    );
+
+    const allTemplates = [];
+    templatesSnap.forEach(d => {
+      allTemplates.push({ id: d.id, ...d.data() });
+    });
+
+    // Filter by client transaction type (client-side)
+    if (clientData && clientData.transactionType) {
+      complianceTemplates = allTemplates.filter(
+        t => t.transactionTypes && t.transactionTypes.includes(clientData.transactionType)
+      );
+    } else {
+      // No transaction type set -- show all but they will be disabled
+      complianceTemplates = allTemplates;
+    }
+
+    renderComplianceList();
+  } catch (err) {
+    console.error("loadComplianceTemplates error:", err);
+    document.getElementById("compliance-list").innerHTML =
+      '<div class="gd-empty"><div class="gd-empty-icon">&#128196;</div><div class="gd-empty-text">Failed to load compliance documents.</div></div>';
+  }
+}
+
+/**
+ * renderComplianceList
+ *
+ * Renders the compliance template rows grouped by category with collapsible
+ * headers. Each row shows: checkbox, name, category badge, required asterisk,
+ * status badge, and Send button.
+ */
+function renderComplianceList() {
+  const listEl = document.getElementById("compliance-list");
+  const bannerEl = document.getElementById("compliance-no-txn-banner");
+  const toolbarEl = document.getElementById("compliance-toolbar");
+
+  const noTxnType = !clientData || !clientData.transactionType;
+
+  // Show/hide banner and toolbar
+  if (noTxnType) {
+    bannerEl.classList.remove("gd-hidden");
+    toolbarEl.classList.add("gd-hidden");
+  } else {
+    bannerEl.classList.add("gd-hidden");
+    toolbarEl.classList.remove("gd-hidden");
+  }
+
+  if (complianceTemplates.length === 0) {
+    listEl.innerHTML = '<div class="gd-empty"><div class="gd-empty-icon">&#128196;</div><div class="gd-empty-text">No compliance documents match this transaction type.</div></div>';
+    return;
+  }
+
+  // Group by category
+  const grouped = {};
+  for (const cat of COMPLIANCE_CATEGORIES) {
+    grouped[cat] = complianceTemplates.filter(t => t.category === cat);
+  }
+
+  let html = "";
+  for (const cat of COMPLIANCE_CATEGORIES) {
+    const items = grouped[cat];
+    if (items.length === 0) continue;
+
+    const categoryLabel = cat.charAt(0).toUpperCase() + cat.slice(1);
+    html += `<div class="gd-compliance-category-header">${escapeHtml(categoryLabel)}</div>`;
+
+    for (const template of items) {
+      const docStatus = complianceDocs[template.id];
+      const status = docStatus?.status || COMPLIANCE_STATUSES.NOT_SENT;
+      const isSent = status !== COMPLIANCE_STATUSES.NOT_SENT;
+      const showSendButton = !noTxnType && !isSent;
+
+      html += `<div class="gd-compliance-row ${noTxnType ? 'gd-disabled' : ''}">
+        <input type="checkbox" class="gd-compliance-check" data-template-id="${escapeHtml(template.id)}"
+          ${isSent ? 'disabled' : ''} ${noTxnType ? 'disabled' : ''}>
+        <span class="gd-compliance-name">${escapeHtml(template.name)}</span>
+        <span class="gd-badge gd-badge-${escapeHtml(template.category)}">${escapeHtml(categoryLabel)}</span>
+        ${template.required ? '<span class="gd-required-asterisk">*</span>' : ''}
+        ${formatComplianceStatus(status, docStatus?.signedAt)}
+        ${showSendButton ? `<button class="gd-btn gd-btn-sm gd-btn-primary" onclick="openSendDialog('${escapeHtml(template.id)}')">Send</button>` : ''}
+      </div>`;
+    }
+  }
+
+  listEl.innerHTML = html;
+
+  // Wire bulk select checkbox events
+  wireComplianceBulkSelect();
+}
+
+/**
+ * startComplianceListener
+ *
+ * Sets up real-time Firestore onSnapshot listener on the client's
+ * complianceDocs subcollection. Re-renders the compliance list whenever
+ * status changes (COMP-10).
+ */
+function startComplianceListener(cid) {
+  if (complianceUnsubscribe) complianceUnsubscribe();
+  complianceUnsubscribe = onSnapshot(
+    collection(db, "clients", cid, "complianceDocs"),
+    (snap) => {
+      complianceDocs = {};
+      snap.forEach(d => { complianceDocs[d.id] = { id: d.id, ...d.data() }; });
+      renderComplianceList();
+    }
+  );
+}
+
+/**
+ * wireComplianceBulkSelect
+ *
+ * Wires the Select All checkbox and individual template checkboxes
+ * to enable/disable the bulk send button.
+ */
+function wireComplianceBulkSelect() {
+  const selectAllEl = document.getElementById("compliance-select-all");
+  const bulkSendBtn = document.getElementById("compliance-bulk-send");
+
+  if (!selectAllEl || !bulkSendBtn) return;
+
+  const checkboxes = document.querySelectorAll(".gd-compliance-check:not(:disabled)");
+
+  selectAllEl.onchange = () => {
+    checkboxes.forEach(cb => { cb.checked = selectAllEl.checked; });
+    updateBulkSendState();
+  };
+
+  checkboxes.forEach(cb => {
+    cb.onchange = () => updateBulkSendState();
+  });
+
+  function updateBulkSendState() {
+    const checked = document.querySelectorAll(".gd-compliance-check:checked");
+    bulkSendBtn.disabled = checked.length === 0;
+    // Update Select All state
+    selectAllEl.checked = checkboxes.length > 0 && checked.length === checkboxes.length;
+  }
+}
+
+// Cleanup listeners on page unload
+window.addEventListener("beforeunload", () => {
+  if (complianceUnsubscribe) complianceUnsubscribe();
+});
+
 // Close modals on Escape key
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
     const modals = [
+      { id: "compliance-confirm-modal", close: () => closeComplianceConfirm() },
       { id: "file-preview-modal", close: () => closePreview() },
       { id: "activity-modal", close: () => closeActivityModal() },
       { id: "add-listing-modal", close: () => closeAddListingModal() },
