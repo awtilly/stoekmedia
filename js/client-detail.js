@@ -54,6 +54,8 @@ const checkSignatureStatusFn = httpsCallable(functions, "checkSignatureStatus");
 const createEmbeddedSignatureRequestFn = httpsCallable(functions, "createEmbeddedSignatureRequest");
 const shareDocumentFn = httpsCallable(functions, "shareDocument");
 const parseListingUrlFn = httpsCallable(functions, "parseListingUrl");
+const sendComplianceDocFn = httpsCallable(functions, "sendComplianceDoc");
+const createSenderIdentityFn = httpsCallable(functions, "createSenderIdentity");
 
 /* --- Auth gate --- */
 onAuthStateChanged(auth, async (user) => {
