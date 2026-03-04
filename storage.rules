@@ -1,11 +1,13 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-    // User files (contracts, disclosures, etc.) — 25 MB max
+    // User files (contracts, disclosures, etc.)
     match /files/{realtorUid}/{allPaths=**} {
-      allow read, write: if request.auth != null
+      allow read: if request.auth != null
+        && request.auth.uid == realtorUid;
+      allow write: if request.auth != null
         && request.auth.uid == realtorUid
-        && (request.resource == null || request.resource.size < 25 * 1024 * 1024);
+        && request.resource.size < 25 * 1024 * 1024;
     }
 
     // Listing photos — any auth user can read, only auth users can write
@@ -19,9 +21,11 @@ service firebase.storage {
 
     // Document templates — owner only, 25 MB max
     match /templates/{realtorUid}/{allPaths=**} {
-      allow read, write: if request.auth != null
+      allow read: if request.auth != null
+        && request.auth.uid == realtorUid;
+      allow write: if request.auth != null
         && request.auth.uid == realtorUid
-        && (request.resource == null || request.resource.size < 25 * 1024 * 1024);
+        && request.resource.size < 25 * 1024 * 1024;
     }
   }
 }

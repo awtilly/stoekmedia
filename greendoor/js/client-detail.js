@@ -563,11 +563,7 @@ window.uploadFile = async function () {
     },
     async () => {
       try {
-        console.log("[upload] Step 1: getDownloadURL...");
         const downloadUrl = await getDownloadURL(storageRef);
-        console.log("[upload] Step 1 OK. URL:", downloadUrl?.slice(0, 60));
-
-        console.log("[upload] Step 2: addDoc to files...", { clientId, realtorId: user.uid, folder });
         await addDoc(collection(db, "files"), {
           clientId,
           realtorId: user.uid,
@@ -579,9 +575,6 @@ window.uploadFile = async function () {
           mimeType: file.type,
           uploadedAt: serverTimestamp()
         });
-        console.log("[upload] Step 2 OK — file record saved.");
-
-        console.log("[upload] Step 3: addDoc to activities...");
         await addDoc(collection(db, "activities"), {
           clientId,
           realtorId: user.uid,
@@ -590,12 +583,7 @@ window.uploadFile = async function () {
           body: "",
           timestamp: serverTimestamp()
         });
-        console.log("[upload] Step 3 OK — activity logged.");
-
-        console.log("[upload] Step 4: updateDoc client lastActivityDate...");
         await updateDoc(doc(db, "clients", clientId), { lastActivityDate: serverTimestamp() });
-        console.log("[upload] Step 4 OK — client updated.");
-
         showToast("File uploaded!");
         fileInput.value = "";
         progressBar.classList.remove("active");
@@ -607,7 +595,7 @@ window.uploadFile = async function () {
           console.warn("File count update failed:", countErr);
         }
       } catch (e) {
-        console.error("[upload] FAILED at step above ^", e.code, e.message, e);
+        console.error("File record error:", e);
         showToast("Upload succeeded but failed to save record.", "error");
         progressBar.classList.remove("active");
       }
