@@ -16,12 +16,12 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### File Folders
 
-- [ ] **FLDR-01**: User can create a named folder for a client's files
-- [ ] **FLDR-02**: User can rename an existing folder
-- [ ] **FLDR-03**: User can delete a folder (files move to root, not deleted)
-- [ ] **FLDR-04**: Folder cards display above the file list with name and file count
-- [ ] **FLDR-05**: User can click a folder to filter files; breadcrumb navigates back to root
-- [ ] **FLDR-06**: User can move a file to a folder or back to root via context menu
+- [x] **FLDR-01**: User can create a named folder for a client's files
+- [x] **FLDR-02**: User can rename an existing folder
+- [x] **FLDR-03**: User can delete a folder (files move to root, not deleted)
+- [x] **FLDR-04**: Folder cards display above the file list with name and file count
+- [x] **FLDR-05**: User can click a folder to filter files; breadcrumb navigates back to root
+- [x] **FLDR-06**: User can move a file to a folder or back to root via context menu
 - [ ] **FLDR-07**: A "Closing Documents" system folder auto-creates per client on page load
 
 ### Transaction Type
@@ -141,12 +141,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 |-------------|-------|--------|
 | TXTP-01 | Phase 1 | Complete |
 | TXTP-02 | Phase 1 | Complete |
-| FLDR-01 | Phase 1 | Pending |
-| FLDR-02 | Phase 1 | Pending |
-| FLDR-03 | Phase 1 | Pending |
-| FLDR-04 | Phase 1 | Pending |
-| FLDR-05 | Phase 1 | Pending |
-| FLDR-06 | Phase 1 | Pending |
+| FLDR-01 | Phase 1 | Complete |
+| FLDR-02 | Phase 1 | Complete |
+| FLDR-03 | Phase 1 | Complete |
+| FLDR-04 | Phase 1 | Complete |
+| FLDR-05 | Phase 1 | Complete |
+| FLDR-06 | Phase 1 | Complete |
 | FLDR-07 | Phase 1 | Pending |
 | BSND-01 | Phase 2 | Pending |
 | BSND-02 | Phase 2 | Pending |

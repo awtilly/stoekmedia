@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 01-01-PLAN.md
-last_updated: "2026-03-04T19:34:35.292Z"
-last_activity: 2026-03-04 — Completed 01-01 Transaction Type Selector
+stopped_at: Completed 01-02-PLAN.md
+last_updated: "2026-03-04T19:42:58.754Z"
+last_activity: 2026-03-04 — Completed 01-02 Folder Management System
 progress:
   total_phases: 5
   completed_phases: 0
   total_plans: 3
-  completed_plans: 1
-  percent: 33
+  completed_plans: 2
+  percent: 67
 ---
 
 # Project State
@@ -26,27 +26,28 @@ See: .planning/PROJECT.md (updated 2026-03-04)
 ## Current Position
 
 Phase: 1 of 5 (Foundations)
-Plan: 1 of 3 in current phase
+Plan: 2 of 3 in current phase
 Status: Executing
-Last activity: 2026-03-04 — Completed 01-01 Transaction Type Selector
+Last activity: 2026-03-04 — Completed 01-02 Folder Management System
 
-Progress: [███░░░░░░░] 33%
+Progress: [███████░░░] 67%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 1
-- Average duration: 2m
-- Total execution time: 0.03 hours
+- Total plans completed: 2
+- Average duration: 3m
+- Total execution time: 0.1 hours
 
 **By Phase:**
 
 | Phase | Plan | Duration | Tasks | Files |
 |-------|------|----------|-------|-------|
 | 01 | P01 | 2m | 1 | 2 |
+| 01 | P02 | 4m | 1 | 3 |
 
 **Recent Trend:**
-- Last 5 plans: 2m
+- Last 5 plans: 2m, 4m
 - Trend: -
 
 *Updated after each plan completion*
@@ -64,6 +65,8 @@ Recent decisions affecting current work:
 - Session-only AI chat: conversation history in memory only, not persisted to Firestore
 - ShowingTime via iCal: no public API available; webcal feeds are the only integration path
 - [Phase 01]: Transaction type saves immediately on dropdown change, not on Save button click
+- [Phase 01]: Folder cards replace old folder filter buttons; root view shows all files
+- [Phase 01]: File kebab menu consolidates Download and Delete alongside Move to folder
 
 ### Pending Todos
 
@@ -78,6 +81,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-04T19:34:35Z
-Stopped at: Completed 01-01-PLAN.md
-Resume file: .planning/phases/01-foundations/01-01-SUMMARY.md
+Last session: 2026-03-04T19:42:58.750Z
+Stopped at: Completed 01-02-PLAN.md
+Resume file: .planning/phases/01-foundations/01-02-SUMMARY.md
