@@ -70,7 +70,7 @@ export const MO_CLOSING_CHECKLIST_TEMPLATE = [
     category: "pre_contract",
     transactionSide: "buyer",
     propertyTypes: ALL_TYPES,
-    linkedTemplateId: "mo-buyer-rep-agreement",
+    linkedTemplateId: "mo-buyer-representation-agreement",
     deadlineOffsetDays: null,
     sortOrder: 2
   },
@@ -638,7 +638,6 @@ function renderChecklistItem(item) {
   // Deadline display
   let deadlineHtml = "";
   if (item.deadline && !isNA) {
-    const deadlineDate = toJSDate(item.deadline);
     const deadlineClass = isOverdue ? "gd-checklist-deadline overdue" : "gd-checklist-deadline";
     deadlineHtml = `<span class="${deadlineClass}">Due: ${formatDate(item.deadline)}</span>`;
   }

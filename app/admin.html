@@ -17,6 +17,7 @@
         <li><a href="/greendoor/app/dashboard">Dashboard</a></li>
         <li><a href="/greendoor/app/clients">Clients</a></li>
         <li><a href="/greendoor/app/calendar">Calendar</a></li>
+        <li><a href="/greendoor/app/listings">Listings</a></li>
         <li id="nav-admin-tab"><a href="/greendoor/app/admin" class="gd-nav-active">Admin</a></li>
         <li><a href="/greendoor/app/settings">Settings</a></li>
         <li class="nav-crm-divider"></li>
@@ -485,7 +486,6 @@
                 <option value="unassign">Leave All Unassigned</option>
                 <option value="delete">Delete All</option>
               </select>
-              <select class="gd-input gd-hidden" id="ob-bulk-reassign-target" style="flex: 1;"></select>
               <button class="gd-btn gd-btn-sm" onclick="applyBulkClientAction()">Apply</button>
             </div>
           </div>
@@ -543,7 +543,6 @@
     </div>
   </div>
 
-  <script src="/assets/js/main.js"></script>
   <script type="module" src="/greendoor/js/auth.js"></script>
   <script type="module" src="/greendoor/js/admin.js"></script>
   <script type="module" src="/greendoor/js/chatbot.js"></script>

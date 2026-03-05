@@ -336,6 +336,10 @@ function handlePhotoFiles(files) {
 
 function renderPhotoPreview() {
   const el = document.getElementById("lst-photo-preview");
+  // Revoke previous blob URLs to prevent memory leaks
+  el.querySelectorAll("img").forEach(img => {
+    if (img.src.startsWith("blob:")) URL.revokeObjectURL(img.src);
+  });
   el.innerHTML = pendingPhotos.map((f, i) => {
     const url = URL.createObjectURL(f);
     return `<div class="gd-photo-thumb">

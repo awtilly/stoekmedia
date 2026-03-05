@@ -10,6 +10,7 @@ const crypto = require("crypto");
 const BOLDSIGN_API_KEY = defineSecret("BOLDSIGN_API_KEY");
 const BOLDSIGN_WEBHOOK_SECRET = defineSecret("BOLDSIGN_WEBHOOK_SECRET");
 const ANTHROPIC_API_KEY = defineSecret("ANTHROPIC_API_KEY");
+const SENDGRID_API_KEY = defineSecret("SENDGRID_API_KEY");
 
 initializeApp();
 const db = getFirestore();
@@ -1001,3 +1002,876 @@ exports.scheduledShowingTimeSync = onSchedule(
     console.log(`scheduledShowingTimeSync complete: ${processed} users synced, ${totalSynced} total showings, ${totalErrors} errors`);
   }
 );
+
+/* ================================================================
+   HELPER: verify caller is admin
+   ================================================================ */
+async function requireAdmin(request) {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "You must be signed in.");
+  }
+  const userSnap = await db.doc(`users/${request.auth.uid}`).get();
+  if (!userSnap.exists || userSnap.data().role !== "admin") {
+    throw new HttpsError("permission-denied", "Admin access required.");
+  }
+  return userSnap;
+}
+
+/* ================================================================
+   HELPER: send email via SendGrid
+   ================================================================ */
+async function sendViaEmail({ to, toName, subject, body, fromEmail, fromName, replyTo }) {
+  const apiKey = SENDGRID_API_KEY.value();
+  if (!apiKey) {
+    throw new HttpsError("failed-precondition", "SENDGRID_API_KEY is not configured.");
+  }
+
+  const msg = {
+    personalizations: [{ to: [{ email: to, name: toName || undefined }] }],
+    from: { email: fromEmail || "greendoor@stoekmedia.com", name: fromName || "GreenDoor CRM" },
+    subject,
+    content: [{ type: "text/html", value: body }]
+  };
+  if (replyTo) msg.reply_to = { email: replyTo };
+
+  const resp = await fetch("https://api.sendgrid.com/v3/mail/send", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify(msg)
+  });
+
+  if (!resp.ok) {
+    const text = await resp.text();
+    throw new HttpsError("internal", `SendGrid error ${resp.status}: ${text}`);
+  }
+}
+
+/* ================================================================
+   sendEmail
+   ================================================================ */
+exports.sendEmail = onCall({ region: "us-central1", secrets: [SENDGRID_API_KEY] }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "You must be signed in.");
+  }
+
+  const { to, toName, subject, body, clientId } = request.data || {};
+  if (!to || !subject || !body) {
+    throw new HttpsError("invalid-argument", "to, subject, and body are required.");
+  }
+
+  const uid = request.auth.uid;
+  const userSnap = await db.doc(`users/${uid}`).get();
+  const userData = userSnap.exists ? userSnap.data() : {};
+
+  const fromEmail = userData.senderVerified ? userData.email : "greendoor@stoekmedia.com";
+  const fromName = userData.fullName || "GreenDoor CRM";
+  const replyTo = userData.senderVerified ? null : userData.email;
+
+  await sendViaEmail({ to, toName, subject, body, fromEmail, fromName, replyTo });
+
+  // Log activity
+  await db.collection("activities").add({
+    type: "email",
+    subject,
+    body,
+    clientId: clientId || null,
+    realtorId: uid,
+    timestamp: require("firebase-admin/firestore").FieldValue.serverTimestamp()
+  });
+
+  return { success: true };
+});
+
+/* ================================================================
+   sendForSignature
+   ================================================================ */
+exports.sendForSignature = onCall({ region: "us-central1", secrets: [BOLDSIGN_API_KEY] }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "You must be signed in.");
+  }
+
+  const { clientId, files, signers, title, message, expiryDays } = request.data || {};
+  if (!files || !signers || !signers.length) {
+    throw new HttpsError("invalid-argument", "files and signers are required.");
+  }
+
+  const uid = request.auth.uid;
+  const apiKey = BOLDSIGN_API_KEY.value();
+  if (!apiKey) {
+    throw new HttpsError("failed-precondition", "BOLDSIGN_API_KEY is not configured.");
+  }
+
+  // Download file buffers from Firebase Storage URLs
+  const fileBuffers = [];
+  for (const file of files) {
+    const resp = await fetch(file.downloadUrl);
+    if (!resp.ok) throw new HttpsError("internal", `Failed to download file: ${file.fileName}`);
+    const buffer = Buffer.from(await resp.arrayBuffer());
+    fileBuffers.push({ ...file, buffer });
+  }
+
+  // Build BoldSign API request
+  const FormData = (await import("node:buffer")).Buffer ? null : null;
+  // Use multipart form for BoldSign
+  const boundary = `----BoldSign${Date.now()}`;
+  const signersList = signers.map((s, i) => ({
+    name: s.name,
+    emailAddress: s.email,
+    signerOrder: i + 1,
+    signerType: "Signer"
+  }));
+
+  const createResp = await fetch("https://api.boldsign.com/v1/document/send", {
+    method: "POST",
+    headers: {
+      "X-API-KEY": apiKey,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      title: title || "Document for Signature",
+      message: message || "",
+      signers: signersList,
+      expiryDays: expiryDays || 30,
+      files: fileBuffers.map(f => ({
+        fileName: f.fileName,
+        contentType: f.mimeType || "application/pdf",
+        content: f.buffer.toString("base64")
+      }))
+    })
+  });
+
+  if (!createResp.ok) {
+    const text = await createResp.text();
+    throw new HttpsError("internal", `BoldSign error ${createResp.status}: ${text}`);
+  }
+
+  const result = await createResp.json();
+  const documentId = result.documentId;
+
+  // Save envelope to Firestore
+  await db.collection("envelopes").doc(documentId).set({
+    documentId,
+    clientId: clientId || null,
+    realtorId: uid,
+    title: title || "Document for Signature",
+    signers: signers,
+    status: "sent",
+    createdAt: require("firebase-admin/firestore").FieldValue.serverTimestamp()
+  });
+
+  return { documentId };
+});
+
+/* ================================================================
+   checkSignatureStatus
+   ================================================================ */
+exports.checkSignatureStatus = onCall({ region: "us-central1", secrets: [BOLDSIGN_API_KEY] }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "You must be signed in.");
+  }
+
+  const { documentId } = request.data || {};
+  if (!documentId) {
+    throw new HttpsError("invalid-argument", "documentId is required.");
+  }
+
+  const apiKey = BOLDSIGN_API_KEY.value();
+  if (!apiKey) {
+    throw new HttpsError("failed-precondition", "BOLDSIGN_API_KEY is not configured.");
+  }
+
+  const resp = await fetch(`https://api.boldsign.com/v1/document/properties?documentId=${documentId}`, {
+    headers: { "X-API-KEY": apiKey }
+  });
+
+  if (!resp.ok) {
+    const text = await resp.text();
+    throw new HttpsError("internal", `BoldSign error ${resp.status}: ${text}`);
+  }
+
+  const data = await resp.json();
+  const status = (data.status || "unknown").toLowerCase();
+
+  // Update Firestore envelope
+  await db.collection("envelopes").doc(documentId).update({
+    status,
+    lastChecked: require("firebase-admin/firestore").FieldValue.serverTimestamp()
+  }).catch(() => {});
+
+  return { status };
+});
+
+/* ================================================================
+   createEmbeddedSignatureRequest
+   ================================================================ */
+exports.createEmbeddedSignatureRequest = onCall({ region: "us-central1", secrets: [BOLDSIGN_API_KEY] }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "You must be signed in.");
+  }
+
+  const { clientId, files, signers, title, message, expiryDays } = request.data || {};
+  if (!files || !signers || !signers.length) {
+    throw new HttpsError("invalid-argument", "files and signers are required.");
+  }
+
+  const uid = request.auth.uid;
+  const apiKey = BOLDSIGN_API_KEY.value();
+  if (!apiKey) {
+    throw new HttpsError("failed-precondition", "BOLDSIGN_API_KEY is not configured.");
+  }
+
+  // Download files from Storage URLs
+  const fileBuffers = [];
+  for (const file of files) {
+    const resp = await fetch(file.downloadUrl);
+    if (!resp.ok) throw new HttpsError("internal", `Failed to download file: ${file.fileName}`);
+    const buffer = Buffer.from(await resp.arrayBuffer());
+    fileBuffers.push({ ...file, buffer });
+  }
+
+  const signersList = signers.map((s, i) => ({
+    name: s.name,
+    emailAddress: s.email,
+    signerOrder: i + 1,
+    signerType: "Signer"
+  }));
+
+  // Create embedded request
+  const createResp = await fetch("https://api.boldsign.com/v1/document/createEmbeddedRequestUrl", {
+    method: "POST",
+    headers: {
+      "X-API-KEY": apiKey,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      title: title || "Document for Signature",
+      message: message || "",
+      signers: signersList,
+      expiryDays: expiryDays || 30,
+      files: fileBuffers.map(f => ({
+        fileName: f.fileName,
+        contentType: f.mimeType || "application/pdf",
+        content: f.buffer.toString("base64")
+      })),
+      redirectUrl: null,
+      showToolbar: true
+    })
+  });
+
+  if (!createResp.ok) {
+    const text = await createResp.text();
+    throw new HttpsError("internal", `BoldSign error ${createResp.status}: ${text}`);
+  }
+
+  const result = await createResp.json();
+  const documentId = result.documentId;
+  const sendUrl = result.sendUrl;
+
+  // Save envelope
+  await db.collection("envelopes").doc(documentId).set({
+    documentId,
+    clientId: clientId || null,
+    realtorId: uid,
+    title: title || "Document for Signature",
+    signers: signers,
+    status: "draft",
+    embedded: true,
+    createdAt: require("firebase-admin/firestore").FieldValue.serverTimestamp()
+  });
+
+  return { sendUrl, documentId };
+});
+
+/* ================================================================
+   shareDocument
+   ================================================================ */
+exports.shareDocument = onCall({ region: "us-central1", secrets: [SENDGRID_API_KEY] }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "You must be signed in.");
+  }
+
+  const { clientId, files, to, cc, subject, message } = request.data || {};
+  if (!to || !files || !files.length) {
+    throw new HttpsError("invalid-argument", "to and files are required.");
+  }
+
+  const uid = request.auth.uid;
+  const userSnap = await db.doc(`users/${uid}`).get();
+  const userData = userSnap.exists ? userSnap.data() : {};
+
+  const fromEmail = userData.senderVerified ? userData.email : "greendoor@stoekmedia.com";
+  const fromName = userData.fullName || "GreenDoor CRM";
+  const replyTo = userData.senderVerified ? null : userData.email;
+
+  // Build HTML body with file links
+  const fileLinks = files.map(f =>
+    `<p><a href="${f.downloadUrl}">${f.fileName}</a></p>`
+  ).join("");
+
+  const htmlBody = `
+    <p>${(message || "").replace(/\n/g, "<br>")}</p>
+    <hr>
+    <p><strong>Shared documents:</strong></p>
+    ${fileLinks}
+  `;
+
+  await sendViaEmail({
+    to,
+    toName: "",
+    subject: subject || "Documents shared with you",
+    body: htmlBody,
+    fromEmail,
+    fromName,
+    replyTo
+  });
+
+  // Log activity
+  await db.collection("activities").add({
+    type: "file_share",
+    subject: subject || "Documents shared",
+    clientId: clientId || null,
+    realtorId: uid,
+    fileCount: files.length,
+    timestamp: require("firebase-admin/firestore").FieldValue.serverTimestamp()
+  });
+
+  return { success: true };
+});
+
+/* ================================================================
+   parseListingUrl
+   ================================================================ */
+exports.parseListingUrl = onCall({ region: "us-central1", secrets: [ANTHROPIC_API_KEY] }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "You must be signed in.");
+  }
+
+  const { url } = request.data || {};
+  if (!url) {
+    throw new HttpsError("invalid-argument", "url is required.");
+  }
+
+  // Fetch the listing page
+  let html;
+  try {
+    const resp = await fetch(url, {
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; GreenDoorBot/1.0)" }
+    });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    html = await resp.text();
+  } catch (err) {
+    throw new HttpsError("internal", `Failed to fetch URL: ${err.message}`);
+  }
+
+  // Truncate HTML to avoid token limits
+  const truncated = html.substring(0, 50000);
+
+  // Use Anthropic API to extract structured listing data
+  const apiKey = ANTHROPIC_API_KEY.value();
+  if (!apiKey) {
+    throw new HttpsError("failed-precondition", "ANTHROPIC_API_KEY is not configured.");
+  }
+
+  const aiResp = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 1024,
+      messages: [{
+        role: "user",
+        content: `Extract real estate listing details from this HTML and return ONLY a JSON object with these fields (use null for missing values): address (object with street, city, state, zip), listingPrice (number), bedrooms (number), bathrooms (number), squareFeet (number), propertyType (string), yearBuilt (number), lotSize (string), garageSpaces (number), stories (number), mlsNumber (string), status (string), description (string), features (array of strings, max 30).\n\nHTML:\n${truncated}`
+      }]
+    })
+  });
+
+  if (!aiResp.ok) {
+    throw new HttpsError("internal", "Failed to parse listing with AI.");
+  }
+
+  const aiData = await aiResp.json();
+  const content = aiData.content?.[0]?.text || "{}";
+
+  // Extract JSON from response
+  let listing;
+  try {
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    listing = jsonMatch ? JSON.parse(jsonMatch[0]) : {};
+  } catch {
+    listing = {};
+  }
+
+  return { listing };
+});
+
+/* ================================================================
+   seedEmailTemplates
+   ================================================================ */
+exports.seedEmailTemplates = onCall({ region: "us-central1" }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "You must be signed in.");
+  }
+
+  const uid = request.auth.uid;
+
+  // Check if templates already exist for this user
+  const existing = await db.collection("emailTemplates")
+    .where("realtorId", "==", uid)
+    .limit(1)
+    .get();
+
+  if (!existing.empty) {
+    return { seeded: false, message: "Templates already exist." };
+  }
+
+  const templates = [
+    { name: "Initial Outreach", subject: "Great to connect with you!", body: "Hi {{clientName}},\n\nThank you for reaching out. I'd love to learn more about what you're looking for in your next home.\n\nWhen would be a good time to chat?\n\nBest,\n{{realtorName}}", category: "prospecting" },
+    { name: "Showing Follow-Up", subject: "How did you like {{propertyAddress}}?", body: "Hi {{clientName}},\n\nI hope you enjoyed touring {{propertyAddress}} today. I'd love to hear your thoughts!\n\nWould you like to schedule another showing or discuss making an offer?\n\nBest,\n{{realtorName}}", category: "showing" },
+    { name: "Listing Update", subject: "New listing that matches your criteria", body: "Hi {{clientName}},\n\nI found a new listing that I think you'll love. Here are the details:\n\n{{listingDetails}}\n\nWould you like to schedule a showing?\n\nBest,\n{{realtorName}}", category: "listing" },
+    { name: "Under Contract Congrats", subject: "Congratulations - You're under contract!", body: "Hi {{clientName}},\n\nGreat news! Your offer has been accepted and you are now under contract. Here's what happens next:\n\n1. Earnest money deposit\n2. Home inspection scheduling\n3. Appraisal\n\nI'll be guiding you through every step.\n\nBest,\n{{realtorName}}", category: "transaction" },
+    { name: "Closing Reminder", subject: "Your closing is approaching!", body: "Hi {{clientName}},\n\nJust a reminder that your closing is scheduled for {{closingDate}}. Please make sure to:\n\n- Bring a valid photo ID\n- Have your closing funds ready\n- Review your closing disclosure\n\nLet me know if you have any questions!\n\nBest,\n{{realtorName}}", category: "transaction" }
+  ];
+
+  const batch = db.batch();
+  for (const tmpl of templates) {
+    const ref = db.collection("emailTemplates").doc();
+    batch.set(ref, {
+      ...tmpl,
+      realtorId: uid,
+      createdAt: require("firebase-admin/firestore").FieldValue.serverTimestamp()
+    });
+  }
+  await batch.commit();
+
+  return { seeded: true, count: templates.length };
+});
+
+/* ================================================================
+   stressTestBoldSign
+   ================================================================ */
+exports.stressTestBoldSign = onCall({ region: "us-central1", secrets: [BOLDSIGN_API_KEY] }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "You must be signed in.");
+  }
+
+  const apiKey = BOLDSIGN_API_KEY.value();
+  const results = [];
+
+  // Test 1: API key validity
+  try {
+    const resp = await fetch("https://api.boldsign.com/v1/template/list?PageSize=1", {
+      headers: { "X-API-KEY": apiKey }
+    });
+    results.push({ test: "API Key Valid", passed: resp.ok, details: resp.ok ? "API key accepted" : `HTTP ${resp.status}` });
+  } catch (err) {
+    results.push({ test: "API Key Valid", passed: false, details: err.message });
+  }
+
+  // Test 2: List templates
+  try {
+    const resp = await fetch("https://api.boldsign.com/v1/template/list?PageSize=5", {
+      headers: { "X-API-KEY": apiKey }
+    });
+    if (resp.ok) {
+      const data = await resp.json();
+      results.push({ test: "List Templates", passed: true, details: `${data.result?.length || 0} templates found` });
+    } else {
+      results.push({ test: "List Templates", passed: false, details: `HTTP ${resp.status}` });
+    }
+  } catch (err) {
+    results.push({ test: "List Templates", passed: false, details: err.message });
+  }
+
+  // Test 3: Sender identities
+  try {
+    const resp = await fetch("https://api.boldsign.com/v1/senderIdentities/list?PageSize=5", {
+      headers: { "X-API-KEY": apiKey }
+    });
+    results.push({ test: "Sender Identities", passed: resp.ok, details: resp.ok ? "Endpoint accessible" : `HTTP ${resp.status}` });
+  } catch (err) {
+    results.push({ test: "Sender Identities", passed: false, details: err.message });
+  }
+
+  // Test 4: API latency
+  try {
+    const start = Date.now();
+    await fetch("https://api.boldsign.com/v1/template/list?PageSize=1", {
+      headers: { "X-API-KEY": apiKey }
+    });
+    const latency = Date.now() - start;
+    results.push({ test: "API Latency", passed: latency < 5000, details: `${latency}ms` });
+  } catch (err) {
+    results.push({ test: "API Latency", passed: false, details: err.message });
+  }
+
+  // Test 5: Webhook secret configured
+  try {
+    const webhookSecret = BOLDSIGN_WEBHOOK_SECRET.value();
+    results.push({ test: "Webhook Secret", passed: !!webhookSecret, details: webhookSecret ? "Configured" : "Not set" });
+  } catch {
+    results.push({ test: "Webhook Secret", passed: false, details: "Not configured" });
+  }
+
+  // Test 6: Firestore connectivity
+  try {
+    const snap = await db.collection("envelopes").limit(1).get();
+    results.push({ test: "Firestore Access", passed: true, details: "Connected" });
+  } catch (err) {
+    results.push({ test: "Firestore Access", passed: false, details: err.message });
+  }
+
+  // Test 7: Storage access
+  try {
+    const bucket = getStorage().bucket();
+    results.push({ test: "Storage Access", passed: true, details: `Bucket: ${bucket.name}` });
+  } catch (err) {
+    results.push({ test: "Storage Access", passed: false, details: err.message });
+  }
+
+  const passed = results.filter(r => r.passed).length;
+  return {
+    summary: `${passed}/${results.length} tests passed`,
+    results
+  };
+});
+
+/* ================================================================
+   requestSenderVerification
+   ================================================================ */
+exports.requestSenderVerification = onCall({ region: "us-central1", secrets: [SENDGRID_API_KEY] }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "You must be signed in.");
+  }
+
+  const uid = request.auth.uid;
+  const userSnap = await db.doc(`users/${uid}`).get();
+  if (!userSnap.exists) {
+    throw new HttpsError("not-found", "User profile not found.");
+  }
+
+  const userData = userSnap.data();
+  if (userData.senderVerified) {
+    return { alreadyVerified: true };
+  }
+
+  const email = userData.email || request.auth.token.email;
+  if (!email) {
+    throw new HttpsError("failed-precondition", "No email address found on your profile.");
+  }
+
+  const apiKey = SENDGRID_API_KEY.value();
+  if (!apiKey) {
+    throw new HttpsError("failed-precondition", "SENDGRID_API_KEY is not configured.");
+  }
+
+  // Create SendGrid sender identity
+  const resp = await fetch("https://api.sendgrid.com/v3/verified_senders", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      nickname: userData.fullName || email,
+      from_email: email,
+      from_name: userData.fullName || "",
+      reply_to: email,
+      reply_to_name: userData.fullName || ""
+    })
+  });
+
+  if (!resp.ok) {
+    const text = await resp.text();
+    // 400 may mean already exists
+    if (resp.status === 400 && text.includes("already")) {
+      await db.doc(`users/${uid}`).update({ senderVerified: true });
+      return { alreadyVerified: true };
+    }
+    throw new HttpsError("internal", `SendGrid error ${resp.status}: ${text}`);
+  }
+
+  const data = await resp.json();
+  await db.doc(`users/${uid}`).update({
+    sendgridSenderId: data.id,
+    senderVerified: false
+  });
+
+  return { alreadyVerified: false };
+});
+
+/* ================================================================
+   checkSenderVerification
+   ================================================================ */
+exports.checkSenderVerification = onCall({ region: "us-central1", secrets: [SENDGRID_API_KEY] }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "You must be signed in.");
+  }
+
+  const uid = request.auth.uid;
+  const userSnap = await db.doc(`users/${uid}`).get();
+  if (!userSnap.exists) {
+    throw new HttpsError("not-found", "User profile not found.");
+  }
+
+  const userData = userSnap.data();
+  if (userData.senderVerified) {
+    return { verified: true };
+  }
+
+  const apiKey = SENDGRID_API_KEY.value();
+  if (!apiKey) {
+    throw new HttpsError("failed-precondition", "SENDGRID_API_KEY is not configured.");
+  }
+
+  // Check verification status
+  const resp = await fetch("https://api.sendgrid.com/v3/verified_senders", {
+    headers: { Authorization: `Bearer ${apiKey}` }
+  });
+
+  if (!resp.ok) {
+    throw new HttpsError("internal", `SendGrid error ${resp.status}`);
+  }
+
+  const data = await resp.json();
+  const email = userData.email || request.auth.token.email;
+  const sender = (data.results || []).find(s => s.from_email === email);
+  const verified = sender?.verified || false;
+
+  if (verified) {
+    await db.doc(`users/${uid}`).update({ senderVerified: true });
+  }
+
+  return { verified };
+});
+
+/* ================================================================
+   removeSenderVerification
+   ================================================================ */
+exports.removeSenderVerification = onCall({ region: "us-central1", secrets: [SENDGRID_API_KEY] }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "You must be signed in.");
+  }
+
+  const uid = request.auth.uid;
+  const userSnap = await db.doc(`users/${uid}`).get();
+  if (!userSnap.exists) {
+    throw new HttpsError("not-found", "User profile not found.");
+  }
+
+  const userData = userSnap.data();
+  const senderId = userData.sendgridSenderId;
+
+  if (senderId) {
+    const apiKey = SENDGRID_API_KEY.value();
+    if (apiKey) {
+      await fetch(`https://api.sendgrid.com/v3/verified_senders/${senderId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${apiKey}` }
+      }).catch(() => {});
+    }
+  }
+
+  await db.doc(`users/${uid}`).update({
+    sendgridSenderId: require("firebase-admin/firestore").FieldValue.delete(),
+    senderVerified: require("firebase-admin/firestore").FieldValue.delete()
+  });
+
+  return { success: true };
+});
+
+/* ================================================================
+   inviteRealtor
+   ================================================================ */
+exports.inviteRealtor = onCall({ region: "us-central1", secrets: [SENDGRID_API_KEY] }, async (request) => {
+  await requireAdmin(request);
+
+  const { email, fullName, company } = request.data || {};
+  if (!email || !fullName) {
+    throw new HttpsError("invalid-argument", "email and fullName are required.");
+  }
+
+  const adminSnap = await db.doc(`users/${request.auth.uid}`).get();
+  const adminName = adminSnap.data()?.fullName || "Admin";
+  const authAdmin = getAuth();
+
+  // Check if user already exists
+  let uid;
+  try {
+    const existing = await authAdmin.getUserByEmail(email);
+    uid = existing.uid;
+  } catch {
+    // Create new auth user with random password
+    const tempPassword = crypto.randomBytes(16).toString("hex");
+    const userRecord = await authAdmin.createUser({
+      email,
+      password: tempPassword,
+      displayName: fullName
+    });
+    uid = userRecord.uid;
+  }
+
+  // Create/update Firestore user profile
+  await db.doc(`users/${uid}`).set({
+    email,
+    fullName,
+    company: company || "",
+    role: "realtor",
+    isActive: true,
+    onboardingComplete: false,
+    invitedBy: request.auth.uid,
+    createdAt: require("firebase-admin/firestore").FieldValue.serverTimestamp(),
+    lastInviteSentAt: require("firebase-admin/firestore").FieldValue.serverTimestamp()
+  }, { merge: true });
+
+  // Generate password reset link for the invited user
+  const resetLink = await authAdmin.generatePasswordResetLink(email);
+
+  // Send invitation email
+  try {
+    await sendViaEmail({
+      to: email,
+      toName: fullName,
+      subject: `You've been invited to GreenDoor CRM`,
+      body: `<p>Hi ${fullName},</p><p>${adminName} has invited you to join GreenDoor CRM.</p><p>Click the link below to set your password and get started:</p><p><a href="${resetLink}">Set Your Password</a></p><p>Best,<br>The GreenDoor Team</p>`,
+      fromEmail: "greendoor@stoekmedia.com",
+      fromName: "GreenDoor CRM"
+    });
+  } catch (err) {
+    console.error("Failed to send invite email:", err);
+  }
+
+  return { uid };
+});
+
+/* ================================================================
+   resendInvite
+   ================================================================ */
+exports.resendInvite = onCall({ region: "us-central1", secrets: [SENDGRID_API_KEY] }, async (request) => {
+  await requireAdmin(request);
+
+  const { targetUid } = request.data || {};
+  if (!targetUid) {
+    throw new HttpsError("invalid-argument", "targetUid is required.");
+  }
+
+  const userSnap = await db.doc(`users/${targetUid}`).get();
+  if (!userSnap.exists) {
+    throw new HttpsError("not-found", "User not found.");
+  }
+
+  const userData = userSnap.data();
+  const authAdmin = getAuth();
+
+  // Generate new password reset link
+  const resetLink = await authAdmin.generatePasswordResetLink(userData.email);
+
+  // Send the invite email
+  await sendViaEmail({
+    to: userData.email,
+    toName: userData.fullName || "",
+    subject: `Reminder: You've been invited to GreenDoor CRM`,
+    body: `<p>Hi ${userData.fullName || "there"},</p><p>This is a reminder that you've been invited to join GreenDoor CRM.</p><p>Click the link below to set your password and get started:</p><p><a href="${resetLink}">Set Your Password</a></p><p>Best,<br>The GreenDoor Team</p>`,
+    fromEmail: "greendoor@stoekmedia.com",
+    fromName: "GreenDoor CRM"
+  });
+
+  await db.doc(`users/${targetUid}`).update({
+    lastInviteSentAt: require("firebase-admin/firestore").FieldValue.serverTimestamp()
+  });
+
+  return { success: true };
+});
+
+/* ================================================================
+   offboardRealtor
+   ================================================================ */
+exports.offboardRealtor = onCall({ region: "us-central1" }, async (request) => {
+  await requireAdmin(request);
+
+  const { targetUid, clientDispositions, options } = request.data || {};
+  if (!targetUid) {
+    throw new HttpsError("invalid-argument", "targetUid is required.");
+  }
+
+  const { FieldValue } = require("firebase-admin/firestore");
+
+  // Process client dispositions
+  if (clientDispositions) {
+    for (const [clientId, disposition] of Object.entries(clientDispositions)) {
+      const clientRef = db.doc(`clients/${clientId}`);
+      if (disposition.action === "reassign" && disposition.targetRealtorId) {
+        await clientRef.update({ realtorId: disposition.targetRealtorId });
+      } else if (disposition.action === "delete") {
+        // Delete client and related data
+        const relatedCols = ["activities", "files", "folders", "bookmarkedProperties", "clientListingMatches", "showings", "followUps"];
+        for (const col of relatedCols) {
+          const snap = await db.collection(col).where("clientId", "==", clientId).get();
+          const batch = db.batch();
+          snap.docs.forEach(d => batch.delete(d.ref));
+          if (!snap.empty) await batch.commit();
+        }
+        // Delete subcollections
+        for (const sub of ["complianceDocs", "closingChecklist"]) {
+          const subSnap = await db.collection(`clients/${clientId}/${sub}`).get();
+          const batch = db.batch();
+          subSnap.docs.forEach(d => batch.delete(d.ref));
+          if (!subSnap.empty) await batch.commit();
+        }
+        await clientRef.delete();
+      } else {
+        // Unassign
+        await clientRef.update({ realtorId: FieldValue.delete() });
+      }
+    }
+  }
+
+  // Data cleanup based on options
+  if (options?.deleteFiles) {
+    const filesSnap = await db.collection("files").where("realtorId", "==", targetUid).get();
+    for (const fileDoc of filesSnap.docs) {
+      const fileData = fileDoc.data();
+      if (fileData.storagePath) {
+        try {
+          await getStorage().bucket().file(fileData.storagePath).delete();
+        } catch {}
+      }
+      await fileDoc.ref.delete();
+    }
+  }
+
+  if (options?.deleteActivities) {
+    for (const col of ["activities", "showings", "followUps", "events"]) {
+      const snap = await db.collection(col).where("realtorId", "==", targetUid).get();
+      const batch = db.batch();
+      snap.docs.forEach(d => batch.delete(d.ref));
+      if (!snap.empty) await batch.commit();
+    }
+  }
+
+  if (options?.deleteEnvelopes) {
+    const snap = await db.collection("envelopes").where("realtorId", "==", targetUid).get();
+    const batch = db.batch();
+    snap.docs.forEach(d => batch.delete(d.ref));
+    if (!snap.empty) await batch.commit();
+  }
+
+  if (options?.disableAuth) {
+    try {
+      await getAuth().updateUser(targetUid, { disabled: true });
+    } catch (err) {
+      console.error("Failed to disable auth:", err);
+    }
+  }
+
+  // Mark user as offboarded
+  await db.doc(`users/${targetUid}`).update({
+    isActive: false,
+    offboardedAt: FieldValue.serverTimestamp()
+  });
+
+  return { success: true };
+});

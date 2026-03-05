@@ -260,9 +260,6 @@ body.gd-light .gd-activity-meta {
   color: #9ca3af;
 }
 
-body.gd-light .gd-activity-text {
-  color: #6b7280;
-}
 
 body.gd-light .gd-timeline::before {
   background: #e5e7eb;
@@ -330,21 +327,6 @@ body.gd-light .gd-client-quick-stat .lbl {
 }
 
 /* Light theme: files */
-body.gd-light .gd-folder-btn {
-  color: #6b7280;
-  border-color: #e5e7eb;
-}
-
-body.gd-light .gd-folder-btn:hover {
-  border-color: #22c55e;
-  color: #16a34a;
-}
-
-body.gd-light .gd-folder-btn.active {
-  background: #f0fdf4;
-  border-color: #22c55e;
-  color: #16a34a;
-}
 
 body.gd-light .gd-file-row {
   border-bottom-color: #f3f4f6;

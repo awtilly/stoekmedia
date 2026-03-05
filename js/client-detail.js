@@ -272,12 +272,20 @@ window.deleteClient = async function () {
   if (!user) return;
 
   try {
-    const collections = ["activities", "files", "bookmarkedProperties", "clientListingMatches", "showings", "followUps"];
+    const collections = ["activities", "files", "folders", "bookmarkedProperties", "clientListingMatches", "showings", "followUps"];
     for (const col of collections) {
       const q = query(collection(db, col), where("clientId", "==", clientId), where("realtorId", "==", user.uid));
       const snap = await getDocs(q);
       for (const d of snap.docs) {
         await deleteDoc(doc(db, col, d.id));
+      }
+    }
+    // Clean up subcollections
+    const subcollections = ["complianceDocs", "closingChecklist"];
+    for (const sub of subcollections) {
+      const subSnap = await getDocs(collection(db, "clients", clientId, sub));
+      for (const d of subSnap.docs) {
+        await deleteDoc(d.ref);
       }
     }
     await deleteDoc(doc(db, "clients", clientId));
