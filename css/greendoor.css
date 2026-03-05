@@ -3946,6 +3946,24 @@ body.gd-light .gd-breadcrumb-current {
 .gd-legend-showing { background: #22c55e; }
 .gd-legend-followup { background: #f59e0b; }
 .gd-legend-event { background: #3b82f6; }
+/* ShowingTime legend dot */
+.gd-legend-showingtime {
+  background: #22c55e;
+  position: relative;
+}
+.gd-legend-showingtime::after {
+  content: "ST";
+  position: absolute;
+  right: -1px;
+  top: -1px;
+  font-size: 0.4rem;
+  font-weight: 700;
+  background: #fff;
+  color: #22c55e;
+  border-radius: 2px;
+  padding: 0 1px;
+  line-height: 1.1;
+}
 
 /* Month View */
 .gd-cal-month {
@@ -4035,6 +4053,24 @@ body.gd-light .gd-breadcrumb-current {
 .gd-cal-event-dot.showing { background: #22c55e; }
 .gd-cal-event-dot.followup { background: #f59e0b; }
 .gd-cal-event-dot.event { background: #3b82f6; }
+/* ShowingTime month view dot */
+.gd-cal-event-dot.showingtime {
+  background: #22c55e;
+  position: relative;
+}
+.gd-cal-event-dot.showingtime::after {
+  content: "ST";
+  position: absolute;
+  right: 2px;
+  top: -1px;
+  font-size: 0.45rem;
+  font-weight: 700;
+  background: #fff;
+  color: #22c55e;
+  border-radius: 2px;
+  padding: 0 2px;
+  line-height: 1.1;
+}
 
 .gd-cal-day.drag-over {
   background: #dcfce7;
@@ -4141,6 +4177,24 @@ body.gd-light .gd-breadcrumb-current {
 .gd-cal-week-event.showing { background: #22c55e; }
 .gd-cal-week-event.followup { background: #f59e0b; }
 .gd-cal-week-event.event { background: #3b82f6; }
+/* ShowingTime week view event */
+.gd-cal-week-event.showingtime {
+  background: #22c55e;
+  position: relative;
+}
+.gd-cal-week-event.showingtime::after {
+  content: "ST";
+  position: absolute;
+  right: 4px;
+  top: 2px;
+  font-size: 0.55rem;
+  font-weight: 700;
+  background: rgba(255,255,255,0.9);
+  color: #22c55e;
+  border-radius: 3px;
+  padding: 0 3px;
+  line-height: 1.3;
+}
 
 .gd-cal-now-line {
   position: absolute;

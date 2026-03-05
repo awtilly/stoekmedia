@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Calendar — GreenDoor</title>
+  <link rel="stylesheet" href="/assets/css/style.css">
+  <link rel="stylesheet" href="/greendoor/css/greendoor.css">
+</head>
+<body class="gd-light">
+
+  <!-- Navigation -->
+  <nav class="nav scrolled">
+    <div class="container">
+      <a href="/greendoor/app/dashboard" class="nav-logo gd-nav-logo"><span class="gd-green">Green</span><span class="gd-door">Door</span><small class="gd-by-line">by stoekmedia</small></a>
+      <ul class="nav-links">
+        <li><a href="/greendoor/app/dashboard">Dashboard</a></li>
+        <li><a href="/greendoor/app/clients">Clients</a></li>
+        <li><a href="/greendoor/app/calendar" class="gd-nav-active">Calendar</a></li>
+        <li id="nav-admin-tab" style="display:none;"><a href="/greendoor/app/admin">Admin</a></li>
+        <li><a href="/greendoor/app/settings">Settings</a></li>
+        <li class="nav-crm-divider"></li>
+        <li><span id="nav-user-name" class="nav-user-name"></span></li>
+        <li><button class="nav-logout-btn" onclick="handleLogout()">Logout</button></li>
+      </ul>
+      <button class="nav-toggle" aria-label="Menu">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+    </div>
+  </nav>
+
+  <div class="gd-page">
+    <div class="gd-content">
+
+      <!-- Loading -->
+      <div id="calendar-loading" class="gd-loading">
+        <div class="gd-spinner gd-spinner-lg"></div>
+        <span class="gd-loading-text">Loading calendar...</span>
+      </div>
+
+      <div id="calendar-content" class="gd-hidden">
+
+        <!-- Header -->
+        <div class="gd-calendar-header">
+          <div class="gd-calendar-nav">
+            <button class="gd-btn gd-btn-sm" onclick="calPrev()">&larr;</button>
+            <button class="gd-btn gd-btn-sm" onclick="calToday()">Today</button>
+            <button class="gd-btn gd-btn-sm" onclick="calNext()">&rarr;</button>
+          </div>
+          <div class="gd-calendar-title" id="cal-title">February 2026</div>
+          <div style="display:flex;gap:0.5rem;align-items:center;">
+            <div class="gd-calendar-view-toggle">
+              <button class="gd-calendar-view-btn" data-view="month" onclick="setCalView('month')">Month</button>
+              <button class="gd-calendar-view-btn active" data-view="week" onclick="setCalView('week')">Week</button>
+            </div>
+            <button class="gd-btn gd-btn-primary gd-btn-sm" onclick="openEventModal()">+ Event</button>
+          </div>
+        </div>
+
+        <!-- Legend -->
+        <div class="gd-calendar-legend">
+          <div class="gd-calendar-legend-item"><div class="gd-calendar-legend-dot gd-legend-showing"></div> Showings</div>
+          <div class="gd-calendar-legend-item"><div class="gd-calendar-legend-dot gd-legend-followup"></div> Follow-ups</div>
+          <div class="gd-calendar-legend-item"><div class="gd-calendar-legend-dot gd-legend-event"></div> Events</div>
+          <div class="gd-calendar-legend-item"><div class="gd-calendar-legend-dot gd-legend-showingtime"></div> ShowingTime</div>
+        </div>
+
+        <!-- Calendar Grid -->
+        <div id="cal-grid"></div>
+
+        <!-- Event Popover (positioned dynamically) -->
+        <div id="cal-popover" class="gd-cal-popover gd-hidden">
+          <div class="gd-cal-popover-header">
+            <div class="gd-cal-popover-title" id="pop-title"></div>
+            <button class="gd-cal-popover-close" onclick="closePopover()">&times;</button>
+          </div>
+          <div class="gd-cal-popover-meta" id="pop-meta"></div>
+          <div class="gd-cal-popover-actions" id="pop-actions"></div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Event Modal -->
+  <div id="event-modal" class="gd-modal-overlay">
+    <div class="gd-modal" style="max-width: 480px;">
+      <div class="gd-modal-header">
+        <h3 id="event-modal-title">Add Event</h3>
+        <button class="gd-modal-close" onclick="closeEventModal()" aria-label="Close">&times;</button>
+      </div>
+      <div class="gd-modal-body">
+        <div class="gd-form-group">
+          <label for="ev-title">Title *</label>
+          <input type="text" id="ev-title" class="gd-input">
+        </div>
+        <div class="gd-form-group">
+          <label for="ev-description">Description</label>
+          <textarea id="ev-description" class="gd-input" rows="2"></textarea>
+        </div>
+        <div class="gd-form-row">
+          <div class="gd-form-group">
+            <label for="ev-start">Start *</label>
+            <input type="datetime-local" id="ev-start" class="gd-input">
+          </div>
+          <div class="gd-form-group">
+            <label for="ev-end">End</label>
+            <input type="datetime-local" id="ev-end" class="gd-input">
+          </div>
+        </div>
+        <div class="gd-sig-option-row">
+          <input type="checkbox" id="ev-allday"> <label for="ev-allday">All day</label>
+        </div>
+        <div class="gd-form-group">
+          <label for="ev-color">Color</label>
+          <select id="ev-color" class="gd-input">
+            <option value="#3b82f6">Blue</option>
+            <option value="#22c55e">Green</option>
+            <option value="#f59e0b">Amber</option>
+            <option value="#ef4444">Red</option>
+            <option value="#8b5cf6">Purple</option>
+          </select>
+        </div>
+        <div class="gd-form-group">
+          <label for="ev-client">Client (optional)</label>
+          <select id="ev-client" class="gd-input">
+            <option value="">— None —</option>
+          </select>
+        </div>
+      </div>
+      <div class="gd-modal-footer">
+        <button class="gd-btn" onclick="closeEventModal()">Cancel</button>
+        <button class="gd-btn gd-btn-primary" onclick="saveEvent()">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/assets/js/main.js"></script>
+  <script type="module" src="/greendoor/js/auth.js"></script>
+  <script type="module" src="/greendoor/js/calendar.js"></script>
+  <script type="module" src="/greendoor/js/tour.js"></script>
+  <script type="module" src="/greendoor/js/chatbot.js"></script>
+</body>
+</html>
