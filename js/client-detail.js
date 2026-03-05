@@ -14,6 +14,7 @@ import {
 } from "./auth.js";
 import { calculateMatchScore, matchScoreColor, matchScoreLabel } from "./match-engine.js";
 import { buildMergeFields, MO_FORM_STUBS, COMPLIANCE_STATUSES, COMPLIANCE_CATEGORIES, formatComplianceStatus } from "./compliance.js";
+import { seedChecklist, recalculateDeadlines } from "./checklist.js";
 
 const params = new URLSearchParams(window.location.search);
 const clientId = params.get("id");
@@ -144,6 +145,12 @@ function populateOverview(c) {
   document.getElementById("ov-preApprovalStatus").value = c.preApprovalStatus || "";
   document.getElementById("ov-preApprovalAmount").value = c.preApprovalAmount || "";
   document.getElementById("ov-notes").value = c.notes || "";
+  document.getElementById("ov-closingDate").value = c.closingDate
+    ? (typeof c.closingDate.toDate === "function"
+        ? c.closingDate.toDate()
+        : new Date(c.closingDate)
+      ).toISOString().split("T")[0]
+    : "";
 
   const types = c.propertyTypes || [];
   document.querySelectorAll("#ov-propertyTypes input").forEach(cb => {
@@ -164,11 +171,35 @@ document.getElementById("ov-transactionType").addEventListener("change", async (
     if (value) {
       await ensureClosingDocumentsFolder(clientId, user.uid);
     }
+    // Seed closing checklist for this transaction type
+    const closingDateVal = clientData.closingDate
+      ? (typeof clientData.closingDate.toDate === "function" ? clientData.closingDate.toDate() : new Date(clientData.closingDate))
+      : null;
+    await seedChecklist(db, clientId, value, closingDateVal);
     // Re-filter compliance templates for the new transaction type
     loadComplianceTemplates(user.uid);
   } catch (err) {
     console.error("Transaction type save error:", err);
     showToast("Failed to update transaction type.", "error");
+  }
+});
+
+/* --- Closing date immediate save + deadline recalculation --- */
+document.getElementById("ov-closingDate").addEventListener("change", async (e) => {
+  const user = auth.currentUser;
+  if (!user) return;
+  const dateValue = e.target.value ? new Date(e.target.value + "T00:00:00") : null;
+  try {
+    await updateDoc(doc(db, "clients", clientId), {
+      closingDate: dateValue ? Timestamp.fromDate(dateValue) : null
+    });
+    clientData.closingDate = dateValue ? Timestamp.fromDate(dateValue) : null;
+    showToast("Closing date updated.");
+    // Recalculate checklist deadlines
+    await recalculateDeadlines(db, clientId, dateValue);
+  } catch (err) {
+    console.error("Closing date save error:", err);
+    showToast("Failed to update closing date.", "error");
   }
 });
 
@@ -211,7 +242,10 @@ window.saveOverview = async function () {
     dealBreakers,
     preApprovalStatus: document.getElementById("ov-preApprovalStatus").value,
     preApprovalAmount: Number(document.getElementById("ov-preApprovalAmount").value) || null,
-    notes: document.getElementById("ov-notes").value.trim()
+    notes: document.getElementById("ov-notes").value.trim(),
+    closingDate: document.getElementById("ov-closingDate").value
+      ? Timestamp.fromDate(new Date(document.getElementById("ov-closingDate").value + "T00:00:00"))
+      : null
   };
 
   try {
