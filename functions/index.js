@@ -649,6 +649,31 @@ exports.boldSignWebhook = onRequest({ region: "us-central1" }, async (req, res) 
       })
     ]);
 
+    // Step 8b -- Auto-complete matching checklist items (CHKL-06)
+    try {
+      const checklistQuery = await db.collection(`clients/${clientId}/closingChecklist`)
+        .where("linkedTemplateId", "==", templateId)
+        .where("completed", "==", false)
+        .get();
+
+      if (!checklistQuery.empty) {
+        const checklistBatch = db.batch();
+        checklistQuery.docs.forEach(checkDoc => {
+          checklistBatch.update(checkDoc.ref, {
+            completed: true,
+            autoCompleted: true,
+            autoCompletedAt: FieldValue.serverTimestamp(),
+            completedAt: FieldValue.serverTimestamp()
+          });
+        });
+        await checklistBatch.commit();
+        console.log(`boldSignWebhook: Auto-completed ${checklistQuery.docs.length} checklist item(s) for template ${templateId}`);
+      }
+    } catch (checklistErr) {
+      // Non-fatal: log but don't fail the webhook for checklist errors
+      console.error("boldSignWebhook: Checklist auto-complete error:", checklistErr);
+    }
+
     console.log(`boldSignWebhook: Processed signed document for client ${clientId}, template ${templateId}`);
 
     // Step 9 -- Respond (WHBK-10)
