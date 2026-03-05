@@ -57,8 +57,8 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### Closing Checklist
 
-- [ ] **CHKL-01**: `closingChecklist` subcollection under each client with category, task, completed, autoCompleted, notes, transactionTypes
-- [ ] **CHKL-02**: Default checklist seeded from human-verified MO transaction template when transactionType is set
+- [x] **CHKL-01**: `closingChecklist` subcollection under each client with category, task, completed, autoCompleted, notes, transactionTypes
+- [x] **CHKL-02**: Default checklist seeded from human-verified MO transaction template when transactionType is set
 - [ ] **CHKL-03**: Checklist items grouped by category (Pre-Contract / Under Contract / Closing) on new "Closing Checklist" tab
 - [ ] **CHKL-04**: Progress bar per category and overall
 - [ ] **CHKL-05**: User can manually toggle checklist items complete/incomplete
@@ -174,8 +174,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | WHBK-10 | Phase 3 | Complete |
 | SDUI-01 | Phase 3 | Complete |
 | SDUI-02 | Phase 3 | Complete |
-| CHKL-01 | Phase 4 | Pending |
-| CHKL-02 | Phase 4 | Pending |
+| CHKL-01 | Phase 4 | Complete |
+| CHKL-02 | Phase 4 | Complete |
 | CHKL-03 | Phase 4 | Pending |
 | CHKL-04 | Phase 4 | Pending |
 | CHKL-05 | Phase 4 | Pending |

@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: completed
-stopped_at: Phase 4 context gathered
-last_updated: "2026-03-05T02:22:09.568Z"
-last_activity: 2026-03-04 — Completed 03-01 BoldSign Webhook Pipeline
+status: executing
+stopped_at: Completed 04-01-PLAN.md
+last_updated: "2026-03-05T02:49:51.690Z"
+last_activity: 2026-03-04 — Completed 04-01 Checklist Data Model
 progress:
   total_phases: 5
   completed_phases: 3
-  total_plans: 8
-  completed_plans: 8
-  percent: 100
+  total_plans: 11
+  completed_plans: 9
+  percent: 82
 ---
 
 # Project State
@@ -21,23 +21,23 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-04)
 
 **Core value:** Realtors can manage their entire client-to-close workflow in one place — from lead intake through document signing to closing — without switching between tools.
-**Current focus:** Phase 3 -- Webhook Pipeline (BoldSign webhook handler + signed document UI)
+**Current focus:** Phase 4 -- AI Closing Checklist (checklist data model, UI, auto-completion, AI check-in)
 
 ## Current Position
 
-Phase: 3 of 5 (Webhook Pipeline)
-Plan: 2 of 2 in current phase (03-01, 03-02 done)
-Status: Phase 3 Complete
-Last activity: 2026-03-04 — Completed 03-01 BoldSign Webhook Pipeline
+Phase: 4 of 5 (AI Closing Checklist)
+Plan: 1 of 3 in current phase (04-01 done)
+Status: Executing Phase 4
+Last activity: 2026-03-04 — Completed 04-01 Checklist Data Model
 
-Progress: [██████████] 100%
+Progress: [████████░░] 82%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 8
-- Average duration: 3.5m
-- Total execution time: 0.47 hours
+- Total plans completed: 9
+- Average duration: 3.3m
+- Total execution time: 0.50 hours
 
 **By Phase:**
 
@@ -52,10 +52,11 @@ Progress: [██████████] 100%
 
 | 03 | P01 | 2m | 1 | 1 |
 | 03 | P02 | 1m | 2 | 2 |
+| 04 | P01 | 2m | 2 | 3 |
 
 **Recent Trend:**
-- Last 5 plans: 2m, 2m, 12m, 1m, 2m
-- Trend: fast execution (webhook function was single focused task)
+- Last 5 plans: 2m, 12m, 1m, 2m, 2m
+- Trend: consistently fast execution
 
 *Updated after each plan completion*
 
@@ -87,6 +88,11 @@ Recent decisions affecting current work:
 - [Phase 03]: HMAC verification uses hex buffer comparison with crypto.timingSafeEqual to prevent timing attacks
 - [Phase 03]: Always return 200 to BoldSign even on internal errors to prevent retry loops on permanently failing requests
 - [Phase 03]: Deterministic file doc ID pattern (clientId_signed_templateId) for natural webhook idempotency via setDoc
+- [Phase 04]: Combined checklist template with propertyTypes tags instead of separate per-property-type templates
+- [Phase 04]: Deterministic doc IDs with merge:true for idempotent re-seeding that preserves completion state
+- [Phase 04]: linkedTemplateId uses mo- prefixed IDs matching documentTemplates for rename-safe auto-completion mapping
+- [Phase 04]: Closing date field in Overview tab Status & Source section (transaction-level, not checklist-level)
+- [Phase 04]: Deadline offsets based on MO residential practice (inspection -28d, financing -10d, walkthrough -1d, MO notice -45d)
 
 ### Pending Todos
 
@@ -101,6 +107,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-05T02:22:09.563Z
-Stopped at: Phase 4 context gathered
-Resume file: .planning/phases/04-ai-closing-checklist/04-CONTEXT.md
+Last session: 2026-03-05T02:49:01Z
+Stopped at: Completed 04-01-PLAN.md
+Resume file: .planning/phases/04-ai-closing-checklist/04-01-SUMMARY.md
