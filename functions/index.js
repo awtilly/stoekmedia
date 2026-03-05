@@ -684,3 +684,101 @@ exports.boldSignWebhook = onRequest({ region: "us-central1" }, async (req, res) 
     return res.status(200).send("OK");
   }
 });
+
+/* ------------------------------------------------------------------ */
+/*  askAssistant                                                       */
+/*                                                                     */
+/*  AI assistant Cloud Function. Accepts a question with optional      */
+/*  context type (general, client_detail, checklist_checkin) and       */
+/*  conversation history. Returns an AI-generated response.            */
+/* ------------------------------------------------------------------ */
+
+exports.askAssistant = onCall({ region: "us-central1" }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "You must be signed in.");
+  }
+
+  const { question, context, history, clientId, contextData } = request.data || {};
+  if (!question) {
+    throw new HttpsError("invalid-argument", "question is required.");
+  }
+
+  const openaiKey = process.env.OPENAI_API_KEY;
+  if (!openaiKey) {
+    throw new HttpsError("internal", "OpenAI API key is not configured.");
+  }
+
+  let systemPrompt = "You are a helpful real estate assistant for GreenDoor CRM.";
+
+  // Build context-specific system prompt
+  if (context === "checklist_checkin" && contextData) {
+    const cd = contextData;
+    systemPrompt = `You are a real estate transaction assistant for GreenDoor CRM. You are helping a realtor check in on their closing checklist.
+
+CLIENT: ${cd.clientName}
+TRANSACTION TYPE: ${cd.transactionType}
+CLOSING DATE: ${cd.closingDate}
+LISTING ADDRESS: ${cd.listingAddress}
+TODAY: ${cd.todayDate}
+
+PROGRESS: ${cd.progress.completed}/${cd.progress.total} items completed (${cd.progress.percentage}%)
+
+COMPLETED ITEMS:
+${cd.completedItems.map(i => `- [x] ${i.task} (${i.category})${i.autoCompleted ? ' [auto-completed via e-signature]' : ''}`).join('\n')}
+
+OUTSTANDING ITEMS:
+${cd.outstandingItems.map(i => `- [ ] ${i.task} (${i.category})${i.deadline ? ` — Due: ${i.deadline}` : ''}${i.overdue ? ' OVERDUE' : ''}`).join('\n')}
+
+${cd.overdueCount > 0 ? `\n${cd.overdueCount} OVERDUE ITEM(S) require immediate attention.\n` : ''}
+
+INSTRUCTIONS:
+1. Start with a brief progress summary (percentage done, tone: encouraging if ahead, urgent if behind)
+2. Highlight any overdue items with specific attention
+3. List what's still outstanding, grouped by urgency
+4. Suggest the top 2-3 priority next actions the realtor should take
+5. Keep your response concise and actionable — this is a quick check-in, not a detailed report
+6. If the realtor asks follow-up questions, use this context to answer them accurately`;
+  } else if (context === "client_detail" && clientId) {
+    // Read client data for generic client-detail context
+    const clientSnap = await db.doc(`clients/${clientId}`).get();
+    if (clientSnap.exists) {
+      const c = clientSnap.data();
+      systemPrompt = `You are a real estate assistant. The realtor is viewing client: ${c.fullName || 'Unknown'}. Status: ${c.status || 'unknown'}. Transaction type: ${c.transactionType || 'not set'}. Help with questions about this client.`;
+    }
+  }
+
+  // Build messages array
+  const messages = [{ role: "system", content: systemPrompt }];
+  if (history && Array.isArray(history)) {
+    // Include last 6 messages for context window management
+    const recentHistory = history.slice(-6);
+    messages.push(...recentHistory);
+  }
+  messages.push({ role: "user", content: question });
+
+  // Call OpenAI
+  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${openaiKey}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      model: "gpt-4o-mini",
+      messages: messages,
+      max_tokens: 800,
+      temperature: 0.7
+    })
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    console.error("OpenAI API error:", errText);
+    throw new HttpsError("internal", "AI service temporarily unavailable. Please try again.");
+  }
+
+  const data = await response.json();
+  const aiResponse = data.choices?.[0]?.message?.content || "I wasn't able to generate a response. Please try again.";
+
+  return { response: aiResponse };
+});

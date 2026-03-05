@@ -505,10 +505,19 @@ function subscribeChecklist(clientId) {
   const colRef = collection(db, "clients", clientId, "closingChecklist");
 
   checklistUnsubscribe = onSnapshot(colRef, (snapshot) => {
-    checklistItems = [];
-    snapshot.forEach(docSnap => {
-      checklistItems.push({ id: docSnap.id, ...docSnap.data() });
-    });
+    // Detect auto-completions for toast
+    const newItems = [];
+    snapshot.forEach(d => newItems.push({ id: d.id, ...d.data() }));
+
+    // Compare with previous state to detect new auto-completions
+    for (const newItem of newItems) {
+      const oldItem = checklistItems.find(i => i.id === newItem.id);
+      if (newItem.autoCompleted && (!oldItem || !oldItem.autoCompleted)) {
+        showToast(`${newItem.task} signed -- checklist updated`, "success");
+      }
+    }
+
+    checklistItems = newItems;
     renderChecklist();
   }, (err) => {
     console.error("Checklist listener error:", err);
@@ -566,6 +575,7 @@ export function renderChecklist() {
       <div class="gd-checklist-overall">
         <div class="gd-checklist-overall-header">
           <span>Closing Progress</span>
+          <button class="gd-btn gd-btn-sm" onclick="openChecklistAI()" style="margin-left: auto;">&#10024; Check in with AI</button>
           <span class="gd-checklist-progress-text">${doneItems.length}/${activeItems.length} (${overallPct}%)</span>
         </div>
         <div class="gd-checklist-progress">
@@ -880,6 +890,86 @@ window.deleteChecklistItem = async function(itemId) {
     showToast("Failed to delete item.", "error");
   }
 };
+
+/* ------------------------------------------------------------------ */
+/*  buildChecklistContext                                               */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Builds a context payload summarizing the current checklist state
+ * for the AI check-in assistant.
+ */
+export function buildChecklistContext() {
+  const items = checklistItems.filter(i => !i.notApplicable)
+    .sort((a, b) => a.sortOrder - b.sortOrder);
+
+  const done = items.filter(i => i.completed);
+  const outstanding = items.filter(i => !i.completed);
+  const overdue = outstanding.filter(i => {
+    if (!i.deadline) return false;
+    const d = typeof i.deadline.toDate === "function" ? i.deadline.toDate() : new Date(i.deadline);
+    return d < new Date();
+  });
+
+  return {
+    clientName: currentClientData?.fullName || "Unknown",
+    transactionType: currentClientData?.transactionType || "Not set",
+    closingDate: currentClientData?.closingDate
+      ? formatDate(currentClientData.closingDate)
+      : "Not set",
+    listingAddress: currentClientData?.listingAddress || "Not linked",
+    progress: {
+      total: items.length,
+      completed: done.length,
+      percentage: items.length > 0 ? Math.round((done.length / items.length) * 100) : 0
+    },
+    completedItems: done.map(i => ({
+      task: i.task,
+      category: CATEGORY_LABELS[i.category] || i.category,
+      autoCompleted: i.autoCompleted || false
+    })),
+    outstandingItems: outstanding.map(i => ({
+      task: i.task,
+      category: CATEGORY_LABELS[i.category] || i.category,
+      deadline: i.deadline ? formatDate(i.deadline) : null,
+      overdue: i.deadline && (typeof i.deadline.toDate === "function" ? i.deadline.toDate() : new Date(i.deadline)) < new Date()
+    })),
+    overdueCount: overdue.length,
+    todayDate: new Date().toLocaleDateString("en-US")
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/*  openChecklistAI                                                    */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Opens the floating chatbot panel with full checklist context and
+ * sends an auto-summary request to the AI assistant.
+ */
+export function openChecklistAI() {
+  const context = buildChecklistContext();
+
+  // Build the auto-summary prompt
+  const prompt = `I'm checking in on my closing checklist for ${context.clientName}. ` +
+    `Transaction type: ${context.transactionType}. ` +
+    `Closing date: ${context.closingDate}. ` +
+    `Please give me a quick status update: what's done, what's outstanding, flag anything overdue, and suggest my top 2-3 next actions.`;
+
+  // Open the chatbot panel and send with checklist context
+  if (typeof window.sendWithContext === "function") {
+    window.sendWithContext(prompt, "checklist_checkin", context);
+  } else {
+    // Fallback: just open panel and set input
+    window.toggleAiPanel();
+    const input = document.getElementById("ai-input");
+    if (input) {
+      input.value = prompt;
+      window.sendAiMessage();
+    }
+  }
+}
+window.openChecklistAI = openChecklistAI;
 
 /* ------------------------------------------------------------------ */
 /*  destroyChecklist                                                   */
