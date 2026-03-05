@@ -83,8 +83,8 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 04-01-PLAN.md — Checklist data model, MO template constant, seeding logic, closing date field (CHKL-01, CHKL-02)
-- [ ] 04-02-PLAN.md — Closing Checklist tab UI with category grouping, progress bars, manual completion, custom items, N/A marking (CHKL-03, CHKL-04, CHKL-05, CHKL-07)
+- [x] 04-01-PLAN.md — Checklist data model, MO template constant, seeding logic, closing date field (CHKL-01, CHKL-02)
+- [x] 04-02-PLAN.md — Closing Checklist tab UI with category grouping, progress bars, manual completion, custom items, N/A marking (CHKL-03, CHKL-04, CHKL-05, CHKL-07)
 - [ ] 04-03-PLAN.md — Webhook auto-complete extension + AI check-in via floating chatbot with context injection (CHKL-06, AICX-01 through AICX-06)
 
 ### Phase 5: ShowingTime Sync

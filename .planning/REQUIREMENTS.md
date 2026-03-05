@@ -59,11 +59,11 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 - [x] **CHKL-01**: `closingChecklist` subcollection under each client with category, task, completed, autoCompleted, notes, transactionTypes
 - [x] **CHKL-02**: Default checklist seeded from human-verified MO transaction template when transactionType is set
-- [ ] **CHKL-03**: Checklist items grouped by category (Pre-Contract / Under Contract / Closing) on new "Closing Checklist" tab
-- [ ] **CHKL-04**: Progress bar per category and overall
-- [ ] **CHKL-05**: User can manually toggle checklist items complete/incomplete
+- [x] **CHKL-03**: Checklist items grouped by category (Pre-Contract / Under Contract / Closing) on new "Closing Checklist" tab
+- [x] **CHKL-04**: Progress bar per category and overall
+- [x] **CHKL-05**: User can manually toggle checklist items complete/incomplete
 - [ ] **CHKL-06**: When a compliance doc is signed (via webhook), matching checklist items auto-complete with autoCompleted: true
-- [ ] **CHKL-07**: Auto-completed items display a distinct badge
+- [x] **CHKL-07**: Auto-completed items display a distinct badge
 
 ### AI Check-in
 
@@ -176,11 +176,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SDUI-02 | Phase 3 | Complete |
 | CHKL-01 | Phase 4 | Complete |
 | CHKL-02 | Phase 4 | Complete |
-| CHKL-03 | Phase 4 | Pending |
-| CHKL-04 | Phase 4 | Pending |
-| CHKL-05 | Phase 4 | Pending |
+| CHKL-03 | Phase 4 | Complete |
+| CHKL-04 | Phase 4 | Complete |
+| CHKL-05 | Phase 4 | Complete |
 | CHKL-06 | Phase 4 | Pending |
-| CHKL-07 | Phase 4 | Pending |
+| CHKL-07 | Phase 4 | Complete |
 | AICX-01 | Phase 4 | Pending |
 | AICX-02 | Phase 4 | Pending |
 | AICX-03 | Phase 4 | Pending |
