@@ -16,7 +16,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 2: Compliance Documents** - BoldSign sender customization, compliance template library, send-for-signature flow, and real-time status tracking (completed 2026-03-04)
 - [ ] **Phase 3: Webhook Pipeline** - BoldSign webhook receives completion events, verifies HMAC, auto-saves signed PDFs to Closing Documents folder, and marks docs signed
 - [ ] **Phase 4: AI Closing Checklist** - AI-seeded per-client closing checklist with manual/auto completion, progress tracking, and contextual AI check-in chat
-- [ ] **Phase 5: ShowingTime Sync** - ShowingTime iCal feed import with 30-minute scheduled sync and read-only calendar display
+- [x] **Phase 5: ShowingTime Sync** - ShowingTime iCal feed import with 30-minute scheduled sync and read-only calendar display (completed 2026-03-05)
 
 ## Phase Details
 
@@ -114,4 +114,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 (Phase 5 depends only
 | 2. Compliance Documents | 3/3 | Complete   | 2026-03-04 |
 | 3. Webhook Pipeline | 0/2 | Not started | - |
 | 4. AI Closing Checklist | 0/3 | Not started | - |
-| 5. ShowingTime Sync | 0/2 | Not started | - |
+| 5. ShowingTime Sync | 2/2 | Complete   | 2026-03-05 |

@@ -84,7 +84,7 @@ Requirements for this milestone. Each maps to roadmap phases.
 - [x] **SHWT-06**: Cancelled events in feed are removed from Firestore (or marked cancelled)
 - [x] **SHWT-07**: Scheduled Cloud Function syncs all users with feed URLs every 30 minutes
 - [x] **SHWT-08**: Rate limited to max once per 15 minutes per user
-- [ ] **SHWT-09**: ShowingTime showings display in calendar with distinct "ST" badge, read-only
+- [x] **SHWT-09**: ShowingTime showings display in calendar with distinct "ST" badge, read-only
 - [x] **SHWT-10**: Invalid or expired feed URLs show clear error in Settings with instructions
 - [x] **SHWT-11**: Last synced timestamp displayed in Settings
 
@@ -195,7 +195,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SHWT-06 | Phase 5 | Complete |
 | SHWT-07 | Phase 5 | Complete |
 | SHWT-08 | Phase 5 | Complete |
-| SHWT-09 | Phase 5 | Pending |
+| SHWT-09 | Phase 5 | Complete |
 | SHWT-10 | Phase 5 | Complete |
 | SHWT-11 | Phase 5 | Complete |
 

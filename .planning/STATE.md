@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: in_progress
-stopped_at: Completed 05-01 ShowingTime Sync Backend and Settings UI
-last_updated: "2026-03-05T15:21:00Z"
-last_activity: 2026-03-05 — Completed 05-01 ShowingTime Sync Backend and Settings UI
+status: complete
+stopped_at: Completed 05-02 ShowingTime Calendar Display — All phases complete
+last_updated: "2026-03-05T15:26:02Z"
+last_activity: 2026-03-05 — Completed 05-02 ShowingTime Calendar Display (v1.0 milestone complete)
 progress:
   total_phases: 5
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 13
-  completed_plans: 12
-  percent: 92
+  completed_plans: 13
+  percent: 100
 ---
 
 # Project State
@@ -25,19 +25,19 @@ See: .planning/PROJECT.md (updated 2026-03-04)
 
 ## Current Position
 
-Phase: 5 of 5 (ShowingTime Sync)
-Plan: 1 of 2 in current phase (05-01 done)
-Status: In Progress
-Last activity: 2026-03-05 — Completed 05-01 ShowingTime Sync Backend and Settings UI
+Phase: 5 of 5 (ShowingTime Sync) -- COMPLETE
+Plan: 2 of 2 in current phase (all done)
+Status: Complete
+Last activity: 2026-03-05 — Completed 05-02 ShowingTime Calendar Display
 
-Progress: [█████████░] 92%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 12
-- Average duration: 3.2m
-- Total execution time: 0.63 hours
+- Total plans completed: 13
+- Average duration: 3.0m
+- Total execution time: 0.65 hours
 
 **By Phase:**
 
@@ -56,9 +56,10 @@ Progress: [█████████░] 92%
 | 04 | P02 | 3m | 2 | 4 |
 | 04 | P03 | 2m | 2 | 3 |
 | 05 | P01 | 3m | 2 | 5 |
+| 05 | P02 | 2m | 2 | 3 |
 
 **Recent Trend:**
-- Last 5 plans: 1m, 2m, 3m, 2m, 3m
+- Last 5 plans: 2m, 3m, 2m, 3m, 2m
 - Trend: consistently fast execution
 
 *Updated after each plan completion*
@@ -105,6 +106,8 @@ Recent decisions affecting current work:
 - [Phase 05]: Lazy require node-ical inside syncFeedForUser to avoid cold start cost for other functions
 - [Phase 05]: Batch chunking at 450 operations to stay safely under Firestore 500 limit
 - [Phase 05]: Client-side disconnect uses Promise.all with individual deleteDoc rather than writeBatch for simplicity
+- [Phase 05]: CSS ::after pseudo-element for ST badge avoids extra DOM elements and works with existing event rendering
+- [Phase 05]: No separate Firestore query for ST showings -- existing showingsSnap already contains all showings including ST docs
 
 ### Pending Todos
 
@@ -119,6 +122,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-05T15:21:00Z
-Stopped at: Completed 05-01 ShowingTime Sync Backend and Settings UI
-Resume file: .planning/phases/05-showingtime-sync/05-01-SUMMARY.md
+Last session: 2026-03-05T15:26:02Z
+Stopped at: Completed 05-02 ShowingTime Calendar Display -- All phases complete (v1.0 milestone)
+Resume file: .planning/phases/05-showingtime-sync/05-02-SUMMARY.md
