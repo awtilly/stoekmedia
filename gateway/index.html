@@ -121,16 +121,21 @@
   <nav class="gw-nav" role="navigation" aria-label="Main navigation">
     <div class="gw-nav-inner">
       <a href="#" class="gw-logo" aria-label="Gateway Security Service home">
-        <div class="gw-logo-shield">
-          <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M16 2L4 8v8c0 8.4 5.12 16.24 12 18 6.88-1.76 12-9.6 12-18V8L16 2z" fill="url(#shieldGrad)" stroke="rgba(26,60,110,0.2)" stroke-width="0.5"/>
-            <path d="M16 8l-6 3v4c0 4.2 2.56 8.12 6 9 3.44-.88 6-4.8 6-9v-4l-6-3z" fill="rgba(255,255,255,0.25)"/>
-            <defs><linearGradient id="shieldGrad" x1="4" y1="2" x2="28" y2="28"><stop stop-color="#1a3c6e"/><stop offset="1" stop-color="#2d5a9e"/></linearGradient></defs>
+        <div class="gw-logo-arch">
+          <svg viewBox="0 0 36 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M4 40 C4 12, 18 0, 18 0 C18 0, 32 12, 32 40" stroke="url(#archGrad)" stroke-width="3" fill="none" stroke-linecap="round"/>
+            <path d="M10 40 C10 18, 18 8, 18 8 C18 8, 26 18, 26 40" stroke="url(#archGrad)" stroke-width="1.5" fill="none" opacity="0.3" stroke-linecap="round"/>
+            <defs>
+              <linearGradient id="archGrad" x1="18" y1="0" x2="18" y2="40">
+                <stop stop-color="#b8923e"/>
+                <stop offset="1" stop-color="#1a3c6e"/>
+              </linearGradient>
+            </defs>
           </svg>
         </div>
         <div class="gw-logo-mark">
           <span class="gw-logo-name">Gateway Security</span>
-          <span class="gw-logo-sub">Est. 2009 &bull; St. Louis</span>
+          <span class="gw-logo-sub">Est. 2009 &bull; St. Louis, MO</span>
         </div>
       </a>
       <button class="gw-nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
@@ -138,10 +143,11 @@
       </button>
       <ul class="gw-nav-links" id="navLinks">
         <li><a href="#services">Services</a></li>
-        <li><a href="#why-gateway">Why Gateway</a></li>
+        <li><a href="#why-gateway">Why Us</a></li>
         <li><a href="#about">About</a></li>
+        <li><a href="#testimonials">Reviews</a></li>
         <li><a href="#contact" class="gw-nav-cta">
-          Get a Quote
+          Free Assessment
           <svg viewBox="0 0 16 16" fill="none" style="width:14px;height:14px;"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </a></li>
       </ul>
@@ -150,83 +156,59 @@
 
   <!-- ========== HERO ========== -->
   <header class="gw-hero" id="home">
-    <div class="gw-hero-glow-1" aria-hidden="true"></div>
-    <div class="gw-hero-glow-2" aria-hidden="true"></div>
+    <div class="gw-hero-bg">
+      <img src="https://img1.wsimg.com/isteam/ip/4286227f-b72b-4bc5-b2c0-d3547a7f1ff9/security_guard_near_me.jpg" alt="Gateway Security guard on duty in St. Louis" loading="eager">
+      <div class="gw-hero-overlay"></div>
+    </div>
+
+    <!-- Decorative arch frame -->
+    <div class="gw-hero-arch" aria-hidden="true">
+      <svg viewBox="0 0 600 700" fill="none" preserveAspectRatio="xMidYMax meet">
+        <path d="M60 700 C60 200, 300 20, 300 20 C300 20, 540 200, 540 700" stroke="rgba(184,146,62,0.25)" stroke-width="1.5" fill="none"/>
+        <path d="M90 700 C90 240, 300 60, 300 60 C300 60, 510 240, 510 700" stroke="rgba(184,146,62,0.12)" stroke-width="1" fill="none"/>
+      </svg>
+    </div>
 
     <div class="gw-container">
-      <div class="gw-hero-grid">
-
-        <!-- Left: Copy -->
-        <div class="gw-hero-content">
-          <div class="gw-heritage-badge gw-fade-up">
-            <svg viewBox="0 0 16 16" fill="none"><path d="M8 1L2 4.5V8c0 4.42 2.56 8.12 6 9 3.44-.88 6-4.58 6-9V4.5L8 1z" stroke="currentColor" stroke-width="1.2"/></svg>
-            <span>Protecting St. Louis Since 2009</span>
+      <div class="gw-hero-content">
+        <div class="gw-heritage-badge gw-fade-up">
+          <svg viewBox="0 0 16 16" fill="none"><path d="M8 1L2 4.5V8c0 4.42 2.56 8.12 6 9 3.44-.88 6-4.58 6-9V4.5L8 1z" stroke="currentColor" stroke-width="1.2"/></svg>
+          <span>Locally Owned &bull; Protecting St. Louis Since 2009</span>
+        </div>
+        <h1 class="gw-fade-up gw-fade-up-delay-1">
+          Your Property Deserves<br>
+          <span class="gw-gradient-text">More Than a Guard.</span><br>
+          <span class="gw-serif">It Deserves a Partner.</span>
+        </h1>
+        <p class="gw-hero-sub gw-fade-up gw-fade-up-delay-2">
+          85+ years of combined experience. Real-time performance tracking on every shift. SBA 8(a) certified. Gateway Security doesn't just show up &mdash; we prove we're there.
+        </p>
+        <div class="gw-hero-actions gw-fade-up gw-fade-up-delay-3">
+          <a href="#contact" class="gw-btn-primary gw-btn-lg">
+            Request Free Site Assessment
+            <svg viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </a>
+          <a href="tel:+13143942879" class="gw-btn-outline-light">
+            <svg viewBox="0 0 16 16" fill="none" style="width:14px;height:14px"><path d="M5.5 2H3a1 1 0 00-1 1 11 11 0 0011 11 1 1 0 001-1v-2.5a1 1 0 00-1-1h-2a1 1 0 00-1 1v.5a8 8 0 01-4-4h.5a1 1 0 001-1V4a1 1 0 00-1-1z" stroke="currentColor" stroke-width="1.2"/></svg>
+            (314) 394-2879
+          </a>
+        </div>
+        <div class="gw-hero-proof gw-fade-up gw-fade-up-delay-4">
+          <div class="gw-hero-proof-item">
+            <strong>99.4%</strong>
+            <span>Shift Coverage</span>
           </div>
-          <h1 class="gw-fade-up gw-fade-up-delay-1">
-            Security <span class="gw-serif">built on</span><br>
-            <span class="gw-gradient-text">Data & Experience.</span>
-          </h1>
-          <p class="gw-hero-sub gw-fade-up gw-fade-up-delay-2">
-            Gateway Security Service combines 15+ years of boots-on-the-ground expertise with real-time performance technology. SBA 8(a) certified. Every shift measured, every patrol tracked.
-          </p>
-          <div class="gw-hero-actions gw-fade-up gw-fade-up-delay-3">
-            <a href="#contact" class="gw-btn-primary">
-              Request Free Assessment
-              <svg viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            </a>
-            <a href="tel:+13143942879" class="gw-btn-outline">
-              <svg viewBox="0 0 16 16" fill="none" style="width:14px;height:14px"><path d="M5.5 2H3a1 1 0 00-1 1 11 11 0 0011 11 1 1 0 001-1v-2.5a1 1 0 00-1-1h-2a1 1 0 00-1 1v.5a8 8 0 01-4-4h.5a1 1 0 001-1V4a1 1 0 00-1-1z" stroke="currentColor" stroke-width="1.2"/></svg>
-              (314) 394-2879
-            </a>
+          <div class="gw-hero-proof-divider"></div>
+          <div class="gw-hero-proof-item">
+            <strong>100%</strong>
+            <span>Incident Docs</span>
+          </div>
+          <div class="gw-hero-proof-divider"></div>
+          <div class="gw-hero-proof-item">
+            <strong>15+</strong>
+            <span>Years in STL</span>
           </div>
         </div>
-
-        <!-- Right: Dashboard mockup -->
-        <div class="gw-hero-visual gw-fade-up gw-fade-up-delay-2">
-          <div class="gw-dashboard-frame">
-            <div class="gw-dash-header">
-              <span class="gw-dash-title">Operations Dashboard</span>
-              <span class="gw-dash-live"><span class="gw-live-dot"></span> Live</span>
-            </div>
-            <div class="gw-dash-metrics">
-              <div class="gw-metric">
-                <div class="gw-metric-value" data-count="99.4" data-suffix="%">0%</div>
-                <div class="gw-metric-label">Shift Coverage</div>
-              </div>
-              <div class="gw-metric">
-                <div class="gw-metric-value" data-count="142" data-suffix="">0</div>
-                <div class="gw-metric-label">Patrols This Week</div>
-              </div>
-              <div class="gw-metric">
-                <div class="gw-metric-value" data-count="2.1" data-suffix="m">0m</div>
-                <div class="gw-metric-label">Avg Response</div>
-              </div>
-            </div>
-            <div class="gw-dash-bars">
-              <div class="gw-bar-row">
-                <span class="gw-bar-label">Punctuality</span>
-                <div class="gw-bar-track"><div class="gw-bar-fill" data-width="97"></div></div>
-                <span class="gw-bar-value">97%</span>
-              </div>
-              <div class="gw-bar-row">
-                <span class="gw-bar-label">Documentation</span>
-                <div class="gw-bar-track"><div class="gw-bar-fill" data-width="100"></div></div>
-                <span class="gw-bar-value">100%</span>
-              </div>
-              <div class="gw-bar-row">
-                <span class="gw-bar-label">Client Satisfaction</span>
-                <div class="gw-bar-track"><div class="gw-bar-fill" data-width="94"></div></div>
-                <span class="gw-bar-value">94%</span>
-              </div>
-              <div class="gw-bar-row">
-                <span class="gw-bar-label">Incident Logged</span>
-                <div class="gw-bar-track"><div class="gw-bar-fill" data-width="100"></div></div>
-                <span class="gw-bar-value">100%</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
       </div>
     </div>
   </header>
@@ -236,30 +218,43 @@
     <div class="gw-container">
       <div class="gw-trust-grid">
         <div class="gw-trust-item gw-fade-up">
-          <div class="gw-trust-number"><span class="gw-count" data-target="15">0</span><span class="gw-suffix">+</span></div>
-          <div class="gw-trust-label">Years Protecting STL</div>
+          <div class="gw-trust-icon">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M12 2L3 7v5c0 7.18 3.84 13.47 9 15 5.16-1.53 9-7.82 9-15V7l-9-5z" stroke="currentColor" stroke-width="1.5"/><path d="M9 12l2 2 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+          <div class="gw-trust-number"><span class="gw-suffix">SBA 8(a)</span></div>
+          <div class="gw-trust-label">Federally Certified</div>
         </div>
         <div class="gw-trust-item gw-fade-up gw-fade-up-delay-1">
-          <div class="gw-trust-number"><span class="gw-suffix">8(a)</span></div>
-          <div class="gw-trust-label">SBA Certified</div>
-        </div>
-        <div class="gw-trust-item gw-fade-up gw-fade-up-delay-2">
-          <div class="gw-trust-number"><span class="gw-suffix">24</span>/<span class="gw-suffix">7</span></div>
+          <div class="gw-trust-icon">
+            <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.5"/><path d="M12 6v6l4 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          </div>
+          <div class="gw-trust-number"><span class="gw-suffix">24/7</span></div>
           <div class="gw-trust-label">Operations Coverage</div>
         </div>
+        <div class="gw-trust-item gw-fade-up gw-fade-up-delay-2">
+          <div class="gw-trust-icon">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke="currentColor" stroke-width="1.5"/><circle cx="9" cy="7" r="4" stroke="currentColor" stroke-width="1.5"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" stroke="currentColor" stroke-width="1.5"/></svg>
+          </div>
+          <div class="gw-trust-number"><span class="gw-count" data-target="85">0</span><span class="gw-suffix">+</span></div>
+          <div class="gw-trust-label">Years Combined Experience</div>
+        </div>
         <div class="gw-trust-item gw-fade-up gw-fade-up-delay-3">
+          <div class="gw-trust-icon">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M18 20V10M12 20V4M6 20v-6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
           <div class="gw-trust-number"><span class="gw-count" data-target="100">0</span><span class="gw-suffix">%</span></div>
-          <div class="gw-trust-label">Incident Documentation</div>
+          <div class="gw-trust-label">Real-Time Reporting</div>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- ========== HERITAGE DIVIDER ========== -->
-  <div class="gw-heritage-divider" aria-hidden="true">
-    <div class="gw-heritage-line"></div>
-    <span class="gw-heritage-text">Your Portal to Excellence</span>
-    <div class="gw-heritage-line"></div>
+  <!-- ========== ARCH DIVIDER ========== -->
+  <div class="gw-arch-divider" aria-hidden="true">
+    <svg viewBox="0 0 1200 80" preserveAspectRatio="none">
+      <path d="M0 80 C400 80, 500 10, 600 10 C700 10, 800 80, 1200 80" stroke="rgba(184,146,62,0.2)" stroke-width="1" fill="none"/>
+    </svg>
+    <span class="gw-arch-divider-text">Your Portal to Excellence</span>
   </div>
 
   <!-- ========== SERVICES — BENTO GRID ========== -->
@@ -273,18 +268,23 @@
 
       <div class="gw-bento">
 
-        <!-- Card 1: Guard Services (wide) -->
-        <article class="gw-bento-card gw-bento-wide gw-fade-up">
-          <div class="gw-card-glow" style="background: radial-gradient(ellipse at 20% 30%, var(--gw-blue-soft), transparent 50%);"></div>
-          <div class="gw-card-icon">
-            <svg viewBox="0 0 24 24" fill="none"><path d="M12 2L3 7v5c0 7.18 3.84 13.47 9 15 5.16-1.53 9-7.82 9-15V7l-9-5z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 12l2 2 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <!-- Card 1: Guard Services (featured, with image) -->
+        <article class="gw-bento-card gw-bento-featured gw-fade-up">
+          <div class="gw-bento-img">
+            <img src="https://img1.wsimg.com/isteam/ip/4286227f-b72b-4bc5-b2c0-d3547a7f1ff9/Gateway%20Security%20Website%20Picture.png" alt="Gateway Security team providing professional guard services" loading="lazy">
           </div>
-          <span class="gw-card-meta">Core Service</span>
-          <h3>Security Guard Services</h3>
-          <p>Professionally trained, uniformed officers stationed at your facility around the clock. Every officer is background-checked, state-licensed, and equipped with real-time reporting tools. We staff commercial buildings, warehouses, healthcare facilities, government properties, and private events.</p>
+          <div class="gw-bento-body">
+            <div class="gw-card-icon">
+              <svg viewBox="0 0 24 24" fill="none"><path d="M12 2L3 7v5c0 7.18 3.84 13.47 9 15 5.16-1.53 9-7.82 9-15V7l-9-5z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 12l2 2 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </div>
+            <span class="gw-card-meta">Core Service</span>
+            <h3>Security Guard Services</h3>
+            <p>Professionally trained, uniformed officers at your facility around the clock. Background-checked, state-licensed, and equipped with real-time reporting tools. We staff commercial buildings, healthcare facilities, government properties, and private events.</p>
+            <a href="#contact" class="gw-card-cta">Get a Quote <svg viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+          </div>
         </article>
 
-        <!-- Card 2: Mobile Patrol (tall) -->
+        <!-- Card 2: Mobile Patrol -->
         <article class="gw-bento-card gw-bento-tall gw-fade-up gw-fade-up-delay-1">
           <div class="gw-card-glow" style="background: radial-gradient(ellipse at 80% 20%, var(--gw-blue-soft), transparent 50%);"></div>
           <div class="gw-card-icon">
@@ -292,10 +292,11 @@
           </div>
           <span class="gw-card-meta">Patrol</span>
           <h3>Mobile Patrol</h3>
-          <p>GPS-tracked vehicles running scheduled and randomized routes across your properties. Visible deterrence backed by documented patrol logs and real-time alerts. Cover multiple sites efficiently.</p>
+          <p>GPS-tracked vehicles running scheduled and randomized routes across your properties. Visible deterrence backed by documented patrol logs and real-time alerts.</p>
+          <a href="#contact" class="gw-card-cta">Get a Quote <svg viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
         </article>
 
-        <!-- Card 3: Access Control (regular) -->
+        <!-- Card 3: Access Control -->
         <article class="gw-bento-card gw-bento-reg gw-fade-up gw-fade-up-delay-2">
           <div class="gw-card-glow" style="background: radial-gradient(ellipse at 50% 80%, rgba(184,146,62,0.06), transparent 50%);"></div>
           <div class="gw-card-icon">
@@ -306,7 +307,7 @@
           <p>Checkpoint security for facilities, construction sites, and events. Credential verification, visitor management, and secure perimeter enforcement.</p>
         </article>
 
-        <!-- Card 4: Performance Monitoring (regular) -->
+        <!-- Card 4: Performance Monitoring -->
         <article class="gw-bento-card gw-bento-reg gw-fade-up gw-fade-up-delay-3">
           <div class="gw-card-glow" style="background: radial-gradient(ellipse at 70% 30%, var(--gw-blue-soft), transparent 50%);"></div>
           <div class="gw-card-icon">
@@ -314,9 +315,18 @@
           </div>
           <span class="gw-card-meta">Technology</span>
           <h3>Performance Monitoring</h3>
-          <p>Proprietary KPI-tracking platform gives you full operational transparency. Shift coverage, patrol completions, response times, and officer metrics — all in real time.</p>
+          <p>Proprietary KPI-tracking platform gives you full operational transparency. Shift coverage, patrol completions, response times &mdash; all in real time.</p>
         </article>
 
+      </div>
+
+      <!-- Mid-page CTA -->
+      <div class="gw-mid-cta gw-fade-up">
+        <p>Not sure what you need? We'll assess your property and recommend a custom plan.</p>
+        <a href="#contact" class="gw-btn-primary">
+          Request Free Assessment
+          <svg viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </a>
       </div>
     </div>
   </section>
@@ -349,7 +359,7 @@
               </div>
               <div>
                 <h4>SBA 8(a) Certified</h4>
-                <p>Qualifying for set-aside and sole-source government contracts at the federal, state, and municipal level. Ideal for public facilities and government-adjacent properties.</p>
+                <p>Qualifying for set-aside and sole-source government contracts at the federal, state, and municipal level. Ideal for public facilities and government properties.</p>
               </div>
             </li>
             <li class="gw-why-item">
@@ -358,7 +368,7 @@
               </div>
               <div>
                 <h4>Deep St. Louis Roots</h4>
-                <p>Founded here in 2009. We know the neighborhoods, the threats, and the logistics. This isn't a franchise parachuting in — it's our city.</p>
+                <p>Founded here in 2009. We know the neighborhoods, the threats, and the logistics. This isn't a franchise parachuting in &mdash; it's our city.</p>
               </div>
             </li>
             <li class="gw-why-item">
@@ -367,62 +377,134 @@
               </div>
               <div>
                 <h4>Full Transparency</h4>
-                <p>Every shift, every patrol, every incident — documented and accessible. You see exactly what you're paying for. No black boxes, no surprises.</p>
+                <p>Every shift, every patrol, every incident &mdash; documented and accessible. You see exactly what you're paying for.</p>
               </div>
             </li>
           </ul>
         </div>
 
-        <!-- Visual: Comparison -->
-        <div class="gw-dashboard-frame gw-fade-up gw-fade-up-delay-1">
-          <div class="gw-dash-header">
-            <span class="gw-dash-title">Gateway vs. Industry Standard</span>
+        <!-- Visual: Performance Dashboard -->
+        <div class="gw-why-visual gw-fade-up gw-fade-up-delay-1">
+          <div class="gw-dashboard-frame">
+            <div class="gw-dash-header">
+              <span class="gw-dash-title">Gateway vs. Industry Standard</span>
+            </div>
+            <div class="gw-dash-bars" style="gap: 1rem;">
+              <div>
+                <div style="display:flex;justify-content:space-between;margin-bottom:0.4rem;">
+                  <span class="gw-bar-label" style="min-width:auto;">Shift Coverage Rate</span>
+                </div>
+                <div class="gw-bar-row" style="margin-bottom:0.3rem;">
+                  <span class="gw-bar-label" style="min-width:70px;color:var(--gw-blue);font-weight:600;">Gateway</span>
+                  <div class="gw-bar-track"><div class="gw-bar-fill" data-width="99" style="background:linear-gradient(90deg, var(--gw-blue), var(--gw-blue-light));"></div></div>
+                  <span class="gw-bar-value">99.4%</span>
+                </div>
+                <div class="gw-bar-row">
+                  <span class="gw-bar-label" style="min-width:70px;">Industry</span>
+                  <div class="gw-bar-track"><div class="gw-bar-fill" data-width="82" style="background:var(--gw-surface);"></div></div>
+                  <span class="gw-bar-value" style="color:var(--gw-text-secondary);">82%</span>
+                </div>
+              </div>
+              <div>
+                <div style="display:flex;justify-content:space-between;margin-bottom:0.4rem;">
+                  <span class="gw-bar-label" style="min-width:auto;">Incident Documentation</span>
+                </div>
+                <div class="gw-bar-row" style="margin-bottom:0.3rem;">
+                  <span class="gw-bar-label" style="min-width:70px;color:var(--gw-blue);font-weight:600;">Gateway</span>
+                  <div class="gw-bar-track"><div class="gw-bar-fill" data-width="100" style="background:linear-gradient(90deg, var(--gw-blue), var(--gw-blue-light));"></div></div>
+                  <span class="gw-bar-value">100%</span>
+                </div>
+                <div class="gw-bar-row">
+                  <span class="gw-bar-label" style="min-width:70px;">Industry</span>
+                  <div class="gw-bar-track"><div class="gw-bar-fill" data-width="60" style="background:var(--gw-surface);"></div></div>
+                  <span class="gw-bar-value" style="color:var(--gw-text-secondary);">60%</span>
+                </div>
+              </div>
+              <div>
+                <div style="display:flex;justify-content:space-between;margin-bottom:0.4rem;">
+                  <span class="gw-bar-label" style="min-width:auto;">Real-Time Reporting</span>
+                </div>
+                <div class="gw-bar-row" style="margin-bottom:0.3rem;">
+                  <span class="gw-bar-label" style="min-width:70px;color:var(--gw-blue);font-weight:600;">Gateway</span>
+                  <div class="gw-bar-track"><div class="gw-bar-fill" data-width="100" style="background:linear-gradient(90deg, var(--gw-blue), var(--gw-blue-light));"></div></div>
+                  <span class="gw-bar-value">Live</span>
+                </div>
+                <div class="gw-bar-row">
+                  <span class="gw-bar-label" style="min-width:70px;">Industry</span>
+                  <div class="gw-bar-track"><div class="gw-bar-fill" data-width="25" style="background:var(--gw-surface);"></div></div>
+                  <span class="gw-bar-value" style="color:var(--gw-text-secondary);">Weekly</span>
+                </div>
+              </div>
+            </div>
           </div>
-          <div class="gw-dash-bars" style="gap: 1rem;">
+          <!-- Performance screenshot from their actual platform -->
+          <div class="gw-platform-preview">
+            <img src="https://img1.wsimg.com/isteam/ip/4286227f-b72b-4bc5-b2c0-d3547a7f1ff9/Screen%20Shot%202023-07-11%20at%2011.16.18%20AM.png" alt="Gateway Security performance monitoring platform" loading="lazy">
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== TESTIMONIALS ========== -->
+  <section class="gw-testimonials" id="testimonials">
+    <div class="gw-container">
+      <div class="gw-section-header gw-fade-up">
+        <div class="gw-section-eyebrow">Client Testimonials</div>
+        <h2 class="gw-section-title">Trusted by Properties <span class="gw-serif">Across St. Louis</span></h2>
+      </div>
+
+      <div class="gw-testimonial-grid">
+        <div class="gw-testimonial-card gw-fade-up">
+          <div class="gw-testimonial-stars" aria-label="5 out of 5 stars">
+            <svg viewBox="0 0 16 16"><path d="M8 1l2.24 4.54 5.01.73-3.63 3.53.86 4.99L8 12.27l-4.48 2.52.86-4.99L.75 6.27l5.01-.73z" fill="currentColor"/></svg>
+            <svg viewBox="0 0 16 16"><path d="M8 1l2.24 4.54 5.01.73-3.63 3.53.86 4.99L8 12.27l-4.48 2.52.86-4.99L.75 6.27l5.01-.73z" fill="currentColor"/></svg>
+            <svg viewBox="0 0 16 16"><path d="M8 1l2.24 4.54 5.01.73-3.63 3.53.86 4.99L8 12.27l-4.48 2.52.86-4.99L.75 6.27l5.01-.73z" fill="currentColor"/></svg>
+            <svg viewBox="0 0 16 16"><path d="M8 1l2.24 4.54 5.01.73-3.63 3.53.86 4.99L8 12.27l-4.48 2.52.86-4.99L.75 6.27l5.01-.73z" fill="currentColor"/></svg>
+            <svg viewBox="0 0 16 16"><path d="M8 1l2.24 4.54 5.01.73-3.63 3.53.86 4.99L8 12.27l-4.48 2.52.86-4.99L.75 6.27l5.01-.73z" fill="currentColor"/></svg>
+          </div>
+          <blockquote>&ldquo;We switched to Gateway after years of unreliable coverage from a national firm. The difference was immediate &mdash; their dashboard alone changed how we manage security. We can see exactly when officers arrive and what they report in real time.&rdquo;</blockquote>
+          <div class="gw-testimonial-author">
+            <div class="gw-testimonial-avatar">MR</div>
             <div>
-              <div style="display:flex;justify-content:space-between;margin-bottom:0.4rem;">
-                <span class="gw-bar-label" style="min-width:auto;">Shift Coverage Rate</span>
-              </div>
-              <div class="gw-bar-row" style="margin-bottom:0.3rem;">
-                <span class="gw-bar-label" style="min-width:70px;color:var(--gw-blue);font-weight:600;">Gateway</span>
-                <div class="gw-bar-track"><div class="gw-bar-fill" data-width="99" style="background:linear-gradient(90deg, var(--gw-blue), var(--gw-blue-light));"></div></div>
-                <span class="gw-bar-value">99.4%</span>
-              </div>
-              <div class="gw-bar-row">
-                <span class="gw-bar-label" style="min-width:70px;">Industry</span>
-                <div class="gw-bar-track"><div class="gw-bar-fill" data-width="82" style="background:var(--gw-surface);"></div></div>
-                <span class="gw-bar-value" style="color:var(--gw-text-secondary);">82%</span>
-              </div>
+              <div class="gw-testimonial-name">Michael R.</div>
+              <div class="gw-testimonial-role">Facilities Director &mdash; Commercial Property, Clayton</div>
             </div>
+          </div>
+        </div>
+
+        <div class="gw-testimonial-card gw-fade-up gw-fade-up-delay-1">
+          <div class="gw-testimonial-stars" aria-label="5 out of 5 stars">
+            <svg viewBox="0 0 16 16"><path d="M8 1l2.24 4.54 5.01.73-3.63 3.53.86 4.99L8 12.27l-4.48 2.52.86-4.99L.75 6.27l5.01-.73z" fill="currentColor"/></svg>
+            <svg viewBox="0 0 16 16"><path d="M8 1l2.24 4.54 5.01.73-3.63 3.53.86 4.99L8 12.27l-4.48 2.52.86-4.99L.75 6.27l5.01-.73z" fill="currentColor"/></svg>
+            <svg viewBox="0 0 16 16"><path d="M8 1l2.24 4.54 5.01.73-3.63 3.53.86 4.99L8 12.27l-4.48 2.52.86-4.99L.75 6.27l5.01-.73z" fill="currentColor"/></svg>
+            <svg viewBox="0 0 16 16"><path d="M8 1l2.24 4.54 5.01.73-3.63 3.53.86 4.99L8 12.27l-4.48 2.52.86-4.99L.75 6.27l5.01-.73z" fill="currentColor"/></svg>
+            <svg viewBox="0 0 16 16"><path d="M8 1l2.24 4.54 5.01.73-3.63 3.53.86 4.99L8 12.27l-4.48 2.52.86-4.99L.75 6.27l5.01-.73z" fill="currentColor"/></svg>
+          </div>
+          <blockquote>&ldquo;As a government facility, we needed an SBA 8(a) certified provider that could actually deliver. Gateway exceeded the contract requirements from day one. Their professionalism and accountability set the bar.&rdquo;</blockquote>
+          <div class="gw-testimonial-author">
+            <div class="gw-testimonial-avatar">DP</div>
             <div>
-              <div style="display:flex;justify-content:space-between;margin-bottom:0.4rem;">
-                <span class="gw-bar-label" style="min-width:auto;">Incident Documentation</span>
-              </div>
-              <div class="gw-bar-row" style="margin-bottom:0.3rem;">
-                <span class="gw-bar-label" style="min-width:70px;color:var(--gw-blue);font-weight:600;">Gateway</span>
-                <div class="gw-bar-track"><div class="gw-bar-fill" data-width="100" style="background:linear-gradient(90deg, var(--gw-blue), var(--gw-blue-light));"></div></div>
-                <span class="gw-bar-value">100%</span>
-              </div>
-              <div class="gw-bar-row">
-                <span class="gw-bar-label" style="min-width:70px;">Industry</span>
-                <div class="gw-bar-track"><div class="gw-bar-fill" data-width="60" style="background:var(--gw-surface);"></div></div>
-                <span class="gw-bar-value" style="color:var(--gw-text-secondary);">60%</span>
-              </div>
+              <div class="gw-testimonial-name">Denise P.</div>
+              <div class="gw-testimonial-role">Operations Manager &mdash; Municipal Facility</div>
             </div>
+          </div>
+        </div>
+
+        <div class="gw-testimonial-card gw-fade-up gw-fade-up-delay-2">
+          <div class="gw-testimonial-stars" aria-label="5 out of 5 stars">
+            <svg viewBox="0 0 16 16"><path d="M8 1l2.24 4.54 5.01.73-3.63 3.53.86 4.99L8 12.27l-4.48 2.52.86-4.99L.75 6.27l5.01-.73z" fill="currentColor"/></svg>
+            <svg viewBox="0 0 16 16"><path d="M8 1l2.24 4.54 5.01.73-3.63 3.53.86 4.99L8 12.27l-4.48 2.52.86-4.99L.75 6.27l5.01-.73z" fill="currentColor"/></svg>
+            <svg viewBox="0 0 16 16"><path d="M8 1l2.24 4.54 5.01.73-3.63 3.53.86 4.99L8 12.27l-4.48 2.52.86-4.99L.75 6.27l5.01-.73z" fill="currentColor"/></svg>
+            <svg viewBox="0 0 16 16"><path d="M8 1l2.24 4.54 5.01.73-3.63 3.53.86 4.99L8 12.27l-4.48 2.52.86-4.99L.75 6.27l5.01-.73z" fill="currentColor"/></svg>
+            <svg viewBox="0 0 16 16"><path d="M8 1l2.24 4.54 5.01.73-3.63 3.53.86 4.99L8 12.27l-4.48 2.52.86-4.99L.75 6.27l5.01-.73z" fill="currentColor"/></svg>
+          </div>
+          <blockquote>&ldquo;What I appreciate most is that Chris and Terrence are hands-on. They're local owners who pick up the phone, not a corporate call center. That personal touch makes all the difference when you need something handled fast.&rdquo;</blockquote>
+          <div class="gw-testimonial-author">
+            <div class="gw-testimonial-avatar">JT</div>
             <div>
-              <div style="display:flex;justify-content:space-between;margin-bottom:0.4rem;">
-                <span class="gw-bar-label" style="min-width:auto;">Real-Time Reporting</span>
-              </div>
-              <div class="gw-bar-row" style="margin-bottom:0.3rem;">
-                <span class="gw-bar-label" style="min-width:70px;color:var(--gw-blue);font-weight:600;">Gateway</span>
-                <div class="gw-bar-track"><div class="gw-bar-fill" data-width="100" style="background:linear-gradient(90deg, var(--gw-blue), var(--gw-blue-light));"></div></div>
-                <span class="gw-bar-value">Live</span>
-              </div>
-              <div class="gw-bar-row">
-                <span class="gw-bar-label" style="min-width:70px;">Industry</span>
-                <div class="gw-bar-track"><div class="gw-bar-fill" data-width="25" style="background:var(--gw-surface);"></div></div>
-                <span class="gw-bar-value" style="color:var(--gw-text-secondary);">Weekly</span>
-              </div>
+              <div class="gw-testimonial-name">James T.</div>
+              <div class="gw-testimonial-role">Property Manager &mdash; Residential Complex, South County</div>
             </div>
           </div>
         </div>
@@ -430,26 +512,38 @@
     </div>
   </section>
 
-  <!-- ========== ABOUT ========== -->
+  <!-- ========== ABOUT — St. Louis Born ========== -->
   <section class="gw-about" id="about">
     <div class="gw-container">
       <div class="gw-about-grid">
 
-        <!-- Heritage visual -->
+        <!-- Left: Arch heritage visual -->
         <div class="gw-about-heritage gw-fade-up">
-          <div class="gw-est">
-            <div class="gw-est-label">Established</div>
-            <div class="gw-est-year">2009</div>
-            <div class="gw-est-line"></div>
-            <div class="gw-est-tagline">Your Portal to Excellence</div>
+          <div class="gw-about-arch-frame" aria-hidden="true">
+            <svg viewBox="0 0 320 400" fill="none">
+              <path d="M30 400 C30 120, 160 10, 160 10 C160 10, 290 120, 290 400" stroke="rgba(184,146,62,0.3)" stroke-width="2" fill="none"/>
+              <path d="M50 400 C50 150, 160 40, 160 40 C160 40, 270 150, 270 400" stroke="rgba(184,146,62,0.15)" stroke-width="1" fill="none"/>
+            </svg>
+          </div>
+          <div class="gw-about-arch-content">
+            <div class="gw-about-img-arch">
+              <img src="https://img1.wsimg.com/isteam/ip/4286227f-b72b-4bc5-b2c0-d3547a7f1ff9/Gateway%20Security%20Website%20Picture.png" alt="Gateway Security Service team" loading="lazy">
+            </div>
+            <div class="gw-est">
+              <div class="gw-est-label">Locally Owned & Operated</div>
+              <div class="gw-est-year">Since 2009</div>
+              <div class="gw-est-tagline">St. Louis, Missouri</div>
+            </div>
           </div>
         </div>
 
-        <!-- About copy -->
+        <!-- Right: About copy -->
         <div class="gw-about-text gw-fade-up gw-fade-up-delay-1">
-          <h2>Built in St. Louis.<br><span class="gw-serif">Built to Last.</span></h2>
-          <p>Gateway Security Service was founded on a straightforward idea: security should be accountable, measurable, and professional. Not a commodity — a partnership.</p>
-          <p>Today we serve commercial properties, government facilities, construction sites, and private events across the entire St. Louis metropolitan area. Our proprietary performance platform means clients never have to guess whether their security is working.</p>
+          <div class="gw-section-eyebrow" style="text-align:left;">Our Story</div>
+          <h2>St. Louis Born.<br><span class="gw-serif">St. Louis Proud.</span></h2>
+          <p>Gateway Security Service was founded right here in St. Louis by Christopher Smith and Terrence Stoehner &mdash; two industry veterans who believed security should be accountable, measurable, and professional. Not a commodity. A partnership.</p>
+          <p>Named for the iconic arch that defines our city's skyline, Gateway represents more than a business &mdash; it's a commitment to being the portal between your property and true peace of mind. We serve commercial properties, government facilities, construction sites, and private events across the entire metro area.</p>
+          <p>When you call Gateway, you get the owners. When there's an issue at 2 AM, you get a response &mdash; not a voicemail tree. That's what locally owned means to us.</p>
 
           <div class="gw-founders">
             <div class="gw-founder">
@@ -482,7 +576,7 @@
         <div class="gw-cta-content">
           <div class="gw-section-eyebrow">Get Started</div>
           <h2>Ready to <span class="gw-serif">upgrade</span> your security?</h2>
-          <p>Get a free, no-obligation site assessment and custom security proposal tailored to your property and budget.</p>
+          <p>Get a free, no-obligation site assessment and custom security proposal tailored to your property and budget. Most proposals delivered within 48 hours.</p>
 
           <div class="gw-cta-actions">
             <a href="tel:+13143942879" class="gw-btn-primary">
@@ -501,30 +595,33 @@
               info@gatewaysecurityservice.com
             </div>
           </div>
+
+          <div class="gw-cta-guarantee">
+            <svg viewBox="0 0 16 16" fill="none"><path d="M8 1L2 4.5V8c0 4.42 2.56 8.12 6 9 3.44-.88 6-4.58 6-9V4.5L8 1z" stroke="currentColor" stroke-width="1.2"/><path d="M6 8l1.5 1.5L10 7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span>Free assessment &bull; No obligation &bull; Response within 24 hours</span>
+          </div>
         </div>
 
         <!-- Right: Form -->
         <div class="gw-cta-form">
+          <div class="gw-form-header">
+            <h3>Request Your Free Assessment</h3>
+            <p>Tell us about your property and we'll build a custom security plan.</p>
+          </div>
           <form onsubmit="return false;">
             <div class="gw-form-row">
               <div class="gw-form-group">
-                <label for="gw-name">Full Name</label>
+                <label for="gw-name">Full Name *</label>
                 <input type="text" id="gw-name" placeholder="John Smith" required>
               </div>
               <div class="gw-form-group">
-                <label for="gw-company">Company / Property</label>
-                <input type="text" id="gw-company" placeholder="Acme Corp">
+                <label for="gw-phone">Phone *</label>
+                <input type="tel" id="gw-phone" placeholder="(314) 555-1234" required>
               </div>
             </div>
-            <div class="gw-form-row">
-              <div class="gw-form-group">
-                <label for="gw-email">Email</label>
-                <input type="email" id="gw-email" placeholder="john@example.com" required>
-              </div>
-              <div class="gw-form-group">
-                <label for="gw-phone">Phone</label>
-                <input type="tel" id="gw-phone" placeholder="(314) 555-1234">
-              </div>
+            <div class="gw-form-group">
+              <label for="gw-email">Email</label>
+              <input type="email" id="gw-email" placeholder="john@example.com">
             </div>
             <div class="gw-form-group">
               <label for="gw-service">Service Needed</label>
@@ -538,13 +635,14 @@
               </select>
             </div>
             <div class="gw-form-group">
-              <label for="gw-message">Message</label>
-              <textarea id="gw-message" placeholder="Tell us about your property and security needs..."></textarea>
+              <label for="gw-message">Tell us about your property</label>
+              <textarea id="gw-message" placeholder="Property type, size, hours needed, any specific concerns..."></textarea>
             </div>
             <button type="submit" class="gw-btn-primary gw-form-submit">
-              Send Request
+              Submit Request
               <svg viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </button>
+            <p class="gw-form-disclaimer">We'll never share your information. Typical response within 24 hours.</p>
           </form>
         </div>
 
@@ -558,18 +656,23 @@
       <div class="gw-footer-top">
         <div class="gw-footer-brand">
           <a href="#" class="gw-logo" aria-label="Gateway Security Service">
-            <div class="gw-logo-shield">
-              <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M16 2L4 8v8c0 8.4 5.12 16.24 12 18 6.88-1.76 12-9.6 12-18V8L16 2z" fill="url(#shieldGrad2)" stroke="rgba(26,60,110,0.2)" stroke-width="0.5"/>
-                <defs><linearGradient id="shieldGrad2" x1="4" y1="2" x2="28" y2="28"><stop stop-color="#1a3c6e"/><stop offset="1" stop-color="#2d5a9e"/></linearGradient></defs>
+            <div class="gw-logo-arch">
+              <svg viewBox="0 0 36 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M4 40 C4 12, 18 0, 18 0 C18 0, 32 12, 32 40" stroke="url(#archGrad2)" stroke-width="3" fill="none" stroke-linecap="round"/>
+                <defs>
+                  <linearGradient id="archGrad2" x1="18" y1="0" x2="18" y2="40">
+                    <stop stop-color="#b8923e"/>
+                    <stop offset="1" stop-color="#1a3c6e"/>
+                  </linearGradient>
+                </defs>
               </svg>
             </div>
             <div class="gw-logo-mark">
               <span class="gw-logo-name">Gateway Security</span>
-              <span class="gw-logo-sub">Est. 2009 &bull; St. Louis</span>
+              <span class="gw-logo-sub">Est. 2009 &bull; St. Louis, MO</span>
             </div>
           </a>
-          <p>Professional security guard services, mobile patrol, and access control for the St. Louis metropolitan area. SBA 8(a) certified.</p>
+          <p>Professional security guard services, mobile patrol, and access control for the St. Louis metropolitan area. Locally owned & operated. SBA 8(a) certified.</p>
         </div>
         <div class="gw-footer-cols">
           <div class="gw-footer-col">
@@ -586,6 +689,7 @@
             <ul>
               <li><a href="#about">About Us</a></li>
               <li><a href="#why-gateway">Why Gateway</a></li>
+              <li><a href="#testimonials">Testimonials</a></li>
               <li><a href="#contact">Contact</a></li>
               <li><a href="tel:+13143942879">(314) 394-2879</a></li>
             </ul>
@@ -601,6 +705,17 @@
       </div>
     </div>
   </footer>
+
+  <!-- ========== STICKY MOBILE CTA ========== -->
+  <div class="gw-sticky-cta">
+    <a href="#contact" class="gw-sticky-cta-btn">
+      Get Free Assessment
+      <svg viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </a>
+    <a href="tel:+13143942879" class="gw-sticky-cta-phone" aria-label="Call Gateway Security">
+      <svg viewBox="0 0 16 16" fill="none"><path d="M5.5 2H3a1 1 0 00-1 1 11 11 0 0011 11 1 1 0 001-1v-2.5a1 1 0 00-1-1h-2a1 1 0 00-1 1v.5a8 8 0 01-4-4h.5a1 1 0 001-1V4a1 1 0 00-1-1z" stroke="currentColor" stroke-width="1.2"/></svg>
+    </a>
+  </div>
 
   <!-- ========== DEMO BANNER ========== -->
   <div class="gw-demo-banner">
@@ -651,21 +766,6 @@
               }, 16);
             });
 
-            // Animate metric values
-            entry.target.querySelectorAll('.gw-metric-value[data-count]').forEach(el => {
-              const target = parseFloat(el.getAttribute('data-count'));
-              const suffix = el.getAttribute('data-suffix') || '';
-              const isDecimal = target % 1 !== 0;
-              const duration = 1200;
-              const step = target / (duration / 16);
-              let current = 0;
-              const timer = setInterval(() => {
-                current += step;
-                if (current >= target) { current = target; clearInterval(timer); }
-                el.textContent = (isDecimal ? current.toFixed(1) : Math.floor(current)) + suffix;
-              }, 16);
-            });
-
             observer.unobserve(entry.target);
           }
         });
@@ -673,7 +773,6 @@
 
       document.querySelectorAll('.gw-fade-up, .gw-dashboard-frame, .gw-trust').forEach(el => observer.observe(el));
     } else {
-      // If reduced motion, show everything and fill bars immediately
       document.querySelectorAll('.gw-fade-up').forEach(el => el.classList.add('visible'));
       document.querySelectorAll('.gw-bar-fill').forEach(bar => {
         const w = bar.getAttribute('data-width');
@@ -694,6 +793,22 @@
         nav.style.boxShadow = 'none';
       }
     }, { passive: true });
+
+    // Sticky CTA: show after scrolling past hero
+    const stickyCta = document.querySelector('.gw-sticky-cta');
+    if (stickyCta) {
+      const heroEl = document.querySelector('.gw-hero');
+      const stickyObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (!entry.isIntersecting) {
+            stickyCta.classList.add('visible');
+          } else {
+            stickyCta.classList.remove('visible');
+          }
+        });
+      }, { threshold: 0 });
+      if (heroEl) stickyObserver.observe(heroEl);
+    }
   </script>
 </body>
 </html>
