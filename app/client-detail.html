@@ -75,6 +75,7 @@
           <button class="gd-tab" data-tab="files">Files</button>
           <button class="gd-tab" data-tab="properties">Properties</button>
           <button class="gd-tab" data-tab="compliance">Compliance Docs</button>
+          <button class="gd-tab" data-tab="checklist">Closing Checklist</button>
         </div>
 
         <!-- ===== OVERVIEW TAB ===== -->
@@ -366,6 +367,23 @@
             <div class="gd-empty">
               <div class="gd-empty-icon">&#128196;</div>
               <div class="gd-empty-text">Loading compliance documents...</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ===== CLOSING CHECKLIST TAB ===== -->
+        <div id="tab-checklist" class="gd-tab-content">
+          <div id="checklist-container">
+            <div id="checklist-empty" class="gd-empty-state" style="display:none;">
+              <p>Set a transaction type on the Overview tab to generate a closing checklist.</p>
+            </div>
+            <div id="checklist-content" style="display:none;">
+              <div id="checklist-overall-progress"></div>
+              <div id="checklist-add-custom" style="margin-bottom: 16px;">
+                <button class="gd-btn gd-btn-sm" onclick="showAddChecklistItem()">+ Add Custom Item</button>
+                <div id="checklist-add-form" class="gd-checklist-add-form"></div>
+              </div>
+              <div id="checklist-categories"></div>
             </div>
           </div>
         </div>
