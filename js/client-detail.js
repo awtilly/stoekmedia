@@ -14,7 +14,7 @@ import {
 } from "./auth.js";
 import { calculateMatchScore, matchScoreColor, matchScoreLabel } from "./match-engine.js";
 import { buildMergeFields, MO_FORM_STUBS, COMPLIANCE_STATUSES, COMPLIANCE_CATEGORIES, formatComplianceStatus } from "./compliance.js";
-import { seedChecklist, recalculateDeadlines } from "./checklist.js";
+import { seedChecklist, recalculateDeadlines, initChecklist, destroyChecklist } from "./checklist.js";
 
 const params = new URLSearchParams(window.location.search);
 const clientId = params.get("id");
@@ -176,6 +176,8 @@ document.getElementById("ov-transactionType").addEventListener("change", async (
       ? (typeof clientData.closingDate.toDate === "function" ? clientData.closingDate.toDate() : new Date(clientData.closingDate))
       : null;
     await seedChecklist(db, clientId, value, closingDateVal);
+    // Re-initialize checklist UI so it picks up newly seeded items
+    initChecklist(clientId, clientData);
     // Re-filter compliance templates for the new transaction type
     loadComplianceTemplates(user.uid);
   } catch (err) {
@@ -294,6 +296,10 @@ document.querySelectorAll(".gd-tab").forEach(tab => {
     document.querySelectorAll(".gd-tab-content").forEach(c => c.classList.remove("active"));
     tab.classList.add("active");
     document.getElementById("tab-" + tab.dataset.tab).classList.add("active");
+    // Initialize checklist tab when activated
+    if (tab.dataset.tab === "checklist" && clientData) {
+      initChecklist(clientId, clientData);
+    }
   });
 });
 

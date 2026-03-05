@@ -1,9 +1,9 @@
 /**
- * checklist.js — Closing checklist data model and seeding logic
+ * checklist.js — Closing checklist data model, seeding, rendering, and interactions
  *
  * Provides the MO residential transaction checklist template, category
- * constants, and functions to seed/update checklist items in the Firestore
- * closingChecklist subcollection.
+ * constants, seeding/update functions, and the full UI rendering with
+ * toggle, N/A, custom items, notes, and real-time Firestore sync.
  *
  * Exports:
  *   - CHECKLIST_CATEGORIES   — Category enum for checklist grouping
@@ -12,11 +12,17 @@
  *   - parseTransactionType   — Parses "SFH - Buyer" into { propType, side }
  *   - seedChecklist          — Seeds applicable items to Firestore subcollection
  *   - recalculateDeadlines   — Recalculates deadline fields when closing date changes
+ *   - initChecklist          — Initializes checklist tab with real-time listener
+ *   - renderChecklist        — Renders checklist items grouped by category
+ *   - destroyChecklist       — Cleans up listener and module state
  */
 
+import { db, auth } from "./firebase-config.js";
 import {
-  writeBatch, doc, collection, getDocs, serverTimestamp
+  writeBatch, doc, collection, getDocs, serverTimestamp,
+  updateDoc, addDoc, deleteDoc, onSnapshot
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { showToast, escapeHtml, formatDate } from "./auth.js";
 
 /* ------------------------------------------------------------------ */
 /*  Constants                                                          */
@@ -447,4 +453,447 @@ export async function recalculateDeadlines(db, clientId, closingDate) {
   if (hasUpdates) {
     await batch.commit();
   }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Module state (UI)                                                  */
+/* ------------------------------------------------------------------ */
+
+let checklistItems = [];
+let checklistUnsubscribe = null;
+let currentClientId = null;
+let currentClientData = null;
+
+/* ------------------------------------------------------------------ */
+/*  initChecklist                                                      */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Initializes the checklist tab: stores client context and sets up
+ * real-time Firestore listener for the closingChecklist subcollection.
+ *
+ * @param {string} clientId - Client document ID
+ * @param {Object} clientData - Client data object (needs transactionType)
+ */
+export function initChecklist(clientId, clientData) {
+  currentClientId = clientId;
+  currentClientData = clientData;
+
+  const emptyEl = document.getElementById("checklist-empty");
+  const contentEl = document.getElementById("checklist-content");
+
+  if (!clientData || !clientData.transactionType) {
+    if (emptyEl) emptyEl.style.display = "block";
+    if (contentEl) contentEl.style.display = "none";
+    return;
+  }
+
+  subscribeChecklist(clientId);
+}
+
+/* ------------------------------------------------------------------ */
+/*  subscribeChecklist (internal)                                      */
+/* ------------------------------------------------------------------ */
+
+function subscribeChecklist(clientId) {
+  // Clean up previous listener
+  if (checklistUnsubscribe) {
+    checklistUnsubscribe();
+    checklistUnsubscribe = null;
+  }
+
+  const colRef = collection(db, "clients", clientId, "closingChecklist");
+
+  checklistUnsubscribe = onSnapshot(colRef, (snapshot) => {
+    checklistItems = [];
+    snapshot.forEach(docSnap => {
+      checklistItems.push({ id: docSnap.id, ...docSnap.data() });
+    });
+    renderChecklist();
+  }, (err) => {
+    console.error("Checklist listener error:", err);
+  });
+}
+
+/* ------------------------------------------------------------------ */
+/*  renderChecklist                                                    */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Renders checklist items grouped by category with progress bars,
+ * badges, and action buttons.
+ */
+export function renderChecklist() {
+  const emptyEl = document.getElementById("checklist-empty");
+  const contentEl = document.getElementById("checklist-content");
+  const overallEl = document.getElementById("checklist-overall-progress");
+  const categoriesEl = document.getElementById("checklist-categories");
+
+  if (!checklistItems.length) {
+    if (emptyEl) emptyEl.style.display = "block";
+    if (contentEl) contentEl.style.display = "none";
+    return;
+  }
+
+  if (emptyEl) emptyEl.style.display = "none";
+  if (contentEl) contentEl.style.display = "block";
+
+  // Group items by category
+  const categoryOrder = ["pre_contract", "under_contract", "closing"];
+  const grouped = {};
+  for (const cat of categoryOrder) {
+    grouped[cat] = [];
+  }
+  for (const item of checklistItems) {
+    const cat = item.category || "closing";
+    if (!grouped[cat]) grouped[cat] = [];
+    grouped[cat].push(item);
+  }
+  // Sort within each category by sortOrder
+  for (const cat of categoryOrder) {
+    grouped[cat].sort((a, b) => (a.sortOrder || 999) - (b.sortOrder || 999));
+  }
+
+  // Overall progress
+  const activeItems = checklistItems.filter(i => !i.notApplicable);
+  const doneItems = activeItems.filter(i => i.completed);
+  const overallPct = activeItems.length > 0
+    ? Math.round((doneItems.length / activeItems.length) * 100)
+    : 0;
+
+  if (overallEl) {
+    overallEl.innerHTML = `
+      <div class="gd-checklist-overall">
+        <div class="gd-checklist-overall-header">
+          <span>Closing Progress</span>
+          <span class="gd-checklist-progress-text">${doneItems.length}/${activeItems.length} (${overallPct}%)</span>
+        </div>
+        <div class="gd-checklist-progress">
+          <div class="gd-checklist-progress-fill" style="width: ${overallPct}%"></div>
+        </div>
+      </div>
+    `;
+  }
+
+  // Per-category sections
+  let catHtml = "";
+  for (const cat of categoryOrder) {
+    const items = grouped[cat];
+    if (!items.length) continue;
+
+    const catActive = items.filter(i => !i.notApplicable);
+    const catDone = catActive.filter(i => i.completed);
+    const catPct = catActive.length > 0
+      ? Math.round((catDone.length / catActive.length) * 100)
+      : 0;
+
+    catHtml += `
+      <div class="gd-checklist-category">
+        <div class="gd-checklist-category-header">
+          <span>${CATEGORY_LABELS[cat] || cat}</span>
+          <span class="gd-checklist-progress-text">${catDone.length}/${catActive.length} (${catPct}%)</span>
+        </div>
+        <div class="gd-checklist-category-progress">
+          <div class="gd-checklist-progress">
+            <div class="gd-checklist-progress-fill" style="width: ${catPct}%"></div>
+          </div>
+        </div>
+    `;
+
+    for (const item of items) {
+      catHtml += renderChecklistItem(item);
+    }
+
+    catHtml += `</div>`;
+  }
+
+  if (categoriesEl) {
+    categoriesEl.innerHTML = catHtml;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/*  renderChecklistItem (internal)                                     */
+/* ------------------------------------------------------------------ */
+
+function renderChecklistItem(item) {
+  const isCompleted = item.completed && !item.notApplicable;
+  const isNA = item.notApplicable;
+  const isOverdue = !item.completed && !item.notApplicable && item.deadline && isDateOverdue(item.deadline);
+
+  const classes = ["gd-checklist-item"];
+  if (isCompleted) classes.push("completed");
+  if (isNA) classes.push("na");
+
+  // Deadline display
+  let deadlineHtml = "";
+  if (item.deadline && !isNA) {
+    const deadlineDate = toJSDate(item.deadline);
+    const deadlineClass = isOverdue ? "gd-checklist-deadline overdue" : "gd-checklist-deadline";
+    deadlineHtml = `<span class="${deadlineClass}">Due: ${formatDate(item.deadline)}</span>`;
+  }
+
+  // Badges
+  let badgesHtml = "";
+  if (item.autoCompleted) {
+    badgesHtml += '<span class="gd-badge gd-badge-auto-completed">Auto-completed</span>';
+  }
+  if (isNA) {
+    badgesHtml += '<span class="gd-badge gd-badge-na">N/A</span>';
+  }
+  if (item.isCustom) {
+    badgesHtml += '<span class="gd-badge gd-badge-custom">Custom</span>';
+  }
+
+  // Actions
+  let actionsHtml = `<button class="gd-checklist-action-btn" onclick="window.toggleChecklistNotes('${item.id}')" title="Notes">&#128221;</button>`;
+  if (item.isSeeded) {
+    actionsHtml += `<button class="gd-checklist-action-btn" onclick="window.toggleChecklistNA('${item.id}')" title="Mark N/A">N/A</button>`;
+  }
+  if (item.isCustom) {
+    actionsHtml += `<button class="gd-checklist-action-btn" onclick="window.deleteChecklistItem('${item.id}')" title="Delete">&#128465;</button>`;
+  }
+
+  return `
+    <div class="${classes.join(" ")}" data-item-id="${item.id}">
+      <input type="checkbox" class="gd-checklist-check"
+        ${isCompleted ? "checked" : ""}
+        ${isNA ? "disabled" : ""}
+        onchange="window.toggleChecklistItem('${item.id}', this.checked)">
+      <div class="gd-checklist-item-content">
+        <span class="gd-checklist-task">${escapeHtml(item.task)}</span>
+        <div class="gd-checklist-item-meta">
+          ${badgesHtml}
+          ${deadlineHtml}
+        </div>
+        <div class="gd-checklist-notes-area" id="notes-${item.id}">
+          <textarea placeholder="Add notes..." onblur="window.saveChecklistNotes('${item.id}', this.value)">${escapeHtml(item.notes || "")}</textarea>
+        </div>
+      </div>
+      <div class="gd-checklist-actions">
+        ${actionsHtml}
+      </div>
+    </div>
+  `;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Date helpers                                                       */
+/* ------------------------------------------------------------------ */
+
+function toJSDate(val) {
+  if (!val) return null;
+  if (typeof val.toDate === "function") return val.toDate();
+  if (val instanceof Date) return val;
+  return new Date(val);
+}
+
+function isDateOverdue(deadline) {
+  const d = toJSDate(deadline);
+  return d && d < new Date();
+}
+
+/* ------------------------------------------------------------------ */
+/*  Window-level interaction handlers                                  */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Toggles a checklist item's completion state.
+ * If unchecking an auto-completed item, also clears autoCompleted fields.
+ */
+window.toggleChecklistItem = async function(itemId, checked) {
+  if (!currentClientId) return;
+  const item = checklistItems.find(i => i.id === itemId);
+  if (!item) return;
+
+  const updateData = {
+    completed: checked,
+    completedAt: checked ? serverTimestamp() : null,
+    completedBy: checked ? (auth.currentUser?.uid || null) : null
+  };
+
+  // Clear auto-completed badge when manually unchecking
+  if (!checked && item.autoCompleted) {
+    updateData.autoCompleted = false;
+    updateData.autoCompletedAt = null;
+  }
+
+  try {
+    await updateDoc(doc(db, "clients", currentClientId, "closingChecklist", itemId), updateData);
+  } catch (err) {
+    console.error("Toggle checklist item error:", err);
+    showToast("Failed to update item.", "error");
+  }
+};
+
+/**
+ * Toggles the notes area open/closed for a checklist item.
+ */
+window.toggleChecklistNotes = function(itemId) {
+  const el = document.getElementById("notes-" + itemId);
+  if (!el) return;
+  el.classList.toggle("open");
+  if (el.classList.contains("open")) {
+    const textarea = el.querySelector("textarea");
+    if (textarea) textarea.focus();
+  }
+};
+
+/**
+ * Saves notes for a checklist item (called on textarea blur).
+ */
+window.saveChecklistNotes = async function(itemId, value) {
+  if (!currentClientId) return;
+  try {
+    await updateDoc(doc(db, "clients", currentClientId, "closingChecklist", itemId), {
+      notes: value
+    });
+  } catch (err) {
+    console.error("Save checklist notes error:", err);
+  }
+};
+
+/**
+ * Toggles a seeded checklist item between N/A and active.
+ * N/A items are excluded from progress calculation.
+ */
+window.toggleChecklistNA = async function(itemId) {
+  if (!currentClientId) return;
+  const item = checklistItems.find(i => i.id === itemId);
+  if (!item) return;
+
+  const newNA = !item.notApplicable;
+  const updateData = { notApplicable: newNA };
+
+  // If marking as N/A, also clear completion and auto-completed
+  if (newNA) {
+    updateData.completed = false;
+    updateData.autoCompleted = false;
+    updateData.autoCompletedAt = null;
+    updateData.completedAt = null;
+    updateData.completedBy = null;
+  }
+
+  try {
+    await updateDoc(doc(db, "clients", currentClientId, "closingChecklist", itemId), updateData);
+    showToast(newNA ? "Marked as N/A" : "Removed N/A marking");
+  } catch (err) {
+    console.error("Toggle N/A error:", err);
+    showToast("Failed to update item.", "error");
+  }
+};
+
+/**
+ * Shows the add custom checklist item form.
+ */
+window.showAddChecklistItem = function() {
+  const formEl = document.getElementById("checklist-add-form");
+  if (!formEl) return;
+
+  if (formEl.classList.contains("open")) {
+    formEl.classList.remove("open");
+    formEl.innerHTML = "";
+    return;
+  }
+
+  formEl.innerHTML = `
+    <input type="text" id="checklist-new-task" class="gd-input" placeholder="Task description...">
+    <select id="checklist-new-category" class="gd-input">
+      <option value="pre_contract">Pre-Contract</option>
+      <option value="under_contract">Under Contract</option>
+      <option value="closing">Closing</option>
+    </select>
+    <div style="display: flex; gap: 8px;">
+      <button class="gd-btn gd-btn-primary gd-btn-sm" onclick="window.saveCustomChecklistItem()">Save</button>
+      <button class="gd-btn gd-btn-sm" onclick="window.showAddChecklistItem()">Cancel</button>
+    </div>
+  `;
+  formEl.classList.add("open");
+  document.getElementById("checklist-new-task")?.focus();
+};
+
+/**
+ * Saves a custom checklist item to Firestore.
+ */
+window.saveCustomChecklistItem = async function() {
+  if (!currentClientId) return;
+  const taskInput = document.getElementById("checklist-new-task");
+  const catSelect = document.getElementById("checklist-new-category");
+  if (!taskInput || !catSelect) return;
+
+  const task = taskInput.value.trim();
+  if (!task) {
+    showToast("Please enter a task description.", "error");
+    return;
+  }
+
+  const category = catSelect.value;
+
+  try {
+    await addDoc(collection(db, "clients", currentClientId, "closingChecklist"), {
+      task: task,
+      category: category,
+      completed: false,
+      autoCompleted: false,
+      autoCompletedAt: null,
+      notApplicable: false,
+      notes: "",
+      sortOrder: 999,
+      transactionSide: "both",
+      propertyTypes: [],
+      linkedTemplateId: null,
+      isCustom: true,
+      isSeeded: false,
+      deadlineOffsetDays: null,
+      deadline: null,
+      seededAt: null,
+      completedAt: null,
+      completedBy: null
+    });
+    showToast("Custom item added");
+    // Close the form
+    window.showAddChecklistItem();
+  } catch (err) {
+    console.error("Add custom item error:", err);
+    showToast("Failed to add item.", "error");
+  }
+};
+
+/**
+ * Deletes a custom checklist item (only allowed for custom items).
+ */
+window.deleteChecklistItem = async function(itemId) {
+  if (!currentClientId) return;
+  const item = checklistItems.find(i => i.id === itemId);
+  if (!item || !item.isCustom) {
+    showToast("Only custom items can be deleted.", "error");
+    return;
+  }
+
+  if (!window.confirm("Delete this custom checklist item?")) return;
+
+  try {
+    await deleteDoc(doc(db, "clients", currentClientId, "closingChecklist", itemId));
+    showToast("Item deleted");
+  } catch (err) {
+    console.error("Delete checklist item error:", err);
+    showToast("Failed to delete item.", "error");
+  }
+};
+
+/* ------------------------------------------------------------------ */
+/*  destroyChecklist                                                   */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Unsubscribes the onSnapshot listener and clears module state.
+ */
+export function destroyChecklist() {
+  if (checklistUnsubscribe) {
+    checklistUnsubscribe();
+    checklistUnsubscribe = null;
+  }
+  checklistItems = [];
+  currentClientId = null;
+  currentClientData = null;
 }
