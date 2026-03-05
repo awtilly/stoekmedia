@@ -1,9 +1,10 @@
 import { auth, db, functions, httpsCallable } from "./firebase-config.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import {
-  collection, query, where, orderBy, limit, getDocs, getCountFromServer, Timestamp
+  collection, query, where, orderBy, limit, getDocs, getCountFromServer, Timestamp,
+  addDoc, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-import { getCurrentUser, timeAgo, formatDate, formatDateTime, escapeHtml } from "./auth.js";
+import { getCurrentUser, timeAgo, formatDate, formatDateTime, escapeHtml, showToast } from "./auth.js";
 import { startTour, checkAndResumeTour } from "./tour.js";
 
 const askAssistant = httpsCallable(functions, "askAssistant");
@@ -156,9 +157,52 @@ async function loadBriefing() {
   contentEl.innerHTML = '<div class="gd-ai-briefing-loading"><div class="gd-spinner"></div><span>Generating your daily briefing...</span></div>';
 
   try {
+    const user = auth.currentUser;
+    if (!user) return;
+    const uid = user.uid;
+
+    // Gather real CRM data for the briefing
+    const contextData = { staleClients: [], todayShowings: [], totalClients: 0, activeBuyers: 0, activeSellers: 0, underContract: 0 };
+
+    // Stale clients: not contacted in 14+ days
+    const fourteenDaysAgo = new Date();
+    fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
+    const clientsSnap = await getDocs(query(collection(db, "clients"), where("realtorId", "==", uid)));
+    contextData.totalClients = clientsSnap.size;
+    clientsSnap.forEach(d => {
+      const c = d.data();
+      if (c.status === "active_buyer") contextData.activeBuyers++;
+      if (c.status === "active_seller") contextData.activeSellers++;
+      if (c.status === "under_contract") contextData.underContract++;
+      const lastDate = c.lastActivityDate
+        ? (typeof c.lastActivityDate.toDate === "function" ? c.lastActivityDate.toDate() : new Date(c.lastActivityDate))
+        : null;
+      if (!lastDate || lastDate < fourteenDaysAgo) {
+        contextData.staleClients.push({ name: c.fullName || "Unknown", daysSince: lastDate ? Math.floor((Date.now() - lastDate.getTime()) / 86400000) : null });
+      }
+    });
+
+    // Today's showings
+    const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date(); todayEnd.setHours(23, 59, 59, 999);
+    const showQ = query(
+      collection(db, "showings"),
+      where("realtorId", "==", uid),
+      where("showingDate", ">=", Timestamp.fromDate(todayStart)),
+      where("showingDate", "<=", Timestamp.fromDate(todayEnd))
+    );
+    const showSnap = await getDocs(showQ);
+    showSnap.forEach(d => {
+      const s = d.data();
+      if (s.status !== "cancelled") {
+        contextData.todayShowings.push({ address: s.address || "TBD", time: s.showingDate ? new Date(s.showingDate.toDate()).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : "" });
+      }
+    });
+
     const result = await askAssistant({
       question: "3 bullet points max, one line each. 1) Any clients not contacted in 14+ days? 2) Today's showings? 3) One priority action. No headers, no intros, no sign-offs. Just the 3 bullets.",
-      context: "dashboard"
+      context: "dashboard",
+      contextData
     });
     const text = result.data.response;
     sessionStorage.setItem(cacheKey, text);
@@ -173,4 +217,66 @@ window.refreshBriefing = function () {
   const today = new Date().toISOString().slice(0, 10);
   sessionStorage.removeItem("gd_briefing_" + today);
   loadBriefing();
+};
+
+/* ===== ADD LISTING MODAL (Dashboard) ===== */
+window.openDashboardAddListing = function () {
+  // Clear form
+  ["dl-address", "dl-city", "dl-state", "dl-zip", "dl-price", "dl-beds", "dl-baths",
+   "dl-sqft", "dl-yearBuilt", "dl-lotSize", "dl-mls", "dl-notes"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = "";
+  });
+  const typeEl = document.getElementById("dl-type");
+  if (typeEl) typeEl.value = "";
+  const statusEl = document.getElementById("dl-status");
+  if (statusEl) statusEl.value = "active";
+  document.getElementById("dash-add-listing-modal").classList.add("active");
+};
+
+window.closeDashboardAddListing = function () {
+  document.getElementById("dash-add-listing-modal").classList.remove("active");
+};
+
+window.saveDashboardListing = async function () {
+  const user = auth.currentUser;
+  if (!user) return;
+
+  const addrFull = document.getElementById("dl-address").value.trim();
+  if (!addrFull) { showToast("Address is required.", "error"); return; }
+
+  const data = {
+    address: {
+      full: addrFull,
+      street: addrFull.split(",")[0]?.trim() || addrFull,
+      city: document.getElementById("dl-city").value.trim(),
+      state: document.getElementById("dl-state").value.trim(),
+      zip: document.getElementById("dl-zip").value.trim()
+    },
+    listingPrice: Number(document.getElementById("dl-price").value) || null,
+    bedrooms: Number(document.getElementById("dl-beds").value) || null,
+    bathrooms: Number(document.getElementById("dl-baths").value) || null,
+    squareFeet: Number(document.getElementById("dl-sqft").value) || null,
+    propertyType: document.getElementById("dl-type").value,
+    yearBuilt: Number(document.getElementById("dl-yearBuilt").value) || null,
+    lotSize: document.getElementById("dl-lotSize").value.trim(),
+    mlsNumber: document.getElementById("dl-mls").value.trim(),
+    status: document.getElementById("dl-status").value,
+    notes: document.getElementById("dl-notes").value.trim(),
+    features: [],
+    photos: [],
+    addedBy: user.uid,
+    source: "manual",
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  };
+
+  try {
+    await addDoc(collection(db, "listings"), data);
+    showToast("Listing added!");
+    closeDashboardAddListing();
+  } catch (e) {
+    console.error("Save listing error:", e);
+    showToast("Failed to save listing.", "error");
+  }
 };

@@ -753,6 +753,34 @@ INSTRUCTIONS:
 4. Suggest the top 2-3 priority next actions the realtor should take
 5. Keep your response concise and actionable — this is a quick check-in, not a detailed report
 6. If the realtor asks follow-up questions, use this context to answer them accurately`;
+  } else if (context === "dashboard" && contextData) {
+    const cd = contextData;
+    const staleList = (cd.staleClients || []).length > 0
+      ? cd.staleClients.map(c => `- ${c.name}${c.daysSince != null ? ` (${c.daysSince} days)` : ' (never contacted)'}`).join('\n')
+      : '- None — all clients contacted recently.';
+    const showingsList = (cd.todayShowings || []).length > 0
+      ? cd.todayShowings.map(s => `- ${s.time} at ${s.address}`).join('\n')
+      : '- No showings today.';
+    systemPrompt = `You are a real estate assistant generating a daily briefing for GreenDoor CRM.
+
+PORTFOLIO STATS:
+- Total clients: ${cd.totalClients || 0}
+- Active buyers: ${cd.activeBuyers || 0}
+- Active sellers: ${cd.activeSellers || 0}
+- Under contract: ${cd.underContract || 0}
+
+CLIENTS NOT CONTACTED IN 14+ DAYS:
+${staleList}
+
+TODAY'S SHOWINGS:
+${showingsList}
+
+INSTRUCTIONS:
+Give exactly 3 bullet points, one line each. Use the real data above.
+1) Clients needing follow-up (name them if any)
+2) Today's showings summary
+3) One specific priority action based on the data
+No headers, no intros, no sign-offs. Just the 3 bullets.`;
   } else if (context === "client_detail" && clientId) {
     // Read client data for generic client-detail context
     const clientSnap = await db.doc(`clients/${clientId}`).get();

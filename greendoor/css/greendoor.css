@@ -2827,16 +2827,7 @@ body.gd-light .gd-breadcrumb-current {
   border-color: #16a34a;
 }
 
-.gd-btn-email {
-  background-color: #3b82f6;
-  color: #ffffff;
-  border-color: #3b82f6;
-}
-
-.gd-btn-email:hover {
-  background-color: #2563eb;
-  border-color: #2563eb;
-}
+/* .gd-btn-email — removed; inherits default gd-btn styling */
 
 /* --- Signature Modal Toggle --- */
 .gd-sig-toggle {
