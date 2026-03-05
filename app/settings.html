@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Settings — GreenDoor</title>
+  <link rel="stylesheet" href="/assets/css/style.css">
+  <link rel="stylesheet" href="/greendoor/css/greendoor.css">
+</head>
+<body class="gd-light">
+
+  <!-- Navigation -->
+  <nav class="nav scrolled">
+    <div class="container">
+      <a href="/greendoor/app/dashboard" class="nav-logo gd-nav-logo"><span class="gd-green">Green</span><span class="gd-door">Door</span><small class="gd-by-line">by stoekmedia</small></a>
+      <ul class="nav-links">
+        <li><a href="/greendoor/app/dashboard">Dashboard</a></li>
+        <li><a href="/greendoor/app/clients">Clients</a></li>
+        <li><a href="/greendoor/app/calendar">Calendar</a></li>
+        <li id="nav-admin-tab" style="display:none;"><a href="/greendoor/app/admin">Admin</a></li>
+        <li><a href="/greendoor/app/settings" class="gd-nav-active">Settings</a></li>
+        <li class="nav-crm-divider"></li>
+        <li><span id="nav-user-name" class="nav-user-name"></span></li>
+        <li><button class="nav-logout-btn" onclick="handleLogout()">Logout</button></li>
+      </ul>
+      <button class="nav-toggle" aria-label="Menu">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+    </div>
+  </nav>
+
+  <div class="gd-page">
+    <div class="gd-content" style="max-width: 720px; margin: 0 auto;">
+
+      <!-- Loading -->
+      <div id="settings-loading" class="gd-loading">
+        <div class="gd-spinner gd-spinner-lg"></div>
+        <span class="gd-loading-text">Loading settings...</span>
+      </div>
+
+      <div id="settings-content" class="gd-hidden">
+
+        <div class="gd-welcome">
+          <h1>Settings</h1>
+        </div>
+
+        <!-- Profile Section -->
+        <div class="gd-card gd-settings-card">
+          <h3>Profile</h3>
+          <div class="gd-form-row">
+            <div class="gd-form-group">
+              <label for="set-fullName">Full Name</label>
+              <input type="text" id="set-fullName" class="gd-input">
+            </div>
+            <div class="gd-form-group">
+              <label for="set-phone">Phone</label>
+              <input type="tel" id="set-phone" class="gd-input">
+            </div>
+          </div>
+          <div class="gd-form-group">
+            <label for="set-company">Company</label>
+            <input type="text" id="set-company" class="gd-input">
+          </div>
+          <div class="gd-form-group">
+            <label for="set-emailSignature">Email Signature</label>
+            <p class="gd-text-muted" style="margin: 0 0 0.25rem 0; font-size: 0.8rem;">Automatically appended to all outgoing emails.</p>
+            <textarea id="set-emailSignature" class="gd-input gd-signature-textarea" rows="5" placeholder="Best regards,&#10;Your Name&#10;Company Name&#10;(555) 123-4567"></textarea>
+          </div>
+          <button class="gd-btn gd-btn-primary" onclick="saveProfile()">Save Profile</button>
+        </div>
+
+        <!-- Document Templates Section -->
+        <div class="gd-card gd-settings-card">
+          <h3>Document Templates</h3>
+          <p class="gd-text-muted" style="margin: 0 0 1rem 0; font-size: 0.85rem;">
+            Upload reusable documents (purchase agreements, disclosures, etc.) that can be pulled into any client's signature flow.
+          </p>
+          <div class="gd-form-row" style="align-items: flex-end;">
+            <div class="gd-form-group" style="flex: 1;">
+              <label for="tpl-category">Category</label>
+              <select id="tpl-category" class="gd-input">
+                <option value="contracts">Contracts</option>
+                <option value="disclosures">Disclosures</option>
+                <option value="inspections">Inspections</option>
+                <option value="financial">Financial</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            <div class="gd-form-group" style="flex: 0 0 auto;">
+              <button class="gd-btn gd-btn-primary" onclick="document.getElementById('tpl-file-input').click()">Upload Template</button>
+              <input type="file" id="tpl-file-input" accept=".pdf,.doc,.docx" multiple hidden>
+            </div>
+          </div>
+          <div id="tpl-progress" class="gd-hidden" style="margin-bottom: 1rem;">
+            <div class="gd-progress-bar"><div id="tpl-progress-fill" class="gd-progress-fill" style="width:0%"></div></div>
+            <span id="tpl-progress-text" class="gd-text-muted" style="font-size:0.8rem;">Uploading...</span>
+          </div>
+          <div id="template-list"></div>
+        </div>
+
+        <!-- BoldSign Section -->
+        <div class="gd-card gd-settings-card">
+          <h3>E-Signatures</h3>
+          <div class="gd-settings-status">
+            <span class="gd-settings-status-dot gd-connected"></span>
+            E-signatures powered by BoldSign &mdash; Connected
+          </div>
+          <p class="gd-text-muted" style="margin: 0.5rem 0 0 0; font-size: 0.85rem;">
+            All e-signature requests are sent through the platform's BoldSign account. Contact admin to configure a dedicated BoldSign account.
+          </p>
+          <div id="boldsign-diagnostics" class="gd-diagnostics" style="display:none;">
+            <button id="btn-run-diagnostics" class="gd-btn gd-btn-outline" onclick="runBoldSignTest()" style="margin-top: 0.75rem;">Run Diagnostics</button>
+            <div id="diagnostics-results" class="gd-diagnostics-results" style="display:none;"></div>
+          </div>
+        </div>
+
+        <!-- Email Section -->
+        <div class="gd-card gd-settings-card">
+          <h3>Email Sending</h3>
+          <div id="email-sender-status"></div>
+        </div>
+
+        <!-- Integrations Section -->
+        <div class="gd-card gd-settings-card">
+          <h3>Integrations</h3>
+          <div id="showingtime-integration">
+            <!-- Rendered dynamically by settings.js -->
+          </div>
+        </div>
+
+        <!-- Help & Support Section -->
+        <div class="gd-card gd-settings-card">
+          <h3>Help &amp; Support</h3>
+          <div class="gd-support-links">
+            <a href="/greendoor/app/faq" class="gd-support-link">
+              <span class="gd-support-icon">&#10067;</span>
+              <div>
+                <div class="gd-support-link-title">FAQ</div>
+                <div class="gd-support-link-desc">Answers to common questions about using GreenDoor</div>
+              </div>
+            </a>
+            <a href="mailto:support@stoekmedia.com" class="gd-support-link">
+              <span class="gd-support-icon">&#9993;</span>
+              <div>
+                <div class="gd-support-link-title">Contact Support</div>
+                <div class="gd-support-link-desc">Email us at support@stoekmedia.com</div>
+              </div>
+            </a>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script src="/assets/js/main.js"></script>
+  <script type="module" src="/greendoor/js/auth.js"></script>
+  <script type="module" src="/greendoor/js/settings.js"></script>
+  <script type="module" src="/greendoor/js/tour.js"></script>
+  <script type="module" src="/greendoor/js/chatbot.js"></script>
+</body>
+</html>
