@@ -1,4 +1,5 @@
 const { onCall, onRequest, HttpsError } = require("firebase-functions/v2/https");
+const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { initializeApp } = require("firebase-admin/app");
 const { getFirestore } = require("firebase-admin/firestore");
 const { getStorage } = require("firebase-admin/storage");
@@ -516,6 +517,14 @@ function verifyBoldSignSignature(signatureHeader, rawBody, secret) {
 }
 
 /* ------------------------------------------------------------------ */
+/*  sanitizeIcalUid: clean iCal UIDs for Firestore doc ID safety       */
+/* ------------------------------------------------------------------ */
+
+function sanitizeIcalUid(uid) {
+  return uid.replace(/[\/\.#\$\[\]]/g, "_");
+}
+
+/* ------------------------------------------------------------------ */
 /*  boldSignWebhook                                                    */
 /*                                                                     */
 /*  Receives BoldSign completion events, verifies HMAC signature,      */
@@ -782,3 +791,208 @@ INSTRUCTIONS:
 
   return { response: aiResponse };
 });
+
+/* ------------------------------------------------------------------ */
+/*  ShowingTime iCal Sync                                              */
+/*                                                                     */
+/*  syncFeedForUser: shared sync logic (internal helper)               */
+/*  syncShowingTime: callable "Sync Now" handler                       */
+/*  scheduledShowingTimeSync: 30-minute cron for all users             */
+/* ------------------------------------------------------------------ */
+
+/**
+ * syncFeedForUser (internal helper)
+ *
+ * Fetches and parses a ShowingTime iCal feed for a single user,
+ * upserts VEVENT data into the showings collection with deterministic
+ * IDs, and deletes showings that are no longer in the feed.
+ *
+ * @param {string} realtorId - The user's UID
+ * @param {string} feedUrl - The iCal/webcal feed URL
+ * @returns {{ synced: number, removed: number }}
+ */
+async function syncFeedForUser(realtorId, feedUrl) {
+  const admin = require("firebase-admin");
+  const ical = require("node-ical");
+  const FieldValue = require("firebase-admin/firestore").FieldValue;
+
+  // Normalize webcal:// to https://
+  const url = feedUrl.replace(/^webcal:\/\//i, "https://");
+
+  // Fetch and parse the iCal feed
+  let data;
+  try {
+    data = await ical.async.fromURL(url);
+  } catch (err) {
+    // Network/parse error: save error but do NOT delete existing showings
+    await db.doc(`users/${realtorId}`).update({
+      showingTimeSyncError: err.message || "Failed to fetch feed",
+    });
+    throw err;
+  }
+
+  // Collect valid events from feed (exclude CANCELLED)
+  const feedEvents = {};
+  for (const [key, event] of Object.entries(data)) {
+    if (event.type !== "VEVENT") continue;
+    if ((event.status || "").toUpperCase() === "CANCELLED") continue;
+    const sanitizedUid = sanitizeIcalUid(event.uid);
+    feedEvents[sanitizedUid] = event;
+  }
+
+  // Get existing ST showings for this user
+  const existingSnap = await db.collection("showings")
+    .where("realtorId", "==", realtorId)
+    .where("source", "==", "showingtime")
+    .get();
+
+  // Build operations list, then chunk into batches of 450
+  const operations = [];
+  let upsertCount = 0;
+  let deleteCount = 0;
+
+  // Upsert: events in feed
+  for (const [sanitizedUid, event] of Object.entries(feedEvents)) {
+    const docId = `st_${realtorId}_${sanitizedUid}`;
+    const docRef = db.doc(`showings/${docId}`);
+
+    operations.push({
+      type: "set",
+      ref: docRef,
+      data: {
+        realtorId,
+        source: "showingtime",
+        icalUid: event.uid,
+        address: event.summary || event.location || "ShowingTime Showing",
+        showingDate: event.start ? admin.firestore.Timestamp.fromDate(new Date(event.start)) : null,
+        endDate: event.end ? admin.firestore.Timestamp.fromDate(new Date(event.end)) : null,
+        location: event.location || "",
+        description: event.description || "",
+        status: "scheduled",
+        icalSequence: event.sequence || 0,
+        updatedAt: FieldValue.serverTimestamp(),
+      },
+      options: { merge: true },
+    });
+    upsertCount++;
+  }
+
+  // Delete: existing docs not in feed
+  for (const doc of existingSnap.docs) {
+    const existingUid = sanitizeIcalUid(doc.data().icalUid);
+    if (!feedEvents[existingUid]) {
+      operations.push({ type: "delete", ref: doc.ref });
+      deleteCount++;
+    }
+  }
+
+  // Commit in chunks of 450 to stay under Firestore batch limit of 500
+  const CHUNK_SIZE = 450;
+  for (let i = 0; i < operations.length; i += CHUNK_SIZE) {
+    const chunk = operations.slice(i, i + CHUNK_SIZE);
+    const batch = db.batch();
+    for (const op of chunk) {
+      if (op.type === "set") {
+        batch.set(op.ref, op.data, op.options);
+      } else if (op.type === "delete") {
+        batch.delete(op.ref);
+      }
+    }
+    await batch.commit();
+  }
+
+  // Update user sync metadata
+  await db.doc(`users/${realtorId}`).update({
+    showingTimeLastSyncedAt: FieldValue.serverTimestamp(),
+    showingTimeSyncError: null,
+    showingTimeSyncCount: upsertCount,
+  });
+
+  return { synced: upsertCount, removed: deleteCount };
+}
+
+/**
+ * syncShowingTime (callable)
+ *
+ * "Sync Now" button handler. Reads the user's feed URL from their
+ * profile, enforces a 15-minute rate limit, and calls syncFeedForUser.
+ */
+exports.syncShowingTime = onCall({ region: "us-central1" }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "You must be signed in.");
+  }
+
+  const uid = request.auth.uid;
+
+  // Read user doc for feed URL and last sync time
+  const userSnap = await db.doc(`users/${uid}`).get();
+  if (!userSnap.exists) {
+    throw new HttpsError("not-found", "User profile not found.");
+  }
+
+  const userData = userSnap.data();
+  const feedUrl = userData.showingTimeFeedUrl;
+
+  if (!feedUrl) {
+    throw new HttpsError("failed-precondition", "No ShowingTime feed URL configured. Add one in Settings > Integrations.");
+  }
+
+  // Rate limit: 15 minutes between syncs
+  const lastSync = userData.showingTimeLastSyncedAt?.toDate();
+  if (lastSync) {
+    const elapsedMs = Date.now() - lastSync.getTime();
+    const fifteenMin = 15 * 60 * 1000;
+    if (elapsedMs < fifteenMin) {
+      const minutesAgo = Math.floor(elapsedMs / 60000);
+      throw new HttpsError("resource-exhausted", `Please wait at least 15 minutes between syncs. Last synced: ${minutesAgo} minute(s) ago.`);
+    }
+  }
+
+  try {
+    const result = await syncFeedForUser(uid, feedUrl);
+    return result;
+  } catch (err) {
+    console.error(`syncShowingTime error for user ${uid}:`, err.message);
+    throw new HttpsError("internal", `Sync failed: ${err.message}`);
+  }
+});
+
+/**
+ * scheduledShowingTimeSync (scheduled)
+ *
+ * Runs every 30 minutes. Iterates all users with a feed URL configured,
+ * skips users synced within the last 15 minutes, and calls syncFeedForUser.
+ */
+exports.scheduledShowingTimeSync = onSchedule(
+  { schedule: "every 30 minutes", region: "us-central1", timeoutSeconds: 300 },
+  async (event) => {
+    const usersSnap = await db.collection("users")
+      .where("showingTimeFeedUrl", "!=", null)
+      .get();
+
+    let totalSynced = 0;
+    let totalErrors = 0;
+    let processed = 0;
+
+    for (const userDoc of usersSnap.docs) {
+      const userData = userDoc.data();
+
+      // Rate limit: skip if synced within last 15 minutes
+      const lastSync = userData.showingTimeLastSyncedAt?.toDate();
+      if (lastSync && (Date.now() - lastSync.getTime()) < 15 * 60 * 1000) {
+        continue;
+      }
+
+      try {
+        const result = await syncFeedForUser(userDoc.id, userData.showingTimeFeedUrl);
+        totalSynced += result.synced;
+        processed++;
+      } catch (err) {
+        console.error(`Scheduled sync failed for user ${userDoc.id}:`, err.message);
+        totalErrors++;
+      }
+    }
+
+    console.log(`scheduledShowingTimeSync complete: ${processed} users synced, ${totalSynced} total showings, ${totalErrors} errors`);
+  }
+);
