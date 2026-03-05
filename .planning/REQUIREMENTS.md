@@ -62,17 +62,17 @@ Requirements for this milestone. Each maps to roadmap phases.
 - [x] **CHKL-03**: Checklist items grouped by category (Pre-Contract / Under Contract / Closing) on new "Closing Checklist" tab
 - [x] **CHKL-04**: Progress bar per category and overall
 - [x] **CHKL-05**: User can manually toggle checklist items complete/incomplete
-- [ ] **CHKL-06**: When a compliance doc is signed (via webhook), matching checklist items auto-complete with autoCompleted: true
+- [x] **CHKL-06**: When a compliance doc is signed (via webhook), matching checklist items auto-complete with autoCompleted: true
 - [x] **CHKL-07**: Auto-completed items display a distinct badge
 
 ### AI Check-in
 
-- [ ] **AICX-01**: "Check in with AI" button on Closing Checklist tab opens chat panel (reuse existing AI assistant UI pattern)
-- [ ] **AICX-02**: AI receives full transaction context: client name, transaction type, listing address, checklist with completion status, today's date
-- [ ] **AICX-03**: AI summarizes what's done, what's outstanding, and flags overdue items
-- [ ] **AICX-04**: AI suggests next 2-3 priority actions
-- [ ] **AICX-05**: AI answers follow-up questions from the realtor
-- [ ] **AICX-06**: Chat is stateful within session (conversation history in memory, not persisted to Firestore)
+- [x] **AICX-01**: "Check in with AI" button on Closing Checklist tab opens chat panel (reuse existing AI assistant UI pattern)
+- [x] **AICX-02**: AI receives full transaction context: client name, transaction type, listing address, checklist with completion status, today's date
+- [x] **AICX-03**: AI summarizes what's done, what's outstanding, and flags overdue items
+- [x] **AICX-04**: AI suggests next 2-3 priority actions
+- [x] **AICX-05**: AI answers follow-up questions from the realtor
+- [x] **AICX-06**: Chat is stateful within session (conversation history in memory, not persisted to Firestore)
 
 ### ShowingTime Sync
 
@@ -179,14 +179,14 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CHKL-03 | Phase 4 | Complete |
 | CHKL-04 | Phase 4 | Complete |
 | CHKL-05 | Phase 4 | Complete |
-| CHKL-06 | Phase 4 | Pending |
+| CHKL-06 | Phase 4 | Complete |
 | CHKL-07 | Phase 4 | Complete |
-| AICX-01 | Phase 4 | Pending |
-| AICX-02 | Phase 4 | Pending |
-| AICX-03 | Phase 4 | Pending |
-| AICX-04 | Phase 4 | Pending |
-| AICX-05 | Phase 4 | Pending |
-| AICX-06 | Phase 4 | Pending |
+| AICX-01 | Phase 4 | Complete |
+| AICX-02 | Phase 4 | Complete |
+| AICX-03 | Phase 4 | Complete |
+| AICX-04 | Phase 4 | Complete |
+| AICX-05 | Phase 4 | Complete |
+| AICX-06 | Phase 4 | Complete |
 | SHWT-01 | Phase 5 | Pending |
 | SHWT-02 | Phase 5 | Pending |
 | SHWT-03 | Phase 5 | Pending |
