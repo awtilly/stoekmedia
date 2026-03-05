@@ -97,11 +97,11 @@ Plans:
   3. ShowingTime showings display with a distinct "ST" badge and cannot be edited or deleted
   4. Showings cancelled in ShowingTime are removed or marked cancelled in the GreenDoor calendar on the next sync
   5. An invalid or expired feed URL shows a clear error message in Settings with troubleshooting guidance, and the last successful sync time is displayed
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 05-01: Feed config + sync Cloud Function — SHWT-01 through SHWT-08, showingTimeFeeds collection, node-ical parsing, scheduled sync
-- [ ] 05-02: Calendar display — SHWT-09 through SHWT-11, ST badge, read-only behavior, error/timestamp display in Settings
+- [ ] 05-01-PLAN.md — Feed URL config in Settings + syncShowingTime callable + scheduledShowingTimeSync cron + node-ical parsing + error/timestamp display (SHWT-01 through SHWT-08, SHWT-10, SHWT-11)
+- [ ] 05-02-PLAN.md — Calendar ST badge rendering, read-only popover, drag prevention, legend entry (SHWT-09)
 
 ## Progress
 
