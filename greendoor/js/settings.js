@@ -7,7 +7,7 @@ import {
 import {
   ref, uploadBytesResumable, getDownloadURL, deleteObject
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
-import { getCurrentUser, showToast, formatFileSize, escapeHtml } from "./auth.js";
+import { getCurrentUser, showToast, formatFileSize, escapeHtml, formatDateTime } from "./auth.js";
 import { checkAndResumeTour } from "./tour.js";
 
 let allTemplates = [];
@@ -31,6 +31,7 @@ onAuthStateChanged(auth, async (user) => {
 
   await loadTemplates(user.uid);
   renderEmailSenderStatus(profile);
+  renderShowingTimeIntegration(profile);
 
   document.getElementById("settings-loading").classList.add("gd-hidden");
   document.getElementById("settings-content").classList.remove("gd-hidden");
@@ -329,5 +330,182 @@ window.removeSenderVerification = async function () {
   } catch (e) {
     console.error("Remove verification error:", e);
     showToast("Failed to remove verification.", "error");
+  }
+};
+
+/* ===== SHOWINGTIME INTEGRATION ===== */
+
+function renderShowingTimeIntegration(profile) {
+  const el = document.getElementById("showingtime-integration");
+  if (!el) return;
+
+  const feedUrl = profile.showingTimeFeedUrl;
+
+  if (!feedUrl) {
+    // Disconnected state: setup guide + feed URL input
+    el.innerHTML = `
+      <div style="margin-bottom: 1rem;">
+        <strong>ShowingTime Calendar Sync</strong>
+        <p class="gd-text-muted" style="font-size: 0.85rem; margin: 0.5rem 0;">
+          Connect your ShowingTime feed to automatically import showings into your GreenDoor calendar.
+        </p>
+        <div style="background: var(--gd-bg-secondary, #f8f9fa); border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 1rem; font-size: 0.85rem;">
+          <strong style="display: block; margin-bottom: 0.5rem;">How to find your iCal feed URL:</strong>
+          <ol style="margin: 0; padding-left: 1.25rem; line-height: 1.7;">
+            <li>Log in to your ShowingTime account</li>
+            <li>Go to <strong>Menu &gt; Profile &gt; Calendar Sync</strong></li>
+            <li>Choose your feed options (All Appointments recommended)</li>
+            <li>Copy the iCal/webcal feed URL</li>
+            <li>Paste the URL below and click Save</li>
+          </ol>
+        </div>
+        <div class="gd-form-group" style="margin-bottom: 0.75rem;">
+          <input type="text" id="st-feed-url" class="gd-input" placeholder="webcal://... or https://... feed URL">
+        </div>
+        <button class="gd-btn gd-btn-primary" onclick="saveShowingTimeFeed()">Save</button>
+      </div>`;
+  } else {
+    // Connected state
+    const truncatedUrl = feedUrl.length > 50 ? feedUrl.substring(0, 50) + "..." : feedUrl;
+    const lastSynced = profile.showingTimeLastSyncedAt
+      ? formatDateTime(profile.showingTimeLastSyncedAt)
+      : "Never synced";
+    const syncCountText = profile.showingTimeSyncCount != null
+      ? ` (${profile.showingTimeSyncCount} showings)`
+      : "";
+    const syncError = profile.showingTimeSyncError;
+
+    let errorHtml = "";
+    if (syncError) {
+      errorHtml = `
+        <div style="border: 1px solid #ef4444; border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 1rem; background: #fef2f2;">
+          <strong style="color: #ef4444; display: block; margin-bottom: 0.25rem;">Sync Error</strong>
+          <p style="margin: 0 0 0.5rem 0; font-size: 0.85rem; color: #991b1b;">${escapeHtml(syncError)}</p>
+          <ul style="margin: 0; padding-left: 1.25rem; font-size: 0.8rem; color: #7f1d1d; line-height: 1.6;">
+            <li>Check that your URL starts with webcal:// or https://</li>
+            <li>Verify your ShowingTime feed is still active</li>
+            <li>Try re-copying the URL from ShowingTime &gt; Profile &gt; Calendar Sync</li>
+          </ul>
+        </div>`;
+    }
+
+    el.innerHTML = `
+      <div>
+        <strong>ShowingTime Calendar Sync</strong>
+        <div class="gd-email-sender-row" style="margin-top: 0.5rem;">
+          <div class="gd-email-sender-info">
+            <span class="gd-settings-status-dot gd-connected"></span>
+            <div>
+              <div class="gd-email-sender-label">Connected</div>
+              <div class="gd-text-muted" style="font-size: 0.8rem;">${escapeHtml(truncatedUrl)}</div>
+            </div>
+          </div>
+        </div>
+        <div class="gd-text-muted" style="font-size: 0.8rem; margin: 0.5rem 0;">
+          Last synced: ${escapeHtml(lastSynced)}${escapeHtml(syncCountText)}
+        </div>
+        ${errorHtml}
+        <div style="display: flex; gap: 0.5rem; margin-top: 0.75rem;">
+          <button id="btn-sync-st" class="gd-btn gd-btn-primary gd-btn-sm" onclick="syncShowingTimeNow()">Sync Now</button>
+          <button class="gd-btn gd-btn-outline gd-btn-sm" onclick="disconnectShowingTime()">Disconnect</button>
+        </div>
+      </div>`;
+  }
+}
+
+window.saveShowingTimeFeed = async function () {
+  const user = auth.currentUser;
+  if (!user) return;
+
+  const urlInput = document.getElementById("st-feed-url");
+  const url = (urlInput?.value || "").trim();
+
+  if (!url) {
+    showToast("Please enter a feed URL.", "error");
+    return;
+  }
+
+  if (!url.startsWith("webcal://") && !url.startsWith("https://") && !url.startsWith("http://")) {
+    showToast("Feed URL must start with webcal://, https://, or http://", "error");
+    return;
+  }
+
+  try {
+    await setDoc(doc(db, "users", user.uid), { showingTimeFeedUrl: url }, { merge: true });
+    showToast("Feed URL saved! Click Sync Now to import showings.");
+    const profile = await getCurrentUser();
+    if (profile) renderShowingTimeIntegration(profile);
+  } catch (e) {
+    console.error("Save feed URL error:", e);
+    showToast("Failed to save feed URL.", "error");
+  }
+};
+
+window.syncShowingTimeNow = async function () {
+  const btn = document.getElementById("btn-sync-st");
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span class="gd-spinner gd-spinner-sm" style="margin-right:0.5rem;"></span>Syncing...';
+  }
+
+  try {
+    const syncFn = httpsCallable(functions, "syncShowingTime");
+    const { data } = await syncFn();
+
+    let msg = `Synced ${data.synced} showings`;
+    if (data.removed > 0) {
+      msg += `, removed ${data.removed}`;
+    }
+    showToast(msg);
+  } catch (e) {
+    console.error("Sync ShowingTime error:", e);
+    const errMsg = e.message || "Sync failed.";
+    showToast(errMsg, "error");
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = "Sync Now";
+    }
+    // Re-render to show updated timestamp/error
+    const profile = await getCurrentUser();
+    if (profile) renderShowingTimeIntegration(profile);
+  }
+};
+
+window.disconnectShowingTime = async function () {
+  if (!confirm("Disconnect ShowingTime? This will stop syncing and remove all imported showings from your calendar.")) return;
+
+  const user = auth.currentUser;
+  if (!user) return;
+
+  try {
+    // Clear feed URL and sync metadata
+    await setDoc(doc(db, "users", user.uid), {
+      showingTimeFeedUrl: null,
+      showingTimeLastSyncedAt: null,
+      showingTimeSyncError: null,
+      showingTimeSyncCount: null
+    }, { merge: true });
+
+    // Delete all ST showings for this user
+    const q = query(
+      collection(db, "showings"),
+      where("realtorId", "==", user.uid),
+      where("source", "==", "showingtime")
+    );
+    const snap = await getDocs(q);
+
+    if (!snap.empty) {
+      // Delete in batches (client-side uses individual deleteDoc)
+      const deletePromises = snap.docs.map(d => deleteDoc(d.ref));
+      await Promise.all(deletePromises);
+    }
+
+    showToast("ShowingTime disconnected.");
+    const profile = await getCurrentUser();
+    if (profile) renderShowingTimeIntegration(profile);
+  } catch (e) {
+    console.error("Disconnect ShowingTime error:", e);
+    showToast("Failed to disconnect ShowingTime.", "error");
   }
 };

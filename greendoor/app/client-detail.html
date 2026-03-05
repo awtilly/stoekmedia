@@ -74,6 +74,8 @@
           <button class="gd-tab" data-tab="showings">Showings</button>
           <button class="gd-tab" data-tab="files">Files</button>
           <button class="gd-tab" data-tab="properties">Properties</button>
+          <button class="gd-tab" data-tab="compliance">Compliance Docs</button>
+          <button class="gd-tab" data-tab="checklist">Closing Checklist</button>
         </div>
 
         <!-- ===== OVERVIEW TAB ===== -->
@@ -124,6 +126,24 @@
                     <option value="Cold Call">Cold Call</option>
                     <option value="Other">Other</option>
                   </select>
+                </div>
+                <div class="gd-form-group">
+                  <label for="ov-transactionType">Transaction Type</label>
+                  <select id="ov-transactionType" class="gd-input">
+                    <option value="">Select...</option>
+                    <option value="SFH - Buyer">SFH - Buyer</option>
+                    <option value="SFH - Seller">SFH - Seller</option>
+                    <option value="Condo - Buyer">Condo - Buyer</option>
+                    <option value="Condo - Seller">Condo - Seller</option>
+                    <option value="Multi-Family - Buyer">Multi-Family - Buyer</option>
+                    <option value="Multi-Family - Seller">Multi-Family - Seller</option>
+                    <option value="Land - Buyer">Land - Buyer</option>
+                    <option value="Land - Seller">Land - Seller</option>
+                  </select>
+                </div>
+                <div class="gd-form-group">
+                  <label for="ov-closingDate">Expected Closing Date</label>
+                  <input type="date" id="ov-closingDate" class="gd-input">
                 </div>
               </div>
               <div class="gd-form-group">
@@ -263,25 +283,10 @@
 
         <!-- ===== FILES TAB ===== -->
         <div id="tab-files" class="gd-tab-content">
-          <div class="gd-folder-filters" id="folder-filters">
-            <button class="gd-folder-btn active" data-folder="all">All</button>
-            <button class="gd-folder-btn" data-folder="contracts">Contracts</button>
-            <button class="gd-folder-btn" data-folder="disclosures">Disclosures</button>
-            <button class="gd-folder-btn" data-folder="inspections">Inspections</button>
-            <button class="gd-folder-btn" data-folder="financial">Financial</button>
-            <button class="gd-folder-btn" data-folder="photos">Photos</button>
-            <button class="gd-folder-btn" data-folder="other">Other</button>
-          </div>
+          <div id="folder-breadcrumb" class="gd-breadcrumb gd-hidden"></div>
+          <div id="folder-cards" class="gd-folder-cards"></div>
 
           <div class="gd-file-controls">
-            <select id="upload-folder" class="gd-input" style="min-width: 140px; max-width: 180px;">
-              <option value="contracts">Contracts</option>
-              <option value="disclosures">Disclosures</option>
-              <option value="inspections">Inspections</option>
-              <option value="financial">Financial</option>
-              <option value="photos">Photos</option>
-              <option value="other">Other</option>
-            </select>
             <button class="gd-upload-circle" onclick="document.getElementById('file-input').click()" title="Upload file">+</button>
             <input type="file" id="file-input" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.xlsx,.csv" style="display:none;">
             <button class="gd-btn gd-btn-signature gd-btn-sm" onclick="openSignatureModal()">&#9997; Send for Signature</button>
@@ -340,6 +345,46 @@
             <span id="compare-count">0 selected</span>
             <button id="compare-btn" class="gd-btn gd-btn-primary gd-btn-sm" onclick="showComparison()">Compare Selected</button>
             <button class="gd-btn gd-btn-sm" onclick="openCopyToClientModal()">Copy to Client</button>
+          </div>
+        </div>
+
+        <!-- ===== COMPLIANCE DOCS TAB ===== -->
+        <div id="tab-compliance" class="gd-tab-content">
+          <!-- Banner when no transaction type -->
+          <div id="compliance-no-txn-banner" class="gd-compliance-banner gd-hidden">
+            <span class="gd-compliance-banner-icon">&#9888;</span>
+            <span>Set a transaction type on the Overview tab to enable compliance documents.</span>
+          </div>
+          <!-- Toolbar with bulk select -->
+          <div id="compliance-toolbar" class="gd-compliance-toolbar gd-hidden">
+            <label class="gd-compliance-select-all">
+              <input type="checkbox" id="compliance-select-all"> Select All
+            </label>
+            <button id="compliance-bulk-send" class="gd-btn gd-btn-primary gd-btn-sm" disabled>Send Selected</button>
+          </div>
+          <!-- Template list -->
+          <div id="compliance-list">
+            <div class="gd-empty">
+              <div class="gd-empty-icon">&#128196;</div>
+              <div class="gd-empty-text">Loading compliance documents...</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ===== CLOSING CHECKLIST TAB ===== -->
+        <div id="tab-checklist" class="gd-tab-content">
+          <div id="checklist-container">
+            <div id="checklist-empty" class="gd-empty-state" style="display:none;">
+              <p>Set a transaction type on the Overview tab to generate a closing checklist.</p>
+            </div>
+            <div id="checklist-content" style="display:none;">
+              <div id="checklist-overall-progress"></div>
+              <div id="checklist-add-custom" style="margin-bottom: 16px;">
+                <button class="gd-btn gd-btn-sm" onclick="showAddChecklistItem()">+ Add Custom Item</button>
+                <div id="checklist-add-form" class="gd-checklist-add-form"></div>
+              </div>
+              <div id="checklist-categories"></div>
+            </div>
           </div>
         </div>
 
@@ -599,6 +644,7 @@
     <span id="file-action-count">0 selected</span>
     <button class="gd-btn gd-btn-primary" onclick="openSendDocModal()">Send to Client</button>
     <button class="gd-btn" onclick="openSignatureModalFromSelection()">Send for Signature</button>
+    <button class="gd-btn" onclick="openBulkMoveMenu(this)">Move to...</button>
     <button class="gd-file-action-close" onclick="clearFileSelection()">&times;</button>
   </div>
 
@@ -894,6 +940,41 @@
       <div class="gd-modal-footer">
         <button class="gd-btn" onclick="closeAddListingModal()">Cancel</button>
         <button id="al-save-btn" class="gd-btn gd-btn-primary" onclick="saveAndMatchListing()">Save &amp; Match</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Compliance Send Confirm Dialog -->
+  <div id="compliance-confirm-modal" class="gd-modal-overlay">
+    <div class="gd-modal gd-modal-md">
+      <div class="gd-modal-header">
+        <h3 id="compliance-confirm-title">Confirm Send for Signature</h3>
+        <button class="gd-modal-close" onclick="closeComplianceConfirm()" aria-label="Close">&times;</button>
+      </div>
+      <div class="gd-modal-body">
+        <div class="gd-confirm-section">
+          <label>Recipient</label>
+          <div id="compliance-confirm-recipient"></div>
+        </div>
+        <div class="gd-confirm-section">
+          <label>Document</label>
+          <div id="compliance-confirm-docname"></div>
+        </div>
+        <div class="gd-confirm-section">
+          <label>Listing</label>
+          <select id="compliance-confirm-listing" class="gd-input"></select>
+        </div>
+        <div id="compliance-confirm-fields" class="gd-confirm-section">
+          <label>Merge Fields</label>
+          <div id="compliance-confirm-field-list"></div>
+        </div>
+        <div id="compliance-confirm-missing" class="gd-confirm-warning gd-hidden">
+          <span>&#9888;</span> <span id="compliance-confirm-missing-text"></span>
+        </div>
+      </div>
+      <div class="gd-modal-footer">
+        <button class="gd-btn gd-btn-sm" onclick="closeComplianceConfirm()">Cancel</button>
+        <button id="compliance-confirm-send-btn" class="gd-btn gd-btn-primary gd-btn-sm" onclick="confirmAndSendCompliance()">Send for Signature</button>
       </div>
     </div>
   </div>

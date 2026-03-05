@@ -1,9 +1,9 @@
 import { auth, db, storage, functions, httpsCallable } from "./firebase-config.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import {
-  doc, getDoc, updateDoc, deleteDoc, addDoc, getDocs,
+  doc, getDoc, setDoc, updateDoc, deleteDoc, addDoc, getDocs,
   collection, query, where, orderBy, serverTimestamp, Timestamp,
-  getCountFromServer, limit, onSnapshot
+  getCountFromServer, limit, onSnapshot, writeBatch
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import {
   ref, uploadBytesResumable, getDownloadURL, deleteObject
@@ -13,6 +13,8 @@ import {
   timeAgo, formatFileSize, statusLabel, escapeHtml, sanitizeUrl
 } from "./auth.js";
 import { calculateMatchScore, matchScoreColor, matchScoreLabel } from "./match-engine.js";
+import { buildMergeFields, MO_FORM_STUBS, COMPLIANCE_STATUSES, COMPLIANCE_CATEGORIES, formatComplianceStatus } from "./compliance.js";
+import { seedChecklist, recalculateDeadlines, initChecklist, destroyChecklist } from "./checklist.js";
 
 const params = new URLSearchParams(window.location.search);
 const clientId = params.get("id");
@@ -23,6 +25,8 @@ let selectedRating = 0;
 let allMatches = []; // clientListingMatches joined with listing data
 let allListingsCache = []; // all listings for match-a-listing panel
 let allFiles = [];
+let allFolders = [];
+let currentFolderId = null;
 let allShowings = [];
 let allFollowUps = [];
 let selectedCompare = new Set();
@@ -40,6 +44,10 @@ let allTemplateFiles = [];
 let copyClientsList = [];
 let selectedCopyClientId = null;
 let addListingFeatureTags = [];
+let complianceTemplates = [];
+let complianceDocs = {};
+let complianceUnsubscribe = null;
+let pendingSendTemplateId = null;
 
 if (!clientId) {
   window.location.href = "/greendoor/app/clients";
@@ -52,6 +60,9 @@ const checkSignatureStatusFn = httpsCallable(functions, "checkSignatureStatus");
 const createEmbeddedSignatureRequestFn = httpsCallable(functions, "createEmbeddedSignatureRequest");
 const shareDocumentFn = httpsCallable(functions, "shareDocument");
 const parseListingUrlFn = httpsCallable(functions, "parseListingUrl");
+const sendComplianceDocFn = httpsCallable(functions, "sendComplianceDoc");
+const sendBulkComplianceDocsFn = httpsCallable(functions, "sendBulkComplianceDocs");
+const createSenderIdentityFn = httpsCallable(functions, "createSenderIdentity");
 
 /* --- Auth gate --- */
 onAuthStateChanged(auth, async (user) => {
@@ -92,7 +103,16 @@ async function loadClient(uid) {
     }
 
     populateOverview(clientData);
-    await Promise.all([loadActivities(uid), loadFiles(uid), loadTemplateFiles(uid), loadMatches(uid), loadEnvelopes(uid), loadShowings(uid), loadFollowUps(uid)]);
+    await Promise.all([loadActivities(uid), loadFiles(uid), loadFolders(uid), loadTemplateFiles(uid), loadMatches(uid), loadEnvelopes(uid), loadShowings(uid), loadFollowUps(uid), loadComplianceTemplates(uid)]);
+    startComplianceListener(clientId);
+    await migrateExistingFolders(uid);
+    renderFolderCards();
+    renderBreadcrumb();
+
+    // Auto-create Closing Documents folder if client already has a transaction type
+    if (clientData.transactionType) {
+      await ensureClosingDocumentsFolder(clientId, uid);
+    }
 
     document.getElementById("detail-loading").classList.add("gd-hidden");
     document.getElementById("detail-content").classList.remove("gd-hidden");
@@ -109,6 +129,7 @@ function populateOverview(c) {
   document.getElementById("ov-phone").value = c.phone || "";
   document.getElementById("ov-status").value = c.status || "lead";
   document.getElementById("ov-source").value = c.source || "";
+  document.getElementById("ov-transactionType").value = c.transactionType || "";
   document.getElementById("ov-timeline").value = c.timeline || "";
   document.getElementById("ov-budgetMin").value = c.budgetMin || "";
   document.getElementById("ov-budgetMax").value = c.budgetMax || "";
@@ -124,12 +145,65 @@ function populateOverview(c) {
   document.getElementById("ov-preApprovalStatus").value = c.preApprovalStatus || "";
   document.getElementById("ov-preApprovalAmount").value = c.preApprovalAmount || "";
   document.getElementById("ov-notes").value = c.notes || "";
+  document.getElementById("ov-closingDate").value = c.closingDate
+    ? (typeof c.closingDate.toDate === "function"
+        ? c.closingDate.toDate()
+        : new Date(c.closingDate)
+      ).toISOString().split("T")[0]
+    : "";
 
   const types = c.propertyTypes || [];
   document.querySelectorAll("#ov-propertyTypes input").forEach(cb => {
     cb.checked = types.includes(cb.value);
   });
 }
+
+/* --- Transaction type immediate save --- */
+document.getElementById("ov-transactionType").addEventListener("change", async (e) => {
+  const user = auth.currentUser;
+  if (!user) return;
+  const value = e.target.value || null;
+  try {
+    await updateDoc(doc(db, "clients", clientId), { transactionType: value });
+    clientData.transactionType = value;
+    showToast("Transaction type updated.");
+    // Auto-create Closing Documents folder when transaction type is set
+    if (value) {
+      await ensureClosingDocumentsFolder(clientId, user.uid);
+    }
+    // Seed closing checklist for this transaction type
+    const closingDateVal = clientData.closingDate
+      ? (typeof clientData.closingDate.toDate === "function" ? clientData.closingDate.toDate() : new Date(clientData.closingDate))
+      : null;
+    await seedChecklist(db, clientId, value, closingDateVal);
+    // Re-initialize checklist UI so it picks up newly seeded items
+    initChecklist(clientId, clientData);
+    // Re-filter compliance templates for the new transaction type
+    loadComplianceTemplates(user.uid);
+  } catch (err) {
+    console.error("Transaction type save error:", err);
+    showToast("Failed to update transaction type.", "error");
+  }
+});
+
+/* --- Closing date immediate save + deadline recalculation --- */
+document.getElementById("ov-closingDate").addEventListener("change", async (e) => {
+  const user = auth.currentUser;
+  if (!user) return;
+  const dateValue = e.target.value ? new Date(e.target.value + "T00:00:00") : null;
+  try {
+    await updateDoc(doc(db, "clients", clientId), {
+      closingDate: dateValue ? Timestamp.fromDate(dateValue) : null
+    });
+    clientData.closingDate = dateValue ? Timestamp.fromDate(dateValue) : null;
+    showToast("Closing date updated.");
+    // Recalculate checklist deadlines
+    await recalculateDeadlines(db, clientId, dateValue);
+  } catch (err) {
+    console.error("Closing date save error:", err);
+    showToast("Failed to update closing date.", "error");
+  }
+});
 
 /* --- Save overview --- */
 window.saveOverview = async function () {
@@ -154,6 +228,7 @@ window.saveOverview = async function () {
     phone: document.getElementById("ov-phone").value.trim(),
     status: document.getElementById("ov-status").value,
     source: document.getElementById("ov-source").value,
+    transactionType: document.getElementById("ov-transactionType").value || null,
     timeline: document.getElementById("ov-timeline").value,
     budgetMin: Number(document.getElementById("ov-budgetMin").value) || null,
     budgetMax: Number(document.getElementById("ov-budgetMax").value) || null,
@@ -169,7 +244,10 @@ window.saveOverview = async function () {
     dealBreakers,
     preApprovalStatus: document.getElementById("ov-preApprovalStatus").value,
     preApprovalAmount: Number(document.getElementById("ov-preApprovalAmount").value) || null,
-    notes: document.getElementById("ov-notes").value.trim()
+    notes: document.getElementById("ov-notes").value.trim(),
+    closingDate: document.getElementById("ov-closingDate").value
+      ? Timestamp.fromDate(new Date(document.getElementById("ov-closingDate").value + "T00:00:00"))
+      : null
   };
 
   try {
@@ -218,6 +296,10 @@ document.querySelectorAll(".gd-tab").forEach(tab => {
     document.querySelectorAll(".gd-tab-content").forEach(c => c.classList.remove("active"));
     tab.classList.add("active");
     document.getElementById("tab-" + tab.dataset.tab).classList.add("active");
+    // Initialize checklist tab when activated
+    if (tab.dataset.tab === "checklist" && clientData) {
+      initChecklist(clientId, clientData);
+    }
   });
 });
 
@@ -426,17 +508,418 @@ window.saveAsTemplate = async function () {
   }
 };
 
-/* ===== FILES TAB ===== */
-let currentFileFolder = "all";
+/* ===== FOLDER MANAGEMENT ===== */
 
-document.getElementById("folder-filters").addEventListener("click", (e) => {
-  const btn = e.target.closest(".gd-folder-btn");
-  if (!btn) return;
-  document.querySelectorAll(".gd-folder-btn").forEach(b => b.classList.remove("active"));
-  btn.classList.add("active");
-  currentFileFolder = btn.dataset.folder;
+async function loadFolders(uid) {
+  try {
+    const q = query(
+      collection(db, "folders"),
+      where("clientId", "==", clientId),
+      where("realtorId", "==", uid),
+      orderBy("createdAt", "asc")
+    );
+    const snap = await getDocs(q);
+    allFolders = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  } catch (e) {
+    console.error("Load folders error:", e);
+  }
+}
+
+async function ensureClosingDocumentsFolder(clientId, uid) {
+  // Check if a system folder already exists for this client
+  const existing = allFolders.find(f => f.isSystem === true);
+  if (existing) return; // Already exists — idempotent
+
+  // Use a deterministic document ID to prevent race conditions
+  // (two tabs setting transaction type simultaneously)
+  const deterministicId = `${clientId}_closing_documents`;
+  const folderRef = doc(db, "folders", deterministicId);
+
+  try {
+    // Check Firestore directly (in case allFolders is stale)
+    const snap = await getDoc(folderRef);
+    if (snap.exists()) {
+      // Already exists in Firestore but not in local state — reload
+      await loadFolders(uid);
+      renderFolderCards();
+      return;
+    }
+
+    // Create the system folder with deterministic ID
+    await setDoc(folderRef, {
+      name: "Closing Documents",
+      clientId: clientId,
+      realtorId: uid,
+      isSystem: true,
+      createdAt: serverTimestamp()
+    });
+
+    // Reload folders to pick up the new system folder
+    await loadFolders(uid);
+    renderFolderCards();
+    showToast("Closing Documents folder created.");
+  } catch (err) {
+    console.error("Ensure Closing Documents folder error:", err);
+    // Don't show error toast — this is a background operation
+    // The folder may have been created by another tab (duplicate key error is OK)
+  }
+}
+
+function renderFolderCards() {
+  const container = document.getElementById("folder-cards");
+  const breadcrumbEl = document.getElementById("folder-breadcrumb");
+  if (!container) return;
+
+  // If inside a folder, hide folder cards and show breadcrumb
+  if (currentFolderId) {
+    container.classList.add("gd-hidden");
+    return;
+  }
+
+  container.classList.remove("gd-hidden");
+
+  let html = allFolders.map(f => {
+    const count = allFiles.filter(file => file.folderId === f.id).length;
+    const isSystem = f.isSystem === true;
+    const systemClass = isSystem ? " gd-folder-card--system" : "";
+    const icon = isSystem ? "&#128274;" : "&#128193;";
+    const kebab = isSystem ? "" : `
+      <button class="gd-folder-kebab" onclick="event.stopPropagation(); toggleFolderMenu('${f.id}')" title="Folder options">&#8942;</button>
+      <div id="folder-menu-${f.id}" class="gd-folder-menu gd-hidden">
+        <button onclick="event.stopPropagation(); renameFolder('${f.id}')">Rename</button>
+        <button onclick="event.stopPropagation(); deleteFolder('${f.id}')">Delete</button>
+      </div>`;
+    return `
+    <div class="gd-folder-card${systemClass}" onclick="enterFolder('${f.id}')"
+      ondragover="event.preventDefault(); this.classList.add('gd-folder-card--dragover')"
+      ondragleave="this.classList.remove('gd-folder-card--dragover')"
+      ondrop="event.preventDefault(); this.classList.remove('gd-folder-card--dragover'); dropFileOnFolder(event, '${f.id}')">
+      <span class="gd-folder-card-icon">${icon}</span>
+      <span class="gd-folder-card-name">${escapeHtml(f.name)}</span>
+      <span class="gd-folder-card-count">${count}</span>
+      ${kebab}
+    </div>`;
+  }).join("");
+
+  // Add "+ New Folder" card
+  html += `
+    <div class="gd-folder-card gd-folder-card--add" onclick="createNewFolder()">
+      <span class="gd-folder-card-icon">+</span>
+      <span class="gd-folder-card-name">New Folder</span>
+    </div>`;
+
+  container.innerHTML = html;
+}
+
+function renderBreadcrumb() {
+  const el = document.getElementById("folder-breadcrumb");
+  if (!el) return;
+
+  if (currentFolderId) {
+    const folder = allFolders.find(f => f.id === currentFolderId);
+    const folderName = folder ? escapeHtml(folder.name) : "Folder";
+    el.innerHTML = `
+      <span class="gd-breadcrumb-link" onclick="exitFolder()">Files</span>
+      <span class="gd-breadcrumb-sep">&rsaquo;</span>
+      <span class="gd-breadcrumb-current">${folderName}</span>`;
+    el.classList.remove("gd-hidden");
+  } else {
+    el.classList.add("gd-hidden");
+    el.innerHTML = "";
+  }
+}
+
+window.enterFolder = function (folderId) {
+  currentFolderId = folderId;
+  renderFolderCards();
   renderFiles();
+  renderBreadcrumb();
+};
+
+window.exitFolder = function () {
+  currentFolderId = null;
+  renderFolderCards();
+  renderFiles();
+  renderBreadcrumb();
+};
+
+window.createNewFolder = async function () {
+  const user = auth.currentUser;
+  if (!user) return;
+
+  const name = prompt("Folder name:");
+  if (!name || !name.trim()) return;
+
+  try {
+    await addDoc(collection(db, "folders"), {
+      name: name.trim(),
+      clientId,
+      realtorId: user.uid,
+      isSystem: false,
+      createdAt: serverTimestamp()
+    });
+    await loadFolders(user.uid);
+    renderFolderCards();
+    showToast("Folder created.");
+  } catch (e) {
+    console.error("Create folder error:", e);
+    showToast("Failed to create folder.", "error");
+  }
+};
+
+window.renameFolder = async function (folderId) {
+  const user = auth.currentUser;
+  if (!user) return;
+
+  const folder = allFolders.find(f => f.id === folderId);
+  if (!folder || folder.isSystem) return;
+
+  const newName = prompt("New folder name:", folder.name);
+  if (!newName || !newName.trim() || newName.trim() === folder.name) return;
+
+  try {
+    await updateDoc(doc(db, "folders", folderId), { name: newName.trim() });
+    await loadFolders(user.uid);
+    renderFolderCards();
+    renderBreadcrumb();
+    showToast("Folder renamed.");
+  } catch (e) {
+    console.error("Rename folder error:", e);
+    showToast("Failed to rename folder.", "error");
+  }
+};
+
+window.deleteFolder = async function (folderId) {
+  const user = auth.currentUser;
+  if (!user) return;
+
+  const folder = allFolders.find(f => f.id === folderId);
+  if (!folder || folder.isSystem) return;
+
+  if (!confirm("Delete this folder? Files inside will be moved to root.")) return;
+
+  try {
+    const batch = writeBatch(db);
+    // Move all files in this folder to root
+    const filesInFolder = allFiles.filter(f => f.folderId === folderId);
+    for (const f of filesInFolder) {
+      batch.update(doc(db, "files", f.id), { folderId: null });
+    }
+    // Delete the folder doc
+    batch.delete(doc(db, "folders", folderId));
+    await batch.commit();
+
+    // If user was inside this folder, exit
+    if (currentFolderId === folderId) {
+      currentFolderId = null;
+    }
+
+    await Promise.all([loadFolders(user.uid), loadFiles(user.uid)]);
+    renderFolderCards();
+    renderFiles();
+    renderBreadcrumb();
+    showToast("Folder deleted. Files moved to root.");
+  } catch (e) {
+    console.error("Delete folder error:", e);
+    showToast("Failed to delete folder.", "error");
+  }
+};
+
+window.toggleFolderMenu = function (folderId) {
+  // Close all other folder menus first
+  document.querySelectorAll(".gd-folder-menu").forEach(m => {
+    if (m.id !== "folder-menu-" + folderId) {
+      m.classList.add("gd-hidden");
+    }
+  });
+  const menu = document.getElementById("folder-menu-" + folderId);
+  if (menu) {
+    menu.classList.toggle("gd-hidden");
+  }
+};
+
+// Close menus on outside click
+document.addEventListener("click", (e) => {
+  if (!e.target.closest(".gd-folder-kebab") && !e.target.closest(".gd-folder-menu")) {
+    document.querySelectorAll(".gd-folder-menu").forEach(m => m.classList.add("gd-hidden"));
+  }
+  if (!e.target.closest(".gd-file-kebab") && !e.target.closest(".gd-file-menu")) {
+    document.querySelectorAll(".gd-file-menu").forEach(m => m.classList.add("gd-hidden"));
+  }
 });
+
+/* --- File Move Functions --- */
+
+window.moveFileToFolder = async function (fileId, folderId) {
+  const user = auth.currentUser;
+  if (!user) return;
+
+  try {
+    await updateDoc(doc(db, "files", fileId), { folderId: folderId || null });
+    // Update in memory
+    const file = allFiles.find(f => f.id === fileId);
+    if (file) file.folderId = folderId || null;
+    renderFolderCards();
+    renderFiles();
+    showToast("File moved.");
+  } catch (e) {
+    console.error("Move file error:", e);
+    showToast("Failed to move file.", "error");
+  }
+};
+
+window.bulkMoveToFolder = async function (folderId) {
+  const user = auth.currentUser;
+  if (!user) return;
+
+  const ids = Array.from(selectedFiles);
+  if (ids.length === 0) return;
+
+  try {
+    const batch = writeBatch(db);
+    for (const fileId of ids) {
+      batch.update(doc(db, "files", fileId), { folderId: folderId || null });
+    }
+    await batch.commit();
+
+    // Update in memory
+    for (const fileId of ids) {
+      const file = allFiles.find(f => f.id === fileId);
+      if (file) file.folderId = folderId || null;
+    }
+
+    clearFileSelection();
+    renderFolderCards();
+    renderFiles();
+    showToast(ids.length + " file" + (ids.length > 1 ? "s" : "") + " moved.");
+  } catch (e) {
+    console.error("Bulk move error:", e);
+    showToast("Failed to move files.", "error");
+  }
+};
+
+window.dropFileOnFolder = function (event, folderId) {
+  const fileId = event.dataTransfer.getData("text/plain");
+  if (fileId) {
+    moveFileToFolder(fileId, folderId);
+  }
+};
+
+window.showFileMoveMenu = function (fileId, event) {
+  event.stopPropagation();
+  // Close any existing file move menus
+  document.querySelectorAll(".gd-file-move-popover").forEach(m => m.remove());
+
+  const btn = event.currentTarget;
+  const rect = btn.getBoundingClientRect();
+
+  let html = '<div class="gd-file-move-popover" style="position:fixed;top:' + (rect.bottom + 4) + 'px;left:' + rect.left + 'px;z-index:2100;">';
+  html += '<div class="gd-file-menu">';
+  html += '<button onclick="moveFileToFolder(\'' + fileId + '\', null); this.closest(\'.gd-file-move-popover\').remove()">Root (no folder)</button>';
+  for (const f of allFolders) {
+    html += '<button onclick="moveFileToFolder(\'' + fileId + '\', \'' + f.id + '\'); this.closest(\'.gd-file-move-popover\').remove()">' + escapeHtml(f.name) + '</button>';
+  }
+  html += '</div></div>';
+
+  document.body.insertAdjacentHTML("beforeend", html);
+
+  // Close on outside click
+  setTimeout(() => {
+    const handler = (e) => {
+      if (!e.target.closest(".gd-file-move-popover")) {
+        document.querySelectorAll(".gd-file-move-popover").forEach(m => m.remove());
+        document.removeEventListener("click", handler);
+      }
+    };
+    document.addEventListener("click", handler);
+  }, 10);
+};
+
+window.openBulkMoveMenu = function (btn) {
+  // Close any existing bulk move menus
+  document.querySelectorAll(".gd-file-move-popover").forEach(m => m.remove());
+
+  const rect = btn.getBoundingClientRect();
+
+  let html = '<div class="gd-file-move-popover" style="position:fixed;top:' + (rect.top - 4) + 'px;left:' + rect.left + 'px;transform:translateY(-100%);z-index:2100;">';
+  html += '<div class="gd-file-menu">';
+  html += '<button onclick="bulkMoveToFolder(null); this.closest(\'.gd-file-move-popover\').remove()">Root (no folder)</button>';
+  for (const f of allFolders) {
+    html += '<button onclick="bulkMoveToFolder(\'' + f.id + '\'); this.closest(\'.gd-file-move-popover\').remove()">' + escapeHtml(f.name) + '</button>';
+  }
+  html += '</div></div>';
+
+  document.body.insertAdjacentHTML("beforeend", html);
+
+  setTimeout(() => {
+    const handler = (e) => {
+      if (!e.target.closest(".gd-file-move-popover")) {
+        document.querySelectorAll(".gd-file-move-popover").forEach(m => m.remove());
+        document.removeEventListener("click", handler);
+      }
+    };
+    document.addEventListener("click", handler);
+  }, 10);
+};
+
+/* --- Migration --- */
+
+async function migrateExistingFolders(uid) {
+  // Only migrate if no folders exist yet and files have old string folder fields
+  if (allFolders.length > 0) return;
+
+  const filesWithStringFolder = allFiles.filter(f => f.folder && typeof f.folder === "string" && !f.folderId);
+  if (filesWithStringFolder.length === 0) return;
+
+  const folderMap = {
+    contracts: "Contracts",
+    disclosures: "Disclosures",
+    other: "Other",
+    inspections: "Inspections",
+    financial: "Financial",
+    photos: "Photos"
+  };
+
+  // Collect unique folder strings
+  const uniqueFolders = [...new Set(filesWithStringFolder.map(f => f.folder))];
+
+  try {
+    const batch = writeBatch(db);
+    const folderIdMap = {};
+
+    // Create folder docs
+    for (const folderKey of uniqueFolders) {
+      const folderName = folderMap[folderKey] || folderKey;
+      const folderRef = doc(collection(db, "folders"));
+      batch.set(folderRef, {
+        name: folderName,
+        clientId,
+        realtorId: uid,
+        isSystem: false,
+        createdAt: serverTimestamp()
+      });
+      folderIdMap[folderKey] = folderRef.id;
+    }
+
+    // Update file docs with folderId
+    for (const f of filesWithStringFolder) {
+      const folderId = folderIdMap[f.folder];
+      if (folderId) {
+        batch.update(doc(db, "files", f.id), { folderId });
+      }
+    }
+
+    await batch.commit();
+
+    // Reload folders and files after migration
+    await Promise.all([loadFolders(uid), loadFiles(uid)]);
+    console.log("Folder migration complete: created", uniqueFolders.length, "folders, updated", filesWithStringFolder.length, "files");
+  } catch (e) {
+    console.error("Folder migration error:", e);
+  }
+}
+
+/* ===== FILES TAB ===== */
 
 document.getElementById("file-input").addEventListener("change", (e) => {
   if (e.target.files[0]) {
@@ -477,32 +960,55 @@ async function loadTemplateFiles(uid) {
 function renderFiles() {
   const el = document.getElementById("files-list");
   let filtered = allFiles;
-  if (currentFileFolder !== "all") {
-    filtered = filtered.filter(f => f.folder === currentFileFolder);
+
+  // Inside a folder: show only that folder's files. At root: show all files.
+  if (currentFolderId) {
+    filtered = filtered.filter(f => f.folderId === currentFolderId);
   }
 
   if (filtered.length === 0) {
-    el.innerHTML = `<div class="gd-empty"><div class="gd-empty-icon">&#128193;</div><div class="gd-empty-text">No files${currentFileFolder !== "all" ? " in this folder" : ""}</div></div>`;
+    el.innerHTML = `<div class="gd-empty"><div class="gd-empty-icon">&#128193;</div><div class="gd-empty-text">No files${currentFolderId ? " in this folder" : " uploaded yet"}</div></div>`;
     return;
   }
 
   el.innerHTML = filtered.map(f => {
-    const signedBadge = f.fileName.startsWith("SIGNED_") ? ' <span class="gd-badge-signed">&#9997; Signed</span>' : '';
+    const signedBadge = f.signedSource
+      ? ` <span class="gd-badge-signed">Signed${f.signedAt ? " &mdash; " + formatDate(f.signedAt) : ""}</span>`
+      : "";
     const checked = selectedFiles.has(f.id) ? "checked" : "";
+    const folderName = allFolders.find(fd => fd.id === f.folderId)?.name || "Root";
     return `
-    <div class="gd-file-row" onclick="openPreview('${f.id}')">
+    <div class="gd-file-row" draggable="true" ondragstart="event.dataTransfer.setData('text/plain', '${f.id}')" onclick="openPreview('${f.id}')">
       <input type="checkbox" class="gd-file-check" data-id="${f.id}" ${checked} onclick="event.stopPropagation(); toggleFileSelect('${f.id}')">
       <span class="gd-file-preview-icon">&#128065;</span>
       <span class="gd-file-name">${escapeHtml(f.fileName)}${signedBadge}</span>
-      <span class="gd-badge gd-badge-${f.folder}">${f.folder}</span>
+      <span class="gd-badge">${escapeHtml(folderName)}</span>
       <span class="gd-file-meta">${formatFileSize(f.fileSize)}</span>
       <span class="gd-file-meta">${formatDate(f.uploadedAt)}</span>
       <button class="gd-btn gd-btn-sm gd-file-send-btn" onclick="event.stopPropagation(); sendSingleFile('${f.id}')">Send</button>
-      <a href="${f.downloadUrl}" target="_blank" class="gd-file-download" onclick="event.stopPropagation()">Download</a>
-      <button class="gd-btn gd-btn-sm gd-btn-danger" onclick="event.stopPropagation(); deleteFile('${f.id}')" title="Delete file">&times;</button>
+      <button class="gd-file-kebab" onclick="event.stopPropagation(); toggleFileRowMenu('${f.id}', event)" title="File options">&#8942;</button>
+      <div id="file-menu-${f.id}" class="gd-file-menu gd-hidden">
+        <button onclick="event.stopPropagation(); showFileMoveMenu('${f.id}', event)">Move to folder</button>
+        <a href="${f.downloadUrl}" target="_blank" onclick="event.stopPropagation();" style="display:block;padding:0.5rem 0.75rem;font-size:0.82rem;text-decoration:none;color:inherit;">Download</a>
+        <button onclick="event.stopPropagation(); deleteFile('${f.id}')">Delete</button>
+      </div>
     </div>`;
   }).join("");
 }
+
+window.toggleFileRowMenu = function (fileId, event) {
+  event.stopPropagation();
+  // Close all other file menus first
+  document.querySelectorAll(".gd-file-menu").forEach(m => {
+    if (m.id !== "file-menu-" + fileId) {
+      m.classList.add("gd-hidden");
+    }
+  });
+  const menu = document.getElementById("file-menu-" + fileId);
+  if (menu) {
+    menu.classList.toggle("gd-hidden");
+  }
+};
 
 window.deleteFile = async function (fileId) {
   if (!confirm("Delete this file? This cannot be undone.")) return;
@@ -540,7 +1046,7 @@ window.uploadFile = async function () {
   const file = fileInput.files[0];
   if (!file) { showToast("Select a file first.", "error"); return; }
 
-  const folder = document.getElementById("upload-folder").value;
+  const folder = currentFolderId ? (allFolders.find(f => f.id === currentFolderId)?.name || "general") : "general";
   const storagePath = `files/${user.uid}/${clientId}/${folder}/${file.name}`;
   const storageRef = ref(storage, storagePath);
 
@@ -571,6 +1077,7 @@ window.uploadFile = async function () {
           storagePath,
           downloadUrl,
           folder,
+          folderId: currentFolderId || null,
           fileSize: file.size,
           mimeType: file.type,
           uploadedAt: serverTimestamp()
@@ -701,7 +1208,7 @@ window.uploadAndSend = async function () {
   const file = fileInput.files[0];
   if (!file) { showToast("Select a file first.", "error"); return; }
 
-  const folder = document.getElementById("upload-folder").value;
+  const folder = currentFolderId ? (allFolders.find(f => f.id === currentFolderId)?.name || "general") : "general";
   const storagePath = `files/${user.uid}/${clientId}/${folder}/${file.name}`;
   const storageRef = ref(storage, storagePath);
 
@@ -711,7 +1218,7 @@ window.uploadAndSend = async function () {
     const downloadUrl = await getDownloadURL(snap.ref);
     const docRef = await addDoc(collection(db, "files"), {
       clientId, realtorId: user.uid, fileName: file.name, storagePath, downloadUrl,
-      folder, fileSize: file.size, mimeType: file.type, uploadedAt: serverTimestamp()
+      folder, folderId: currentFolderId || null, fileSize: file.size, mimeType: file.type, uploadedAt: serverTimestamp()
     });
     fileInput.value = "";
     await loadFiles(user.uid);
@@ -2318,10 +2825,444 @@ window.saveAndMatchListing = async function () {
   }
 };
 
+/* ================================================================== */
+/*  COMPLIANCE DOCS TAB                                               */
+/* ================================================================== */
+
+/**
+ * loadComplianceTemplates
+ *
+ * Queries Firestore documentTemplates collection and filters client-side
+ * by the client's transaction type. If no transaction type is set, loads
+ * all templates but marks them as disabled.
+ */
+async function loadComplianceTemplates(uid) {
+  try {
+    const templatesSnap = await getDocs(
+      query(collection(db, "documentTemplates"), orderBy("sortOrder"))
+    );
+
+    const allTemplates = [];
+    templatesSnap.forEach(d => {
+      allTemplates.push({ id: d.id, ...d.data() });
+    });
+
+    // Filter by client transaction type (client-side)
+    if (clientData && clientData.transactionType) {
+      complianceTemplates = allTemplates.filter(
+        t => t.transactionTypes && t.transactionTypes.includes(clientData.transactionType)
+      );
+    } else {
+      // No transaction type set -- show all but they will be disabled
+      complianceTemplates = allTemplates;
+    }
+
+    renderComplianceList();
+  } catch (err) {
+    console.error("loadComplianceTemplates error:", err);
+    document.getElementById("compliance-list").innerHTML =
+      '<div class="gd-empty"><div class="gd-empty-icon">&#128196;</div><div class="gd-empty-text">Failed to load compliance documents.</div></div>';
+  }
+}
+
+/**
+ * renderComplianceList
+ *
+ * Renders the compliance template rows grouped by category with collapsible
+ * headers. Each row shows: checkbox, name, category badge, required asterisk,
+ * status badge, and Send button.
+ */
+function renderComplianceList() {
+  const listEl = document.getElementById("compliance-list");
+  const bannerEl = document.getElementById("compliance-no-txn-banner");
+  const toolbarEl = document.getElementById("compliance-toolbar");
+
+  const noTxnType = !clientData || !clientData.transactionType;
+
+  // Show/hide banner and toolbar
+  if (noTxnType) {
+    bannerEl.classList.remove("gd-hidden");
+    toolbarEl.classList.add("gd-hidden");
+  } else {
+    bannerEl.classList.add("gd-hidden");
+    toolbarEl.classList.remove("gd-hidden");
+  }
+
+  if (complianceTemplates.length === 0) {
+    listEl.innerHTML = '<div class="gd-empty"><div class="gd-empty-icon">&#128196;</div><div class="gd-empty-text">No compliance documents match this transaction type.</div></div>';
+    return;
+  }
+
+  // Group by category
+  const grouped = {};
+  for (const cat of COMPLIANCE_CATEGORIES) {
+    grouped[cat] = complianceTemplates.filter(t => t.category === cat);
+  }
+
+  let html = "";
+  for (const cat of COMPLIANCE_CATEGORIES) {
+    const items = grouped[cat];
+    if (items.length === 0) continue;
+
+    const categoryLabel = cat.charAt(0).toUpperCase() + cat.slice(1);
+    html += `<div class="gd-compliance-category-header">${escapeHtml(categoryLabel)}</div>`;
+
+    for (const template of items) {
+      const docStatus = complianceDocs[template.id];
+      const status = docStatus?.status || COMPLIANCE_STATUSES.NOT_SENT;
+      const isSent = status !== COMPLIANCE_STATUSES.NOT_SENT;
+      const showSendButton = !noTxnType && !isSent;
+
+      html += `<div class="gd-compliance-row ${noTxnType ? 'gd-disabled' : ''}">
+        <input type="checkbox" class="gd-compliance-check" data-template-id="${escapeHtml(template.id)}"
+          ${isSent ? 'disabled' : ''} ${noTxnType ? 'disabled' : ''}>
+        <span class="gd-compliance-name">${escapeHtml(template.name)}</span>
+        <span class="gd-badge gd-badge-${escapeHtml(template.category)}">${escapeHtml(categoryLabel)}</span>
+        ${template.required ? '<span class="gd-required-asterisk">*</span>' : ''}
+        ${formatComplianceStatus(status, docStatus?.signedAt)}
+        ${showSendButton ? `<button class="gd-btn gd-btn-sm gd-btn-primary" onclick="openSendDialog('${escapeHtml(template.id)}')">Send</button>` : ''}
+      </div>`;
+    }
+  }
+
+  listEl.innerHTML = html;
+
+  // Wire bulk select checkbox events
+  wireComplianceBulkSelect();
+}
+
+/**
+ * startComplianceListener
+ *
+ * Sets up real-time Firestore onSnapshot listener on the client's
+ * complianceDocs subcollection. Re-renders the compliance list whenever
+ * status changes (COMP-10).
+ */
+function startComplianceListener(cid) {
+  if (complianceUnsubscribe) complianceUnsubscribe();
+  complianceUnsubscribe = onSnapshot(
+    collection(db, "clients", cid, "complianceDocs"),
+    (snap) => {
+      complianceDocs = {};
+      snap.forEach(d => { complianceDocs[d.id] = { id: d.id, ...d.data() }; });
+      renderComplianceList();
+    }
+  );
+}
+
+/**
+ * wireComplianceBulkSelect
+ *
+ * Wires the Select All checkbox and individual template checkboxes
+ * to enable/disable the bulk send button.
+ */
+function wireComplianceBulkSelect() {
+  const selectAllEl = document.getElementById("compliance-select-all");
+  const bulkSendBtn = document.getElementById("compliance-bulk-send");
+
+  if (!selectAllEl || !bulkSendBtn) return;
+
+  const checkboxes = document.querySelectorAll(".gd-compliance-check:not(:disabled)");
+
+  selectAllEl.onchange = () => {
+    checkboxes.forEach(cb => { cb.checked = selectAllEl.checked; });
+    updateBulkSendState();
+  };
+
+  checkboxes.forEach(cb => {
+    cb.onchange = () => updateBulkSendState();
+  });
+
+  function updateBulkSendState() {
+    const checked = document.querySelectorAll(".gd-compliance-check:checked");
+    bulkSendBtn.disabled = checked.length === 0;
+    // Update Select All state
+    selectAllEl.checked = checkboxes.length > 0 && checked.length === checkboxes.length;
+  }
+}
+
+/**
+ * openSendDialog
+ *
+ * Opens the compliance confirm dialog for a single template. Populates
+ * recipient info, document name, listing selector, and resolved merge
+ * field preview.
+ */
+async function openSendDialog(templateId) {
+  const template = complianceTemplates.find(t => t.id === templateId);
+  if (!template) return;
+
+  pendingSendTemplateId = templateId;
+
+  // Populate recipient
+  const recipientEl = document.getElementById("compliance-confirm-recipient");
+  recipientEl.textContent = `${clientData.fullName || "Client"} (${clientData.email || "no email"})`;
+
+  // Populate document name
+  document.getElementById("compliance-confirm-docname").textContent = template.name;
+
+  // Populate listing selector
+  const listingSelect = document.getElementById("compliance-confirm-listing");
+  listingSelect.innerHTML = '<option value="">No listing selected</option>';
+
+  try {
+    // Query client listing matches to get linked listings
+    const user = auth.currentUser;
+    if (user) {
+      const matchesSnap = await getDocs(
+        query(collection(db, "clientListingMatches"),
+          where("clientId", "==", clientId),
+          where("realtorId", "==", user.uid))
+      );
+
+      const listingIds = [];
+      matchesSnap.forEach(d => {
+        const data = d.data();
+        if (data.listingId) listingIds.push(data.listingId);
+      });
+
+      for (const lid of listingIds) {
+        const lSnap = await getDoc(doc(db, "listings", lid));
+        if (lSnap.exists()) {
+          const lData = lSnap.data();
+          const addr = lData.address?.full || lData.address?.street || lid;
+          listingSelect.innerHTML += `<option value="${escapeHtml(lid)}">${escapeHtml(addr)}</option>`;
+        }
+      }
+
+      if (listingIds.length === 0) {
+        listingSelect.innerHTML = '<option value="">No listings linked -- property fields will be blank</option>';
+      } else {
+        // Default to first listing
+        listingSelect.selectedIndex = 1;
+      }
+    }
+  } catch (err) {
+    console.error("Error loading listings for compliance confirm:", err);
+    listingSelect.innerHTML = '<option value="">No listings linked -- property fields will be blank</option>';
+  }
+
+  // Resolve and display merge fields
+  await updateComplianceConfirmFields(template);
+
+  // Listen for listing changes to re-resolve fields
+  listingSelect.onchange = () => updateComplianceConfirmFields(template);
+
+  // Show the modal
+  document.getElementById("compliance-confirm-modal").classList.add("active");
+}
+
+/**
+ * updateComplianceConfirmFields
+ *
+ * Resolves merge fields based on the currently selected listing and
+ * updates the confirm dialog's field list and missing warning.
+ */
+async function updateComplianceConfirmFields(template) {
+  const listingSelect = document.getElementById("compliance-confirm-listing");
+  const fieldListEl = document.getElementById("compliance-confirm-field-list");
+  const missingEl = document.getElementById("compliance-confirm-missing");
+  const missingTextEl = document.getElementById("compliance-confirm-missing-text");
+
+  let listingData = null;
+  const selectedListingId = listingSelect.value;
+
+  if (selectedListingId) {
+    try {
+      const lSnap = await getDoc(doc(db, "listings", selectedListingId));
+      if (lSnap.exists()) {
+        listingData = lSnap.data();
+      }
+    } catch (err) {
+      console.error("Error loading listing for merge fields:", err);
+    }
+  }
+
+  // Build merge fields using the compliance.js utility
+  const agentProfile = realtorProfile || {};
+  const { existingFormFields, missing } = buildMergeFields(template, clientData, listingData, agentProfile);
+
+  // Render field rows
+  let fieldsHtml = "";
+  for (const field of existingFormFields) {
+    const isEmpty = !field.value;
+    fieldsHtml += `<div class="gd-confirm-field-row">
+      <span class="gd-confirm-field-name">${escapeHtml(field.id)}</span>
+      <span class="gd-confirm-field-value ${isEmpty ? 'gd-missing' : ''}">${isEmpty ? '(empty)' : escapeHtml(field.value)}</span>
+    </div>`;
+  }
+  fieldListEl.innerHTML = fieldsHtml;
+
+  // Show/hide missing warning
+  if (missing.length > 0) {
+    missingTextEl.textContent = `${missing.length} field(s) will be blank: ${missing.join(", ")}`;
+    missingEl.classList.remove("gd-hidden");
+  } else {
+    missingEl.classList.add("gd-hidden");
+  }
+}
+
+/**
+ * confirmAndSendCompliance
+ *
+ * Called when the user clicks "Send for Signature" in the confirm dialog.
+ * Calls the sendComplianceDoc Cloud Function.
+ */
+async function confirmAndSendCompliance() {
+  const sendBtn = document.getElementById("compliance-confirm-send-btn");
+  const originalText = sendBtn.textContent;
+  sendBtn.disabled = true;
+  sendBtn.textContent = "Sending...";
+
+  const listingSelect = document.getElementById("compliance-confirm-listing");
+  const listingId = listingSelect.value || null;
+
+  try {
+    await sendComplianceDocFn({
+      templateId: pendingSendTemplateId,
+      clientId: clientId,
+      listingId: listingId
+    });
+
+    showToast("Document sent for signature");
+    closeComplianceConfirm();
+    // The onSnapshot listener will automatically update the row status
+  } catch (err) {
+    console.error("sendComplianceDoc error:", err);
+    showToast(err.message || "Failed to send document.", "error");
+    sendBtn.disabled = false;
+    sendBtn.textContent = originalText;
+  }
+}
+
+/**
+ * closeComplianceConfirm
+ *
+ * Closes the compliance confirm dialog and clears pending state.
+ */
+function closeComplianceConfirm() {
+  document.getElementById("compliance-confirm-modal").classList.remove("active");
+  pendingSendTemplateId = null;
+}
+
+/**
+ * handleBulkComplianceSend
+ *
+ * Collects selected template IDs and sends them as a single BoldSign
+ * envelope via sendBulkComplianceDocsFn. Falls back gracefully if
+ * envelope bundling is unavailable.
+ */
+async function handleBulkComplianceSend() {
+  const checked = document.querySelectorAll(".gd-compliance-check:checked");
+  if (checked.length === 0) return;
+
+  const templateIds = [];
+  checked.forEach(cb => templateIds.push(cb.dataset.templateId));
+
+  // Open confirm dialog in bulk mode
+  pendingSendTemplateId = null; // null signals bulk mode
+
+  const recipientEl = document.getElementById("compliance-confirm-recipient");
+  recipientEl.textContent = `${clientData.fullName || "Client"} (${clientData.email || "no email"})`;
+
+  document.getElementById("compliance-confirm-docname").textContent =
+    `${templateIds.length} document(s) -- will be bundled into a single signing session`;
+
+  // Populate listing selector
+  const listingSelect = document.getElementById("compliance-confirm-listing");
+  listingSelect.innerHTML = '<option value="">No listing selected</option>';
+
+  try {
+    const user = auth.currentUser;
+    if (user) {
+      const matchesSnap = await getDocs(
+        query(collection(db, "clientListingMatches"),
+          where("clientId", "==", clientId),
+          where("realtorId", "==", user.uid))
+      );
+
+      const listingIds = [];
+      matchesSnap.forEach(d => {
+        const data = d.data();
+        if (data.listingId) listingIds.push(data.listingId);
+      });
+
+      for (const lid of listingIds) {
+        const lSnap = await getDoc(doc(db, "listings", lid));
+        if (lSnap.exists()) {
+          const lData = lSnap.data();
+          const addr = lData.address?.full || lData.address?.street || lid;
+          listingSelect.innerHTML += `<option value="${escapeHtml(lid)}">${escapeHtml(addr)}</option>`;
+        }
+      }
+
+      if (listingIds.length > 0) {
+        listingSelect.selectedIndex = 1;
+      }
+    }
+  } catch (err) {
+    console.error("Error loading listings for bulk compliance confirm:", err);
+  }
+
+  // Hide merge field preview for bulk mode (too complex to preview all)
+  document.getElementById("compliance-confirm-field-list").innerHTML =
+    '<div class="gd-text-muted" style="font-size:0.85rem;">Merge fields will be resolved for each document at send time.</div>';
+  document.getElementById("compliance-confirm-missing").classList.add("gd-hidden");
+
+  // Override the send button for bulk
+  const sendBtn = document.getElementById("compliance-confirm-send-btn");
+  sendBtn.textContent = `Send ${templateIds.length} Documents`;
+  sendBtn.onclick = async () => {
+    sendBtn.disabled = true;
+    sendBtn.textContent = `Sending ${templateIds.length} documents...`;
+
+    const listingId = listingSelect.value || null;
+
+    try {
+      const result = await sendBulkComplianceDocsFn({
+        templateIds: templateIds,
+        clientId: clientId,
+        listingId: listingId
+      });
+
+      if (result.data && result.data.mode === "sequential") {
+        showToast("Documents sent individually (envelope bundling unavailable).");
+      } else {
+        showToast(`${templateIds.length} compliance documents sent as one signing session`);
+      }
+
+      closeComplianceConfirm();
+    } catch (err) {
+      console.error("sendBulkComplianceDocs error:", err);
+      showToast(err.message || "Failed to send documents.", "error");
+      sendBtn.disabled = false;
+      sendBtn.textContent = `Send ${templateIds.length} Documents`;
+    }
+  };
+
+  // Reset the send button when closing
+  const originalConfirmClose = closeComplianceConfirm;
+  document.getElementById("compliance-confirm-modal").classList.add("active");
+}
+
+// Wire the bulk send button
+document.getElementById("compliance-bulk-send")?.addEventListener("click", handleBulkComplianceSend);
+
+/* --- Expose compliance window functions --- */
+window.openSendDialog = openSendDialog;
+window.closeComplianceConfirm = closeComplianceConfirm;
+window.confirmAndSendCompliance = confirmAndSendCompliance;
+
+// Cleanup listeners on page unload
+window.addEventListener("beforeunload", () => {
+  if (complianceUnsubscribe) complianceUnsubscribe();
+});
+
 // Close modals on Escape key
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
     const modals = [
+      { id: "compliance-confirm-modal", close: () => closeComplianceConfirm() },
       { id: "file-preview-modal", close: () => closePreview() },
       { id: "activity-modal", close: () => closeActivityModal() },
       { id: "add-listing-modal", close: () => closeAddListingModal() },

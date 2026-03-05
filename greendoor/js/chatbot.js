@@ -223,6 +223,50 @@ window.sendAiMessage = async function () {
   btn.disabled = false;
 };
 
+/* ---------- send with context (for external modules like checklist AI check-in) ---------- */
+window.sendWithContext = async function (question, contextType, contextData) {
+  const page = detectPage();
+  const clientId = getClientId();
+
+  // Open the panel if not already open
+  const panel = document.getElementById("ai-panel");
+  if (!panel.classList.contains("open")) {
+    panel.classList.add("open");
+  }
+
+  // Show the user's question in the chat
+  addAiMessage(question, "user", page);
+
+  const btn = document.getElementById("ai-send-btn");
+  btn.disabled = true;
+  showTypingIndicator();
+
+  try {
+    const payload = {
+      question,
+      context: contextType,
+      history: chatHistory,
+      contextData: contextData
+    };
+    if (clientId) {
+      payload.clientId = clientId;
+    }
+    const result = await askAssistant(payload);
+    removeTypingIndicator();
+    const response = result.data.response;
+    addAiMessage(response, "ai", page);
+
+    // Append to session history
+    chatHistory.push({ role: "user", content: question });
+    chatHistory.push({ role: "assistant", content: response });
+  } catch (err) {
+    removeTypingIndicator();
+    const msg = err.message || "Something went wrong. Please try again.";
+    addAiMessage(msg, "error", page);
+  }
+  btn.disabled = false;
+};
+
 /* ---------- voice input ---------- */
 let recognition = null;
 let isListening = false;

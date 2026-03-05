@@ -54,13 +54,15 @@ async function loadCalendarData(uid) {
   showingsSnap.forEach(d => {
     const s = d.data();
     if (s.status === "cancelled") return;
+    const isShowingTime = s.source === "showingtime";
     const start = s.showingDate?.toDate ? s.showingDate.toDate() : new Date();
     allCalEvents.push({
-      id: d.id, type: "showing",
-      title: s.address || "Showing",
+      id: d.id,
+      type: isShowingTime ? "showingtime" : "showing",
+      title: s.address || (isShowingTime ? "ShowingTime" : "Showing"),
       start,
       end: s.endDate?.toDate ? s.endDate.toDate() : new Date(start.getTime() + 3600000),
-      clientId: s.clientId,
+      clientId: s.clientId || null,
       color: "#22c55e",
       data: s
     });
@@ -165,7 +167,8 @@ function renderMonth() {
       const clickHandler = ev.type === "event"
         ? `event.stopPropagation();editEvent('${ev.id}')`
         : `event.stopPropagation();showPopover('${ev.id}',this)`;
-      html += `<div class="gd-cal-event-dot ${ev.type}" draggable="true" ondragstart="onEventDragStart(event,'${ev.id}')" onclick="${clickHandler}">${escapeHtml(ev.title)}</div>`;
+      const isDraggable = ev.type !== "showingtime";
+      html += `<div class="gd-cal-event-dot ${ev.type}" ${isDraggable ? 'draggable="true" ondragstart="onEventDragStart(event,\'' + ev.id + '\')"' : ''} onclick="${clickHandler}">${escapeHtml(ev.title)}</div>`;
     });
 
     if (dayEvents.length > maxShow) {
@@ -243,8 +246,10 @@ function renderWeek() {
         evEl.style.height = height + "px";
         evEl.style.background = ev.color;
         evEl.textContent = ev.title;
-        evEl.draggable = true;
-        evEl.addEventListener("dragstart", (e) => { onEventDragStart(e, ev.id); });
+        if (ev.type !== "showingtime") {
+          evEl.draggable = true;
+          evEl.addEventListener("dragstart", (e) => { onEventDragStart(e, ev.id); });
+        }
         evEl.onclick = (e) => {
           e.stopPropagation();
           if (ev.type === "event") { editEvent(ev.id); } else { showPopover(ev.id, evEl); }
@@ -310,15 +315,23 @@ window.showPopover = function (eventId, anchorEl) {
   const clientName = ev.clientId && allClients[ev.clientId] ? allClients[ev.clientId].fullName : "";
   let meta = formatDateTime(Timestamp.fromDate(ev.start));
   if (clientName) meta += `<br>Client: ${clientName}`;
+  if (ev.type === "showingtime" && ev.data.location) {
+    meta += `<br>${escapeHtml(ev.data.location)}`;
+  }
+  if (ev.type === "showingtime") {
+    meta += '<br><span class="gd-text-muted" style="font-size:0.75rem;">Source: ShowingTime</span>';
+  }
   document.getElementById("pop-meta").innerHTML = meta;
 
   let actions = "";
-  if (ev.clientId) {
-    actions += `<a href="/greendoor/app/client-detail?id=${ev.clientId}" class="gd-btn gd-btn-sm gd-btn-primary">View Client</a>`;
-  }
-  if (ev.type === "event") {
-    actions += `<button class="gd-btn gd-btn-sm" onclick="editEvent('${ev.id}')">Edit</button>`;
-    actions += `<button class="gd-btn gd-btn-sm" onclick="deleteEvent('${ev.id}')">Delete</button>`;
+  if (ev.type !== "showingtime") {
+    if (ev.clientId) {
+      actions += `<a href="/greendoor/app/client-detail?id=${ev.clientId}" class="gd-btn gd-btn-sm gd-btn-primary">View Client</a>`;
+    }
+    if (ev.type === "event") {
+      actions += `<button class="gd-btn gd-btn-sm" onclick="editEvent('${ev.id}')">Edit</button>`;
+      actions += `<button class="gd-btn gd-btn-sm" onclick="deleteEvent('${ev.id}')">Delete</button>`;
+    }
   }
   document.getElementById("pop-actions").innerHTML = actions;
 
@@ -483,6 +496,7 @@ window.dropOnWeekCell = async function (year, month, day, hour) {
 };
 
 async function moveEvent(ev, newStart) {
+  if (ev.type === "showingtime") return; // ST showings are read-only
   const user = auth.currentUser;
   if (!user) return;
 
