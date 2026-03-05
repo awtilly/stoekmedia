@@ -2,7 +2,7 @@
   "name": "greendoor-functions",
   "description": "Cloud Functions for GreenDoor CRM",
   "engines": {
-    "node": "18"
+    "node": "22"
   },
   "main": "index.js",
   "dependencies": {

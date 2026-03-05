@@ -1,10 +1,15 @@
 const { onCall, onRequest, HttpsError } = require("firebase-functions/v2/https");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
+const { defineSecret } = require("firebase-functions/params");
 const { initializeApp } = require("firebase-admin/app");
 const { getFirestore } = require("firebase-admin/firestore");
 const { getStorage } = require("firebase-admin/storage");
 const { getAuth } = require("firebase-admin/auth");
 const crypto = require("crypto");
+
+const BOLDSIGN_API_KEY = defineSecret("BOLDSIGN_API_KEY");
+const BOLDSIGN_WEBHOOK_SECRET = defineSecret("BOLDSIGN_WEBHOOK_SECRET");
+const ANTHROPIC_API_KEY = defineSecret("ANTHROPIC_API_KEY");
 
 initializeApp();
 const db = getFirestore();
@@ -21,7 +26,7 @@ const db = getFirestore();
  *
  * Stores approval status in Firestore users/{uid}.
  */
-exports.createSenderIdentity = onCall({ region: "us-central1" }, async (request) => {
+exports.createSenderIdentity = onCall({ region: "us-central1", secrets: [BOLDSIGN_API_KEY] }, async (request) => {
   // Validate authentication
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "You must be signed in to create a sender identity.");
@@ -57,7 +62,7 @@ exports.createSenderIdentity = onCall({ region: "us-central1" }, async (request)
   }
 
   // Call BoldSign Sender Identity API
-  const apiKey = process.env.BOLDSIGN_API_KEY;
+  const apiKey = BOLDSIGN_API_KEY.value();
   if (!apiKey) {
     throw new HttpsError("internal", "BoldSign API key is not configured. Set BOLDSIGN_API_KEY in Cloud Functions environment.");
   }
@@ -148,7 +153,7 @@ function resolveServerMergeFields(mergeFields, clientData, listingData, agentPro
  *
  * Accepts: { templateId, clientId, listingId }
  */
-exports.sendComplianceDoc = onCall({ region: "us-central1" }, async (request) => {
+exports.sendComplianceDoc = onCall({ region: "us-central1", secrets: [BOLDSIGN_API_KEY] }, async (request) => {
   // Validate authentication
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "You must be signed in to send compliance documents.");
@@ -162,7 +167,7 @@ exports.sendComplianceDoc = onCall({ region: "us-central1" }, async (request) =>
     throw new HttpsError("invalid-argument", "templateId and clientId are required.");
   }
 
-  const apiKey = process.env.BOLDSIGN_API_KEY;
+  const apiKey = BOLDSIGN_API_KEY.value();
   if (!apiKey) {
     throw new HttpsError("internal", "BoldSign API key is not configured. Set BOLDSIGN_API_KEY in Cloud Functions environment.");
   }
@@ -290,7 +295,7 @@ exports.sendComplianceDoc = onCall({ region: "us-central1" }, async (request) =>
  *
  * Accepts: { templateIds: string[], clientId, listingId }
  */
-exports.sendBulkComplianceDocs = onCall({ region: "us-central1" }, async (request) => {
+exports.sendBulkComplianceDocs = onCall({ region: "us-central1", secrets: [BOLDSIGN_API_KEY] }, async (request) => {
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "You must be signed in to send compliance documents.");
   }
@@ -302,7 +307,7 @@ exports.sendBulkComplianceDocs = onCall({ region: "us-central1" }, async (reques
     throw new HttpsError("invalid-argument", "templateIds (non-empty array) and clientId are required.");
   }
 
-  const apiKey = process.env.BOLDSIGN_API_KEY;
+  const apiKey = BOLDSIGN_API_KEY.value();
   if (!apiKey) {
     throw new HttpsError("internal", "BoldSign API key is not configured. Set BOLDSIGN_API_KEY in Cloud Functions environment.");
   }
@@ -533,7 +538,7 @@ function sanitizeIcalUid(uid) {
 /*  record, and updates the compliance doc status to "signed".          */
 /* ------------------------------------------------------------------ */
 
-exports.boldSignWebhook = onRequest({ region: "us-central1" }, async (req, res) => {
+exports.boldSignWebhook = onRequest({ region: "us-central1", secrets: [BOLDSIGN_API_KEY, BOLDSIGN_WEBHOOK_SECRET] }, async (req, res) => {
   // Step 1 -- Method guard: only accept POST
   if (req.method !== "POST") {
     return res.status(405).send("Method not allowed");
@@ -541,7 +546,7 @@ exports.boldSignWebhook = onRequest({ region: "us-central1" }, async (req, res) 
 
   // Step 2 -- HMAC verification (WHBK-02)
   const sigHeader = req.headers["x-boldsign-signature"];
-  if (!sigHeader || !verifyBoldSignSignature(sigHeader, req.rawBody, process.env.BOLDSIGN_WEBHOOK_SECRET)) {
+  if (!sigHeader || !verifyBoldSignSignature(sigHeader, req.rawBody, BOLDSIGN_WEBHOOK_SECRET.value())) {
     console.error("Webhook signature verification failed");
     return res.status(401).send("Invalid signature");
   }
@@ -594,7 +599,7 @@ exports.boldSignWebhook = onRequest({ region: "us-central1" }, async (req, res) 
     }
 
     // Step 6 -- Download signed PDF (WHBK-05)
-    const apiKey = process.env.BOLDSIGN_API_KEY;
+    const apiKey = BOLDSIGN_API_KEY.value();
     if (!apiKey) {
       console.error("boldSignWebhook: BOLDSIGN_API_KEY not configured");
       return res.status(200).send("OK");
@@ -702,7 +707,7 @@ exports.boldSignWebhook = onRequest({ region: "us-central1" }, async (req, res) 
 /*  conversation history. Returns an AI-generated response.            */
 /* ------------------------------------------------------------------ */
 
-exports.askAssistant = onCall({ region: "us-central1" }, async (request) => {
+exports.askAssistant = onCall({ region: "us-central1", secrets: [ANTHROPIC_API_KEY] }, async (request) => {
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "You must be signed in.");
   }
@@ -712,9 +717,9 @@ exports.askAssistant = onCall({ region: "us-central1" }, async (request) => {
     throw new HttpsError("invalid-argument", "question is required.");
   }
 
-  const openaiKey = process.env.OPENAI_API_KEY;
-  if (!openaiKey) {
-    throw new HttpsError("internal", "OpenAI API key is not configured.");
+  const anthropicKey = ANTHROPIC_API_KEY.value();
+  if (!anthropicKey) {
+    throw new HttpsError("internal", "Anthropic API key is not configured.");
   }
 
   let systemPrompt = "You are a helpful real estate assistant for GreenDoor CRM.";
@@ -757,37 +762,37 @@ INSTRUCTIONS:
   }
 
   // Build messages array
-  const messages = [{ role: "system", content: systemPrompt }];
+  const messages = [];
   if (history && Array.isArray(history)) {
-    // Include last 6 messages for context window management
     const recentHistory = history.slice(-6);
     messages.push(...recentHistory);
   }
   messages.push({ role: "user", content: question });
 
-  // Call OpenAI
-  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+  // Call Anthropic Claude
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
-      "Authorization": `Bearer ${openaiKey}`,
+      "x-api-key": anthropicKey,
+      "anthropic-version": "2023-06-01",
       "Content-Type": "application/json"
     },
     body: JSON.stringify({
-      model: "gpt-4o-mini",
+      model: "claude-sonnet-4-6",
+      system: systemPrompt,
       messages: messages,
-      max_tokens: 800,
-      temperature: 0.7
+      max_tokens: 800
     })
   });
 
   if (!response.ok) {
     const errText = await response.text();
-    console.error("OpenAI API error:", errText);
+    console.error("Anthropic API error:", errText);
     throw new HttpsError("internal", "AI service temporarily unavailable. Please try again.");
   }
 
   const data = await response.json();
-  const aiResponse = data.choices?.[0]?.message?.content || "I wasn't able to generate a response. Please try again.";
+  const aiResponse = data.content?.[0]?.text || "I wasn't able to generate a response. Please try again.";
 
   return { response: aiResponse };
 });

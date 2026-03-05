@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Get Started — GreenDoor</title>
+  <link rel="stylesheet" href="/assets/css/style.css">
+  <link rel="stylesheet" href="/greendoor/css/greendoor.css">
+</head>
+<body class="gd-light">
+  <div class="gd-onboarding-page">
+    <div class="gd-onboarding-card">
+      <div class="gd-login-logo"><span class="gd-green">Green</span><span class="gd-door">Door</span></div>
+      <p class="gd-login-subtitle">Welcome — let's get you set up</p>
+
+      <!-- Stepper -->
+      <div class="gd-stepper">
+        <div class="gd-step active" data-step="1">
+          <div class="gd-step-dot">1</div>
+          <div class="gd-step-label">Profile</div>
+        </div>
+        <div class="gd-step-line" data-after="1"></div>
+        <div class="gd-step" data-step="2">
+          <div class="gd-step-dot">2</div>
+          <div class="gd-step-label">Branding</div>
+        </div>
+        <div class="gd-step-line" data-after="2"></div>
+        <div class="gd-step" data-step="3">
+          <div class="gd-step-dot">3</div>
+          <div class="gd-step-label">Go</div>
+        </div>
+      </div>
+
+      <!-- Step 1: Profile -->
+      <div class="gd-onboard-step active" id="step-1">
+        <!-- Initials avatar -->
+        <div class="gd-onboard-avatar" id="onboard-avatar">
+          <svg viewBox="0 0 24 24"><path d="M12 12c2.7 0 5-2.3 5-5s-2.3-5-5-5-5 2.3-5 5 2.3 5 5 5zm0 2c-3.3 0-10 1.7-10 5v2h20v-2c0-3.3-6.7-5-10-5z"/></svg>
+        </div>
+        <h2 class="gd-onboard-title">Your Profile</h2>
+        <p class="gd-onboard-desc">This information appears in client communications and your CRM profile.</p>
+        <div class="gd-form-group">
+          <label for="onboard-name">Full Name *</label>
+          <input type="text" id="onboard-name" class="gd-input" placeholder="Jane Smith">
+        </div>
+        <div class="gd-form-group">
+          <label for="onboard-phone">Phone Number *</label>
+          <input type="tel" id="onboard-phone" class="gd-input" placeholder="(555) 123-4567">
+        </div>
+        <!-- Live profile preview -->
+        <div class="gd-live-preview" id="profile-preview" style="display:none;">
+          <div class="gd-live-preview-label">How you'll appear</div>
+          <div style="display:flex;align-items:center;gap:0.75rem;">
+            <div class="gd-live-preview-avatar" id="preview-avatar"></div>
+            <div class="gd-live-preview-info">
+              <div class="gd-live-preview-name" id="preview-name"></div>
+              <div class="gd-live-preview-phone" id="preview-phone"></div>
+            </div>
+          </div>
+        </div>
+        <div class="gd-onboard-nav">
+          <div></div>
+          <button class="gd-btn gd-btn-primary" onclick="validateAndGoToStep(2)">Continue</button>
+        </div>
+      </div>
+
+      <!-- Step 2: Company & Branding -->
+      <div class="gd-onboard-step" id="step-2">
+        <h2 class="gd-onboard-title">Company &amp; Branding</h2>
+        <p class="gd-onboard-desc">Your company name and email signature are used in all outgoing emails and documents.</p>
+        <div class="gd-form-group">
+          <label for="onboard-company">Company / Brokerage</label>
+          <input type="text" id="onboard-company" class="gd-input" placeholder="ABC Realty Group">
+        </div>
+        <div class="gd-form-group">
+          <label for="onboard-signature">Email Signature</label>
+          <p class="gd-text-muted" style="margin: 0 0 0.25rem 0; font-size: 0.78rem;">Automatically appended to all outgoing emails. You can update this later in Settings.</p>
+          <textarea id="onboard-signature" class="gd-input gd-signature-textarea" rows="4" placeholder="Best regards,&#10;Jane Smith&#10;ABC Realty Group&#10;(555) 123-4567"></textarea>
+          <button class="gd-sig-reset" id="sig-reset-btn" type="button">Reset to default</button>
+        </div>
+        <!-- Signature preview -->
+        <div class="gd-sig-preview-label">Signature Preview</div>
+        <div class="gd-sig-preview" id="sig-preview">Your signature will appear here...</div>
+        <div class="gd-onboard-nav">
+          <button class="gd-btn gd-btn-ghost" onclick="goToStep(1)">Back</button>
+          <button class="gd-btn gd-btn-primary" onclick="goToStep(3)">Continue</button>
+        </div>
+      </div>
+
+      <!-- Step 3: Ready to Go -->
+      <div class="gd-onboard-step" id="step-3">
+        <h2 class="gd-onboard-title" id="step3-title">You're Ready</h2>
+        <p class="gd-onboard-desc">Your account is set up. Here's how to get started.</p>
+
+        <!-- Setup summary -->
+        <div class="gd-setup-summary" id="setup-summary"></div>
+
+        <div class="gd-getting-started-list">
+          <div class="gd-getting-started-item">
+            <span class="gd-getting-started-num">1</span>
+            <div>
+              <strong>Add your first client</strong>
+              <p>Click "+ New Client" on your dashboard to start building your pipeline.</p>
+            </div>
+          </div>
+          <div class="gd-getting-started-item">
+            <span class="gd-getting-started-num">2</span>
+            <div>
+              <strong>Add a listing</strong>
+              <p>Go to a client's Properties tab and click "+ Add Listing" — paste a URL to auto-fill the details.</p>
+            </div>
+          </div>
+          <div class="gd-getting-started-item">
+            <span class="gd-getting-started-num">3</span>
+            <div>
+              <strong>Upload document templates</strong>
+              <p>Head to Settings to upload your go-to contracts and disclosures for quick signature workflows.</p>
+            </div>
+          </div>
+        </div>
+
+        <p class="gd-onboard-help-note">Need help? Visit <a href="/greendoor/app/faq">FAQ</a> or email <a href="mailto:support@stoekmedia.com">support@stoekmedia.com</a></p>
+
+        <label class="gd-checkbox-label" style="margin-top: 1.5rem; font-size: 0.92rem;">
+          <input type="checkbox" id="terms-checkbox">
+          <span>I have read and agree to the <a href="/greendoor/terms" target="_blank">Terms &amp; Conditions</a></span>
+        </label>
+
+        <div class="gd-onboard-nav">
+          <button class="gd-btn gd-btn-ghost" onclick="goToStep(2)">Back</button>
+          <button class="gd-btn gd-btn-primary" id="onboard-finish-btn" onclick="finishOnboarding()">Go to Dashboard</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script type="module" src="/greendoor/js/auth.js"></script>
+  <script type="module" src="/greendoor/js/onboarding.js"></script>
+</body>
+</html>

@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Clients — GreenDoor</title>
+  <link rel="stylesheet" href="/assets/css/style.css">
+  <link rel="stylesheet" href="/greendoor/css/greendoor.css">
+</head>
+<body class="gd-light">
+
+  <!-- Navigation -->
+  <nav class="nav scrolled">
+    <div class="container">
+      <a href="/greendoor/app/dashboard" class="nav-logo gd-nav-logo"><span class="gd-green">Green</span><span class="gd-door">Door</span><small class="gd-by-line">by stoekmedia</small></a>
+      <ul class="nav-links">
+        <li><a href="/greendoor/app/dashboard">Dashboard</a></li>
+        <li><a href="/greendoor/app/clients" class="gd-nav-active">Clients</a></li>
+        <li><a href="/greendoor/app/calendar">Calendar</a></li>
+        <li id="nav-admin-tab" style="display:none;"><a href="/greendoor/app/admin">Admin</a></li>
+        <li><a href="/greendoor/app/settings">Settings</a></li>
+        <li class="nav-crm-divider"></li>
+        <li><span id="nav-user-name" class="nav-user-name"></span></li>
+        <li><button class="nav-logout-btn" onclick="handleLogout()">Logout</button></li>
+      </ul>
+      <button class="nav-toggle" aria-label="Menu">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+    </div>
+  </nav>
+
+  <div class="gd-page">
+    <div class="gd-content">
+
+      <div class="gd-section-header">
+        <h2 style="font-family: var(--font-display); font-size: clamp(1.8rem, 3vw, 2.5rem); font-weight: 500;">Clients</h2>
+      </div>
+
+      <!-- Top Bar -->
+      <div class="gd-top-bar">
+        <input type="text" id="search-input" class="gd-input gd-search-input" placeholder="Search by name, email, or phone...">
+        <select id="status-filter" class="gd-input gd-filter-select">
+          <option value="">All Statuses</option>
+          <option value="lead">Lead</option>
+          <option value="active_buyer">Active Buyer</option>
+          <option value="active_seller">Active Seller</option>
+          <option value="under_contract">Under Contract</option>
+          <option value="closed">Closed</option>
+          <option value="inactive">Inactive</option>
+        </select>
+        <button class="gd-btn gd-btn-primary" onclick="openAddModal()">+ Add Client</button>
+      </div>
+
+      <!-- Loading -->
+      <div id="clients-loading" class="gd-loading">
+        <div class="gd-spinner gd-spinner-lg"></div>
+        <span class="gd-loading-text">Loading clients...</span>
+      </div>
+
+      <!-- Table -->
+      <div id="clients-table-wrap" class="gd-table-wrap gd-hidden">
+        <table class="gd-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Status</th>
+              <th>Budget</th>
+              <th>Location</th>
+              <th>Last Activity</th>
+              <th style="width:40px;"></th>
+            </tr>
+          </thead>
+          <tbody id="clients-tbody"></tbody>
+        </table>
+      </div>
+
+      <!-- Empty State -->
+      <div id="clients-empty" class="gd-empty gd-hidden">
+        <div class="gd-empty-icon">&#128100;</div>
+        <div class="gd-empty-text">No clients yet</div>
+        <div class="gd-empty-sub">Click "+ Add Client" to get started.</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Add Client Modal -->
+  <div id="add-modal" class="gd-modal-overlay">
+    <div class="gd-modal">
+      <div class="gd-modal-header">
+        <h3>Add New Client</h3>
+        <button class="gd-modal-close" onclick="closeAddModal()" aria-label="Close">&times;</button>
+      </div>
+      <div class="gd-modal-body">
+        <div class="gd-form-row">
+          <div class="gd-form-group">
+            <label for="add-fullName">Full Name *</label>
+            <input type="text" id="add-fullName" class="gd-input" required>
+          </div>
+          <div class="gd-form-group">
+            <label for="add-email">Email *</label>
+            <input type="email" id="add-email" class="gd-input" required>
+          </div>
+        </div>
+        <div class="gd-form-row">
+          <div class="gd-form-group">
+            <label for="add-phone">Phone</label>
+            <input type="tel" id="add-phone" class="gd-input">
+          </div>
+          <div class="gd-form-group">
+            <label for="add-status">Status</label>
+            <select id="add-status" class="gd-input">
+              <option value="lead" selected>Lead</option>
+              <option value="active_buyer">Active Buyer</option>
+              <option value="active_seller">Active Seller</option>
+              <option value="under_contract">Under Contract</option>
+              <option value="closed">Closed</option>
+              <option value="inactive">Inactive</option>
+            </select>
+          </div>
+        </div>
+        <div class="gd-form-row">
+          <div class="gd-form-group">
+            <label for="add-budgetMin">Budget Min</label>
+            <input type="number" id="add-budgetMin" class="gd-input" placeholder="200000">
+          </div>
+          <div class="gd-form-group">
+            <label for="add-budgetMax">Budget Max</label>
+            <input type="number" id="add-budgetMax" class="gd-input" placeholder="500000">
+          </div>
+        </div>
+        <div class="gd-form-row">
+          <div class="gd-form-group">
+            <label for="add-timeline">Timeline</label>
+            <select id="add-timeline" class="gd-input">
+              <option value="">Select...</option>
+              <option value="Immediate">Immediate</option>
+              <option value="1-3 Months">1-3 Months</option>
+              <option value="3-6 Months">3-6 Months</option>
+              <option value="6-12 Months">6-12 Months</option>
+              <option value="Just Browsing">Just Browsing</option>
+            </select>
+          </div>
+          <div class="gd-form-group">
+            <label for="add-source">Source</label>
+            <select id="add-source" class="gd-input">
+              <option value="">Select...</option>
+              <option value="Referral">Referral</option>
+              <option value="Online Ad">Online Ad</option>
+              <option value="Open House">Open House</option>
+              <option value="Website">Website</option>
+              <option value="Social Media">Social Media</option>
+              <option value="Cold Call">Cold Call</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+        </div>
+        <div class="gd-form-group">
+          <label for="add-notes">Notes</label>
+          <textarea id="add-notes" class="gd-input" rows="3" placeholder="Any initial notes..."></textarea>
+        </div>
+      </div>
+      <div class="gd-modal-footer">
+        <button class="gd-btn" onclick="closeAddModal()">Cancel</button>
+        <button class="gd-btn gd-btn-primary" onclick="saveClient()">Save Client</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- AI Summary Popover -->
+  <div id="ai-popover" class="gd-ai-popover">
+    <div class="gd-ai-popover-header">
+      <span>&#10024; Quick Summary</span>
+      <button class="gd-ai-popover-close" onclick="closeAiPopover()" aria-label="Close">&times;</button>
+    </div>
+    <div id="ai-popover-content" class="gd-ai-popover-content">
+      <div class="gd-spinner"></div>
+    </div>
+  </div>
+
+  <script src="/assets/js/main.js"></script>
+  <script type="module" src="/greendoor/js/auth.js"></script>
+  <script type="module" src="/greendoor/js/clients.js"></script>
+  <script type="module" src="/greendoor/js/tour.js"></script>
+  <script type="module" src="/greendoor/js/chatbot.js"></script>
+</body>
+</html>

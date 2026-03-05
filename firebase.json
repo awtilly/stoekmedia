@@ -1,29 +1,25 @@
 {
-  "functions": {
-    "source": "functions"
-  },
-  "firestore": {
-    "rules": "firestore.rules",
-    "indexes": "firestore.indexes.json"
-  },
-  "storage": {
-    "rules": "storage.rules"
-  },
   "hosting": {
-    "public": "public",
-    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
-    "cleanUrls": true,
-    "trailingSlash": false,
-    "headers": [
+    "public": ".",
+    "ignore": [
+      "firebase.json",
+      ".firebaserc",
+      ".planning/**",
+      ".claude/**",
+      ".git/**",
+      "functions/**",
+      "node_modules/**",
+      "CLAUDE.md",
+      "*.md"
+    ],
+    "rewrites": [
       {
-        "source": "/app/**",
-        "headers": [
-          {
-            "key": "Cache-Control",
-            "value": "no-cache, no-store, must-revalidate"
-          }
-        ]
+        "source": "**",
+        "destination": "/index.html"
       }
     ]
+  },
+  "functions": {
+    "source": "functions"
   }
 }

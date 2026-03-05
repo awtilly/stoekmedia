@@ -1,9 +1,4 @@
-.DS_Store
-.firebase/
+functions/.env
 functions/node_modules/
-.env
-.env.*
-*.pem
-*.key
-serviceAccountKey*.json
-credentials.json
+node_modules/
+.firebase/
