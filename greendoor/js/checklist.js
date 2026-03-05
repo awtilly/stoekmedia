@@ -8,7 +8,7 @@
  * Exports:
  *   - CHECKLIST_CATEGORIES   — Category enum for checklist grouping
  *   - CATEGORY_LABELS        — Human-readable labels for each category
- *   - MO_CLOSING_CHECKLIST_TEMPLATE — 28-item Missouri residential checklist template
+ *   - MO_CLOSING_CHECKLIST_TEMPLATE — Missouri residential checklist template (42 items)
  *   - parseTransactionType   — Parses "SFH - Buyer" into { propType, side }
  *   - seedChecklist          — Seeds applicable items to Firestore subcollection
  *   - recalculateDeadlines   — Recalculates deadline fields when closing date changes
@@ -31,13 +31,15 @@ import { showToast, escapeHtml, formatDate } from "./auth.js";
 export const CHECKLIST_CATEGORIES = {
   PRE_CONTRACT: "pre_contract",
   UNDER_CONTRACT: "under_contract",
-  CLOSING: "closing"
+  CLOSING: "closing",
+  POST_CLOSING: "post_closing"
 };
 
 export const CATEGORY_LABELS = {
   pre_contract: "Pre-Contract",
   under_contract: "Under Contract",
-  closing: "Closing"
+  closing: "Closing",
+  post_closing: "Post-Closing"
 };
 
 /* ------------------------------------------------------------------ */
@@ -49,7 +51,7 @@ const SFH_CONDO_MF = ["SFH", "Condo", "Multi-Family"];
 const SFH_CONDO = ["SFH", "Condo"];
 
 /* ------------------------------------------------------------------ */
-/*  MO Closing Checklist Template (28 items)                           */
+/*  MO Closing Checklist Template (42 items)                           */
 /* ------------------------------------------------------------------ */
 
 export const MO_CLOSING_CHECKLIST_TEMPLATE = [
@@ -70,7 +72,7 @@ export const MO_CLOSING_CHECKLIST_TEMPLATE = [
     category: "pre_contract",
     transactionSide: "buyer",
     propertyTypes: ALL_TYPES,
-    linkedTemplateId: "mo-buyer-rep-agreement",
+    linkedTemplateId: "mo-buyer-representation-agreement",
     deadlineOffsetDays: null,
     sortOrder: 2
   },
@@ -124,8 +126,28 @@ export const MO_CLOSING_CHECKLIST_TEMPLATE = [
     deadlineOffsetDays: null,
     sortOrder: 7
   },
+  {
+    id: "fair_housing_ack",
+    task: "Sign Fair Housing Acknowledgment",
+    category: "pre_contract",
+    transactionSide: "both",
+    propertyTypes: ALL_TYPES,
+    linkedTemplateId: null,
+    deadlineOffsetDays: null,
+    sortOrder: 8
+  },
+  {
+    id: "buyer_broker_comp_disclosure",
+    task: "Buyer Broker Compensation Disclosure (NAR Settlement)",
+    category: "pre_contract",
+    transactionSide: "buyer",
+    propertyTypes: ALL_TYPES,
+    linkedTemplateId: null,
+    deadlineOffsetDays: null,
+    sortOrder: 9
+  },
 
-  // ── Under Contract (14 items) ───────────────────────────────────
+  // ── Under Contract ──────────────────────────────────────────────
   {
     id: "earnest_money",
     task: "Deposit Earnest Money",
@@ -266,8 +288,78 @@ export const MO_CLOSING_CHECKLIST_TEMPLATE = [
     deadlineOffsetDays: -7,
     sortOrder: 14
   },
+  {
+    id: "wire_fraud_advisory",
+    task: "Deliver Wire Fraud Advisory",
+    category: "under_contract",
+    transactionSide: "buyer",
+    propertyTypes: ALL_TYPES,
+    linkedTemplateId: null,
+    deadlineOffsetDays: -30,
+    sortOrder: 15
+  },
+  {
+    id: "mortgage_application",
+    task: "Confirm Mortgage Application Submitted",
+    category: "under_contract",
+    transactionSide: "buyer",
+    propertyTypes: ALL_TYPES,
+    linkedTemplateId: null,
+    deadlineOffsetDays: -30,
+    sortOrder: 16
+  },
+  {
+    id: "hoa_estoppel",
+    task: "Request HOA Estoppel Letter",
+    category: "under_contract",
+    transactionSide: "seller",
+    propertyTypes: ["Condo"],
+    linkedTemplateId: null,
+    deadlineOffsetDays: -21,
+    sortOrder: 17
+  },
+  {
+    id: "pest_termite_inspection",
+    task: "Schedule Pest/Termite Inspection",
+    category: "under_contract",
+    transactionSide: "buyer",
+    propertyTypes: SFH_CONDO_MF,
+    linkedTemplateId: null,
+    deadlineOffsetDays: -25,
+    sortOrder: 18
+  },
+  {
+    id: "title_commitment_review",
+    task: "Review Title Commitment",
+    category: "under_contract",
+    transactionSide: "buyer",
+    propertyTypes: ALL_TYPES,
+    linkedTemplateId: null,
+    deadlineOffsetDays: -14,
+    sortOrder: 19
+  },
+  {
+    id: "payoff_authorization",
+    task: "Obtain Payoff Authorization",
+    category: "under_contract",
+    transactionSide: "seller",
+    propertyTypes: ALL_TYPES,
+    linkedTemplateId: null,
+    deadlineOffsetDays: -14,
+    sortOrder: 20
+  },
+  {
+    id: "specialized_inspections",
+    task: "Schedule Specialized Inspections (radon, mold, etc.)",
+    category: "under_contract",
+    transactionSide: "buyer",
+    propertyTypes: SFH_CONDO_MF,
+    linkedTemplateId: null,
+    deadlineOffsetDays: -25,
+    sortOrder: 21
+  },
 
-  // ── Closing (7 items) ──────────────────────────────────────────
+  // ── Closing ─────────────────────────────────────────────────────
   {
     id: "final_walkthrough",
     task: "Complete Final Walk-Through",
@@ -337,6 +429,88 @@ export const MO_CLOSING_CHECKLIST_TEMPLATE = [
     linkedTemplateId: null,
     deadlineOffsetDays: 0,
     sortOrder: 7
+  },
+  {
+    id: "settlement_statement_review",
+    task: "Review Settlement Statement (HUD-1/ALTA)",
+    category: "closing",
+    transactionSide: "both",
+    propertyTypes: ALL_TYPES,
+    linkedTemplateId: null,
+    deadlineOffsetDays: -1,
+    sortOrder: 8
+  },
+  {
+    id: "commission_disbursement",
+    task: "Commission Disbursement Authorization",
+    category: "closing",
+    transactionSide: "both",
+    propertyTypes: ALL_TYPES,
+    linkedTemplateId: null,
+    deadlineOffsetDays: 0,
+    sortOrder: 9
+  },
+  {
+    id: "insurance_binder",
+    task: "Insurance Binder Sent to Lender",
+    category: "closing",
+    transactionSide: "buyer",
+    propertyTypes: SFH_CONDO_MF,
+    linkedTemplateId: null,
+    deadlineOffsetDays: -3,
+    sortOrder: 10
+  },
+  {
+    id: "firpta_compliance",
+    task: "FIRPTA Compliance (if foreign seller)",
+    category: "closing",
+    transactionSide: "seller",
+    propertyTypes: ALL_TYPES,
+    linkedTemplateId: null,
+    deadlineOffsetDays: 0,
+    sortOrder: 11
+  },
+
+  // ── Post-Closing ────────────────────────────────────────────────
+  {
+    id: "mls_status_update",
+    task: "Update MLS Status to Sold/Closed",
+    category: "post_closing",
+    transactionSide: "seller",
+    propertyTypes: ALL_TYPES,
+    linkedTemplateId: null,
+    deadlineOffsetDays: 1,
+    sortOrder: 1
+  },
+  {
+    id: "transaction_file_archived",
+    task: "Archive Transaction File",
+    category: "post_closing",
+    transactionSide: "both",
+    propertyTypes: ALL_TYPES,
+    linkedTemplateId: null,
+    deadlineOffsetDays: 7,
+    sortOrder: 2
+  },
+  {
+    id: "client_followup_scheduled",
+    task: "Schedule Client Follow-Up",
+    category: "post_closing",
+    transactionSide: "both",
+    propertyTypes: ALL_TYPES,
+    linkedTemplateId: null,
+    deadlineOffsetDays: 3,
+    sortOrder: 3
+  },
+  {
+    id: "commission_receipt_confirmed",
+    task: "Confirm Commission Receipt",
+    category: "post_closing",
+    transactionSide: "both",
+    propertyTypes: ALL_TYPES,
+    linkedTemplateId: null,
+    deadlineOffsetDays: 7,
+    sortOrder: 4
   }
 ];
 
@@ -548,7 +722,7 @@ export function renderChecklist() {
   if (contentEl) contentEl.style.display = "block";
 
   // Group items by category
-  const categoryOrder = ["pre_contract", "under_contract", "closing"];
+  const categoryOrder = ["pre_contract", "under_contract", "closing", "post_closing"];
   const grouped = {};
   for (const cat of categoryOrder) {
     grouped[cat] = [];
@@ -638,7 +812,6 @@ function renderChecklistItem(item) {
   // Deadline display
   let deadlineHtml = "";
   if (item.deadline && !isNA) {
-    const deadlineDate = toJSDate(item.deadline);
     const deadlineClass = isOverdue ? "gd-checklist-deadline overdue" : "gd-checklist-deadline";
     deadlineHtml = `<span class="${deadlineClass}">Due: ${formatDate(item.deadline)}</span>`;
   }
@@ -812,6 +985,7 @@ window.showAddChecklistItem = function() {
       <option value="pre_contract">Pre-Contract</option>
       <option value="under_contract">Under Contract</option>
       <option value="closing">Closing</option>
+      <option value="post_closing">Post-Closing</option>
     </select>
     <div style="display: flex; gap: 8px;">
       <button class="gd-btn gd-btn-primary gd-btn-sm" onclick="window.saveCustomChecklistItem()">Save</button>

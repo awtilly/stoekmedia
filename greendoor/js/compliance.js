@@ -8,7 +8,7 @@
  * Exports:
  *   - COMPLIANCE_STATUSES   — Status enum for complianceDocs subcollection
  *   - COMPLIANCE_CATEGORIES  — Valid template categories
- *   - MO_FORM_STUBS          — 7 Missouri residential form template definitions
+ *   - MO_FORM_STUBS          — Missouri residential form template definitions (24 forms)
  *   - buildMergeFields        — Resolves template mergeFields from client/listing/agent data
  *   - formatComplianceStatus  — Returns HTML badge string for a given status
  */
@@ -98,7 +98,7 @@ const SELLER_COMMON_FIELDS = [
 ];
 
 /* ------------------------------------------------------------------ */
-/*  MO Form Stubs (7 Missouri residential forms)                       */
+/*  MO Form Stubs (24 Missouri residential forms)                      */
 /* ------------------------------------------------------------------ */
 
 export const MO_FORM_STUBS = [
@@ -209,6 +209,215 @@ export const MO_FORM_STUBS = [
     state: "MO",
     required: true,
     sortOrder: 7,
+    mergeFields: [
+      { boldSignFieldId: "BuyerName", source: "client.fullName" },
+      { boldSignFieldId: "ClientEmail", source: "client.email" },
+      { boldSignFieldId: "AgentName", source: "agent.fullName" },
+      { boldSignFieldId: "AgentEmail", source: "agent.email" },
+      { boldSignFieldId: "Brokerage", source: "agent.brokerage" },
+      { boldSignFieldId: "Date", source: "date" }
+    ]
+  },
+
+  // ── Buyer-side additions ─────────────────────────────────────────
+  {
+    name: "Financing Contingency Addendum",
+    description: "Addendum specifying financing contingency terms and deadlines",
+    boldSignTemplateId: "",
+    category: "contracts",
+    transactionTypes: ALL_BUYER,
+    state: "MO",
+    required: false,
+    sortOrder: 8,
+    mergeFields: BUYER_COMMON_FIELDS
+  },
+  {
+    name: "Appraisal Contingency Addendum",
+    description: "Addendum addressing appraisal contingency and resolution procedures",
+    boldSignTemplateId: "",
+    category: "contracts",
+    transactionTypes: ALL_BUYER,
+    state: "MO",
+    required: false,
+    sortOrder: 9,
+    mergeFields: BUYER_COMMON_FIELDS
+  },
+  {
+    name: "Inspection Contingency Addendum",
+    description: "Addendum outlining inspection contingency terms and deadlines",
+    boldSignTemplateId: "",
+    category: "contracts",
+    transactionTypes: ALL_BUYER,
+    state: "MO",
+    required: false,
+    sortOrder: 10,
+    mergeFields: BUYER_COMMON_FIELDS
+  },
+  {
+    name: "Home Warranty Agreement",
+    description: "Home warranty coverage agreement for residential purchase",
+    boldSignTemplateId: "",
+    category: "contracts",
+    transactionTypes: ALL_BUYER,
+    state: "MO",
+    required: false,
+    sortOrder: 11,
+    mergeFields: BUYER_COMMON_FIELDS
+  },
+  {
+    name: "Wire Fraud Advisory",
+    description: "Advisory notice regarding wire fraud risks during closing",
+    boldSignTemplateId: "",
+    category: "disclosures",
+    transactionTypes: ALL_BUYER,
+    state: "MO",
+    required: true,
+    sortOrder: 12,
+    mergeFields: BUYER_COMMON_FIELDS
+  },
+  {
+    name: "MREC Broker Disclosure Form",
+    description: "Missouri Real Estate Commission broker relationship disclosure",
+    boldSignTemplateId: "",
+    category: "disclosures",
+    transactionTypes: ALL_BUYER,
+    state: "MO",
+    required: true,
+    sortOrder: 13,
+    mergeFields: BUYER_COMMON_FIELDS
+  },
+
+  // ── Seller-side additions ────────────────────────────────────────
+  {
+    name: "Seller's Affidavit",
+    description: "Seller affidavit regarding property ownership and liens",
+    boldSignTemplateId: "",
+    category: "disclosures",
+    transactionTypes: ALL_SELLER,
+    state: "MO",
+    required: false,
+    sortOrder: 14,
+    mergeFields: SELLER_COMMON_FIELDS
+  },
+  {
+    name: "Commission Disclosure",
+    description: "Disclosure of commission structure and compensation terms",
+    boldSignTemplateId: "",
+    category: "disclosures",
+    transactionTypes: ALL_SELLER,
+    state: "MO",
+    required: true,
+    sortOrder: 15,
+    mergeFields: SELLER_COMMON_FIELDS
+  },
+  {
+    name: "Photography/Media Authorization",
+    description: "Authorization for property photography and media usage for marketing",
+    boldSignTemplateId: "",
+    category: "contracts",
+    transactionTypes: ALL_SELLER,
+    state: "MO",
+    required: false,
+    sortOrder: 16,
+    mergeFields: SELLER_COMMON_FIELDS
+  },
+  {
+    name: "MLS Data Input Sheet",
+    description: "Property data form for MLS listing entry",
+    boldSignTemplateId: "",
+    category: "contracts",
+    transactionTypes: ALL_SELLER,
+    state: "MO",
+    required: false,
+    sortOrder: 17,
+    mergeFields: SELLER_COMMON_FIELDS
+  },
+  {
+    name: "FIRPTA Certificate",
+    description: "Foreign Investment in Real Property Tax Act certification (seller)",
+    boldSignTemplateId: "",
+    category: "disclosures",
+    transactionTypes: ALL_SELLER,
+    state: "MO",
+    required: false,
+    sortOrder: 18,
+    mergeFields: SELLER_COMMON_FIELDS
+  },
+
+  // ── Both/All additions ───────────────────────────────────────────
+  {
+    name: "Closing Date Extension Addendum",
+    description: "Addendum to extend the closing date for the transaction",
+    boldSignTemplateId: "",
+    category: "contracts",
+    transactionTypes: ALL_TYPES,
+    state: "MO",
+    required: false,
+    sortOrder: 19,
+    mergeFields: BUYER_COMMON_FIELDS
+  },
+  {
+    name: "Repair Agreement/Amendment",
+    description: "Agreement specifying negotiated repairs and amendments to the contract",
+    boldSignTemplateId: "",
+    category: "contracts",
+    transactionTypes: ALL_TYPES,
+    state: "MO",
+    required: false,
+    sortOrder: 20,
+    mergeFields: BUYER_COMMON_FIELDS
+  },
+  {
+    name: "Escrow Holdback Addendum",
+    description: "Addendum for holdback of funds in escrow for post-closing items",
+    boldSignTemplateId: "",
+    category: "contracts",
+    transactionTypes: ALL_TYPES,
+    state: "MO",
+    required: false,
+    sortOrder: 21,
+    mergeFields: BUYER_COMMON_FIELDS
+  },
+  {
+    name: "Radon Disclosure",
+    description: "Radon gas testing disclosure and acknowledgment",
+    boldSignTemplateId: "",
+    category: "disclosures",
+    transactionTypes: ALL_TYPES,
+    state: "MO",
+    required: false,
+    sortOrder: 22,
+    mergeFields: BUYER_COMMON_FIELDS
+  },
+
+  // ── Dual Agency ──────────────────────────────────────────────────
+  {
+    name: "Dual Agency Disclosure",
+    description: "Disclosure and consent for dual agency representation",
+    boldSignTemplateId: "",
+    category: "disclosures",
+    transactionTypes: ALL_TYPES,
+    state: "MO",
+    required: false,
+    sortOrder: 23,
+    mergeFields: [
+      { boldSignFieldId: "BuyerName", source: "client.fullName" },
+      { boldSignFieldId: "ClientEmail", source: "client.email" },
+      { boldSignFieldId: "AgentName", source: "agent.fullName" },
+      { boldSignFieldId: "AgentEmail", source: "agent.email" },
+      { boldSignFieldId: "Brokerage", source: "agent.brokerage" },
+      { boldSignFieldId: "Date", source: "date" }
+    ]
+  },
+  {
+    name: "Informed Consent (Dual Agency)",
+    description: "Buyer and seller informed consent for dual agency relationship",
+    boldSignTemplateId: "",
+    category: "disclosures",
+    transactionTypes: ALL_TYPES,
+    state: "MO",
+    required: false,
+    sortOrder: 24,
     mergeFields: [
       { boldSignFieldId: "BuyerName", source: "client.fullName" },
       { boldSignFieldId: "ClientEmail", source: "client.email" },

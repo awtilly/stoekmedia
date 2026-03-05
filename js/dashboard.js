@@ -182,22 +182,29 @@ async function loadBriefing() {
       }
     });
 
-    // Today's showings
-    const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
-    const todayEnd = new Date(); todayEnd.setHours(23, 59, 59, 999);
-    const showQ = query(
-      collection(db, "showings"),
-      where("realtorId", "==", uid),
-      where("showingDate", ">=", Timestamp.fromDate(todayStart)),
-      where("showingDate", "<=", Timestamp.fromDate(todayEnd))
-    );
-    const showSnap = await getDocs(showQ);
-    showSnap.forEach(d => {
-      const s = d.data();
-      if (s.status !== "cancelled") {
-        contextData.todayShowings.push({ address: s.address || "TBD", time: s.showingDate ? new Date(s.showingDate.toDate()).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : "" });
-      }
-    });
+    // Today's showings (wrapped separately so a missing index doesn't block the briefing)
+    try {
+      const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+      const showQ = query(
+        collection(db, "showings"),
+        where("realtorId", "==", uid),
+        where("showingDate", ">=", Timestamp.fromDate(todayStart)),
+        orderBy("showingDate", "asc"),
+        limit(10)
+      );
+      const showSnap = await getDocs(showQ);
+      const todayEnd = new Date(); todayEnd.setHours(23, 59, 59, 999);
+      showSnap.forEach(d => {
+        const s = d.data();
+        if (s.status === "cancelled") return;
+        const dt = s.showingDate?.toDate ? s.showingDate.toDate() : null;
+        if (dt && dt <= todayEnd) {
+          contextData.todayShowings.push({ address: s.address || "TBD", time: dt.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) });
+        }
+      });
+    } catch (showErr) {
+      console.warn("Showings query failed (may need index):", showErr);
+    }
 
     const result = await askAssistant({
       question: "3 bullet points max, one line each. 1) Any clients not contacted in 14+ days? 2) Today's showings? 3) One priority action. No headers, no intros, no sign-offs. Just the 3 bullets.",

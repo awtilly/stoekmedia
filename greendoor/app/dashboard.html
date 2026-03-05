@@ -17,7 +17,7 @@
         <li><a href="/greendoor/app/dashboard" class="gd-nav-active">Dashboard</a></li>
         <li><a href="/greendoor/app/clients">Clients</a></li>
         <li><a href="/greendoor/app/calendar">Calendar</a></li>
-
+        <li><a href="/greendoor/app/listings">Listings</a></li>
         <li id="nav-admin-tab" style="display:none;"><a href="/greendoor/app/admin">Admin</a></li>
         <li><a href="/greendoor/app/settings">Settings</a></li>
         <li class="nav-crm-divider"></li>
@@ -49,7 +49,7 @@
           <h1>Welcome back, <em id="welcome-name"></em></h1>
           <div class="gd-quick-actions" style="margin:0;">
             <a href="/greendoor/app/clients" class="gd-btn gd-btn-primary">+ New Client</a>
-            <a href="/greendoor/app/listings" class="gd-btn">+ Add Listing</a>
+            <button class="gd-btn" onclick="openDashboardAddListing()">+ Add Listing</button>
           </div>
         </div>
 
@@ -114,6 +114,90 @@
 
         </div>
 
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Listing Modal -->
+  <div id="dash-add-listing-modal" class="gd-modal-overlay">
+    <div class="gd-modal gd-modal-lg">
+      <div class="gd-modal-header">
+        <h3>Add Listing</h3>
+        <button class="gd-modal-close" onclick="closeDashboardAddListing()" aria-label="Close">&times;</button>
+      </div>
+      <div class="gd-modal-body">
+        <div class="gd-add-listing-form">
+          <div class="gd-form-section">
+            <div class="gd-form-section-title">Address</div>
+            <div class="gd-form-group">
+              <label for="dl-address">Street Address *</label>
+              <input type="text" id="dl-address" class="gd-input" placeholder="123 Main St">
+            </div>
+            <div class="gd-form-row">
+              <div class="gd-form-group"><label for="dl-city">City</label><input type="text" id="dl-city" class="gd-input"></div>
+              <div class="gd-form-group"><label for="dl-state">State</label><input type="text" id="dl-state" class="gd-input" maxlength="2" placeholder="MO"></div>
+              <div class="gd-form-group"><label for="dl-zip">ZIP</label><input type="text" id="dl-zip" class="gd-input" maxlength="10"></div>
+            </div>
+          </div>
+
+          <div class="gd-form-section">
+            <div class="gd-form-section-title">Pricing</div>
+            <div class="gd-form-group">
+              <label for="dl-price">List Price ($)</label>
+              <input type="number" id="dl-price" class="gd-input">
+            </div>
+          </div>
+
+          <div class="gd-form-section">
+            <div class="gd-form-section-title">Details</div>
+            <div class="gd-form-row">
+              <div class="gd-form-group"><label for="dl-type">Property Type</label>
+                <select id="dl-type" class="gd-input">
+                  <option value="">Select...</option>
+                  <option value="Single Family">Single Family</option>
+                  <option value="Condo">Condo</option>
+                  <option value="Townhouse">Townhouse</option>
+                  <option value="Multi-Family">Multi-Family</option>
+                  <option value="Land">Land</option>
+                </select>
+              </div>
+              <div class="gd-form-group"><label for="dl-beds">Beds</label><input type="number" id="dl-beds" class="gd-input"></div>
+              <div class="gd-form-group"><label for="dl-baths">Baths</label><input type="number" id="dl-baths" class="gd-input" step="0.5"></div>
+            </div>
+            <div class="gd-form-row">
+              <div class="gd-form-group"><label for="dl-sqft">Sq Ft</label><input type="number" id="dl-sqft" class="gd-input"></div>
+              <div class="gd-form-group"><label for="dl-yearBuilt">Year Built</label><input type="number" id="dl-yearBuilt" class="gd-input"></div>
+              <div class="gd-form-group"><label for="dl-lotSize">Lot Size</label><input type="text" id="dl-lotSize" class="gd-input" placeholder="0.25 acres"></div>
+            </div>
+          </div>
+
+          <div class="gd-form-section">
+            <div class="gd-form-section-title">Listing Info</div>
+            <div class="gd-form-row">
+              <div class="gd-form-group"><label for="dl-mls">MLS Number</label><input type="text" id="dl-mls" class="gd-input"></div>
+              <div class="gd-form-group"><label for="dl-status">Status</label>
+                <select id="dl-status" class="gd-input">
+                  <option value="active">Active</option>
+                  <option value="pending">Pending</option>
+                  <option value="sold">Sold</option>
+                  <option value="coming_soon">Coming Soon</option>
+                  <option value="withdrawn">Withdrawn</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="gd-form-section" style="border-bottom:none;">
+            <div class="gd-form-section-title">Notes</div>
+            <div class="gd-form-group">
+              <textarea id="dl-notes" class="gd-input" rows="2" placeholder="Internal notes..."></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="gd-modal-footer">
+        <button class="gd-btn" onclick="closeDashboardAddListing()">Cancel</button>
+        <button class="gd-btn gd-btn-primary" onclick="saveDashboardListing()">Save Listing</button>
       </div>
     </div>
   </div>

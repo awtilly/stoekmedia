@@ -109,9 +109,10 @@ async function loadClient(uid) {
     renderFolderCards();
     renderBreadcrumb();
 
-    // Auto-create Closing Documents folder if client already has a transaction type
+    // Auto-create Closing Documents folder and default folders if client already has a transaction type
     if (clientData.transactionType) {
       await ensureClosingDocumentsFolder(clientId, uid);
+      await ensureDefaultFolders(clientId, uid);
     }
 
     document.getElementById("detail-loading").classList.add("gd-hidden");
@@ -167,22 +168,36 @@ document.getElementById("ov-transactionType").addEventListener("change", async (
     await updateDoc(doc(db, "clients", clientId), { transactionType: value });
     clientData.transactionType = value;
     showToast("Transaction type updated.");
-    // Auto-create Closing Documents folder when transaction type is set
+  } catch (err) {
+    console.error("Transaction type save error:", err);
+    showToast("Failed to update transaction type.", "error");
+    return;
+  }
+
+  // Downstream operations — errors here should not show "Failed to update transaction type"
+  try {
     if (value) {
       await ensureClosingDocumentsFolder(clientId, user.uid);
+      await ensureDefaultFolders(clientId, user.uid);
     }
-    // Seed closing checklist for this transaction type
+  } catch (err) {
+    console.error("Failed to create folders:", err);
+  }
+
+  try {
     const closingDateVal = clientData.closingDate
       ? (typeof clientData.closingDate.toDate === "function" ? clientData.closingDate.toDate() : new Date(clientData.closingDate))
       : null;
     await seedChecklist(db, clientId, value, closingDateVal);
-    // Re-initialize checklist UI so it picks up newly seeded items
     initChecklist(clientId, clientData);
-    // Re-filter compliance templates for the new transaction type
+  } catch (err) {
+    console.error("Failed to initialize checklist:", err);
+  }
+
+  try {
     loadComplianceTemplates(user.uid);
   } catch (err) {
-    console.error("Transaction type save error:", err);
-    showToast("Failed to update transaction type.", "error");
+    console.error("Failed to load compliance templates:", err);
   }
 });
 
@@ -272,12 +287,20 @@ window.deleteClient = async function () {
   if (!user) return;
 
   try {
-    const collections = ["activities", "files", "bookmarkedProperties", "clientListingMatches", "showings", "followUps"];
+    const collections = ["activities", "files", "folders", "bookmarkedProperties", "clientListingMatches", "showings", "followUps"];
     for (const col of collections) {
       const q = query(collection(db, col), where("clientId", "==", clientId), where("realtorId", "==", user.uid));
       const snap = await getDocs(q);
       for (const d of snap.docs) {
         await deleteDoc(doc(db, col, d.id));
+      }
+    }
+    // Clean up subcollections
+    const subcollections = ["complianceDocs", "closingChecklist"];
+    for (const sub of subcollections) {
+      const subSnap = await getDocs(collection(db, "clients", clientId, sub));
+      for (const d of subSnap.docs) {
+        await deleteDoc(d.ref);
       }
     }
     await deleteDoc(doc(db, "clients", clientId));
@@ -525,6 +548,47 @@ async function loadFolders(uid) {
   }
 }
 
+const DEFAULT_FOLDERS = [
+  "Contracts",
+  "Disclosures",
+  "Inspections",
+  "Financial",
+  "Photos",
+  "Correspondence"
+];
+
+async function ensureDefaultFolders(clientId, uid) {
+  // Only create defaults if no non-system, non-Closing-Documents folders exist yet
+  const hasUserFolders = allFolders.some(f => !f.isSystem && !DEFAULT_FOLDERS.includes(f.name));
+  const hasAnyDefaultFolder = allFolders.some(f => DEFAULT_FOLDERS.includes(f.name));
+  if (hasUserFolders || hasAnyDefaultFolder) return;
+
+  let created = false;
+  for (const name of DEFAULT_FOLDERS) {
+    const deterministicId = `${clientId}_default_${name.toLowerCase().replace(/\s+/g, "_")}`;
+    const folderRef = doc(db, "folders", deterministicId);
+    try {
+      const snap = await getDoc(folderRef);
+      if (snap.exists()) continue;
+      await setDoc(folderRef, {
+        name,
+        clientId,
+        realtorId: uid,
+        isSystem: false,
+        createdAt: serverTimestamp()
+      });
+      created = true;
+    } catch (err) {
+      console.error(`Error creating default folder "${name}":`, err);
+    }
+  }
+
+  if (created) {
+    await loadFolders(uid);
+    renderFolderCards();
+  }
+}
+
 async function ensureClosingDocumentsFolder(clientId, uid) {
   // Check if a system folder already exists for this client
   const existing = allFolders.find(f => f.isSystem === true);
@@ -560,8 +624,26 @@ async function ensureClosingDocumentsFolder(clientId, uid) {
     showToast("Closing Documents folder created.");
   } catch (err) {
     console.error("Ensure Closing Documents folder error:", err);
-    // Don't show error toast — this is a background operation
-    // The folder may have been created by another tab (duplicate key error is OK)
+  }
+
+  // Also create Compliance Documents system folder
+  const compFolderId = `${clientId}_compliance_documents`;
+  const compFolderRef = doc(db, "folders", compFolderId);
+  try {
+    const compSnap = await getDoc(compFolderRef);
+    if (!compSnap.exists()) {
+      await setDoc(compFolderRef, {
+        name: "Compliance Documents",
+        clientId: clientId,
+        realtorId: uid,
+        isSystem: true,
+        createdAt: serverTimestamp()
+      });
+      await loadFolders(uid);
+      renderFolderCards();
+    }
+  } catch (err) {
+    console.error("Ensure Compliance Documents folder error:", err);
   }
 }
 
