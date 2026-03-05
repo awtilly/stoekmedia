@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: completed
-stopped_at: Phase 5 context gathered
-last_updated: "2026-03-05T14:59:52.386Z"
-last_activity: 2026-03-04 — Completed 04-03 AI Check-in and Auto-completion
+status: in_progress
+stopped_at: Completed 05-01 ShowingTime Sync Backend and Settings UI
+last_updated: "2026-03-05T15:21:00Z"
+last_activity: 2026-03-05 — Completed 05-01 ShowingTime Sync Backend and Settings UI
 progress:
   total_phases: 5
   completed_phases: 4
-  total_plans: 11
-  completed_plans: 11
-  percent: 100
+  total_plans: 13
+  completed_plans: 12
+  percent: 92
 ---
 
 # Project State
@@ -21,23 +21,23 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-04)
 
 **Core value:** Realtors can manage their entire client-to-close workflow in one place — from lead intake through document signing to closing — without switching between tools.
-**Current focus:** Phase 4 -- AI Closing Checklist (checklist data model, UI, auto-completion, AI check-in)
+**Current focus:** Phase 5 -- ShowingTime Sync (iCal feed sync backend, Settings UI, calendar display)
 
 ## Current Position
 
-Phase: 4 of 5 (AI Closing Checklist) -- COMPLETE
-Plan: 3 of 3 in current phase (04-03 done)
-Status: Phase 4 Complete
-Last activity: 2026-03-04 — Completed 04-03 AI Check-in and Auto-completion
+Phase: 5 of 5 (ShowingTime Sync)
+Plan: 1 of 2 in current phase (05-01 done)
+Status: In Progress
+Last activity: 2026-03-05 — Completed 05-01 ShowingTime Sync Backend and Settings UI
 
-Progress: [██████████] 100%
+Progress: [█████████░] 92%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 11
+- Total plans completed: 12
 - Average duration: 3.2m
-- Total execution time: 0.58 hours
+- Total execution time: 0.63 hours
 
 **By Phase:**
 
@@ -55,9 +55,10 @@ Progress: [██████████] 100%
 | 04 | P01 | 2m | 2 | 3 |
 | 04 | P02 | 3m | 2 | 4 |
 | 04 | P03 | 2m | 2 | 3 |
+| 05 | P01 | 3m | 2 | 5 |
 
 **Recent Trend:**
-- Last 5 plans: 2m, 1m, 2m, 3m, 2m
+- Last 5 plans: 1m, 2m, 3m, 2m, 3m
 - Trend: consistently fast execution
 
 *Updated after each plan completion*
@@ -101,6 +102,9 @@ Recent decisions affecting current work:
 - [Phase 04]: Non-fatal try/catch for checklist auto-completion in webhook so errors never fail the webhook
 - [Phase 04]: Admin SDK db.batch() for webhook auto-completion vs client SDK writeBatch in checklist.js
 - [Phase 04]: sendWithContext as window-level function for cross-module chatbot context injection
+- [Phase 05]: Lazy require node-ical inside syncFeedForUser to avoid cold start cost for other functions
+- [Phase 05]: Batch chunking at 450 operations to stay safely under Firestore 500 limit
+- [Phase 05]: Client-side disconnect uses Promise.all with individual deleteDoc rather than writeBatch for simplicity
 
 ### Pending Todos
 
@@ -115,6 +119,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-05T14:59:52.380Z
-Stopped at: Phase 5 context gathered
-Resume file: .planning/phases/05-showingtime-sync/05-CONTEXT.md
+Last session: 2026-03-05T15:21:00Z
+Stopped at: Completed 05-01 ShowingTime Sync Backend and Settings UI
+Resume file: .planning/phases/05-showingtime-sync/05-01-SUMMARY.md

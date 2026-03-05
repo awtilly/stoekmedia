@@ -76,17 +76,17 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### ShowingTime Sync
 
-- [ ] **SHWT-01**: Settings page has "Integrations" section with ShowingTime iCal feed URL input
-- [ ] **SHWT-02**: Feed URL saves to users/{uid}.showingTimeFeedUrl
-- [ ] **SHWT-03**: "Sync Now" button triggers callable Cloud Function to fetch and parse the iCal feed
-- [ ] **SHWT-04**: Cloud Function converts webcal:// to https://, fetches feed, parses with node-ical
-- [ ] **SHWT-05**: Each VEVENT upserted to users/{uid}/showings/{icalUid} with title, times, location, source: "showingtime"
-- [ ] **SHWT-06**: Cancelled events in feed are removed from Firestore (or marked cancelled)
-- [ ] **SHWT-07**: Scheduled Cloud Function syncs all users with feed URLs every 30 minutes
-- [ ] **SHWT-08**: Rate limited to max once per 15 minutes per user
+- [x] **SHWT-01**: Settings page has "Integrations" section with ShowingTime iCal feed URL input
+- [x] **SHWT-02**: Feed URL saves to users/{uid}.showingTimeFeedUrl
+- [x] **SHWT-03**: "Sync Now" button triggers callable Cloud Function to fetch and parse the iCal feed
+- [x] **SHWT-04**: Cloud Function converts webcal:// to https://, fetches feed, parses with node-ical
+- [x] **SHWT-05**: Each VEVENT upserted to users/{uid}/showings/{icalUid} with title, times, location, source: "showingtime"
+- [x] **SHWT-06**: Cancelled events in feed are removed from Firestore (or marked cancelled)
+- [x] **SHWT-07**: Scheduled Cloud Function syncs all users with feed URLs every 30 minutes
+- [x] **SHWT-08**: Rate limited to max once per 15 minutes per user
 - [ ] **SHWT-09**: ShowingTime showings display in calendar with distinct "ST" badge, read-only
-- [ ] **SHWT-10**: Invalid or expired feed URLs show clear error in Settings with instructions
-- [ ] **SHWT-11**: Last synced timestamp displayed in Settings
+- [x] **SHWT-10**: Invalid or expired feed URLs show clear error in Settings with instructions
+- [x] **SHWT-11**: Last synced timestamp displayed in Settings
 
 ### Signed Document UI
 
@@ -187,17 +187,17 @@ Which phases cover which requirements. Updated during roadmap creation.
 | AICX-04 | Phase 4 | Complete |
 | AICX-05 | Phase 4 | Complete |
 | AICX-06 | Phase 4 | Complete |
-| SHWT-01 | Phase 5 | Pending |
-| SHWT-02 | Phase 5 | Pending |
-| SHWT-03 | Phase 5 | Pending |
-| SHWT-04 | Phase 5 | Pending |
-| SHWT-05 | Phase 5 | Pending |
-| SHWT-06 | Phase 5 | Pending |
-| SHWT-07 | Phase 5 | Pending |
-| SHWT-08 | Phase 5 | Pending |
+| SHWT-01 | Phase 5 | Complete |
+| SHWT-02 | Phase 5 | Complete |
+| SHWT-03 | Phase 5 | Complete |
+| SHWT-04 | Phase 5 | Complete |
+| SHWT-05 | Phase 5 | Complete |
+| SHWT-06 | Phase 5 | Complete |
+| SHWT-07 | Phase 5 | Complete |
+| SHWT-08 | Phase 5 | Complete |
 | SHWT-09 | Phase 5 | Pending |
-| SHWT-10 | Phase 5 | Pending |
-| SHWT-11 | Phase 5 | Pending |
+| SHWT-10 | Phase 5 | Complete |
+| SHWT-11 | Phase 5 | Complete |
 
 **Coverage:**
 - v1 requirements: 59 total
