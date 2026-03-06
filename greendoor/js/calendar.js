@@ -115,7 +115,10 @@ function render() {
     const weekStart = getWeekStart(currentDate);
     const weekEnd = new Date(weekStart);
     weekEnd.setDate(weekEnd.getDate() + 6);
-    titleEl.textContent = `${MONTHS[weekStart.getMonth()]} ${weekStart.getDate()} — ${weekEnd.getDate()}, ${weekStart.getFullYear()}`;
+    const endLabel = weekStart.getMonth() !== weekEnd.getMonth()
+      ? `${MONTHS[weekEnd.getMonth()]} ${weekEnd.getDate()}`
+      : `${weekEnd.getDate()}`;
+    titleEl.textContent = `${MONTHS[weekStart.getMonth()]} ${weekStart.getDate()} — ${endLabel}, ${weekEnd.getFullYear()}`;
     renderWeek();
   }
 }

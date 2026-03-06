@@ -17,7 +17,6 @@
         <li><a href="/greendoor/app/dashboard" class="gd-nav-active">Dashboard</a></li>
         <li><a href="/greendoor/app/clients">Clients</a></li>
         <li><a href="/greendoor/app/calendar">Calendar</a></li>
-        <li><a href="/greendoor/app/listings">Listings</a></li>
         <li id="nav-admin-tab" style="display:none;"><a href="/greendoor/app/admin">Admin</a></li>
         <li><a href="/greendoor/app/settings">Settings</a></li>
         <li class="nav-crm-divider"></li>
@@ -126,6 +125,22 @@
         <button class="gd-modal-close" onclick="closeDashboardAddListing()" aria-label="Close">&times;</button>
       </div>
       <div class="gd-modal-body">
+
+        <!-- URL Fetch Section -->
+        <div class="gd-url-fetch-section">
+          <div class="gd-form-group" style="margin-bottom:0;">
+            <label>Import from URL</label>
+            <div style="display:flex;gap:0.5rem;">
+              <input type="url" id="dl-url" class="gd-input" placeholder="Paste a Zillow, Realtor.com, or other listing URL..." style="flex:1;">
+              <button id="dl-fetch-btn" class="gd-btn gd-btn-primary" onclick="fetchDashboardListingFromUrl()">Fetch</button>
+            </div>
+          </div>
+          <div id="dl-fetch-status" class="gd-url-fetch-result"></div>
+        </div>
+
+        <div class="gd-or-divider"><span>OR enter manually</span></div>
+
+        <!-- Manual Form -->
         <div class="gd-add-listing-form">
           <div class="gd-form-section">
             <div class="gd-form-section-title">Address</div>
@@ -137,6 +152,10 @@
               <div class="gd-form-group"><label for="dl-city">City</label><input type="text" id="dl-city" class="gd-input"></div>
               <div class="gd-form-group"><label for="dl-state">State</label><input type="text" id="dl-state" class="gd-input" maxlength="2" placeholder="MO"></div>
               <div class="gd-form-group"><label for="dl-zip">ZIP</label><input type="text" id="dl-zip" class="gd-input" maxlength="10"></div>
+            </div>
+            <div class="gd-form-row">
+              <div class="gd-form-group"><label for="dl-county">County</label><input type="text" id="dl-county" class="gd-input"></div>
+              <div class="gd-form-group"><label for="dl-neighborhood">Neighborhood</label><input type="text" id="dl-neighborhood" class="gd-input"></div>
             </div>
           </div>
 
@@ -169,6 +188,21 @@
               <div class="gd-form-group"><label for="dl-yearBuilt">Year Built</label><input type="number" id="dl-yearBuilt" class="gd-input"></div>
               <div class="gd-form-group"><label for="dl-lotSize">Lot Size</label><input type="text" id="dl-lotSize" class="gd-input" placeholder="0.25 acres"></div>
             </div>
+            <div class="gd-form-row">
+              <div class="gd-form-group"><label for="dl-garage">Garage Spaces</label><input type="number" id="dl-garage" class="gd-input"></div>
+              <div class="gd-form-group"><label for="dl-stories">Stories</label><input type="number" id="dl-stories" class="gd-input"></div>
+            </div>
+          </div>
+
+          <div class="gd-form-section">
+            <div class="gd-form-section-title">Features</div>
+            <div class="gd-form-group">
+              <div class="gd-tag-input-wrap">
+                <div id="dl-tag-list" class="gd-tag-list"></div>
+                <input type="text" id="dl-tag-input" class="gd-tag-field" placeholder="Type a feature and press Enter">
+              </div>
+              <div id="dl-tag-suggestions" class="gd-tag-suggestions"></div>
+            </div>
           </div>
 
           <div class="gd-form-section">
@@ -185,6 +219,14 @@
                 </select>
               </div>
             </div>
+            <div class="gd-form-group">
+              <label for="dl-listingUrl">Listing URL</label>
+              <input type="url" id="dl-listingUrl" class="gd-input">
+            </div>
+            <div class="gd-form-group">
+              <label for="dl-description">Description</label>
+              <textarea id="dl-description" class="gd-input" rows="3"></textarea>
+            </div>
           </div>
 
           <div class="gd-form-section" style="border-bottom:none;">
@@ -193,17 +235,31 @@
               <textarea id="dl-notes" class="gd-input" rows="2" placeholder="Internal notes..."></textarea>
             </div>
           </div>
+
+          <!-- Match to Clients -->
+          <div class="gd-form-section" style="border-bottom:none;">
+            <div class="gd-form-section-title">Match to Clients</div>
+            <div class="gd-form-group">
+              <label for="dl-client-select">Select clients to match this listing to</label>
+              <div id="dl-client-checkboxes" class="gd-client-checkbox-list" style="max-height:160px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius);padding:0.5rem;">
+                <span class="gd-muted">Loading clients...</span>
+              </div>
+            </div>
+          </div>
         </div>
+
       </div>
       <div class="gd-modal-footer">
         <button class="gd-btn" onclick="closeDashboardAddListing()">Cancel</button>
-        <button class="gd-btn gd-btn-primary" onclick="saveDashboardListing()">Save Listing</button>
+        <button id="dl-save-btn" class="gd-btn gd-btn-primary" onclick="saveDashboardListing()">Save Listing</button>
       </div>
     </div>
   </div>
 
+  <script src="/assets/js/main.js"></script>
   <script type="module" src="/greendoor/js/auth.js"></script>
   <script type="module" src="/greendoor/js/tour.js"></script>
+  <script type="module" src="/greendoor/js/match-engine.js"></script>
   <script type="module" src="/greendoor/js/dashboard.js"></script>
   <script type="module" src="/greendoor/js/chatbot.js"></script>
 </body>

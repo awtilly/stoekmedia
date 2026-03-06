@@ -17,7 +17,6 @@
         <li><a href="/greendoor/app/dashboard">Dashboard</a></li>
         <li><a href="/greendoor/app/clients" class="gd-nav-active">Clients</a></li>
         <li><a href="/greendoor/app/calendar">Calendar</a></li>
-
         <li id="nav-admin-tab" style="display:none;"><a href="/greendoor/app/admin">Admin</a></li>
         <li><a href="/greendoor/app/settings">Settings</a></li>
         <li class="nav-crm-divider"></li>
@@ -74,7 +73,6 @@
           <button class="gd-tab" data-tab="showings">Showings</button>
           <button class="gd-tab" data-tab="files">Files</button>
           <button class="gd-tab" data-tab="properties">Properties</button>
-          <button class="gd-tab" data-tab="compliance">Compliance Docs</button>
           <button class="gd-tab" data-tab="checklist">Closing Checklist</button>
         </div>
 
@@ -308,6 +306,26 @@
             <h4 class="gd-pending-title">&#9997; Documents Pending Signature</h4>
             <div id="pending-signatures-list"></div>
           </div>
+
+          <!-- Compliance Docs Panel (shown inside "Compliance Documents" folder) -->
+          <div id="compliance-folder-panel" class="gd-hidden">
+            <div id="compliance-no-txn-banner" class="gd-compliance-banner gd-hidden">
+              <span class="gd-compliance-banner-icon">&#9888;</span>
+              <span>Set a transaction type on the Overview tab to enable compliance documents.</span>
+            </div>
+            <div id="compliance-toolbar" class="gd-compliance-toolbar gd-hidden">
+              <label class="gd-compliance-select-all">
+                <input type="checkbox" id="compliance-select-all"> Select All
+              </label>
+              <button id="compliance-bulk-send" class="gd-btn gd-btn-primary gd-btn-sm" disabled>Send Selected</button>
+            </div>
+            <div id="compliance-list">
+              <div class="gd-empty">
+                <div class="gd-empty-icon">&#128196;</div>
+                <div class="gd-empty-text">Loading compliance documents...</div>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- ===== PROPERTIES TAB ===== -->
@@ -345,29 +363,6 @@
             <span id="compare-count">0 selected</span>
             <button id="compare-btn" class="gd-btn gd-btn-primary gd-btn-sm" onclick="showComparison()">Compare Selected</button>
             <button class="gd-btn gd-btn-sm" onclick="openCopyToClientModal()">Copy to Client</button>
-          </div>
-        </div>
-
-        <!-- ===== COMPLIANCE DOCS TAB ===== -->
-        <div id="tab-compliance" class="gd-tab-content">
-          <!-- Banner when no transaction type -->
-          <div id="compliance-no-txn-banner" class="gd-compliance-banner gd-hidden">
-            <span class="gd-compliance-banner-icon">&#9888;</span>
-            <span>Set a transaction type on the Overview tab to enable compliance documents.</span>
-          </div>
-          <!-- Toolbar with bulk select -->
-          <div id="compliance-toolbar" class="gd-compliance-toolbar gd-hidden">
-            <label class="gd-compliance-select-all">
-              <input type="checkbox" id="compliance-select-all"> Select All
-            </label>
-            <button id="compliance-bulk-send" class="gd-btn gd-btn-primary gd-btn-sm" disabled>Send Selected</button>
-          </div>
-          <!-- Template list -->
-          <div id="compliance-list">
-            <div class="gd-empty">
-              <div class="gd-empty-icon">&#128196;</div>
-              <div class="gd-empty-text">Loading compliance documents...</div>
-            </div>
           </div>
         </div>
 

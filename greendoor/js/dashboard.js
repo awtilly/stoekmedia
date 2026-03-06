@@ -6,9 +6,14 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { getCurrentUser, timeAgo, formatDate, formatDateTime, escapeHtml, showToast } from "./auth.js";
 import { startTour, checkAndResumeTour } from "./tour.js";
+import { calculateMatchScore } from "./match-engine.js";
 
 const askAssistant = httpsCallable(functions, "askAssistant");
 const seedEmailTemplates = httpsCallable(functions, "seedEmailTemplates");
+const parseListingUrlFn = httpsCallable(functions, "parseListingUrl");
+
+let dashboardClients = [];
+let dlFeatureTags = [];
 
 onAuthStateChanged(auth, async (user) => {
   if (!user) return;
@@ -227,10 +232,98 @@ window.refreshBriefing = function () {
 };
 
 /* ===== ADD LISTING MODAL (Dashboard) ===== */
+
+const DL_FEATURE_SUGGESTIONS = [
+  "Pool", "Garage", "Fireplace", "Hardwood Floors", "Open Floor Plan",
+  "Basement", "Deck", "Patio", "Fenced Yard", "Central Air",
+  "Updated Kitchen", "Stainless Appliances", "Granite Counters",
+  "Walk-in Closet", "Laundry Room", "Home Office", "Smart Home",
+  "Solar Panels", "Corner Lot", "Cul-de-sac", "New Roof"
+];
+
+async function loadDashboardClients() {
+  const user = auth.currentUser;
+  if (!user) return;
+  try {
+    const snap = await getDocs(query(collection(db, "clients"), where("realtorId", "==", user.uid)));
+    dashboardClients = [];
+    snap.forEach(d => { dashboardClients.push({ id: d.id, ...d.data() }); });
+  } catch (e) {
+    console.error("Load clients error:", e);
+  }
+  renderDashboardClientCheckboxes();
+}
+
+function renderDashboardClientCheckboxes() {
+  const container = document.getElementById("dl-client-checkboxes");
+  if (!container) return;
+  if (dashboardClients.length === 0) {
+    container.innerHTML = '<span class="gd-muted">No clients found.</span>';
+    return;
+  }
+  container.innerHTML = dashboardClients.map(c =>
+    `<label style="display:flex;align-items:center;gap:0.5rem;padding:0.25rem 0;">
+      <input type="checkbox" class="dl-client-check" value="${c.id}">
+      <span>${escapeHtml(c.fullName || "Unnamed")} <small class="gd-muted">(${c.status || "lead"})</small></span>
+    </label>`
+  ).join("");
+}
+
+function renderDlTags() {
+  const el = document.getElementById("dl-tag-list");
+  if (!el) return;
+  el.innerHTML = dlFeatureTags.map((tag, i) =>
+    `<span class="gd-tag">${escapeHtml(tag)}<button class="gd-tag-remove" onclick="removeDlTag(${i})">&times;</button></span>`
+  ).join("");
+}
+
+function renderDlTagSuggestions() {
+  const el = document.getElementById("dl-tag-suggestions");
+  if (!el) return;
+  const available = DL_FEATURE_SUGGESTIONS.filter(s => !dlFeatureTags.includes(s));
+  el.innerHTML = available.map(s =>
+    `<button class="gd-tag-suggestion" onclick="addDlTag('${s}')">${s}</button>`
+  ).join("");
+}
+
+window.addDlTag = function (tag) {
+  if (!dlFeatureTags.includes(tag)) {
+    dlFeatureTags.push(tag);
+    renderDlTags();
+    renderDlTagSuggestions();
+  }
+};
+
+window.removeDlTag = function (index) {
+  dlFeatureTags.splice(index, 1);
+  renderDlTags();
+  renderDlTagSuggestions();
+};
+
+// Wire tag input Enter key
+document.addEventListener("DOMContentLoaded", () => {
+  const tagInput = document.getElementById("dl-tag-input");
+  if (tagInput) {
+    tagInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        const val = e.target.value.trim();
+        if (val && !dlFeatureTags.includes(val)) {
+          dlFeatureTags.push(val);
+          renderDlTags();
+          renderDlTagSuggestions();
+        }
+        e.target.value = "";
+      }
+    });
+  }
+});
+
 window.openDashboardAddListing = function () {
   // Clear form
-  ["dl-address", "dl-city", "dl-state", "dl-zip", "dl-price", "dl-beds", "dl-baths",
-   "dl-sqft", "dl-yearBuilt", "dl-lotSize", "dl-mls", "dl-notes"].forEach(id => {
+  ["dl-url", "dl-address", "dl-city", "dl-state", "dl-zip", "dl-county", "dl-neighborhood",
+   "dl-price", "dl-beds", "dl-baths", "dl-sqft", "dl-yearBuilt", "dl-lotSize",
+   "dl-garage", "dl-stories", "dl-mls", "dl-listingUrl", "dl-description", "dl-notes"].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = "";
   });
@@ -238,11 +331,75 @@ window.openDashboardAddListing = function () {
   if (typeEl) typeEl.value = "";
   const statusEl = document.getElementById("dl-status");
   if (statusEl) statusEl.value = "active";
+  document.getElementById("dl-fetch-status").innerHTML = "";
+  document.getElementById("dl-fetch-btn").disabled = false;
+  document.getElementById("dl-fetch-btn").textContent = "Fetch";
+  const saveBtn = document.getElementById("dl-save-btn");
+  if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = "Save Listing"; }
+  dlFeatureTags = [];
+  renderDlTags();
+  renderDlTagSuggestions();
+  loadDashboardClients();
   document.getElementById("dash-add-listing-modal").classList.add("active");
 };
 
 window.closeDashboardAddListing = function () {
   document.getElementById("dash-add-listing-modal").classList.remove("active");
+};
+
+window.fetchDashboardListingFromUrl = async function () {
+  const url = document.getElementById("dl-url").value.trim();
+  if (!url) { showToast("Enter a listing URL.", "error"); return; }
+
+  const btn = document.getElementById("dl-fetch-btn");
+  const statusEl = document.getElementById("dl-fetch-status");
+  btn.disabled = true;
+  btn.textContent = "Fetching...";
+  statusEl.innerHTML = '<div class="gd-spinner" style="display:inline-block;vertical-align:middle;margin-right:0.5rem;"></div> Extracting property details...';
+  statusEl.className = "gd-url-fetch-result gd-url-fetch-loading";
+
+  try {
+    const result = await parseListingUrlFn({ url });
+    const listing = result.data.listing;
+
+    if (listing.address) {
+      document.getElementById("dl-address").value = listing.address.street || listing.address.full || "";
+      document.getElementById("dl-city").value = listing.address.city || "";
+      document.getElementById("dl-state").value = listing.address.state || "";
+      document.getElementById("dl-zip").value = listing.address.zip || "";
+      document.getElementById("dl-county").value = listing.address.county || "";
+      document.getElementById("dl-neighborhood").value = listing.address.neighborhood || "";
+    }
+    if (listing.listingPrice) document.getElementById("dl-price").value = listing.listingPrice;
+    if (listing.bedrooms != null) document.getElementById("dl-beds").value = listing.bedrooms;
+    if (listing.bathrooms != null) document.getElementById("dl-baths").value = listing.bathrooms;
+    if (listing.squareFeet) document.getElementById("dl-sqft").value = listing.squareFeet;
+    if (listing.propertyType) document.getElementById("dl-type").value = listing.propertyType;
+    if (listing.yearBuilt) document.getElementById("dl-yearBuilt").value = listing.yearBuilt;
+    if (listing.lotSize) document.getElementById("dl-lotSize").value = listing.lotSize;
+    if (listing.garageSpaces) document.getElementById("dl-garage").value = listing.garageSpaces;
+    if (listing.stories) document.getElementById("dl-stories").value = listing.stories;
+    if (listing.mlsNumber) document.getElementById("dl-mls").value = listing.mlsNumber;
+    if (listing.status) document.getElementById("dl-status").value = listing.status;
+    if (listing.description) document.getElementById("dl-description").value = listing.description;
+    document.getElementById("dl-listingUrl").value = url;
+
+    if (listing.features && Array.isArray(listing.features)) {
+      dlFeatureTags = listing.features.slice(0, 30);
+      renderDlTags();
+      renderDlTagSuggestions();
+    }
+
+    statusEl.innerHTML = "&#10003; Property details extracted!";
+    statusEl.className = "gd-url-fetch-result gd-url-fetch-success";
+  } catch (err) {
+    console.error("Fetch listing error:", err);
+    statusEl.innerHTML = "&#10007; Failed to extract details. Enter manually below.";
+    statusEl.className = "gd-url-fetch-result gd-url-fetch-error";
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Fetch";
+  }
 };
 
 window.saveDashboardListing = async function () {
@@ -252,25 +409,39 @@ window.saveDashboardListing = async function () {
   const addrFull = document.getElementById("dl-address").value.trim();
   if (!addrFull) { showToast("Address is required.", "error"); return; }
 
+  const saveBtn = document.getElementById("dl-save-btn");
+  if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = "Saving..."; }
+
+  const price = Number(document.getElementById("dl-price").value) || null;
+  const sqft = Number(document.getElementById("dl-sqft").value) || null;
+
+  const address = {
+    full: [addrFull, document.getElementById("dl-city").value.trim(), document.getElementById("dl-state").value.trim(), document.getElementById("dl-zip").value.trim()].filter(Boolean).join(", "),
+    street: addrFull,
+    city: document.getElementById("dl-city").value.trim(),
+    state: document.getElementById("dl-state").value.trim(),
+    zip: document.getElementById("dl-zip").value.trim(),
+    county: document.getElementById("dl-county").value.trim(),
+    neighborhood: document.getElementById("dl-neighborhood").value.trim()
+  };
+
   const data = {
-    address: {
-      full: addrFull,
-      street: addrFull.split(",")[0]?.trim() || addrFull,
-      city: document.getElementById("dl-city").value.trim(),
-      state: document.getElementById("dl-state").value.trim(),
-      zip: document.getElementById("dl-zip").value.trim()
-    },
-    listingPrice: Number(document.getElementById("dl-price").value) || null,
+    address,
+    listingPrice: price,
     bedrooms: Number(document.getElementById("dl-beds").value) || null,
     bathrooms: Number(document.getElementById("dl-baths").value) || null,
-    squareFeet: Number(document.getElementById("dl-sqft").value) || null,
+    squareFeet: sqft,
     propertyType: document.getElementById("dl-type").value,
     yearBuilt: Number(document.getElementById("dl-yearBuilt").value) || null,
     lotSize: document.getElementById("dl-lotSize").value.trim(),
+    garageSpaces: Number(document.getElementById("dl-garage").value) || null,
+    stories: Number(document.getElementById("dl-stories").value) || null,
+    features: dlFeatureTags,
     mlsNumber: document.getElementById("dl-mls").value.trim(),
     status: document.getElementById("dl-status").value,
+    listingUrl: document.getElementById("dl-listingUrl").value.trim(),
+    description: document.getElementById("dl-description").value.trim(),
     notes: document.getElementById("dl-notes").value.trim(),
-    features: [],
     photos: [],
     addedBy: user.uid,
     source: "manual",
@@ -278,12 +449,44 @@ window.saveDashboardListing = async function () {
     updatedAt: serverTimestamp()
   };
 
+  if (price && sqft) {
+    data.pricePerSqft = Math.round(price / sqft);
+  }
+
   try {
-    await addDoc(collection(db, "listings"), data);
-    showToast("Listing added!");
+    const docRef = await addDoc(collection(db, "listings"), data);
+
+    // Match to selected clients
+    const selectedClients = document.querySelectorAll(".dl-client-check:checked");
+    const listingForScore = { id: docRef.id, ...data };
+
+    for (const cb of selectedClients) {
+      const cid = cb.value;
+      const clientObj = dashboardClients.find(c => c.id === cid);
+      if (!clientObj) continue;
+
+      const result = calculateMatchScore(listingForScore, clientObj);
+      await addDoc(collection(db, "clientListingMatches"), {
+        listingId: docRef.id,
+        clientId: cid,
+        realtorId: user.uid,
+        matchScore: result.score,
+        matchBreakdown: result.breakdown,
+        dealBreakerHits: result.dealBreakerHits,
+        status: "interested",
+        clientRating: null,
+        clientFeedback: "",
+        realtorNotes: "",
+        matchedAt: serverTimestamp()
+      });
+    }
+
+    const matchCount = selectedClients.length;
+    showToast(matchCount > 0 ? `Listing added and matched to ${matchCount} client${matchCount > 1 ? "s" : ""}!` : "Listing added!");
     closeDashboardAddListing();
   } catch (e) {
     console.error("Save listing error:", e);
     showToast("Failed to save listing.", "error");
+    if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = "Save Listing"; }
   }
 };

@@ -156,7 +156,7 @@ async function loadActivityChart() {
     const tsThirty = Timestamp.fromDate(thirtyDaysAgo);
 
     const activitiesSnap = await getDocs(
-      query(collection(db, "activities"), where("timestamp", ">=", tsThirty))
+      query(collection(db, "activities"), where("createdAt", ">=", tsThirty))
     );
 
     const typeCounts = {};
@@ -220,7 +220,8 @@ async function loadUsersTab() {
 function getRealtorStatus(r) {
   if (r.offboardedAt) return "offboarded";
   if (!r.isActive) return "inactive";
-  if (r.onboardingComplete === false) return "onboarding";
+  if (r.onboardingComplete === false && !r.lastLogin) return "onboarding";
+  if (r.onboardingComplete === false && r.lastLogin) return "onboarding";
   return "active";
 }
 
@@ -393,9 +394,9 @@ async function loadInvitations() {
 
       return `
       <tr>
-        <td style="color: var(--color-text-primary); font-weight: 500;">${r.fullName || "—"}</td>
-        <td>${r.email || "—"}</td>
-        <td>${r.company || "—"}</td>
+        <td style="color: var(--color-text-primary); font-weight: 500;">${escapeHtml(r.fullName) || "—"}</td>
+        <td>${escapeHtml(r.email) || "—"}</td>
+        <td>${escapeHtml(r.company) || "—"}</td>
         <td>${formatDate(r.lastInviteSentAt || r.createdAt)}</td>
         <td>${statusBadge}</td>
         <td>${canResend ? `<button class="gd-btn gd-btn-sm" onclick="resendInvite('${r.id}', this)">Resend</button>` : "—"}</td>
@@ -760,7 +761,7 @@ function renderOffboardClients() {
     return `
     <tr>
       <td style="color: var(--color-text-primary); font-weight: 500;">${c.fullName || "—"}</td>
-      <td><span class="gd-badge">${escapeHtml(c.status || "lead")}</span></td>
+      <td>${getStatusBadge(c.status || "lead")}</td>
       <td>
         <select class="gd-input" style="font-size: 0.8rem; padding: 0.4rem 0.6rem;" onchange="setClientDisposition('${c.id}', this.value)">
           <option value="unassign" ${currentVal === "unassign" || !currentVal ? "selected" : ""}>Leave Unassigned</option>

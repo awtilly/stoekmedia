@@ -69,7 +69,7 @@ onAuthStateChanged(auth, async (user) => {
   if (!user) return;
   realtorProfile = await getCurrentUser();
   await loadClient(user.uid);
-  loadEmailTemplates(user.uid);
+  await loadEmailTemplates(user.uid);
 });
 
 /* --- Load client --- */
@@ -109,10 +109,12 @@ async function loadClient(uid) {
     renderFolderCards();
     renderBreadcrumb();
 
-    // Auto-create Closing Documents folder and default folders if client already has a transaction type
+    // Auto-create default folders and compliance folder for all clients
+    await ensureDefaultFolders(clientId, uid);
+    await ensureComplianceDocumentsFolder(clientId, uid);
+    // Closing Documents folder depends on transaction type
     if (clientData.transactionType) {
       await ensureClosingDocumentsFolder(clientId, uid);
-      await ensureDefaultFolders(clientId, uid);
     }
 
     document.getElementById("detail-loading").classList.add("gd-hidden");
@@ -176,9 +178,10 @@ document.getElementById("ov-transactionType").addEventListener("change", async (
 
   // Downstream operations — errors here should not show "Failed to update transaction type"
   try {
+    await ensureDefaultFolders(clientId, user.uid);
+    await ensureComplianceDocumentsFolder(clientId, user.uid);
     if (value) {
       await ensureClosingDocumentsFolder(clientId, user.uid);
-      await ensureDefaultFolders(clientId, user.uid);
     }
   } catch (err) {
     console.error("Failed to create folders:", err);
@@ -626,15 +629,19 @@ async function ensureClosingDocumentsFolder(clientId, uid) {
     console.error("Ensure Closing Documents folder error:", err);
   }
 
-  // Also create Compliance Documents system folder
-  const compFolderId = `${clientId}_compliance_documents`;
+}
+
+async function ensureComplianceDocumentsFolder(cid, uid) {
+  const compFolderId = `${cid}_compliance_documents`;
   const compFolderRef = doc(db, "folders", compFolderId);
   try {
+    const existing = allFolders.find(f => f.id === compFolderId);
+    if (existing) return;
     const compSnap = await getDoc(compFolderRef);
     if (!compSnap.exists()) {
       await setDoc(compFolderRef, {
         name: "Compliance Documents",
-        clientId: clientId,
+        clientId: cid,
         realtorId: uid,
         isSystem: true,
         createdAt: serverTimestamp()
@@ -714,12 +721,50 @@ function renderBreadcrumb() {
 window.enterFolder = function (folderId) {
   currentFolderId = folderId;
   renderFolderCards();
-  renderFiles();
   renderBreadcrumb();
+
+  // Check if this is the Compliance Documents system folder
+  const folder = allFolders.find(f => f.id === folderId);
+  const compliancePanel = document.getElementById("compliance-folder-panel");
+  const fileControls = document.querySelector("#tab-files .gd-file-controls");
+  const filesList = document.getElementById("files-list");
+  const uploadProgress = document.getElementById("upload-progress");
+  const pendingSigs = document.getElementById("pending-signatures");
+
+  if (folder && folder.name === "Compliance Documents" && folder.isSystem) {
+    // Show compliance panel, hide file controls
+    if (compliancePanel) compliancePanel.classList.remove("gd-hidden");
+    if (fileControls) fileControls.style.display = "none";
+    if (filesList) filesList.style.display = "none";
+    if (uploadProgress) uploadProgress.style.display = "none";
+    if (pendingSigs) pendingSigs.style.display = "none";
+    renderComplianceList();
+  } else {
+    // Normal folder — show files
+    if (compliancePanel) compliancePanel.classList.add("gd-hidden");
+    if (fileControls) fileControls.style.display = "";
+    if (filesList) filesList.style.display = "";
+    if (uploadProgress) uploadProgress.style.display = "";
+    if (pendingSigs) pendingSigs.style.display = "";
+    renderFiles();
+  }
 };
 
 window.exitFolder = function () {
   currentFolderId = null;
+
+  // Hide compliance panel, restore file controls
+  const compliancePanel = document.getElementById("compliance-folder-panel");
+  const fileControls = document.querySelector("#tab-files .gd-file-controls");
+  const filesList = document.getElementById("files-list");
+  const uploadProgress = document.getElementById("upload-progress");
+  const pendingSigs = document.getElementById("pending-signatures");
+  if (compliancePanel) compliancePanel.classList.add("gd-hidden");
+  if (fileControls) fileControls.style.display = "";
+  if (filesList) filesList.style.display = "";
+  if (uploadProgress) uploadProgress.style.display = "";
+  if (pendingSigs) pendingSigs.style.display = "";
+
   renderFolderCards();
   renderFiles();
   renderBreadcrumb();
@@ -3225,6 +3270,13 @@ async function confirmAndSendCompliance() {
 function closeComplianceConfirm() {
   document.getElementById("compliance-confirm-modal").classList.remove("active");
   pendingSendTemplateId = null;
+  // Restore original single-send handler in case bulk send overrode it
+  const sendBtn = document.getElementById("compliance-confirm-send-btn");
+  if (sendBtn) {
+    sendBtn.onclick = null;
+    sendBtn.textContent = "Send for Signature";
+    sendBtn.disabled = false;
+  }
 }
 
 /**
@@ -3322,8 +3374,6 @@ async function handleBulkComplianceSend() {
     }
   };
 
-  // Reset the send button when closing
-  const originalConfirmClose = closeComplianceConfirm;
   document.getElementById("compliance-confirm-modal").classList.add("active");
 }
 

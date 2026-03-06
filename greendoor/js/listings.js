@@ -336,6 +336,10 @@ function handlePhotoFiles(files) {
 
 function renderPhotoPreview() {
   const el = document.getElementById("lst-photo-preview");
+  // Revoke previous blob URLs to prevent memory leaks
+  el.querySelectorAll("img").forEach(img => {
+    if (img.src.startsWith("blob:")) URL.revokeObjectURL(img.src);
+  });
   el.innerHTML = pendingPhotos.map((f, i) => {
     const url = URL.createObjectURL(f);
     return `<div class="gd-photo-thumb">
@@ -821,8 +825,8 @@ async function importBookmarkedPropertiesOnce(uid) {
           createdAt: bp.createdAt || serverTimestamp(),
           updatedAt: serverTimestamp()
         };
-        const ref = await addDoc(collection(db, "listings"), listingData);
-        listingId = ref.id;
+        const docRef = await addDoc(collection(db, "listings"), listingData);
+        listingId = docRef.id;
       }
 
       // Create clientListingMatch

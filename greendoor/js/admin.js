@@ -394,9 +394,9 @@ async function loadInvitations() {
 
       return `
       <tr>
-        <td style="color: var(--color-text-primary); font-weight: 500;">${r.fullName || "—"}</td>
-        <td>${r.email || "—"}</td>
-        <td>${r.company || "—"}</td>
+        <td style="color: var(--color-text-primary); font-weight: 500;">${escapeHtml(r.fullName) || "—"}</td>
+        <td>${escapeHtml(r.email) || "—"}</td>
+        <td>${escapeHtml(r.company) || "—"}</td>
         <td>${formatDate(r.lastInviteSentAt || r.createdAt)}</td>
         <td>${statusBadge}</td>
         <td>${canResend ? `<button class="gd-btn gd-btn-sm" onclick="resendInvite('${r.id}', this)">Resend</button>` : "—"}</td>

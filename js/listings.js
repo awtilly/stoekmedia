@@ -825,8 +825,8 @@ async function importBookmarkedPropertiesOnce(uid) {
           createdAt: bp.createdAt || serverTimestamp(),
           updatedAt: serverTimestamp()
         };
-        const ref = await addDoc(collection(db, "listings"), listingData);
-        listingId = ref.id;
+        const docRef = await addDoc(collection(db, "listings"), listingData);
+        listingId = docRef.id;
       }
 
       // Create clientListingMatch
