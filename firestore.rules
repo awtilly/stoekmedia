@@ -52,6 +52,18 @@ service cloud.firestore {
       allow create: if isAuthenticated() && incomingRealtorIdMatchesAuth();
       allow update: if isAuthenticated() && (isOwner(resource.data.realtorId) || isAdmin()) && realtorIdUnchanged();
       allow delete: if isAuthenticated() && (isOwner(resource.data.realtorId) || isAdmin());
+
+      // Closing Checklist subcollection
+      match /closingChecklist/{itemId} {
+        allow read, write: if isAuthenticated()
+          && get(/databases/$(database)/documents/clients/$(clientId)).data.realtorId == request.auth.uid;
+      }
+
+      // Compliance Docs subcollection
+      match /complianceDocs/{docId} {
+        allow read, write: if isAuthenticated()
+          && get(/databases/$(database)/documents/clients/$(clientId)).data.realtorId == request.auth.uid;
+      }
     }
 
     match /activities/{activityId} {
@@ -108,6 +120,18 @@ service cloud.firestore {
       allow create: if isAuthenticated() && incomingRealtorIdMatchesAuth();
       allow update: if isAuthenticated() && (isOwner(resource.data.realtorId) || isAdmin()) && realtorIdUnchanged();
       allow delete: if isAuthenticated() && (isOwner(resource.data.realtorId) || isAdmin());
+    }
+
+    match /folders/{folderId} {
+      allow read: if isAuthenticated() && (isOwner(resource.data.realtorId) || isAdmin());
+      allow create: if isAuthenticated() && incomingRealtorIdMatchesAuth();
+      allow update: if isAuthenticated() && (isOwner(resource.data.realtorId) || isAdmin()) && realtorIdUnchanged();
+      allow delete: if isAuthenticated() && (isOwner(resource.data.realtorId) || isAdmin());
+    }
+
+    match /documentTemplates/{templateId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && isAdmin();
     }
 
     match /listings/{listingId} {
