@@ -12,6 +12,23 @@ import { checkAndResumeTour } from "./tour.js";
 
 let allTemplates = [];
 
+/* ===== SETTINGS TAB SWITCHING ===== */
+
+function switchSettingsTab(tabName) {
+  document.querySelectorAll(".gd-settings-tab").forEach(t =>
+    t.classList.toggle("active", t.dataset.tab === tabName)
+  );
+  document.querySelectorAll(".gd-settings-main .gd-tab-content").forEach(c =>
+    c.classList.toggle("active", c.id === `tab-${tabName}`)
+  );
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  document.querySelectorAll(".gd-settings-tab").forEach(tab => {
+    tab.addEventListener("click", () => switchSettingsTab(tab.dataset.tab));
+  });
+});
+
 onAuthStateChanged(auth, async (user) => {
   if (!user) return;
 

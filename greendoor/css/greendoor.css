@@ -1425,6 +1425,99 @@ textarea.gd-input {
   display: block;
 }
 
+/* --- Settings Sidebar Layout --- */
+.gd-settings-layout {
+  display: flex;
+  gap: var(--space-lg);
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.gd-settings-sidebar {
+  width: 200px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  position: sticky;
+  top: 5rem;
+  align-self: flex-start;
+}
+
+.gd-settings-tab {
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  font-weight: 400;
+  color: var(--color-text-muted);
+  background: none;
+  border: none;
+  border-left: 3px solid transparent;
+  padding: var(--space-sm) var(--space-md);
+  text-align: left;
+  cursor: pointer;
+  border-radius: 0 var(--gd-radius-xs) var(--gd-radius-xs) 0;
+  transition: all var(--gd-duration-fast) var(--gd-ease);
+}
+
+.gd-settings-tab:hover {
+  color: var(--color-text-primary);
+  background: var(--color-surface);
+}
+
+.gd-settings-tab.active {
+  color: var(--gd-green-600);
+  font-weight: 500;
+  border-left-color: var(--gd-green-600);
+  background: var(--color-surface);
+}
+
+.gd-settings-main {
+  flex: 1;
+  min-width: 0;
+}
+
+@media (max-width: 768px) {
+  .gd-settings-layout {
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .gd-settings-sidebar {
+    width: 100%;
+    flex-direction: row;
+    position: static;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    gap: 2px;
+    background: var(--color-surface);
+    border-radius: var(--gd-radius-sm);
+    padding: 3px;
+    margin-bottom: var(--space-md);
+  }
+
+  .gd-settings-sidebar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .gd-settings-tab {
+    flex-shrink: 0;
+    border-left: none;
+    border-radius: var(--gd-radius-xs);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    white-space: nowrap;
+    text-align: center;
+  }
+
+  .gd-settings-tab.active {
+    border-left-color: transparent;
+    background: var(--color-bg-card);
+    box-shadow: var(--gd-shadow-xs);
+  }
+}
+
 /* --- Activity Action Buttons --- */
 .gd-activity-actions {
   display: flex;
