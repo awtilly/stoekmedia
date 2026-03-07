@@ -180,11 +180,34 @@ window.showAiSummary = async function (clientId, btnEl) {
   const popover = document.getElementById("ai-popover");
   const content = document.getElementById("ai-popover-content");
 
-  // Position popover near the button
+  // Position popover near the button with viewport boundary checking
   const rect = btnEl.getBoundingClientRect();
-  popover.style.top = (rect.bottom + window.scrollY + 8) + "px";
-  popover.style.right = (window.innerWidth - rect.right) + "px";
-  popover.style.left = "auto";
+  const isMobile = window.innerWidth <= 640;
+
+  if (isMobile) {
+    popover.style.position = "fixed";
+    popover.style.top = "auto";
+    popover.style.bottom = "1rem";
+    popover.style.left = "1rem";
+    popover.style.right = "1rem";
+    popover.style.maxHeight = "60vh";
+    popover.style.overflowY = "auto";
+  } else {
+    popover.style.position = "";
+    popover.style.bottom = "";
+    popover.style.maxHeight = "";
+    popover.style.overflowY = "";
+    let topPos = rect.bottom + window.scrollY + 8;
+    // Ensure popover doesn't overflow bottom of viewport
+    if (rect.bottom + 250 > window.innerHeight) {
+      topPos = rect.top + window.scrollY - 250;
+    }
+    popover.style.top = topPos + "px";
+    let rightPos = window.innerWidth - rect.right;
+    if (rightPos < 8) rightPos = 8;
+    popover.style.right = rightPos + "px";
+    popover.style.left = "auto";
+  }
   popover.classList.add("active");
 
   // Check cache

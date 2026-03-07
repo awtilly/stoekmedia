@@ -338,10 +338,34 @@ window.showPopover = function (eventId, anchorEl) {
   }
   document.getElementById("pop-actions").innerHTML = actions;
 
-  // Position popover near anchor
+  // Position popover near anchor with viewport boundary checking
   const rect = anchorEl.getBoundingClientRect();
-  pop.style.top = (rect.bottom + window.scrollY + 8) + "px";
-  pop.style.left = Math.min(rect.left, window.innerWidth - 280) + "px";
+  const isMobile = window.innerWidth <= 640;
+
+  if (isMobile) {
+    pop.style.position = "fixed";
+    pop.style.top = "auto";
+    pop.style.bottom = "1rem";
+    pop.style.left = "1rem";
+    pop.style.right = "1rem";
+    pop.style.maxHeight = "60vh";
+    pop.style.overflowY = "auto";
+  } else {
+    pop.style.position = "";
+    pop.style.right = "";
+    pop.style.bottom = "";
+    pop.style.maxHeight = "";
+    pop.style.overflowY = "";
+    let topPos = rect.bottom + window.scrollY + 8;
+    let leftPos = Math.min(rect.left, window.innerWidth - 280);
+    // Ensure popover doesn't overflow bottom of viewport
+    if (rect.bottom + 200 > window.innerHeight) {
+      topPos = rect.top + window.scrollY - 200;
+    }
+    if (leftPos < 8) leftPos = 8;
+    pop.style.top = topPos + "px";
+    pop.style.left = leftPos + "px";
+  }
   pop.classList.remove("gd-hidden");
 };
 

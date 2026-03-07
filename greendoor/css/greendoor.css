@@ -6909,6 +6909,247 @@ body.gd-light .gd-confirm-warning { background: #fffbeb; color: #92400e; }
   margin-bottom: 8px;
 }
 
+/* ============================================================
+   MOBILE OPTIMIZATION
+   ============================================================ */
+
+/* --- Responsive utility classes --- */
+.gd-hide-desktop {
+  display: none !important;
+}
+
+/* --- 768px: Tablets & small screens --- */
+@media (max-width: 768px) {
+  /* Modals — full-screen on mobile */
+  .gd-modal {
+    max-width: 100%;
+    max-height: 100vh;
+    max-height: 100dvh;
+    border-radius: 0;
+    margin: 0;
+  }
+
+  .gd-modal-lg {
+    max-width: 100%;
+  }
+
+  .gd-preview-modal {
+    max-width: 100%;
+    max-height: 100vh;
+  }
+
+  .gd-modal-overlay.active {
+    align-items: flex-end;
+  }
+
+  .gd-modal-body {
+    padding: var(--space-sm);
+  }
+
+  .gd-modal-header,
+  .gd-modal-footer {
+    padding: var(--space-sm);
+  }
+
+  .gd-modal-close {
+    padding: 0.75rem;
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  /* Touch targets — minimum 44px */
+  .gd-btn {
+    min-height: 44px;
+    padding: 0.75rem 1.25rem;
+  }
+
+  .gd-btn-sm {
+    min-height: 44px;
+    padding: 0.65rem 1rem;
+  }
+
+  .gd-tab {
+    min-height: 44px;
+    padding: 0.5rem 0.75rem;
+  }
+
+  .gd-checklist-check,
+  .gd-file-check,
+  .gd-property-check,
+  .gd-compliance-check {
+    width: 22px;
+    height: 22px;
+  }
+
+  .gd-folder-kebab,
+  .gd-file-kebab {
+    padding: 0.5rem;
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .gd-checklist-action-btn {
+    padding: 0.5rem;
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .nav-links a {
+    padding: 0.75rem 1rem;
+  }
+
+  /* AI FAB — position on mobile */
+  .gd-ai-fab {
+    bottom: 1rem;
+    right: 1rem;
+  }
+}
+
+/* --- 640px: Small phones --- */
+@media (max-width: 640px) {
+  /* Responsive utility classes */
+  .gd-hide-mobile {
+    display: none !important;
+  }
+
+  .gd-hide-desktop {
+    display: block !important;
+  }
+
+  /* Filter bar overflow */
+  .gd-search-input {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .gd-filter-select {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .gd-filter-input {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .gd-filter-sm {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .gd-top-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .gd-filter-row {
+    gap: 0.5rem;
+  }
+
+  /* Tables — compact on mobile */
+  .gd-table th,
+  .gd-table td {
+    padding: 0.5rem 0.5rem;
+  }
+
+  .gd-table {
+    font-size: 0.8rem;
+  }
+
+  .gd-listings-table th,
+  .gd-listings-table td {
+    padding: 0.5rem 0.5rem;
+  }
+
+  .gd-table .gd-hide-mobile {
+    display: none !important;
+  }
+
+  /* Calendar — mobile-friendly */
+  .gd-cal-day {
+    min-height: 40px;
+    font-size: 0.65rem;
+    padding: 0.2rem;
+  }
+
+  .gd-cal-day-num {
+    font-size: 0.75rem;
+  }
+
+  .gd-cal-popover {
+    position: fixed;
+    left: 1rem !important;
+    right: 1rem !important;
+    top: auto !important;
+    bottom: 1rem;
+    width: auto;
+    max-height: 60vh;
+    overflow-y: auto;
+    z-index: 2000;
+  }
+
+  .gd-cal-event,
+  .gd-cal-event-dot {
+    font-size: 0.6rem;
+    padding: 1px 2px;
+  }
+
+  /* Quick Match Sidebar — full overlay on mobile */
+  .gd-quick-match-sidebar {
+    z-index: 1700;
+  }
+
+  /* Page padding/spacing — tighter on mobile */
+  .gd-content {
+    padding: var(--space-sm);
+  }
+
+  .gd-card {
+    padding: var(--space-sm);
+  }
+
+  .gd-page {
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  .gd-welcome h1 {
+    font-size: clamp(1.4rem, 4vw, 1.8rem);
+  }
+}
+
+/* --- 480px: Very small phones --- */
+@media (max-width: 480px) {
+  /* Tabs — horizontal scroll */
+  .gd-tabs {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    flex-wrap: nowrap;
+    white-space: nowrap;
+    scrollbar-width: none;
+  }
+
+  .gd-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .gd-tab {
+    flex-shrink: 0;
+    font-size: 0.72rem;
+  }
+
+  /* Login/Onboarding — better small phone fit */
+  .gd-login-card {
+    margin: 1rem;
+    padding: 1.5rem;
+  }
+
+  .gd-onboarding-card {
+    margin: 1rem;
+    padding: 1rem;
+  }
+}
+
 /* ===== Reduced Motion ===== */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
