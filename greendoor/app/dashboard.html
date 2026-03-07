@@ -47,7 +47,7 @@
         <div class="gd-welcome" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:var(--space-sm);">
           <h1>Welcome back, <em id="welcome-name"></em></h1>
           <div class="gd-quick-actions" style="margin:0;">
-            <a href="/greendoor/app/clients" class="gd-btn gd-btn-primary">+ New Client</a>
+            <button class="gd-btn gd-btn-primary" onclick="openDashboardAddClient()">+ New Client</button>
             <button class="gd-btn" onclick="openDashboardAddListing()">+ Add Listing</button>
           </div>
         </div>
@@ -252,6 +252,89 @@
       <div class="gd-modal-footer">
         <button class="gd-btn" onclick="closeDashboardAddListing()">Cancel</button>
         <button id="dl-save-btn" class="gd-btn gd-btn-primary" onclick="saveDashboardListing()">Save Listing</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Client Modal -->
+  <div id="dash-add-client-modal" class="gd-modal-overlay">
+    <div class="gd-modal">
+      <div class="gd-modal-header">
+        <h3>Add New Client</h3>
+        <button class="gd-modal-close" onclick="closeDashboardAddClient()" aria-label="Close">&times;</button>
+      </div>
+      <div class="gd-modal-body">
+        <div class="gd-form-row">
+          <div class="gd-form-group">
+            <label for="dash-add-fullName">Full Name *</label>
+            <input type="text" id="dash-add-fullName" class="gd-input" required>
+          </div>
+          <div class="gd-form-group">
+            <label for="dash-add-email">Email *</label>
+            <input type="email" id="dash-add-email" class="gd-input" required>
+          </div>
+        </div>
+        <div class="gd-form-row">
+          <div class="gd-form-group">
+            <label for="dash-add-phone">Phone</label>
+            <input type="tel" id="dash-add-phone" class="gd-input">
+          </div>
+          <div class="gd-form-group">
+            <label for="dash-add-status">Status</label>
+            <select id="dash-add-status" class="gd-input">
+              <option value="lead" selected>Lead</option>
+              <option value="active_buyer">Active Buyer</option>
+              <option value="active_seller">Active Seller</option>
+              <option value="under_contract">Under Contract</option>
+              <option value="closed">Closed</option>
+              <option value="inactive">Inactive</option>
+            </select>
+          </div>
+        </div>
+        <div class="gd-form-row">
+          <div class="gd-form-group">
+            <label for="dash-add-budgetMin">Budget Min</label>
+            <input type="number" id="dash-add-budgetMin" class="gd-input" placeholder="200000">
+          </div>
+          <div class="gd-form-group">
+            <label for="dash-add-budgetMax">Budget Max</label>
+            <input type="number" id="dash-add-budgetMax" class="gd-input" placeholder="500000">
+          </div>
+        </div>
+        <div class="gd-form-row">
+          <div class="gd-form-group">
+            <label for="dash-add-timeline">Timeline</label>
+            <select id="dash-add-timeline" class="gd-input">
+              <option value="">Select...</option>
+              <option value="Immediate">Immediate</option>
+              <option value="1-3 Months">1-3 Months</option>
+              <option value="3-6 Months">3-6 Months</option>
+              <option value="6-12 Months">6-12 Months</option>
+              <option value="Just Browsing">Just Browsing</option>
+            </select>
+          </div>
+          <div class="gd-form-group">
+            <label for="dash-add-source">Source</label>
+            <select id="dash-add-source" class="gd-input">
+              <option value="">Select...</option>
+              <option value="Referral">Referral</option>
+              <option value="Online Ad">Online Ad</option>
+              <option value="Open House">Open House</option>
+              <option value="Website">Website</option>
+              <option value="Social Media">Social Media</option>
+              <option value="Cold Call">Cold Call</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+        </div>
+        <div class="gd-form-group">
+          <label for="dash-add-notes">Notes</label>
+          <textarea id="dash-add-notes" class="gd-input" rows="3" placeholder="Any initial notes..."></textarea>
+        </div>
+      </div>
+      <div class="gd-modal-footer">
+        <button class="gd-btn" onclick="closeDashboardAddClient()">Cancel</button>
+        <button class="gd-btn gd-btn-primary" onclick="saveDashboardClient()">Save Client</button>
       </div>
     </div>
   </div>

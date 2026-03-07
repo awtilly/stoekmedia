@@ -402,6 +402,81 @@ window.fetchDashboardListingFromUrl = async function () {
   }
 };
 
+/* --- Add Client Modal (Dashboard) --- */
+window.openDashboardAddClient = function () {
+  document.getElementById("dash-add-client-modal").classList.add("active");
+};
+
+window.closeDashboardAddClient = function () {
+  document.getElementById("dash-add-client-modal").classList.remove("active");
+};
+
+window.saveDashboardClient = async function () {
+  const fullName = document.getElementById("dash-add-fullName").value.trim();
+  const email = document.getElementById("dash-add-email").value.trim();
+
+  if (!fullName || !email) {
+    showToast("Name and email are required.", "error");
+    return;
+  }
+
+  const user = auth.currentUser;
+  if (!user) return;
+
+  const data = {
+    realtorId: user.uid,
+    fullName,
+    email,
+    phone: document.getElementById("dash-add-phone").value.trim(),
+    status: document.getElementById("dash-add-status").value,
+    budgetMin: Number(document.getElementById("dash-add-budgetMin").value) || null,
+    budgetMax: Number(document.getElementById("dash-add-budgetMax").value) || null,
+    timeline: document.getElementById("dash-add-timeline").value,
+    source: document.getElementById("dash-add-source").value,
+    notes: document.getElementById("dash-add-notes").value.trim(),
+    preferredLocations: [],
+    propertyTypes: [],
+    bedsMin: null,
+    bedsMax: null,
+    bathsMin: null,
+    bathsMax: null,
+    sqftMin: null,
+    sqftMax: null,
+    mustHaveFeatures: [],
+    preApprovalStatus: "",
+    preApprovalAmount: null,
+    lastActivityDate: serverTimestamp(),
+    createdAt: serverTimestamp()
+  };
+
+  try {
+    const docRef = await addDoc(collection(db, "clients"), data);
+
+    await addDoc(collection(db, "activities"), {
+      clientId: docRef.id,
+      realtorId: user.uid,
+      type: "note",
+      subject: "Client created",
+      body: "",
+      timestamp: serverTimestamp()
+    });
+
+    showToast("Client added successfully!");
+    closeDashboardAddClient();
+
+    // Clear form
+    ["dash-add-fullName", "dash-add-email", "dash-add-phone", "dash-add-budgetMin", "dash-add-budgetMax", "dash-add-notes"].forEach(id => {
+      document.getElementById(id).value = "";
+    });
+    document.getElementById("dash-add-status").value = "lead";
+    document.getElementById("dash-add-timeline").value = "";
+    document.getElementById("dash-add-source").value = "";
+  } catch (e) {
+    console.error("Save client error:", e);
+    showToast("Failed to save client.", "error");
+  }
+};
+
 window.saveDashboardListing = async function () {
   const user = auth.currentUser;
   if (!user) return;
