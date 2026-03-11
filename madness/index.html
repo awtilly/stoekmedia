@@ -951,6 +951,73 @@ td.val {
   opacity: 1;
 }
 
+/* ── Install Banner ── */
+.install-banner {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--black);
+  color: var(--white);
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  z-index: 999;
+  box-shadow: 0 -2px 12px rgba(0,0,0,.15);
+  animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+.install-banner-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.install-banner-text {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.install-banner-text small {
+  display: block;
+  font-weight: 400;
+  font-size: 12px;
+  color: var(--g400);
+  margin-top: 2px;
+}
+
+.install-banner .btn-install {
+  background: var(--gold);
+  color: var(--white);
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+  font-family: inherit;
+}
+
+.install-banner .btn-dismiss {
+  background: none;
+  border: none;
+  color: var(--g400);
+  font-size: 20px;
+  cursor: pointer;
+  padding: 4px;
+  line-height: 1;
+}
+
 /* ── Offline Badge ── */
 .offline-badge {
   background: var(--red);
@@ -2137,9 +2204,68 @@ if(urlRoom){
   renderLobby();
 }
 
-/* ── Service Worker Registration ── */
+/* ── Service Worker & Install Banner ── */
 if('serviceWorker' in navigator){
   navigator.serviceWorker.register('sw.js').catch(err => console.warn('SW registration failed:', err));
+}
+
+let deferredInstallPrompt = null;
+
+function isStandalone(){
+  return window.matchMedia('(display-mode: standalone)').matches
+    || window.navigator.standalone === true;
+}
+
+function showInstallBanner(){
+  if(isStandalone()) return;
+  if(sessionStorage.getItem('mm4_install_dismissed')) return;
+  if(document.getElementById('install-banner')) return;
+
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+  const banner = document.createElement('div');
+  banner.id = 'install-banner';
+  banner.className = 'install-banner';
+  banner.innerHTML = `
+    <img class="install-banner-icon" src="icons/icon-192.png" alt="App icon">
+    <div class="install-banner-text">
+      Install March Madness Draft
+      <small>${isIOS ? 'Tap Share then "Add to Home Screen"' : 'Add to your home screen for quick access'}</small>
+    </div>
+    ${isIOS ? '' : '<button class="btn-install" onclick="installApp()">Install</button>'}
+    <button class="btn-dismiss" onclick="dismissInstallBanner()">&times;</button>`;
+  document.body.appendChild(banner);
+}
+
+function dismissInstallBanner(){
+  const banner = document.getElementById('install-banner');
+  if(banner) banner.remove();
+  sessionStorage.setItem('mm4_install_dismissed', '1');
+}
+
+async function installApp(){
+  if(!deferredInstallPrompt) return;
+  deferredInstallPrompt.prompt();
+  const result = await deferredInstallPrompt.userChoice;
+  deferredInstallPrompt = null;
+  dismissInstallBanner();
+  if(result.outcome === 'accepted') showToast('App installed!');
+}
+
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  showInstallBanner();
+});
+
+window.addEventListener('appinstalled', () => {
+  deferredInstallPrompt = null;
+  dismissInstallBanner();
+  showToast('App installed!');
+});
+
+// On iOS, show the banner after a short delay since there's no beforeinstallprompt
+if(/iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream && !isStandalone()){
+  setTimeout(showInstallBanner, 2000);
 }
 </script>
 </body>
