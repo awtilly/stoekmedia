@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>March Madness Draft</title>
 
 <!-- PWA -->
@@ -42,6 +42,9 @@ body {
   color: var(--black);
   line-height: 1.5;
   -webkit-text-size-adjust: 100%;
+  padding-top: env(safe-area-inset-top);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
 }
 
 /* ── Layout ── */
@@ -77,7 +80,7 @@ body {
 }
 
 /* ── Nav ── */
-nav {
+.top-nav {
   display: flex;
   gap: 2px;
   border-bottom: 1px solid var(--g200);
@@ -86,7 +89,7 @@ nav {
   overflow-x: auto;
 }
 
-nav button {
+.top-nav button {
   padding: 10px 18px;
   border: none;
   background: none;
@@ -100,17 +103,17 @@ nav button {
   white-space: nowrap;
 }
 
-nav button.active {
+.top-nav button.active {
   color: var(--gold);
   border-bottom-color: var(--gold);
 }
 
-nav button:disabled {
+.top-nav button:disabled {
   color: var(--g300);
   cursor: not-allowed;
 }
 
-nav button:not(:disabled):hover {
+.top-nav button:not(:disabled):hover {
   color: var(--gold);
 }
 
@@ -118,9 +121,10 @@ nav button:not(:disabled):hover {
 .card {
   background: var(--white);
   border: 1px solid var(--g200);
-  border-radius: 8px;
+  border-radius: 12px;
   padding: 18px;
   margin-bottom: 14px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.04);
 }
 
 .label {
@@ -223,7 +227,7 @@ textarea {
   cursor: pointer;
   color: var(--g400);
   font-size: 14px;
-  padding: 2px;
+  padding: 6px;
 }
 
 .icon-btn:hover {
@@ -1256,7 +1260,7 @@ td.val {
     font-size: 12px;
   }
 
-  nav {
+  .top-nav {
     gap: 0;
     margin-bottom: 14px;
     flex-wrap: nowrap;
@@ -1265,11 +1269,11 @@ td.val {
     scrollbar-width: none;
   }
 
-  nav::-webkit-scrollbar {
+  .top-nav::-webkit-scrollbar {
     display: none;
   }
 
-  nav button {
+  .top-nav button {
     padding: 10px 12px;
     font-size: 12px;
     flex-shrink: 0;
@@ -1298,7 +1302,7 @@ td.val {
   .btn-sm {
     padding: 8px 14px;
     font-size: 13px;
-    min-height: 40px;
+    min-height: 44px;
   }
 
   input, select {
@@ -1310,8 +1314,8 @@ td.val {
   .icon-btn {
     font-size: 18px;
     padding: 6px;
-    min-width: 36px;
-    min-height: 36px;
+    min-width: 44px;
+    min-height: 44px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -1366,7 +1370,7 @@ td.val {
   .preset-btn {
     padding: 8px 12px;
     font-size: 12px;
-    min-height: 40px;
+    min-height: 44px;
   }
 
   table {
@@ -1459,6 +1463,7 @@ td.val {
   .round-tab {
     padding: 8px 12px;
     font-size: 12px;
+    min-height: 44px;
   }
 
   .scores-grid {
@@ -1476,6 +1481,320 @@ td.val {
     min-width: 0;
     padding: 6px 12px;
     gap: 8px;
+  }
+
+  .live-filter-btn {
+    min-height: 44px;
+  }
+
+  input, select {
+    min-height: 48px;
+    border-radius: 8px;
+    border-width: 1.5px;
+  }
+}
+
+/* ── Tap States ── */
+button, a, .pick-btn, .preset-btn, .round-tab, .live-filter-btn, .icon-btn {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.btn:active:not(:disabled) {
+  transform: scale(.97);
+}
+
+.pick-btn:active:not(:disabled) {
+  transform: scale(.98);
+}
+
+.preset-btn:active, .round-tab:active, .live-filter-btn:active {
+  transform: scale(.97);
+}
+
+/* ── Modal Overlay ── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.45);
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  opacity: 0;
+  transition: opacity .2s;
+}
+
+.modal-overlay.show {
+  opacity: 1;
+}
+
+.modal-box {
+  background: var(--white);
+  border-radius: 16px;
+  padding: 24px;
+  max-width: 380px;
+  width: 100%;
+  box-shadow: 0 12px 40px rgba(0,0,0,.2);
+  transform: translateY(20px);
+  transition: transform .25s cubic-bezier(.22,1,.36,1);
+}
+
+.modal-overlay.show .modal-box {
+  transform: translateY(0);
+}
+
+.modal-title {
+  font-size: 17px;
+  font-weight: 800;
+  margin-bottom: 8px;
+}
+
+.modal-msg {
+  font-size: 14px;
+  color: var(--g600);
+  margin-bottom: 18px;
+  line-height: 1.5;
+  white-space: pre-line;
+}
+
+.modal-input {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1.5px solid var(--g200);
+  border-radius: 10px;
+  font-size: 16px;
+  font-family: inherit;
+  color: var(--black);
+  outline: none;
+  margin-bottom: 16px;
+  background: var(--g50);
+}
+
+.modal-input:focus {
+  border-color: var(--gold);
+  background: var(--white);
+}
+
+.modal-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.modal-actions .btn {
+  min-width: 80px;
+  justify-content: center;
+  border-radius: 10px;
+}
+
+.modal-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.modal-choice-btn {
+  width: 100%;
+  padding: 14px 16px;
+  border: 1.5px solid var(--g200);
+  border-radius: 10px;
+  background: var(--white);
+  font-size: 15px;
+  font-weight: 600;
+  font-family: inherit;
+  color: var(--black);
+  cursor: pointer;
+  text-align: left;
+  transition: all .15s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.modal-choice-btn:hover {
+  border-color: var(--gold);
+  background: var(--gold-bg);
+}
+
+.modal-choice-btn:active {
+  transform: scale(.98);
+}
+
+@media (max-width: 700px) {
+  .modal-overlay {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .modal-box {
+    max-width: 100%;
+    border-radius: 20px 20px 0 0;
+    padding: 24px 20px;
+    padding-bottom: calc(24px + env(safe-area-inset-bottom));
+    transform: translateY(100%);
+  }
+
+  .modal-overlay.show .modal-box {
+    transform: translateY(0);
+  }
+}
+
+/* ── Bottom Navigation ── */
+.bottom-nav {
+  display: none;
+}
+
+@media (max-width: 700px) {
+  .bottom-nav {
+    display: flex;
+    flex-shrink: 0;
+    background: var(--white);
+    border-top: 1px solid var(--g200);
+    padding: 6px 0;
+    padding-bottom: calc(6px + env(safe-area-inset-bottom));
+    z-index: 100;
+  }
+
+  .bottom-nav-btn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 6px 0;
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--g400);
+    position: relative;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .bottom-nav-btn.active {
+    color: var(--gold);
+  }
+
+  .bottom-nav-btn.active::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 25%;
+    right: 25%;
+    height: 2.5px;
+    background: var(--gold);
+    border-radius: 0 0 2px 2px;
+  }
+
+  .bottom-nav-btn svg {
+    width: 22px;
+    height: 22px;
+  }
+}
+
+/* ── App Shell (mobile) ── */
+@media (max-width: 700px) {
+  body {
+    height: 100dvh;
+    overflow: hidden;
+  }
+
+  .container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    padding: 0;
+    overflow: hidden;
+  }
+
+  .header {
+    flex-shrink: 0;
+    padding: 10px 14px;
+    margin-bottom: 0;
+    border-bottom: 1px solid var(--g200);
+  }
+
+  .top-nav {
+    display: none;
+  }
+
+  .content-scroll {
+    flex: 1;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 14px;
+  }
+
+  .lobby {
+    margin: 0 auto;
+    padding: 40px 16px;
+    padding-bottom: calc(40px + env(safe-area-inset-bottom));
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+}
+
+/* ── App Shell desktop revert ── */
+@media (min-width: 701px) {
+  .content-scroll {
+    /* No special styles on desktop - normal doc flow */
+  }
+
+  .top-nav {
+    display: flex;
+  }
+}
+
+/* ── Page Transitions ── */
+.page-enter {
+  animation: pageIn .2s ease-out;
+}
+
+@keyframes pageIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Settings Gear ── */
+.settings-gear {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--g400);
+  padding: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.settings-gear:hover {
+  color: var(--black);
+  background: var(--g50);
+}
+
+.settings-gear svg {
+  width: 22px;
+  height: 22px;
+}
+
+/* ── Toast / Install banner safe areas ── */
+.toast {
+  bottom: calc(20px + env(safe-area-inset-bottom));
+}
+
+@media (max-width: 700px) {
+  .toast {
+    bottom: calc(70px + env(safe-area-inset-bottom));
+  }
+
+  .install-banner {
+    padding-bottom: calc(14px + env(safe-area-inset-bottom));
   }
 }
 </style>
@@ -1527,46 +1846,39 @@ const espn = {
     // Also try the current scoreboard with seasontype=3
     const allTeams = {};
 
-    for (const dateStr of candidates) {
-      try {
-        const r = await fetch(`${ESPN_BASE}/scoreboard?dates=${dateStr}&limit=200`);
-        if (!r.ok) continue;
-        const data = await r.json();
-        for (const ev of (data.events || [])) {
-          const comp = ev.competitions?.[0];
-          if (!comp) continue;
-          const notes = comp.notes || [];
-          const note = notes[0]?.headline || '';
-          // Only tournament games have region info in notes
-          let region = '';
-          if (note.includes('South')) region = 'South';
-          else if (note.includes('East')) region = 'East';
-          else if (note.includes('Midwest')) region = 'Midwest';
-          else if (note.includes('West')) region = 'West';
-          if (!region) continue;
-
-          for (const c of (comp.competitors || [])) {
-            const team = c.team || {};
-            const seed = c.curatedRank?.current;
-            if (!seed || seed > 16) continue;
-            const name = team.shortDisplayName || team.displayName || team.name || '';
-            const key = `${name}_${seed}_${region}`;
-            if (!allTeams[key]) {
-              allTeams[key] = {
-                name,
-                seed,
-                region,
-                logo: team.logo || '',
-                abbr: team.abbreviation || '',
-                espnId: team.id || '',
-                color: team.color || '',
-                record: c.records?.[0]?.summary || ''
-              };
-            }
+    function _extractTeams(data) {
+      for (const ev of (data.events || [])) {
+        const comp = ev.competitions?.[0];
+        if (!comp) continue;
+        const notes = comp.notes || [];
+        const note = notes[0]?.headline || '';
+        let region = '';
+        if (note.includes('South')) region = 'South';
+        else if (note.includes('East')) region = 'East';
+        else if (note.includes('Midwest')) region = 'Midwest';
+        else if (note.includes('West')) region = 'West';
+        if (!region) continue;
+        for (const c of (comp.competitors || [])) {
+          const team = c.team || {};
+          const seed = c.curatedRank?.current;
+          if (!seed || seed > 16) continue;
+          const name = team.shortDisplayName || team.displayName || team.name || '';
+          const key = `${name}_${seed}_${region}`;
+          if (!allTeams[key]) {
+            allTeams[key] = { name, seed, region, logo: team.logo || '', abbr: team.abbreviation || '', espnId: team.id || '', color: team.color || '', record: c.records?.[0]?.summary || '' };
           }
         }
-        if (Object.keys(allTeams).length >= 68) break;
-      } catch(e) { continue; }
+      }
+    }
+
+    // Fetch all dates in parallel
+    const results = await Promise.allSettled(
+      candidates.map(dateStr =>
+        fetch(`${ESPN_BASE}/scoreboard?dates=${dateStr}&limit=200`).then(r => r.ok ? r.json() : null)
+      )
+    );
+    for (const r of results) {
+      if (r.status === 'fulfilled' && r.value) _extractTeams(r.value);
     }
     // Detect play-in pairs: same seed + region, different team name
     const teamsList = Object.values(allTeams);
@@ -1758,6 +2070,81 @@ function showToast(message, duration = 3000){
   toast._tid = setTimeout(() => { toast.className = 'toast'; }, duration);
 }
 
+/* ── In-App Modal System ── */
+function _showModal(html) {
+  return new Promise(resolve => {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `<div class="modal-box">${html}</div>`;
+    document.body.appendChild(overlay);
+    requestAnimationFrame(() => requestAnimationFrame(() => overlay.classList.add('show')));
+
+    overlay._resolve = resolve;
+    overlay._close = (val) => {
+      overlay.classList.remove('show');
+      setTimeout(() => { overlay.remove(); resolve(val); }, 200);
+    };
+
+    overlay.addEventListener('click', e => { if (e.target === overlay) overlay._close(null); });
+
+    const input = overlay.querySelector('.modal-input');
+    if (input) setTimeout(() => input.focus(), 100);
+  });
+}
+
+function appPrompt(message, { title = '', placeholder = '', defaultValue = '' } = {}) {
+  const id = 'mp_' + Date.now();
+  const html = `
+    ${title ? `<div class="modal-title">${escapeHtml(title)}</div>` : ''}
+    <div class="modal-msg">${escapeHtml(message)}</div>
+    <input class="modal-input" id="${id}" placeholder="${escapeHtml(placeholder)}" value="${escapeHtml(defaultValue)}">
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="this.closest('.modal-overlay')._close(null)">Cancel</button>
+      <button class="btn btn-primary" onclick="this.closest('.modal-overlay')._close(document.getElementById('${id}').value)">OK</button>
+    </div>`;
+  const p = _showModal(html);
+  // Allow enter key to submit
+  setTimeout(() => {
+    const input = document.getElementById(id);
+    if (input) input.addEventListener('keydown', e => { if (e.key === 'Enter') input.closest('.modal-overlay')._close(input.value); });
+  }, 50);
+  return p;
+}
+
+function appConfirm(message, { title = '', confirmLabel = 'Confirm', danger = false } = {}) {
+  const html = `
+    ${title ? `<div class="modal-title">${escapeHtml(title)}</div>` : ''}
+    <div class="modal-msg">${escapeHtml(message)}</div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="this.closest('.modal-overlay')._close(false)">Cancel</button>
+      <button class="btn ${danger ? 'btn-danger' : 'btn-primary'}" onclick="this.closest('.modal-overlay')._close(true)">${escapeHtml(confirmLabel)}</button>
+    </div>`;
+  return _showModal(html);
+}
+
+function appChoice(message, choices, { title = '' } = {}) {
+  const html = `
+    ${title ? `<div class="modal-title">${escapeHtml(title)}</div>` : ''}
+    <div class="modal-msg">${escapeHtml(message)}</div>
+    <div class="modal-choices">
+      ${choices.map((ch, i) => `<button class="modal-choice-btn" onclick="this.closest('.modal-overlay')._close(${i})">${escapeHtml(ch)}</button>`).join('')}
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="this.closest('.modal-overlay')._close(null)">Cancel</button>
+    </div>`;
+  return _showModal(html);
+}
+
+function appAlert(message, { title = '' } = {}) {
+  const html = `
+    ${title ? `<div class="modal-title">${escapeHtml(title)}</div>` : ''}
+    <div class="modal-msg">${escapeHtml(message)}</div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="this.closest('.modal-overlay')._close(true)">OK</button>
+    </div>`;
+  return _showModal(html);
+}
+
 /* ── Security: SHA-256 Hashing ── */
 async function hashPin(pin){
   const data = new TextEncoder().encode(pin);
@@ -1796,14 +2183,14 @@ async function requireAdmin(){
   const doc = await db.collection("rooms").doc(roomId).get();
   const data = doc.exists ? doc.data() : null;
   if(!data || !data.adminPin){
-    const pin = prompt("This room has no admin PIN yet.\nSet a 4-digit PIN to protect editing:");
-    if(!pin || !/^\d{4}$/.test(pin.trim())){ alert("PIN must be exactly 4 digits."); return false; }
+    const pin = await appPrompt("This room has no admin PIN yet.\nSet a 4-digit PIN to protect editing:", { title: 'Set Admin PIN', placeholder: '4-digit PIN' });
+    if(!pin || !/^\d{4}$/.test(pin.trim())){ await appAlert("PIN must be exactly 4 digits."); return false; }
     const hashed = await hashPin(pin.trim());
     await db.collection("rooms").doc(roomId).set({ adminPin: hashed }, { merge: true });
     unlockAdmin();
     return true;
   }
-  const entry = prompt("Enter 4-digit admin PIN:");
+  const entry = await appPrompt("Enter 4-digit admin PIN:", { title: 'Admin PIN' });
   if(!entry) return false;
   /* Legacy plaintext PIN migration (hash is always 64 hex chars) */
   if(data.adminPin.length !== 64){
@@ -1813,12 +2200,12 @@ async function requireAdmin(){
       unlockAdmin();
       return true;
     }
-    alert("Incorrect PIN.");
+    await appAlert("Incorrect PIN.");
     return false;
   }
   const hashed = await hashPin(entry.trim());
   if(hashed === data.adminPin){ unlockAdmin(); return true; }
-  alert("Incorrect PIN.");
+  await appAlert("Incorrect PIN.");
   return false;
 }
 
@@ -1830,11 +2217,11 @@ async function claimPlayer(id){
   const player = S.players.find(p => p.id === id);
   if(!player) return;
   if(player.passphraseHash){
-    const pass = prompt("Enter your passphrase to join as " + player.name + ":");
+    const pass = await appPrompt("Enter your passphrase to join as " + player.name + ":", { title: 'Passphrase' });
     if(!pass) return;
     const hash = await hashPin(pass.trim());
     if(hash !== player.passphraseHash){
-      alert("Incorrect passphrase.");
+      await appAlert("Incorrect passphrase.");
       return;
     }
   }
@@ -1867,9 +2254,11 @@ function renderJoinScreen(){
 /* ── State Persistence ── */
 const VIEW_LOCAL = ['phase','bracketRegion','fr','fs','liveScoresDate','liveScoresFilter'];
 
-function saveState(){
-  try { localStorage.setItem("mm4", JSON.stringify(S)); } catch(e){}
-  if(roomId && !isRemoteUpdate){
+let _firestoreWriteTimer = null;
+function _debouncedFirestoreWrite(){
+  clearTimeout(_firestoreWriteTimer);
+  _firestoreWriteTimer = setTimeout(() => {
+    if(!roomId || isRemoteUpdate) return;
     const shared = {};
     for(const k in S){ if(!VIEW_LOCAL.includes(k)) shared[k] = S[k]; }
     db.collection("rooms").doc(roomId).set({
@@ -1879,7 +2268,12 @@ function saveState(){
       console.warn("Firestore write error:", e);
       showToast("Sync error \u2014 changes saved locally");
     });
-  }
+  }, 800);
+}
+
+function saveState(){
+  try { localStorage.setItem("mm4", JSON.stringify(S)); } catch(e){}
+  if(roomId && !isRemoteUpdate) _debouncedFirestoreWrite();
 }
 
 function loadState(){
@@ -1893,13 +2287,13 @@ function loadState(){
 async function createRoom(){
   const nameInput = document.getElementById("room-name");
   const raw = nameInput ? nameInput.value.trim() : '';
-  if(!raw){ alert("Enter a room name."); return; }
+  if(!raw){ await appAlert("Enter a room name."); return; }
   const code = raw.toUpperCase().replace(/[^A-Z0-9]/g,'');
-  if(code.length < 2 || code.length > 20){ alert("Room name must be 2-20 letters/numbers."); return; }
+  if(code.length < 2 || code.length > 20){ await appAlert("Room name must be 2-20 letters/numbers."); return; }
   const existing = await db.collection("rooms").doc(code).get();
-  if(existing.exists){ alert("That room name is already taken. Try another."); return; }
-  const pin = prompt("Set a 4-digit admin PIN to protect editing:");
-  if(!pin || !/^\d{4}$/.test(pin.trim())){ alert("PIN must be exactly 4 digits."); return; }
+  if(existing.exists){ await appAlert("That room name is already taken. Try another."); return; }
+  const pin = await appPrompt("Set a 4-digit admin PIN to protect editing:", { title: 'Set Admin PIN', placeholder: '4-digit PIN' });
+  if(!pin || !/^\d{4}$/.test(pin.trim())){ await appAlert("PIN must be exactly 4 digits."); return; }
   const hashedPin = await hashPin(pin.trim());
   roomId = code;
   const url = new URL(window.location);
@@ -2030,21 +2424,23 @@ async function showResolvePlayIn(teamId) {
   if (!await requireAdmin()) return;
   const team = S.teams.find(t => t.id === teamId);
   if (!team || !team.playIn || team.playInResolved) return;
-  const choice = prompt(`Which team won?\n1) ${team.playInTeams[0].name}\n2) ${team.playInTeams[1].name}\n\nEnter 1 or 2:`);
-  if (choice === '1') resolvePlayIn(teamId, 0);
-  else if (choice === '2') resolvePlayIn(teamId, 1);
+  const choice = await appChoice('Which team won the play-in game?', [team.playInTeams[0].name, team.playInTeams[1].name], { title: 'Resolve Play-In' });
+  if (choice === 0) resolvePlayIn(teamId, 0);
+  else if (choice === 1) resolvePlayIn(teamId, 1);
 }
 
 async function autoResolvePlayIns() {
   const unresolved = S.teams.filter(t => t.playIn && !t.playInResolved);
   if (unresolved.length === 0) return;
-  for (let d = 14; d <= 21; d++) {
-    const dateStr = `${S.year}03${String(d).padStart(2,'0')}`;
-    const data = await espn.fetchScoreboard(dateStr);
-    if (!data) continue;
-    for (const ev of espn.parseScoreboardEvents(data)) {
+  const dateCandidates = [];
+  for (let d = 14; d <= 21; d++) dateCandidates.push(`${S.year}03${String(d).padStart(2,'0')}`);
+  const results = await Promise.allSettled(dateCandidates.map(ds => espn.fetchScoreboard(ds)));
+  for (const r of results) {
+    if (r.status !== 'fulfilled' || !r.value) continue;
+    for (const ev of espn.parseScoreboardEvents(r.value)) {
       if (ev.state !== 'post') continue;
       for (const ut of unresolved) {
+        if (ut.playInResolved) continue;
         const abbrs = ut.playInTeams.map(pt => pt.abbr);
         if (abbrs.includes(ev.away.abbr) && abbrs.includes(ev.home.abbr)) {
           const winnerAbbr = ev.away.winner ? ev.away.abbr : ev.home.abbr;
@@ -2247,6 +2643,20 @@ function scores(){
   }).sort((a,b) => b.tot - a.tot);
 }
 
+/* ── Bottom Nav ── */
+function bottomNavHTML(canD, canT) {
+  const tabs = [
+    { id: 'setup', label: 'Setup', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>' },
+    { id: 'draft', label: 'Draft', disabled: !canD, icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>' },
+    { id: 'bracket', label: 'Bracket', disabled: !canT, icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 7 4 4 20 4 20 7"/><line x1="12" y1="4" x2="12" y2="20"/><path d="M8 20h8"/></svg>' },
+    { id: 'leaderboard', label: 'Board', disabled: !canT, icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg>' },
+    { id: 'live', label: 'Live', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>' }
+  ];
+  return `<nav class="bottom-nav">${tabs.map(t =>
+    `<button class="bottom-nav-btn ${S.phase===t.id?'active':''}" ${t.disabled?'disabled':''} onclick="navigate('${t.id}')">${t.icon}<span>${t.label}</span></button>`
+  ).join('')}</nav>`;
+}
+
 /* ── Main Render ── */
 function render(){
   try {
@@ -2259,8 +2669,11 @@ function render(){
   const canT = S.ds.complete;
   const app = document.getElementById("app");
   app.innerHTML = `
-    <div class="header"><div><h1><span>March Madness</span> Draft</h1><div class="header-sub">${S.year} \u2014 ${S.players.length} players \u2014 ${S.teams.length} teams${roomId ? ` \u00b7 <span class="room-badge" onclick="copyRoomLink()" title="Click to copy link"><span class="sync-dot"></span> Room: ${roomId}</span>` : ''}${!isOnline ? ' <span class="offline-badge">Offline</span>' : ''}</div></div></div>
-    <nav>
+    <div class="header">
+      <div><h1><span>March Madness</span> Draft</h1><div class="header-sub">${S.year} \u2014 ${S.players.length} players \u2014 ${S.teams.length} teams${roomId ? ` \u00b7 <span class="room-badge" onclick="copyRoomLink()" title="Click to copy link"><span class="sync-dot"></span> Room: ${roomId}</span>` : ''}${!isOnline ? ' <span class="offline-badge">Offline</span>' : ''}</div></div>
+      <button class="settings-gear" onclick="navigate('settings')" title="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg></button>
+    </div>
+    <nav class="top-nav">
       <button class="${S.phase==='setup'?'active':''}" onclick="navigate('setup')">Setup</button>
       <button class="${S.phase==='teams'?'active':''}" onclick="navigate('teams')">Teams</button>
       <button class="${S.phase==='draft'?'active':''}" ${canD?'':'disabled'} onclick="navigate('draft')">Draft</button>
@@ -2268,8 +2681,12 @@ function render(){
       <button class="${S.phase==='leaderboard'?'active':''}" ${canT?'':'disabled'} onclick="navigate('leaderboard')">Leaderboard</button>
       <button class="${S.phase==='live'?'active':''}" onclick="navigate('live')">Live Scores</button>
       <button class="${S.phase==='settings'?'active':''}" onclick="navigate('settings')">Settings</button>
-    </nav><div id="c"></div>
-    <div class="footer"><strong>Scoring:</strong> ${Object.entries(S.rp).map(([r,p]) => `${RN[r]}=${p}pt${p!==1?'s':''}`).join(' \u00b7 ')}${S.ub ? ' \u00b7 Upset bonus=seed diff' : ''}</div>`;
+    </nav>
+    <div class="content-scroll">
+      <div id="c"></div>
+      <div class="footer"><strong>Scoring:</strong> ${Object.entries(S.rp).map(([r,p]) => `${RN[r]}=${p}pt${p!==1?'s':''}`).join(' \u00b7 ')}${S.ub ? ' \u00b7 Upset bonus=seed diff' : ''}</div>
+    </div>
+    ${bottomNavHTML(canD, canT)}`;
   const c = document.getElementById("c");
   ({setup:renderSetup, teams:renderTeams, draft:renderDraft, bracket:renderBracket, leaderboard:renderLeaderboard, live:renderLive, settings:renderSettings})[S.phase]?.(c);
   } catch(e) {
@@ -2284,6 +2701,11 @@ function navigate(p){
   S.phase = p;
   if (p === 'live') startLiveRefresh();
   else render();
+  // Page transition + scroll to top
+  const c = document.getElementById('c');
+  if (c) { c.classList.remove('page-enter'); void c.offsetWidth; c.classList.add('page-enter'); }
+  const scroll = document.querySelector('.content-scroll');
+  if (scroll) scroll.scrollTop = 0;
 }
 
 function copyRoomLink(){
@@ -2294,7 +2716,7 @@ function copyRoomLink(){
 
 async function resetAll(){
   if(!await requireAdmin()) return;
-  if(!confirm("Start a new tournament?")) return;
+  if(!await appConfirm("Start a new tournament? This will delete all data.", { title: 'New Tournament', danger: true, confirmLabel: 'Start Fresh' })) return;
   if(roomId){
     if(unsubRoom) unsubRoom();
     const freshState = JSON.parse(JSON.stringify(S));
@@ -2334,7 +2756,7 @@ async function addPlayer(){
   const el = document.getElementById("pn");
   const n = el.value.trim();
   if(!n) return;
-  const pass = prompt("Set a passphrase for " + n + " (they'll need this to claim their player):\n\nLeave blank for no passphrase.");
+  const pass = await appPrompt("Set a passphrase for " + n + ".\nThey'll need this to claim their player.\n\nLeave blank for no passphrase.", { title: 'Player Passphrase', placeholder: 'Passphrase (optional)' });
   let passphraseHash = null;
   if(pass && pass.trim()){
     passphraseHash = await hashPin(pass.trim());
@@ -2420,7 +2842,7 @@ async function parseBulkImport(){
 /* ── ESPN Import ── */
 async function importFromESPN(){
   if(!await requireAdmin()) return;
-  if(S.teams.length > 0 && !confirm('This will replace all current teams. Continue?')) return;
+  if(S.teams.length > 0 && !await appConfirm('This will replace all current teams. Continue?', { title: 'Replace Teams', confirmLabel: 'Replace' })) return;
 
   const btn = document.querySelector('.import-espn-card .btn-primary, .btn-secondary');
   const origText = btn?.textContent;
@@ -2679,7 +3101,7 @@ async function undoDraft(){
 
 async function resetDraft(){
   if(!await requireAdmin()) return;
-  if(!confirm("Reset draft?")) return;
+  if(!await appConfirm("Reset the entire draft? All picks will be lost.", { title: 'Reset Draft', danger: true, confirmLabel: 'Reset' })) return;
   S.ds = {order:[], cp:0, started:false, complete:false};
   S.players.forEach(p => p.teamIds = []);
   render();
@@ -2884,7 +3306,7 @@ async function changeYear(v){
 
 async function clearAllTeams(){
   if(!await requireAdmin()) return;
-  if(!confirm('Clear all teams?')) return;
+  if(!await appConfirm('Clear all teams?', { title: 'Clear Teams', danger: true, confirmLabel: 'Clear All' })) return;
   S.teams = [];
   render();
 }
