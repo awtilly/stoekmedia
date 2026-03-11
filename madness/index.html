@@ -2940,7 +2940,6 @@ function isStandalone(){
 
 function showInstallBanner(){
   if(isStandalone()) return;
-  if(sessionStorage.getItem('mm4_install_dismissed')) return;
   if(document.getElementById('install-banner')) return;
 
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
@@ -2961,7 +2960,6 @@ function showInstallBanner(){
 function dismissInstallBanner(){
   const banner = document.getElementById('install-banner');
   if(banner) banner.remove();
-  sessionStorage.setItem('mm4_install_dismissed', '1');
 }
 
 async function installApp(){
