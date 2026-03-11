@@ -15,8 +15,8 @@ service cloud.firestore {
                        || (request.resource.data.adminPin is string
                            && request.resource.data.adminPin.size() == 64));
 
-      // Delete: allow (for reset/new tournament)
-      allow delete: if true;
+      // Delete: disallowed — use update to reset instead
+      allow delete: if false;
     }
   }
 }

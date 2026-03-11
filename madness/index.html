@@ -1521,7 +1521,7 @@ const espn = {
     // We search around typical first round dates (mid-March Thu/Fri)
     // Try multiple date ranges to find the tournament
     const candidates = [];
-    for (let d = 17; d <= 22; d++) {
+    for (let d = 14; d <= 25; d++) {
       candidates.push(`${year}03${String(d).padStart(2,'0')}`);
     }
     // Also try the current scoreboard with seasontype=3
@@ -1661,13 +1661,12 @@ const espn = {
 
 /* ── Live Scores State ── */
 let liveScores = [];
-let liveScoresDate = '';
-let liveScoresFilter = 'all'; // 'all', 'live', 'final', 'upcoming'
+// liveScoresDate and liveScoresFilter are on S (persisted via VIEW_LOCAL)
 let liveRefreshTimer = null;
 let liveLastRefresh = 0;
 
 async function refreshLiveScores() {
-  const dateStr = liveScoresDate || new Date().toISOString().slice(0,10).replace(/-/g,'');
+  const dateStr = S.liveScoresDate || new Date().toISOString().slice(0,10).replace(/-/g,'');
   const data = await espn.fetchScoreboard(dateStr);
   if (data) {
     liveScores = espn.parseScoreboardEvents(data);
@@ -1711,7 +1710,9 @@ let S = {
   },
   bracketRegion: "South",
   fr: "All",
-  fs: "All"
+  fs: "All",
+  liveScoresDate: '',
+  liveScoresFilter: 'all'
 };
 
 /* ── Firebase Setup ── */
@@ -2037,7 +2038,7 @@ async function showResolvePlayIn(teamId) {
 async function autoResolvePlayIns() {
   const unresolved = S.teams.filter(t => t.playIn && !t.playInResolved);
   if (unresolved.length === 0) return;
-  for (let d = 17; d <= 19; d++) {
+  for (let d = 14; d <= 21; d++) {
     const dateStr = `${S.year}03${String(d).padStart(2,'0')}`;
     const data = await espn.fetchScoreboard(dateStr);
     if (!data) continue;
@@ -2248,6 +2249,7 @@ function scores(){
 
 /* ── Main Render ── */
 function render(){
+  try {
   if(roomId && !adminUnlocked){
     const myId = getMyPlayerId();
     if(!myId || !S.players.some(p => p.id === myId)){ renderJoinScreen(); return; }
@@ -2270,6 +2272,11 @@ function render(){
     <div class="footer"><strong>Scoring:</strong> ${Object.entries(S.rp).map(([r,p]) => `${RN[r]}=${p}pt${p!==1?'s':''}`).join(' \u00b7 ')}${S.ub ? ' \u00b7 Upset bonus=seed diff' : ''}</div>`;
   const c = document.getElementById("c");
   ({setup:renderSetup, teams:renderTeams, draft:renderDraft, bracket:renderBracket, leaderboard:renderLeaderboard, live:renderLive, settings:renderSettings})[S.phase]?.(c);
+  } catch(e) {
+    console.error('Render error:', e);
+    const app = document.getElementById("app");
+    if(app) app.innerHTML = `<div style="padding:40px;text-align:center"><h2 style="color:var(--red,#c00)">Something went wrong</h2><p style="margin:12px 0;color:#666">${e.message || 'An unexpected error occurred.'}</p><button class="btn btn-primary" onclick="location.reload()">Reload</button></div>`;
+  }
 }
 
 function navigate(p){
@@ -2289,8 +2296,22 @@ async function resetAll(){
   if(!await requireAdmin()) return;
   if(!confirm("Start a new tournament?")) return;
   if(roomId){
-    db.collection("rooms").doc(roomId).delete().catch(() => {});
     if(unsubRoom) unsubRoom();
+    const freshState = JSON.parse(JSON.stringify(S));
+    // Reset to defaults but keep year
+    Object.assign(freshState, {
+      phase: 'setup', players: [], teams: [],
+      ds: {order:[], cp:0, started:false, complete:false},
+      rp: {1:1, 2:2, 3:4, 4:8, 5:16, 6:32}, ub: true,
+      bracket: {South:Array(15).fill(null), East:Array(15).fill(null), Midwest:Array(15).fill(null), West:Array(15).fill(null), ff:Array(3).fill(null)},
+      bracketRegion:'South', fr:'All', fs:'All', liveScoresDate:'', liveScoresFilter:'all'
+    });
+    const shared = {};
+    for(const k in freshState){ if(!VIEW_LOCAL.includes(k)) shared[k] = freshState[k]; }
+    db.collection("rooms").doc(roomId).update({
+      state: JSON.stringify(shared),
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    }).catch(() => {});
   }
   localStorage.removeItem("mm4");
   if(roomId) localStorage.removeItem('mm4_me_' + roomId);
@@ -2478,13 +2499,13 @@ function renderLive(c){
   const hasLive = liveScores.some(g => g.state === 'in');
   const now = new Date();
   const todayStr = now.toISOString().slice(0,10).replace(/-/g,'');
-  const currentDate = liveScoresDate || todayStr;
+  const currentDate = S.liveScoresDate || todayStr;
   const displayDate = currentDate.replace(/(\d{4})(\d{2})(\d{2})/, '$2/$3/$1');
 
   let filtered = liveScores;
-  if(liveScoresFilter === 'live') filtered = liveScores.filter(g => g.state === 'in');
-  else if(liveScoresFilter === 'final') filtered = liveScores.filter(g => g.state === 'post');
-  else if(liveScoresFilter === 'upcoming') filtered = liveScores.filter(g => g.state === 'pre');
+  if(S.liveScoresFilter === 'live') filtered = liveScores.filter(g => g.state === 'in');
+  else if(S.liveScoresFilter === 'final') filtered = liveScores.filter(g => g.state === 'post');
+  else if(S.liveScoresFilter === 'upcoming') filtered = liveScores.filter(g => g.state === 'pre');
 
   // Sort: live first, then upcoming, then final
   filtered.sort((a,b) => {
@@ -2522,16 +2543,16 @@ function renderLive(c){
       </div>
       <div class="row" style="gap:8px">
         <button class="btn btn-secondary btn-sm" onclick="changeLiveDate(-1)">Prev Day</button>
-        <button class="btn btn-secondary btn-sm" onclick="liveScoresDate='';startLiveRefresh()">Today</button>
+        <button class="btn btn-secondary btn-sm" onclick="S.liveScoresDate='';startLiveRefresh()">Today</button>
         <button class="btn btn-secondary btn-sm" onclick="changeLiveDate(1)">Next Day</button>
         <button class="btn btn-secondary btn-sm" onclick="refreshLiveScores()" title="Refresh now">Refresh</button>
       </div>
     </div>
     <div class="live-filter-bar">
-      <button class="live-filter-btn ${liveScoresFilter==='all'?'active':''}" onclick="liveScoresFilter='all';renderLiveInPlace()">All (${liveScores.length})</button>
-      <button class="live-filter-btn ${liveScoresFilter==='live'?'active':''}" onclick="liveScoresFilter='live';renderLiveInPlace()">Live (${liveScores.filter(g=>g.state==='in').length})</button>
-      <button class="live-filter-btn ${liveScoresFilter==='upcoming'?'active':''}" onclick="liveScoresFilter='upcoming';renderLiveInPlace()">Upcoming (${liveScores.filter(g=>g.state==='pre').length})</button>
-      <button class="live-filter-btn ${liveScoresFilter==='final'?'active':''}" onclick="liveScoresFilter='final';renderLiveInPlace()">Final (${liveScores.filter(g=>g.state==='post').length})</button>
+      <button class="live-filter-btn ${S.liveScoresFilter==='all'?'active':''}" onclick="S.liveScoresFilter='all';renderLiveInPlace()">All (${liveScores.length})</button>
+      <button class="live-filter-btn ${S.liveScoresFilter==='live'?'active':''}" onclick="S.liveScoresFilter='live';renderLiveInPlace()">Live (${liveScores.filter(g=>g.state==='in').length})</button>
+      <button class="live-filter-btn ${S.liveScoresFilter==='upcoming'?'active':''}" onclick="S.liveScoresFilter='upcoming';renderLiveInPlace()">Upcoming (${liveScores.filter(g=>g.state==='pre').length})</button>
+      <button class="live-filter-btn ${S.liveScoresFilter==='final'?'active':''}" onclick="S.liveScoresFilter='final';renderLiveInPlace()">Final (${liveScores.filter(g=>g.state==='post').length})</button>
     </div>
     ${filtered.length === 0 ? '<div class="card" style="text-align:center;padding:40px;color:var(--g400)"><p style="font-size:16px;font-weight:700;margin-bottom:4px">No games found</p><p style="font-size:13px">Try a different date or check back later.</p></div>' : ''}
     <div class="scores-grid">
@@ -2587,12 +2608,14 @@ function renderLiveInPlace(){
 }
 
 function changeLiveDate(delta){
-  const current = liveScoresDate || new Date().toISOString().slice(0,10).replace(/-/g,'');
+  const current = S.liveScoresDate || new Date().toISOString().slice(0,10).replace(/-/g,'');
   const y = parseInt(current.slice(0,4));
   const m = parseInt(current.slice(4,6)) - 1;
   const d = parseInt(current.slice(6,8));
-  const dt = new Date(y, m, d + delta);
-  liveScoresDate = dt.toISOString().slice(0,10).replace(/-/g,'');
+  const dt = new Date(Date.UTC(y, m, d + delta));
+  S.liveScoresDate = dt.getUTCFullYear() +
+    String(dt.getUTCMonth() + 1).padStart(2,'0') +
+    String(dt.getUTCDate()).padStart(2,'0');
   liveScores = [];
   startLiveRefresh();
 }
