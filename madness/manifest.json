@@ -1,0 +1,21 @@
+{
+  "name": "March Madness Draft",
+  "short_name": "MM Draft",
+  "description": "March Madness bracket pool with snake draft",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#C5991A",
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

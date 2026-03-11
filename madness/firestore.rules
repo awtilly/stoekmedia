@@ -1,0 +1,22 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /rooms/{roomId} {
+      // Anyone can read rooms
+      allow read: if true;
+
+      // Create: require 64-char hashed admin PIN and state
+      allow create: if request.resource.data.adminPin is string
+                    && request.resource.data.adminPin.size() == 64
+                    && request.resource.data.keys().hasAll(['adminPin', 'state']);
+
+      // Update: if adminPin is being changed, it must be 64 chars (hash)
+      allow update: if (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['adminPin'])
+                       || (request.resource.data.adminPin is string
+                           && request.resource.data.adminPin.size() == 64));
+
+      // Delete: allow (for reset/new tournament)
+      allow delete: if true;
+    }
+  }
+}
