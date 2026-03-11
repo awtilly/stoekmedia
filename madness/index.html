@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>March Madness Draft</title>
 
 <!-- PWA -->
@@ -34,6 +34,7 @@
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+  touch-action: manipulation;
 }
 
 body {
@@ -1697,7 +1698,12 @@ button, a, .pick-btn, .preset-btn, .round-tab, .live-filter-btn, .icon-btn {
 /* ── App Shell (mobile) ── */
 @media (max-width: 700px) {
   body {
-    height: 100dvh;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 100%;
     overflow: hidden;
   }
 
@@ -1722,19 +1728,58 @@ button, a, .pick-btn, .preset-btn, .round-tab, .live-filter-btn, .icon-btn {
 
   .content-scroll {
     flex: 1;
+    min-height: 0;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: contain;
     padding: 14px;
+  }
+
+  .bottom-nav {
+    flex-shrink: 0;
   }
 
   .lobby {
     margin: 0 auto;
     padding: 40px 16px;
     padding-bottom: calc(40px + env(safe-area-inset-bottom));
-    min-height: 100dvh;
+    min-height: 100%;
     display: flex;
     flex-direction: column;
     justify-content: center;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* ── Standalone PWA fix ── */
+@media all and (display-mode: standalone) {
+  body {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 100%;
+    overflow: hidden;
+  }
+
+  .container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow: hidden;
+  }
+
+  .content-scroll {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+  }
+
+  .bottom-nav {
+    flex-shrink: 0;
   }
 }
 
@@ -2245,8 +2290,8 @@ function renderJoinScreen(){
           </div>
         ` : `<p>The commissioner hasn't added players yet. Check back soon!</p>`}
       </div>
-      <div style="margin-top:16px">
-        <button class="btn btn-secondary btn-sm" onclick="startLocal()">Leave Room</button>
+      <div style="margin-top:16px;display:flex;gap:8px;justify-content:center">
+        <button class="btn btn-secondary btn-sm" onclick="goHome()">Switch Tournament</button>
       </div>
     </div>`;
 }
@@ -2324,6 +2369,7 @@ function joinRoom(){
 
 function connectToRoom(code){
   if(unsubRoom) unsubRoom();
+  saveRecentRoom(code);
   unsubRoom = db.collection("rooms").doc(code).onSnapshot(doc => {
     if(!doc.exists){
       saveState();
@@ -2346,11 +2392,47 @@ function connectToRoom(code){
   });
 }
 
+function getRecentRooms(){
+  try {
+    const rooms = JSON.parse(localStorage.getItem('mm4_rooms') || '[]');
+    return rooms.filter(r => r && r.code).slice(0, 5);
+  } catch(e){ return []; }
+}
+
+function saveRecentRoom(code){
+  try {
+    let rooms = JSON.parse(localStorage.getItem('mm4_rooms') || '[]');
+    rooms = rooms.filter(r => r.code !== code);
+    rooms.unshift({ code, ts: Date.now() });
+    localStorage.setItem('mm4_rooms', JSON.stringify(rooms.slice(0, 10)));
+  } catch(e){}
+}
+
+function rejoinRoom(code){
+  roomId = code;
+  const url = new URL(window.location);
+  url.searchParams.set("room", code);
+  window.history.replaceState({}, "", url);
+  checkAdminSession();
+  connectToRoom(code);
+  render();
+}
+
 function renderLobby(){
+  const recent = getRecentRooms();
   document.getElementById("app").innerHTML = `
     <div class="lobby">
       <h1><span>March Madness</span> Draft</h1>
       <p class="lobby-sub">Create or join a room to sync brackets with friends in real time.</p>
+      ${recent.length > 0 ? `
+      <div class="lobby-card">
+        <h3>Your Tournaments</h3>
+        <p>Rejoin a tournament you've been in.</p>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          ${recent.map(r => `<button class="btn btn-primary" style="width:100%;justify-content:center" onclick="rejoinRoom('${escapeHtml(r.code)}')">${escapeHtml(r.code)}</button>`).join('')}
+        </div>
+      </div>
+      <div class="lobby-or">\u2014 or \u2014</div>` : ''}
       <div class="lobby-card">
         <h3>Create a Room</h3>
         <p>Choose a name for your room and share it with friends.</p>
@@ -2657,6 +2739,17 @@ function bottomNavHTML(canD, canT) {
   ).join('')}</nav>`;
 }
 
+/* ── Go Home (back to lobby) ── */
+function goHome() {
+  stopLiveRefresh();
+  if(unsubRoom) { unsubRoom(); unsubRoom = null; }
+  roomId = null;
+  const url = new URL(window.location);
+  url.searchParams.delete("room");
+  window.history.replaceState({}, "", url);
+  renderLobby();
+}
+
 /* ── Main Render ── */
 function render(){
   try {
@@ -2670,7 +2763,10 @@ function render(){
   const app = document.getElementById("app");
   app.innerHTML = `
     <div class="header">
-      <div><h1><span>March Madness</span> Draft</h1><div class="header-sub">${S.year} \u2014 ${S.players.length} players \u2014 ${S.teams.length} teams${roomId ? ` \u00b7 <span class="room-badge" onclick="copyRoomLink()" title="Click to copy link"><span class="sync-dot"></span> Room: ${roomId}</span>` : ''}${!isOnline ? ' <span class="offline-badge">Offline</span>' : ''}</div></div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <button class="settings-gear" onclick="goHome()" title="Back to Lobby"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></button>
+        <div><h1><span>March Madness</span> Draft</h1><div class="header-sub">${S.year} \u2014 ${S.players.length} players \u2014 ${S.teams.length} teams${roomId ? ` \u00b7 <span class="room-badge" onclick="copyRoomLink()" title="Click to copy link"><span class="sync-dot"></span> Room: ${roomId}</span>` : ''}${!isOnline ? ' <span class="offline-badge">Offline</span>' : ''}</div></div>
+      </div>
       <button class="settings-gear" onclick="navigate('settings')" title="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg></button>
     </div>
     <nav class="top-nav">
@@ -2699,13 +2795,16 @@ function render(){
 function navigate(p){
   if (S.phase === 'live' && p !== 'live') stopLiveRefresh();
   S.phase = p;
+  saveState();
   if (p === 'live') startLiveRefresh();
   else render();
   // Page transition + scroll to top
-  const c = document.getElementById('c');
-  if (c) { c.classList.remove('page-enter'); void c.offsetWidth; c.classList.add('page-enter'); }
-  const scroll = document.querySelector('.content-scroll');
-  if (scroll) scroll.scrollTop = 0;
+  requestAnimationFrame(() => {
+    const c = document.getElementById('c');
+    if (c) { c.classList.remove('page-enter'); void c.offsetWidth; c.classList.add('page-enter'); }
+    const scroll = document.querySelector('.content-scroll');
+    if (scroll) scroll.scrollTop = 0;
+  });
 }
 
 function copyRoomLink(){

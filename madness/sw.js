@@ -1,4 +1,4 @@
-const CACHE_NAME = 'mm-draft-v2';
+const CACHE_NAME = 'mm-draft-v3';
 const STATIC_ASSETS = [
   './',
   './index.html',
