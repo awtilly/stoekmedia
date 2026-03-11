@@ -476,6 +476,211 @@ td.val {
   opacity: .5;
 }
 
+/* ── Live Scores ── */
+.live-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.live-pulse {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--green);
+}
+
+.live-pulse .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--green);
+  animation: pulse 2s infinite;
+}
+
+.score-card {
+  display: flex;
+  align-items: stretch;
+  border: 1px solid var(--g200);
+  border-radius: 8px;
+  margin-bottom: 8px;
+  overflow: hidden;
+  transition: border-color .15s;
+}
+
+.score-card.live {
+  border-color: var(--green);
+  border-width: 2px;
+}
+
+.score-card.final .score-status {
+  color: var(--red);
+}
+
+.score-teams {
+  flex: 1;
+  padding: 10px 12px;
+}
+
+.score-team-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: 14px;
+}
+
+.score-team-row.winner {
+  font-weight: 800;
+}
+
+.score-team-row.loser {
+  opacity: .5;
+}
+
+.score-team-row img {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.score-team-row .team-seed {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--gold);
+  min-width: 16px;
+  text-align: center;
+}
+
+.score-team-row .team-name {
+  flex: 1;
+  font-size: 13px;
+}
+
+.score-team-row .team-record {
+  font-size: 11px;
+  color: var(--g400);
+}
+
+.score-team-row .team-score {
+  font-size: 18px;
+  font-weight: 800;
+  min-width: 32px;
+  text-align: right;
+}
+
+.score-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 12px;
+  min-width: 90px;
+  background: var(--g50);
+  border-left: 1px solid var(--g200);
+  gap: 2px;
+}
+
+.score-status {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--green);
+  text-align: center;
+}
+
+.score-time {
+  font-size: 11px;
+  color: var(--g500);
+  text-align: center;
+}
+
+.score-broadcast {
+  font-size: 10px;
+  color: var(--g400);
+  text-align: center;
+}
+
+.score-note {
+  font-size: 10px;
+  color: var(--gold);
+  font-weight: 600;
+  text-align: center;
+}
+
+.scores-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 8px;
+}
+
+.team-logo-sm {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.import-espn-card {
+  background: linear-gradient(135deg, var(--gold-bg) 0%, var(--white) 100%);
+  border: 2px dashed var(--gold);
+  border-radius: 10px;
+  padding: 20px;
+  text-align: center;
+  margin-bottom: 16px;
+  cursor: pointer;
+  transition: all .2s;
+}
+
+.import-espn-card:hover {
+  border-style: solid;
+  background: var(--gold-bg);
+}
+
+.import-espn-card h3 {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--gold);
+  margin-bottom: 4px;
+}
+
+.import-espn-card p {
+  font-size: 13px;
+  color: var(--g500);
+  margin-bottom: 12px;
+}
+
+
+.live-filter-bar {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.live-filter-btn {
+  padding: 5px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--g200);
+  background: var(--white);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  color: var(--g600);
+}
+
+.live-filter-btn.active {
+  background: var(--gold);
+  color: var(--white);
+  border-color: var(--gold);
+}
+
 /* ── Settings ── */
 .toggle {
   width: 44px;
@@ -1255,6 +1460,23 @@ td.val {
     padding: 8px 12px;
     font-size: 12px;
   }
+
+  .scores-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .score-card {
+    flex-direction: column;
+  }
+
+  .score-meta {
+    flex-direction: row;
+    border-left: none;
+    border-top: 1px solid var(--g200);
+    min-width: 0;
+    padding: 6px 12px;
+    gap: 8px;
+  }
 }
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
@@ -1274,6 +1496,203 @@ for(let i=8; i<12; i++) GAME_ROUND[i] = 2;
 GAME_ROUND[12] = 3; GAME_ROUND[13] = 3; GAME_ROUND[14] = 4;
 
 const generateId = () => crypto.randomUUID();
+
+/* ── ESPN API ── */
+const ESPN_BASE = 'https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball';
+
+const espn = {
+  _cache: {},
+  async fetchScoreboard(date) {
+    const dateStr = date || new Date().toISOString().slice(0,10).replace(/-/g,'');
+    const url = `${ESPN_BASE}/scoreboard?dates=${dateStr}&limit=200`;
+    try {
+      const r = await fetch(url);
+      if (!r.ok) throw new Error(r.status);
+      return await r.json();
+    } catch(e) {
+      console.warn('ESPN scoreboard fetch failed:', e);
+      return null;
+    }
+  },
+
+  async fetchTournamentTeams() {
+    // Fetch first round days to get all 64 teams with seeds and regions
+    const year = S.year;
+    // We search around typical first round dates (mid-March Thu/Fri)
+    // Try multiple date ranges to find the tournament
+    const candidates = [];
+    for (let d = 17; d <= 22; d++) {
+      candidates.push(`${year}03${String(d).padStart(2,'0')}`);
+    }
+    // Also try the current scoreboard with seasontype=3
+    const allTeams = {};
+
+    for (const dateStr of candidates) {
+      try {
+        const r = await fetch(`${ESPN_BASE}/scoreboard?dates=${dateStr}&limit=200`);
+        if (!r.ok) continue;
+        const data = await r.json();
+        for (const ev of (data.events || [])) {
+          const comp = ev.competitions?.[0];
+          if (!comp) continue;
+          const notes = comp.notes || [];
+          const note = notes[0]?.headline || '';
+          // Only tournament games have region info in notes
+          let region = '';
+          if (note.includes('South')) region = 'South';
+          else if (note.includes('East')) region = 'East';
+          else if (note.includes('Midwest')) region = 'Midwest';
+          else if (note.includes('West')) region = 'West';
+          if (!region) continue;
+
+          for (const c of (comp.competitors || [])) {
+            const team = c.team || {};
+            const seed = c.curatedRank?.current;
+            if (!seed || seed > 16) continue;
+            const name = team.shortDisplayName || team.displayName || team.name || '';
+            const key = `${name}_${seed}_${region}`;
+            if (!allTeams[key]) {
+              allTeams[key] = {
+                name,
+                seed,
+                region,
+                logo: team.logo || '',
+                abbr: team.abbreviation || '',
+                espnId: team.id || '',
+                color: team.color || '',
+                record: c.records?.[0]?.summary || ''
+              };
+            }
+          }
+        }
+        if (Object.keys(allTeams).length >= 68) break;
+      } catch(e) { continue; }
+    }
+    // Detect play-in pairs: same seed + region, different team name
+    const teamsList = Object.values(allTeams);
+    const bySlot = {};
+    for (const t of teamsList) {
+      const key = `${t.seed}_${t.region}`;
+      if (!bySlot[key]) bySlot[key] = [];
+      bySlot[key].push(t);
+    }
+    const result = [];
+    for (const key in bySlot) {
+      const group = bySlot[key];
+      if (group.length === 2) {
+        result.push({
+          name: `${group[0].name} / ${group[1].name}`,
+          seed: group[0].seed,
+          region: group[0].region,
+          logo: '',
+          abbr: '',
+          espnId: '',
+          color: '',
+          record: '',
+          playIn: true,
+          playInResolved: false,
+          playInTeams: group.map(g => ({
+            name: g.name, logo: g.logo, abbr: g.abbr,
+            espnId: g.espnId, color: g.color, record: g.record
+          }))
+        });
+      } else {
+        result.push(...group);
+      }
+    }
+    return result.sort((a,b) => {
+      const ri = REGIONS.indexOf(a.region) - REGIONS.indexOf(b.region);
+      return ri !== 0 ? ri : a.seed - b.seed;
+    });
+  },
+
+  parseScoreboardEvents(data) {
+    if (!data || !data.events) return [];
+    return data.events.map(ev => {
+      const comp = ev.competitions?.[0];
+      if (!comp) return null;
+      const status = comp.status || ev.status || {};
+      const statusType = status.type || {};
+      const notes = comp.notes || [];
+      const note = notes[0]?.headline || '';
+      const broadcasts = comp.broadcasts || [];
+      const broadcast = broadcasts[0]?.names?.[0] || '';
+
+      const teams = (comp.competitors || []).map(c => {
+        const t = c.team || {};
+        return {
+          name: t.shortDisplayName || t.displayName || '',
+          abbr: t.abbreviation || '',
+          logo: t.logo || '',
+          score: c.score || '',
+          seed: c.curatedRank?.current,
+          record: c.records?.[0]?.summary || '',
+          homeAway: c.homeAway,
+          winner: c.winner,
+          espnId: t.id || '',
+          color: t.color || ''
+        };
+      });
+
+      // Put away team first (top), home team second (bottom) for display
+      const away = teams.find(t => t.homeAway === 'away') || teams[0];
+      const home = teams.find(t => t.homeAway === 'home') || teams[1];
+
+      return {
+        id: ev.id,
+        name: ev.shortName || ev.name,
+        date: ev.date,
+        state: statusType.state || 'pre', // pre, in, post
+        statusName: statusType.name || '',
+        detail: statusType.detail || statusType.shortDetail || '',
+        shortDetail: statusType.shortDetail || '',
+        clock: status.displayClock || '',
+        period: status.period || 0,
+        completed: statusType.completed || false,
+        note,
+        broadcast,
+        venue: comp.venue?.fullName || '',
+        away,
+        home
+      };
+    }).filter(Boolean);
+  }
+};
+
+/* ── Live Scores State ── */
+let liveScores = [];
+let liveScoresDate = '';
+let liveScoresFilter = 'all'; // 'all', 'live', 'final', 'upcoming'
+let liveRefreshTimer = null;
+let liveLastRefresh = 0;
+
+async function refreshLiveScores() {
+  const dateStr = liveScoresDate || new Date().toISOString().slice(0,10).replace(/-/g,'');
+  const data = await espn.fetchScoreboard(dateStr);
+  if (data) {
+    liveScores = espn.parseScoreboardEvents(data);
+    liveLastRefresh = Date.now();
+    // Only re-render if we're on the live tab
+    if (S.phase === 'live') {
+      const c = document.getElementById('c');
+      if (c) renderLive(c);
+    }
+  }
+}
+
+function startLiveRefresh() {
+  stopLiveRefresh();
+  autoResolvePlayIns();
+  refreshLiveScores();
+  liveRefreshTimer = setInterval(refreshLiveScores, 30000); // every 30s
+}
+
+function stopLiveRefresh() {
+  if (liveRefreshTimer) {
+    clearInterval(liveRefreshTimer);
+    liveRefreshTimer = null;
+  }
+}
 
 let S = {
   phase: "setup",
@@ -1445,7 +1864,7 @@ function renderJoinScreen(){
 }
 
 /* ── State Persistence ── */
-const VIEW_LOCAL = ['phase','bracketRegion','fr','fs'];
+const VIEW_LOCAL = ['phase','bracketRegion','fr','fs','liveScoresDate','liveScoresFilter'];
 
 function saveState(){
   try { localStorage.setItem("mm4", JSON.stringify(S)); } catch(e){}
@@ -1574,6 +1993,67 @@ function seedClass(s){ return s <= 4 ? "seed-top" : s <= 8 ? "seed-mid" : "seed-
 function seedBadge(s){ return `<span class="seed-badge ${seedClass(s)}">${s}</span>`; }
 function escapeHtml(s){ const d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
 function owner(tid){ const p = S.players.find(p => p.teamIds.includes(tid)); return p ? p.name : ""; }
+
+function teamDisplayName(t) {
+  if (t.playIn && !t.playInResolved) return t.playInTeams.map(pt => pt.name).join(' / ');
+  return t.name;
+}
+function teamLogoHTML(t, size) {
+  if (t.playIn && !t.playInResolved) {
+    return t.playInTeams.map(pt =>
+      pt.logo ? `<img src="${pt.logo}" style="width:${size}px;height:${size}px;object-fit:contain">` : ''
+    ).join('');
+  }
+  return t.logo ? `<img src="${t.logo}" style="width:${size}px;height:${size}px;object-fit:contain">` : '';
+}
+function teamRecordDisplay(t) {
+  if (t.playIn && !t.playInResolved) return t.playInTeams.map(pt => pt.record).filter(Boolean).join(' / ');
+  return t.record || '';
+}
+
+async function resolvePlayIn(teamId, winnerIdx) {
+  const team = S.teams.find(t => t.id === teamId);
+  if (!team || !team.playIn) return;
+  const winner = team.playInTeams[winnerIdx];
+  team.name = winner.name;
+  team.logo = winner.logo;
+  team.abbr = winner.abbr;
+  team.espnId = winner.espnId;
+  team.color = winner.color;
+  team.record = winner.record;
+  team.playInResolved = true;
+  render();
+}
+
+async function showResolvePlayIn(teamId) {
+  if (!await requireAdmin()) return;
+  const team = S.teams.find(t => t.id === teamId);
+  if (!team || !team.playIn || team.playInResolved) return;
+  const choice = prompt(`Which team won?\n1) ${team.playInTeams[0].name}\n2) ${team.playInTeams[1].name}\n\nEnter 1 or 2:`);
+  if (choice === '1') resolvePlayIn(teamId, 0);
+  else if (choice === '2') resolvePlayIn(teamId, 1);
+}
+
+async function autoResolvePlayIns() {
+  const unresolved = S.teams.filter(t => t.playIn && !t.playInResolved);
+  if (unresolved.length === 0) return;
+  for (let d = 17; d <= 19; d++) {
+    const dateStr = `${S.year}03${String(d).padStart(2,'0')}`;
+    const data = await espn.fetchScoreboard(dateStr);
+    if (!data) continue;
+    for (const ev of espn.parseScoreboardEvents(data)) {
+      if (ev.state !== 'post') continue;
+      for (const ut of unresolved) {
+        const abbrs = ut.playInTeams.map(pt => pt.abbr);
+        if (abbrs.includes(ev.away.abbr) && abbrs.includes(ev.home.abbr)) {
+          const winnerAbbr = ev.away.winner ? ev.away.abbr : ev.home.abbr;
+          const winnerIdx = abbrs.indexOf(winnerAbbr);
+          if (winnerIdx >= 0) await resolvePlayIn(ut.id, winnerIdx);
+        }
+      }
+    }
+  }
+}
 
 function snakeOrder(pids, tot){
   const o = [];
@@ -1784,14 +2264,20 @@ function render(){
       <button class="${S.phase==='draft'?'active':''}" ${canD?'':'disabled'} onclick="navigate('draft')">Draft</button>
       <button class="${S.phase==='bracket'?'active':''}" ${canT?'':'disabled'} onclick="navigate('bracket')">Bracket</button>
       <button class="${S.phase==='leaderboard'?'active':''}" ${canT?'':'disabled'} onclick="navigate('leaderboard')">Leaderboard</button>
+      <button class="${S.phase==='live'?'active':''}" onclick="navigate('live')">Live Scores</button>
       <button class="${S.phase==='settings'?'active':''}" onclick="navigate('settings')">Settings</button>
     </nav><div id="c"></div>
     <div class="footer"><strong>Scoring:</strong> ${Object.entries(S.rp).map(([r,p]) => `${RN[r]}=${p}pt${p!==1?'s':''}`).join(' \u00b7 ')}${S.ub ? ' \u00b7 Upset bonus=seed diff' : ''}</div>`;
   const c = document.getElementById("c");
-  ({setup:renderSetup, teams:renderTeams, draft:renderDraft, bracket:renderBracket, leaderboard:renderLeaderboard, settings:renderSettings})[S.phase]?.(c);
+  ({setup:renderSetup, teams:renderTeams, draft:renderDraft, bracket:renderBracket, leaderboard:renderLeaderboard, live:renderLive, settings:renderSettings})[S.phase]?.(c);
 }
 
-function navigate(p){ S.phase = p; render(); }
+function navigate(p){
+  if (S.phase === 'live' && p !== 'live') stopLiveRefresh();
+  S.phase = p;
+  if (p === 'live') startLiveRefresh();
+  else render();
+}
 
 function copyRoomLink(){
   const url = new URL(window.location);
@@ -1856,8 +2342,20 @@ function renderTeams(c){
   const br = REGIONS.map(r => ({r, t: S.teams.filter(t => t.region === r).sort((a,b) => a.seed - b.seed)}));
   c.innerHTML = `<div class="row" style="justify-content:space-between;margin-bottom:4px;flex-wrap:wrap;gap:8px">
     <div class="section-title">Teams <span style="color:var(--gold);font-size:16px">${S.teams.length}/64</span></div>
-    <button class="btn btn-secondary btn-sm" onclick="document.getElementById('ba').classList.toggle('hidden')">Bulk Import</button></div>
+    <div class="row" style="gap:6px">
+      <button class="btn btn-secondary btn-sm" onclick="document.getElementById('ba').classList.toggle('hidden')">Bulk Import</button>
+    </div></div>
   <p class="section-desc">Add all 64 tournament teams.</p>
+  ${S.teams.length === 0 ? `
+    <div class="import-espn-card" onclick="importFromESPN()" id="espn-import">
+      <h3>Import from ESPN</h3>
+      <p>Auto-import all 64 tournament teams with seeds, regions, logos, and rankings from ESPN.</p>
+      <button class="btn btn-primary">Import ${S.year} Tournament Teams</button>
+    </div>` : `
+    <div style="margin-bottom:14px;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-secondary btn-sm" onclick="importFromESPN()">Re-Import from ESPN</button>
+      <button class="btn btn-secondary btn-sm" onclick="refreshTeamData()">Refresh Logos & Rankings</button>
+    </div>`}
   <div id="ba" class="card hidden" style="margin-bottom:14px"><span class="label">Bulk Import (Team, Seed, Region per line)</span>
     <textarea id="bt" rows="5" placeholder="Duke, 1, East\nAuburn, 1, South"></textarea>
     <button class="btn btn-primary btn-sm" style="margin-top:8px" onclick="parseBulkImport()">Import</button></div>
@@ -1866,7 +2364,7 @@ function renderTeams(c){
     <div style="width:75px"><span class="label">Seed</span><select id="ts" style="width:100%">${SEEDS.map(s => `<option value="${s}">#${s}</option>`).join('')}</select></div>
     <div style="width:110px"><span class="label">Region</span><select id="tr" style="width:100%">${REGIONS.map(r => `<option value="${r}">${r}</option>`).join('')}</select></div>
     <button class="btn btn-primary" onclick="addTeam()">Add</button></div></div>
-  <div class="grid-2">${br.map(({r,t}) => `<div class="card" style="padding:14px"><h3 style="font-size:15px;font-weight:800;margin-bottom:8px;color:var(--gold)">${r} <span style="color:var(--g400);font-size:12px">(${t.length}/16)</span></h3>${t.length === 0 ? '<p style="color:var(--g300);font-size:13px">No teams</p>' : t.map(t => `<div class="team-item">${seedBadge(t.seed)}<span style="flex:1">${escapeHtml(t.name)}</span><button class="icon-btn icon-btn-danger" onclick="deleteTeam('${t.id}')">\u2715</button></div>`).join('')}</div>`).join('')}</div>
+  <div class="grid-2">${br.map(({r,t}) => `<div class="card" style="padding:14px"><h3 style="font-size:15px;font-weight:800;margin-bottom:8px;color:var(--gold)">${r} <span style="color:var(--g400);font-size:12px">(${t.length}/16)</span></h3>${t.length === 0 ? '<p style="color:var(--g300);font-size:13px">No teams</p>' : t.map(t => `<div class="team-item">${teamLogoHTML(t, 20)}${seedBadge(t.seed)}<span style="flex:1">${escapeHtml(teamDisplayName(t))}${teamRecordDisplay(t) ? ` <span style="font-size:11px;color:var(--g400)">(${escapeHtml(teamRecordDisplay(t))})</span>` : ''}</span>${t.playIn && !t.playInResolved ? `<button class="btn btn-sm btn-secondary" style="padding:2px 8px;font-size:11px;min-height:0" onclick="event.stopPropagation();showResolvePlayIn('${t.id}')">Resolve</button>` : ''}<button class="icon-btn icon-btn-danger" onclick="deleteTeam('${t.id}')">\u2715</button></div>`).join('')}</div>`).join('')}</div>
   ${S.teams.length > 0 ? `<div style="margin-top:14px;text-align:right"><button class="btn btn-danger btn-sm" onclick="clearAllTeams()">Clear All</button></div>` : ''}`;
 }
 
@@ -1898,6 +2396,207 @@ async function parseBulkImport(){
   render();
 }
 
+/* ── ESPN Import ── */
+async function importFromESPN(){
+  if(!await requireAdmin()) return;
+  if(S.teams.length > 0 && !confirm('This will replace all current teams. Continue?')) return;
+
+  const btn = document.querySelector('.import-espn-card .btn-primary, .btn-secondary');
+  const origText = btn?.textContent;
+  if(btn){ btn.textContent = 'Importing...'; btn.disabled = true; }
+  showToast('Fetching tournament teams from ESPN...');
+
+  try {
+    const teams = await espn.fetchTournamentTeams();
+    if(teams.length === 0){
+      // Tournament bracket not yet available - try to import current year's ranking-based teams
+      showToast('Tournament bracket not available yet. Try after Selection Sunday.');
+      if(btn){ btn.textContent = origText; btn.disabled = false; }
+      return;
+    }
+
+    S.teams = teams.map(t => ({
+      id: generateId(),
+      name: t.name,
+      seed: t.seed,
+      region: t.region,
+      logo: t.logo,
+      abbr: t.abbr,
+      espnId: t.espnId,
+      color: t.color,
+      record: t.record,
+      ...(t.playIn ? { playIn: true, playInResolved: false, playInTeams: t.playInTeams } : {})
+    }));
+
+    showToast(`Imported ${S.teams.length} teams from ESPN!`);
+    render();
+  } catch(e) {
+    console.error('ESPN import failed:', e);
+    showToast('Import failed. Check your connection and try again.');
+    if(btn){ btn.textContent = origText; btn.disabled = false; }
+  }
+}
+
+async function refreshTeamData(){
+  if(!await requireAdmin()) return;
+  showToast('Refreshing team data...');
+  try {
+    // Refresh from ESPN scoreboard for latest records
+    const data = await espn.fetchScoreboard();
+    const espnTeams = {};
+    if(data){
+      for(const ev of (data.events || [])){
+        const comp = ev.competitions?.[0];
+        if(!comp) continue;
+        for(const c of (comp.competitors || [])){
+          const t = c.team || {};
+          espnTeams[t.abbreviation] = {
+            logo: t.logo || '',
+            record: c.records?.[0]?.summary || ''
+          };
+        }
+      }
+    }
+
+    for(const team of S.teams){
+      const espnData = espnTeams[team.abbr];
+      if(espnData){
+        if(espnData.logo) team.logo = espnData.logo;
+        if(espnData.record) team.record = espnData.record;
+      }
+    }
+    await autoResolvePlayIns();
+    showToast('Team data refreshed!');
+    render();
+  } catch(e) {
+    showToast('Refresh failed.');
+  }
+}
+
+/* ── Live Scores Page ── */
+function renderLive(c){
+  const hasLive = liveScores.some(g => g.state === 'in');
+  const now = new Date();
+  const todayStr = now.toISOString().slice(0,10).replace(/-/g,'');
+  const currentDate = liveScoresDate || todayStr;
+  const displayDate = currentDate.replace(/(\d{4})(\d{2})(\d{2})/, '$2/$3/$1');
+
+  let filtered = liveScores;
+  if(liveScoresFilter === 'live') filtered = liveScores.filter(g => g.state === 'in');
+  else if(liveScoresFilter === 'final') filtered = liveScores.filter(g => g.state === 'post');
+  else if(liveScoresFilter === 'upcoming') filtered = liveScores.filter(g => g.state === 'pre');
+
+  // Sort: live first, then upcoming, then final
+  filtered.sort((a,b) => {
+    const order = {in:0, pre:1, post:2};
+    return (order[a.state] ?? 1) - (order[b.state] ?? 1);
+  });
+
+  // Match live games to our drafted teams
+  const teamsByEspn = {};
+  const teamsByAbbr = {};
+  const teamsByName = {};
+  for(const t of S.teams){
+    if(t.espnId) teamsByEspn[t.espnId] = t;
+    if(t.abbr) teamsByAbbr[t.abbr] = t;
+    teamsByName[t.name.toLowerCase()] = t;
+  }
+  function findOurTeam(scoreTeam){
+    const direct = teamsByEspn[scoreTeam.espnId] || teamsByAbbr[scoreTeam.abbr] || teamsByName[scoreTeam.name.toLowerCase()];
+    if (direct) return direct;
+    // Check unresolved play-in teams
+    return S.teams.find(t => t.playIn && !t.playInResolved &&
+      t.playInTeams.some(pt => pt.espnId === scoreTeam.espnId || pt.abbr === scoreTeam.abbr)
+    ) || null;
+  }
+
+  c.innerHTML = `
+    <div class="live-header">
+      <div>
+        <div class="section-title">Live Scores</div>
+        <p class="section-desc" style="margin-bottom:0">
+          ${displayDate}
+          ${hasLive ? ' <span class="live-pulse"><span class="dot"></span>LIVE</span>' : ''}
+          ${liveLastRefresh ? ` <span style="font-size:11px;color:var(--g400)">Updated ${new Date(liveLastRefresh).toLocaleTimeString()}</span>` : ''}
+        </p>
+      </div>
+      <div class="row" style="gap:8px">
+        <button class="btn btn-secondary btn-sm" onclick="changeLiveDate(-1)">Prev Day</button>
+        <button class="btn btn-secondary btn-sm" onclick="liveScoresDate='';startLiveRefresh()">Today</button>
+        <button class="btn btn-secondary btn-sm" onclick="changeLiveDate(1)">Next Day</button>
+        <button class="btn btn-secondary btn-sm" onclick="refreshLiveScores()" title="Refresh now">Refresh</button>
+      </div>
+    </div>
+    <div class="live-filter-bar">
+      <button class="live-filter-btn ${liveScoresFilter==='all'?'active':''}" onclick="liveScoresFilter='all';renderLiveInPlace()">All (${liveScores.length})</button>
+      <button class="live-filter-btn ${liveScoresFilter==='live'?'active':''}" onclick="liveScoresFilter='live';renderLiveInPlace()">Live (${liveScores.filter(g=>g.state==='in').length})</button>
+      <button class="live-filter-btn ${liveScoresFilter==='upcoming'?'active':''}" onclick="liveScoresFilter='upcoming';renderLiveInPlace()">Upcoming (${liveScores.filter(g=>g.state==='pre').length})</button>
+      <button class="live-filter-btn ${liveScoresFilter==='final'?'active':''}" onclick="liveScoresFilter='final';renderLiveInPlace()">Final (${liveScores.filter(g=>g.state==='post').length})</button>
+    </div>
+    ${filtered.length === 0 ? '<div class="card" style="text-align:center;padding:40px;color:var(--g400)"><p style="font-size:16px;font-weight:700;margin-bottom:4px">No games found</p><p style="font-size:13px">Try a different date or check back later.</p></div>' : ''}
+    <div class="scores-grid">
+      ${filtered.map(game => {
+        const awayOur = findOurTeam(game.away);
+        const homeOur = findOurTeam(game.home);
+        const awayOwner = awayOur ? owner(awayOur.id) : '';
+        const homeOwner = homeOur ? owner(homeOur.id) : '';
+        const isLive = game.state === 'in';
+        const isFinal = game.state === 'post';
+        const isPre = game.state === 'pre';
+
+        const awayWon = isFinal && game.away.winner;
+        const homeWon = isFinal && game.home.winner;
+
+        const gameTime = new Date(game.date);
+        const timeStr = gameTime.toLocaleTimeString([], {hour:'numeric', minute:'2-digit'});
+
+        return `<div class="score-card ${isLive?'live':''} ${isFinal?'final':''}">
+          <div class="score-teams">
+            <div class="score-team-row ${awayWon?'winner':''} ${isFinal&&!awayWon?'loser':''}">
+              ${game.away.logo ? `<img src="${game.away.logo}" alt="">` : '<span style="width:24px"></span>'}
+              <span class="team-seed">${game.away.seed && game.away.seed <= 16 ? game.away.seed : ''}</span>
+              <span class="team-name">${escapeHtml(game.away.name)}${awayOwner ? ` <span style="font-size:10px;color:var(--gold);font-weight:700">(${escapeHtml(awayOwner)})</span>` : ''}</span>
+              <span class="team-record">${game.away.record || ''}</span>
+              <span class="team-score">${game.away.score || (isPre ? '' : '0')}</span>
+            </div>
+            <div class="score-team-row ${homeWon?'winner':''} ${isFinal&&!homeWon?'loser':''}">
+              ${game.home.logo ? `<img src="${game.home.logo}" alt="">` : '<span style="width:24px"></span>'}
+              <span class="team-seed">${game.home.seed && game.home.seed <= 16 ? game.home.seed : ''}</span>
+              <span class="team-name">${escapeHtml(game.home.name)}${homeOwner ? ` <span style="font-size:10px;color:var(--gold);font-weight:700">(${escapeHtml(homeOwner)})</span>` : ''}</span>
+              <span class="team-record">${game.home.record || ''}</span>
+              <span class="team-score">${game.home.score || (isPre ? '' : '0')}</span>
+            </div>
+          </div>
+          <div class="score-meta">
+            <div class="score-status" style="${isFinal?'color:var(--red)':isLive?'color:var(--green)':'color:var(--g500)'}">${isLive ? game.shortDetail : isFinal ? 'FINAL' : timeStr}</div>
+            ${game.note ? `<div class="score-note">${escapeHtml(game.note.replace("Men's Basketball Championship - ",''))}</div>` : ''}
+            ${game.broadcast ? `<div class="score-broadcast">${escapeHtml(game.broadcast)}</div>` : ''}
+            ${game.venue ? `<div class="score-broadcast">${escapeHtml(game.venue)}</div>` : ''}
+          </div>
+        </div>`;
+      }).join('')}
+    </div>
+    <div style="margin-top:16px;text-align:center;font-size:11px;color:var(--g400)">
+      Scores refresh automatically every 30 seconds. Data from ESPN.
+    </div>`;
+}
+
+function renderLiveInPlace(){
+  const c = document.getElementById('c');
+  if(c) renderLive(c);
+}
+
+function changeLiveDate(delta){
+  const current = liveScoresDate || new Date().toISOString().slice(0,10).replace(/-/g,'');
+  const y = parseInt(current.slice(0,4));
+  const m = parseInt(current.slice(4,6)) - 1;
+  const d = parseInt(current.slice(6,8));
+  const dt = new Date(y, m, d + delta);
+  liveScoresDate = dt.toISOString().slice(0,10).replace(/-/g,'');
+  liveScores = [];
+  startLiveRefresh();
+}
+
 /* ── Draft Page ── */
 function renderDraft(c){
   const ds = S.ds;
@@ -1920,9 +2619,9 @@ function renderDraft(c){
       <select onchange="S.fr=this.value;render()" style="width:130px"><option value="All" ${S.fr==='All'?'selected':''}>All Regions</option>${REGIONS.map(r => `<option value="${r}" ${S.fr===r?'selected':''}>${r}</option>`).join('')}</select>
       <select onchange="S.fs=this.value;render()" style="width:110px"><option value="All" ${S.fs==='All'?'selected':''}>All Seeds</option>${SEEDS.map(s => `<option value="${s}" ${String(S.fs)===String(s)?'selected':''}>Seed ${s}</option>`).join('')}</select>
       <span style="color:var(--g400);font-size:12px">${av.length} available</span></div>
-    <div class="draft-teams">${av.map(t => `<button class="pick-btn" onclick="pickTeam('${t.id}')" ${ds.complete?'disabled':''}>${seedBadge(t.seed)}<div><div style="font-weight:600">${escapeHtml(t.name)}</div><div style="font-size:11px;color:var(--g400)">${t.region}</div></div></button>`).join('')}</div></div>
+    <div class="draft-teams">${av.map(t => `<button class="pick-btn" onclick="pickTeam('${t.id}')" ${ds.complete?'disabled':''}>${teamLogoHTML(t, 20)}${seedBadge(t.seed)}<div><div style="font-weight:600">${escapeHtml(teamDisplayName(t))}</div><div style="font-size:11px;color:var(--g400)">${t.region}${teamRecordDisplay(t) ? ` · ${teamRecordDisplay(t)}` : ''}</div></div></button>`).join('')}</div></div>
   <div><span class="label">Rosters</span>
-    ${S.players.map(p => {const pt = S.teams.filter(t => p.teamIds.includes(t.id)).sort((a,b) => a.seed - b.seed); const act = p.id === cid && !ds.complete; return `<div class="roster-card ${act?'active':''}"><div class="row" style="justify-content:space-between;margin-bottom:4px"><span style="font-weight:700;font-size:13px;color:${act?'var(--gold)':'var(--black)'}">${escapeHtml(p.name)}</span><span style="color:var(--g400);font-size:11px">${pt.length}</span></div>${pt.map(t => `<div style="display:flex;align-items:center;gap:5px;font-size:12px;padding:1px 0">${seedBadge(t.seed)} ${escapeHtml(t.name)}</div>`).join('')}</div>`}).join('')}
+    ${S.players.map(p => {const pt = S.teams.filter(t => p.teamIds.includes(t.id)).sort((a,b) => a.seed - b.seed); const act = p.id === cid && !ds.complete; return `<div class="roster-card ${act?'active':''}"><div class="row" style="justify-content:space-between;margin-bottom:4px"><span style="font-weight:700;font-size:13px;color:${act?'var(--gold)':'var(--black)'}">${escapeHtml(p.name)}</span><span style="color:var(--g400);font-size:11px">${pt.length}</span></div>${pt.map(t => `<div style="display:flex;align-items:center;gap:5px;font-size:12px;padding:1px 0">${teamLogoHTML(t, 20)}${seedBadge(t.seed)} ${escapeHtml(teamDisplayName(t))}</div>`).join('')}</div>`}).join('')}
   </div></div>`;
 }
 
@@ -2022,7 +2721,7 @@ function renderRegionBracket(region){
   const rw = rwId ? S.teams.find(t => t.id === rwId) : null;
   html += `<div class="round" style="min-width:120px;justify-content:center"><div class="round-header">Region Winner</div>
     <div class="gw"><div style="text-align:center;padding:12px">
-      ${rw ? `<div style="font-size:11px;color:var(--gold);font-weight:800">${rw.seed}</div><div style="font-weight:800;font-size:14px">${escapeHtml(rw.name)}</div><div style="font-size:11px;color:var(--g400)">${owner(rw.id) || ''}</div>` : '<div style="color:var(--g300);font-size:13px">TBD</div>'}
+      ${rw ? `${teamLogoHTML(rw, 28) ? `<div style="margin-bottom:4px">${teamLogoHTML(rw, 28)}</div>` : ''}<div style="font-size:11px;color:var(--gold);font-weight:800">${rw.seed}</div><div style="font-weight:800;font-size:14px">${escapeHtml(teamDisplayName(rw))}</div><div style="font-size:11px;color:var(--g400)">${owner(rw.id) || ''}</div>` : '<div style="color:var(--g300);font-size:13px">TBD</div>'}
     </div></div></div>`;
   html += `</div></div>`;
   area.innerHTML = html;
@@ -2039,7 +2738,7 @@ function slotHTML(region, gi, team, winnerId){
     ontouchstart="startLongPress(()=>clearBracketGame('${region}',${gi}))"
     ontouchend="endLongPress(event)"
     ontouchmove="cancelLongPress()">
-    <span class="sd">${team.seed}</span><span class="tn">${escapeHtml(team.name)}</span>${ow ? `<span class="ow">${escapeHtml(ow)}</span>` : ''}
+    ${teamLogoHTML(team, 16)}<span class="sd">${team.seed}</span><span class="tn">${escapeHtml(teamDisplayName(team))}</span>${ow ? `<span class="ow">${escapeHtml(ow)}</span>` : ''}
   </div>`;
 }
 
@@ -2066,7 +2765,7 @@ function renderFF(){
       ontouchstart="startLongPress(()=>clearFFGame(${ffIdx}))"
       ontouchend="endLongPress(event)"
       ontouchmove="cancelLongPress()">
-      <span class="sd">${team.seed}</span>${escapeHtml(team.name)}<span style="margin-left:auto;font-size:10px;color:var(--g400)">${owner(team.id) || ''}</span></div>`;
+      ${teamLogoHTML(team, 20)}<span class="sd">${team.seed}</span>${escapeHtml(teamDisplayName(team))}<span style="margin-left:auto;font-size:10px;color:var(--g400)">${owner(team.id) || ''}</span></div>`;
   }
 
   const ff0t = ff0 ? S.teams.find(t => t.id === ff0) : null;
@@ -2091,18 +2790,18 @@ function renderFF(){
             ontouchstart="startLongPress(()=>clearFFGame(2))"
             ontouchend="endLongPress(event)"
             ontouchmove="cancelLongPress()">
-            <span class="sd">${ff0t.seed}</span>${escapeHtml(ff0t.name)}</div>` : '<div class="ff-slot empty">TBD</div>'}
+            <span class="sd">${ff0t.seed}</span>${escapeHtml(teamDisplayName(ff0t))}</div>` : '<div class="ff-slot empty">TBD</div>'}
           ${ff1t ? `<div class="ff-slot ${champ===ff1?'winner':''} ${champ&&champ!==ff1?'loser':''}"
             onclick="advanceFF(2,'${ff1}')"
             oncontextmenu="clearFFGame(2,event)"
             ontouchstart="startLongPress(()=>clearFFGame(2))"
             ontouchend="endLongPress(event)"
             ontouchmove="cancelLongPress()">
-            <span class="sd">${ff1t.seed}</span>${escapeHtml(ff1t.name)}</div>` : '<div class="ff-slot empty">TBD</div>'}
+            <span class="sd">${ff1t.seed}</span>${escapeHtml(teamDisplayName(ff1t))}</div>` : '<div class="ff-slot empty">TBD</div>'}
         </div>
         <div class="champ-box">
           <div class="champ-label">Champion</div>
-          ${champt ? `<div class="champ-team">${seedBadge(champt.seed)} ${escapeHtml(champt.name)}</div><div class="champ-owner">${owner(champt.id) || ''}</div>` : '<div class="champ-team" style="color:var(--g300)">TBD</div>'}
+          ${champt ? `${teamLogoHTML(champt, 32) ? `<div style="margin-bottom:4px">${teamLogoHTML(champt, 32)}</div>` : ''}<div class="champ-team">${seedBadge(champt.seed)} ${escapeHtml(teamDisplayName(champt))}</div><div class="champ-owner">${owner(champt.id) || ''}</div>` : '<div class="champ-team" style="color:var(--g300)">TBD</div>'}
         </div>
       </div>
     </div>
@@ -2122,7 +2821,7 @@ function renderLeaderboard(c){
   <div class="card" style="margin-bottom:14px"><span class="label">Score Bars</span>
     ${sc.map(s => `<div class="row" style="margin-bottom:6px"><span style="width:70px;font-weight:700;font-size:13px;text-align:right">${escapeHtml(s.name)}</span><div class="bar-container"><div class="bar-fill" style="width:${(s.tot/mx)*100}%"></div></div><span style="width:36px;font-weight:800;font-size:14px;color:var(--gold)">${s.tot}</span></div>`).join('')}</div>
   <div class="card"><span class="label">Team Rosters & Status</span>
-    ${S.players.map(p => {const pt = S.teams.filter(t => p.teamIds.includes(t.id)).sort((a,b) => a.seed - b.seed); return `<div style="margin-bottom:14px"><h4 style="font-weight:700;margin-bottom:6px;font-size:14px">${escapeHtml(p.name)}</h4><div class="row" style="flex-wrap:wrap;gap:5px">${pt.map(t => {const w = (S.games||[]).filter(g => g.wid===t.id).length; const el = (S.games||[]).some(g => (g.t1===t.id||g.t2===t.id) && g.wid && g.wid!==t.id); return `<span class="tag ${el?'tag-elim':'tag-alive'}">${seedBadge(t.seed)} ${escapeHtml(t.name)}${w>0?`<span style="color:var(--green);font-weight:700">W${w}</span>`:''}${el?'<span style="color:var(--red)">\u2715</span>':''}</span>`}).join('')}</div></div>`}).join('')}</div>`;
+    ${S.players.map(p => {const pt = S.teams.filter(t => p.teamIds.includes(t.id)).sort((a,b) => a.seed - b.seed); return `<div style="margin-bottom:14px"><h4 style="font-weight:700;margin-bottom:6px;font-size:14px">${escapeHtml(p.name)}</h4><div class="row" style="flex-wrap:wrap;gap:5px">${pt.map(t => {const w = (S.games||[]).filter(g => g.wid===t.id).length; const el = (S.games||[]).some(g => (g.t1===t.id||g.t2===t.id) && g.wid && g.wid!==t.id); return `<span class="tag ${el?'tag-elim':'tag-alive'}">${teamLogoHTML(t, 16)}${seedBadge(t.seed)} ${escapeHtml(teamDisplayName(t))}${w>0?`<span style="color:var(--green);font-weight:700">W${w}</span>`:''}${el?'<span style="color:var(--red)">\u2715</span>':''}</span>`}).join('')}</div></div>`}).join('')}</div>`;
 }
 
 /* ── Settings Page ── */
