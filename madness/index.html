@@ -1842,6 +1842,23 @@ button, a, .pick-btn, .preset-btn, .round-tab, .live-filter-btn, .icon-btn {
     padding-bottom: calc(14px + env(safe-area-inset-bottom));
   }
 }
+
+/* ── Draft Clock ── */
+.draft-timer {
+  font-size: 36px;
+  font-weight: 800;
+  text-align: center;
+  padding: 8px 0;
+  font-variant-numeric: tabular-nums;
+  transition: color 0.3s;
+}
+.timer-green { color: #22c55e; }
+.timer-yellow { color: #eab308; }
+.timer-red { color: #ef4444; animation: timer-pulse 0.5s ease-in-out infinite; }
+@keyframes timer-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
@@ -2395,6 +2412,10 @@ function loadState(){
   try {
     const s = localStorage.getItem("mm4");
     if(s) Object.assign(S, JSON.parse(s));
+    // Reconstruct Firestore Timestamp from serialized JSON
+    if(S.ds && S.ds.pickDeadline && typeof S.ds.pickDeadline === 'object' && S.ds.pickDeadline.seconds){
+      S.ds.pickDeadline = new firebase.firestore.Timestamp(S.ds.pickDeadline.seconds, S.ds.pickDeadline.nanoseconds || 0);
+    }
   } catch(e){}
 }
 
@@ -2452,6 +2473,10 @@ function connectToRoom(code){
       for(const k of VIEW_LOCAL) local[k] = S[k];
       const remote = JSON.parse(data.state);
       Object.assign(S, remote, local);
+      // Reconstruct Firestore Timestamp from serialized JSON
+      if(S.ds && S.ds.pickDeadline && typeof S.ds.pickDeadline === 'object' && S.ds.pickDeadline.seconds){
+        S.ds.pickDeadline = new firebase.firestore.Timestamp(S.ds.pickDeadline.seconds, S.ds.pickDeadline.nanoseconds || 0);
+      }
       localStorage.setItem("mm4", JSON.stringify(S));
       render();
       isRemoteUpdate = false;
@@ -2855,6 +2880,21 @@ function render(){
     ${bottomNavHTML(canD, canT)}`;
   const c = document.getElementById("c");
   ({setup:renderSetup, teams:renderTeams, draft:renderDraft, bracket:renderBracket, leaderboard:renderLeaderboard, live:renderLive, settings:renderSettings})[S.phase]?.(c);
+  // Start/stop draft clock based on current view
+  if(S.phase === 'draft' && S.ds.started && !S.ds.complete && S.ds.pickDeadline && !S.ds.timerPaused){
+    startDraftClock();
+  } else {
+    stopDraftClock();
+  }
+  // Show paused time in timer element
+  if(S.phase === 'draft' && S.ds.timerPaused && S.ds.pausedRemaining != null){
+    const el = document.getElementById('draft-timer');
+    if(el){
+      const secs = Math.ceil(S.ds.pausedRemaining / 1000);
+      el.textContent = secs + 's (paused)';
+      el.className = 'draft-timer ' + (secs > 30 ? 'timer-green' : secs > 10 ? 'timer-yellow' : 'timer-red');
+    }
+  }
   } catch(e) {
     console.error('Render error:', e);
     const app = document.getElementById("app");
@@ -2962,6 +3002,14 @@ async function resetAll(){
 /* ── Setup Page ── */
 function renderSetup(c){
   c.innerHTML = `<div class="section-title">Tournament Setup</div><p class="section-desc">Add players in draft order.</p>
+  <div class="card" style="margin-bottom:14px"><span class="label">Draft Clock</span>
+    <p style="font-size:13px;color:var(--g500);margin-bottom:10px">Time limit per pick. Auto-picks highest seed when time expires.</p>
+    <div class="row" style="flex-wrap:wrap;gap:6px">
+      ${[{v:0,l:'No Limit'},{v:60,l:'60s'},{v:90,l:'90s'},{v:120,l:'120s'}].map(o =>
+        `<button class="preset-btn ${(S.draftClockDuration||0)===o.v?'active':''}" onclick="setDraftClock(${o.v})">${o.l}</button>`
+      ).join('')}
+    </div>
+  </div>
   <div class="card" style="margin-bottom:14px"><span class="label">Year</span><input type="number" value="${S.year}" style="width:100px" onchange="changeYear(this.value)"></div>
   <div class="card"><span class="label">Players (${S.players.length})</span>
   <div class="row" style="margin-bottom:12px"><input id="pn" placeholder="Player name..." style="flex:1" onkeydown="if(event.key==='Enter')addPlayer()"><button class="btn btn-primary" onclick="addPlayer()">Add</button></div>
@@ -3276,16 +3324,22 @@ function renderDraft(c){
   const all = S.players.flatMap(p => p.teamIds);
   const av = S.teams.filter(t => !all.includes(t.id)).filter(t => S.fr === "All" || t.region === S.fr).filter(t => S.fs === "All" || t.seed === Number(S.fs)).sort((a,b) => a.seed - b.seed || a.name.localeCompare(b.name));
   const cid = ds.order[ds.cp], cp = S.players.find(p => p.id === cid);
+  const myId = getMyPlayerId();
+  const isMyTurn = adminUnlocked || myId === ds.order[ds.cp];
   c.innerHTML = `<div class="row" style="justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
     <div class="section-title">${ds.complete ? 'Draft Complete' : 'Snake Draft'}</div>
-    <div class="row" style="gap:6px"><button class="btn btn-secondary btn-sm" onclick="undoDraft()" ${ds.cp === 0 ? 'disabled' : ''}>Undo</button><button class="btn btn-danger btn-sm" onclick="resetDraft()">Reset</button></div></div>
-  ${!ds.complete ? `<div class="card active-pick" style="margin-bottom:14px"><div style="font-size:12px;font-weight:700;color:var(--g500);text-transform:uppercase;letter-spacing:.8px">Pick ${ds.cp+1} of ${ds.order.length} \u2014 Round ${Math.floor(ds.cp/S.players.length)+1}</div><div style="font-size:20px;font-weight:800;color:var(--gold)">${escapeHtml(cp?.name || '')}'s Pick</div><div class="progress-bar"><div class="progress-fill" style="width:${(ds.cp/ds.order.length)*100}%"></div></div></div>` : ''}
+    <div class="row" style="gap:6px">${adminUnlocked && ds.timerDuration > 0 && !ds.complete ? `
+      ${ds.timerPaused
+        ? '<button class="btn btn-primary btn-sm" onclick="resumeDraftClock()">Resume Clock</button>'
+        : '<button class="btn btn-secondary btn-sm" onclick="pauseDraftClock()">Pause Clock</button>'}
+    ` : ''}<button class="btn btn-secondary btn-sm" onclick="undoDraft()" ${ds.cp === 0 ? 'disabled' : ''}>Undo</button><button class="btn btn-danger btn-sm" onclick="resetDraft()">Reset</button></div></div>
+  ${!ds.complete ? `<div class="card active-pick" style="margin-bottom:14px"><div style="font-size:12px;font-weight:700;color:var(--g500);text-transform:uppercase;letter-spacing:.8px">Pick ${ds.cp+1} of ${ds.order.length} \u2014 Round ${Math.floor(ds.cp/S.players.length)+1}</div><div style="font-size:20px;font-weight:800;color:var(--gold)">${escapeHtml(cp?.name || '')}'s Pick</div><div id="draft-timer" class="draft-timer" style="display:${ds.pickDeadline || ds.timerPaused ? 'block' : 'none'}"></div><div class="progress-bar"><div class="progress-fill" style="width:${(ds.cp/ds.order.length)*100}%"></div></div></div>` : ''}
   <div class="draft-grid"><div>
     <div class="row" style="margin-bottom:10px;gap:8px;flex-wrap:wrap">
       <select onchange="S.fr=this.value;render()" style="width:130px"><option value="All" ${S.fr==='All'?'selected':''}>All Regions</option>${REGIONS.map(r => `<option value="${r}" ${S.fr===r?'selected':''}>${r}</option>`).join('')}</select>
       <select onchange="S.fs=this.value;render()" style="width:110px"><option value="All" ${S.fs==='All'?'selected':''}>All Seeds</option>${SEEDS.map(s => `<option value="${s}" ${String(S.fs)===String(s)?'selected':''}>Seed ${s}</option>`).join('')}</select>
       <span style="color:var(--g400);font-size:12px">${av.length} available</span></div>
-    <div class="draft-teams">${av.map(t => `<button class="pick-btn" onclick="pickTeam('${t.id}')" ${ds.complete?'disabled':''}>${teamLogoHTML(t, 20)}${seedBadge(t.seed)}<div><div style="font-weight:600">${escapeHtml(teamDisplayName(t))}</div><div style="font-size:11px;color:var(--g400)">${t.region}${teamRecordDisplay(t) ? ` · ${teamRecordDisplay(t)}` : ''}</div></div></button>`).join('')}</div></div>
+    <div class="draft-teams">${av.map(t => `<button class="pick-btn" onclick="pickTeam('${t.id}')" ${!isMyTurn || ds.complete ? 'disabled' : ''}>${teamLogoHTML(t, 20)}${seedBadge(t.seed)}<div><div style="font-weight:600">${escapeHtml(teamDisplayName(t))}</div><div style="font-size:11px;color:var(--g400)">${t.region}${teamRecordDisplay(t) ? ` · ${teamRecordDisplay(t)}` : ''}</div></div></button>`).join('')}</div></div>
   <div><span class="label">Rosters</span>
     ${S.players.map(p => {const pt = S.teams.filter(t => p.teamIds.includes(t.id)).sort((a,b) => a.seed - b.seed); const act = p.id === cid && !ds.complete; return `<div class="roster-card ${act?'active':''}"><div class="row" style="justify-content:space-between;margin-bottom:4px"><span style="font-weight:700;font-size:13px;color:${act?'var(--gold)':'var(--black)'}">${escapeHtml(p.name)}</span><span style="color:var(--g400);font-size:11px">${pt.length}</span></div>${pt.map(t => `<div style="display:flex;align-items:center;gap:5px;font-size:12px;padding:1px 0">${teamLogoHTML(t, 20)}${seedBadge(t.seed)} ${escapeHtml(teamDisplayName(t))}</div>`).join('')}</div>`}).join('')}
   </div></div>`;
@@ -3293,19 +3347,41 @@ function renderDraft(c){
 
 async function startDraft(){
   if(!await requireAdmin()) return;
-  S.ds = {order: snakeOrder(S.players.map(p => p.id), S.teams.length), cp:0, started:true, complete:false};
+  const duration = S.draftClockDuration || 0;
+  S.ds = {
+    order: snakeOrder(S.players.map(p => p.id), S.teams.length),
+    cp: 0, started: true, complete: false,
+    timerDuration: duration,
+    pickDeadline: duration > 0 ? firebase.firestore.Timestamp.fromDate(new Date(Date.now() + duration * 1000)) : null,
+    timerPaused: false,
+    pausedRemaining: null
+  };
   S.players.forEach(p => p.teamIds = []);
+  if(duration > 0) startDraftClock();
   render();
 }
 
 async function pickTeam(tid){
-  if(!await requireAdmin()) return;
+  const myId = getMyPlayerId();
   const ds = S.ds;
   if(ds.complete) return;
+  // Turn enforcement: only the current drafter can pick (admin override preserved)
+  if(!adminUnlocked && myId !== ds.order[ds.cp]){
+    showToast("It's not your turn!");
+    return;
+  }
   const p = S.players.find(p => p.id === ds.order[ds.cp]);
   if(p) p.teamIds.push(tid);
   ds.cp++;
-  if(ds.cp >= ds.order.length) ds.complete = true;
+  if(ds.cp >= ds.order.length){
+    ds.complete = true;
+    ds.pickDeadline = null;
+    stopDraftClock();
+  } else if(ds.timerDuration && ds.timerDuration > 0){
+    ds.pickDeadline = firebase.firestore.Timestamp.fromDate(new Date(Date.now() + ds.timerDuration * 1000));
+    ds.timerPaused = false;
+    ds.pausedRemaining = null;
+  }
   render();
 }
 
@@ -3317,14 +3393,116 @@ async function undoDraft(){
   ds.complete = false;
   const p = S.players.find(p => p.id === ds.order[ds.cp]);
   if(p) p.teamIds.pop();
+  // Reset timer for the restored pick
+  if(ds.timerDuration && ds.timerDuration > 0){
+    ds.pickDeadline = firebase.firestore.Timestamp.fromDate(new Date(Date.now() + ds.timerDuration * 1000));
+    ds.timerPaused = false;
+    ds.pausedRemaining = null;
+  }
   render();
 }
 
 async function resetDraft(){
   if(!await requireAdmin()) return;
   if(!await appConfirm("Reset the entire draft? All picks will be lost.", { title: 'Reset Draft', danger: true, confirmLabel: 'Reset' })) return;
+  stopDraftClock();
   S.ds = {order:[], cp:0, started:false, complete:false};
   S.players.forEach(p => p.teamIds = []);
+  render();
+}
+
+/* -- Draft Clock -- */
+let _draftClockInterval = null;
+
+function startDraftClock(){
+  stopDraftClock();
+  _draftClockInterval = setInterval(updateDraftClock, 250);
+}
+
+function stopDraftClock(){
+  if(_draftClockInterval){ clearInterval(_draftClockInterval); _draftClockInterval = null; }
+}
+
+function updateDraftClock(){
+  const ds = S.ds;
+  if(!ds.pickDeadline || ds.timerPaused || ds.complete){ return; }
+  const deadline = ds.pickDeadline.toMillis ? ds.pickDeadline.toMillis() : ds.pickDeadline;
+  const remaining = Math.max(0, deadline - Date.now());
+  const seconds = Math.ceil(remaining / 1000);
+
+  const el = document.getElementById('draft-timer');
+  if(el){
+    el.textContent = seconds + 's';
+    el.className = 'draft-timer ' + (seconds > 30 ? 'timer-green' : seconds > 10 ? 'timer-yellow' : 'timer-red');
+  }
+
+  // Auto-pick on expiry (only active drafter's client, or admin)
+  if(remaining === 0){
+    stopDraftClock();
+    const myId = getMyPlayerId();
+    if(myId === ds.order[ds.cp] || adminUnlocked){
+      autoPickHighestSeed();
+    } else {
+      // Fallback: non-active clients wait 3 seconds, then attempt auto-pick
+      setTimeout(() => {
+        if(S.ds.cp === ds.cp && !S.ds.complete){
+          autoPickHighestSeed();
+        }
+      }, 3000);
+    }
+  }
+}
+
+function autoPickHighestSeed(){
+  const ds = S.ds;
+  if(ds.complete) return;
+  const all = S.players.flatMap(p => p.teamIds);
+  const available = S.teams.filter(t => !all.includes(t.id)).sort((a,b) => a.seed - b.seed);
+  if(available.length === 0) return;
+  const tid = available[0].id;
+  const p = S.players.find(p => p.id === ds.order[ds.cp]);
+  if(p) p.teamIds.push(tid);
+  ds.cp++;
+  if(ds.cp >= ds.order.length){
+    ds.complete = true;
+    ds.pickDeadline = null;
+  } else if(ds.timerDuration && ds.timerDuration > 0){
+    ds.pickDeadline = firebase.firestore.Timestamp.fromDate(new Date(Date.now() + ds.timerDuration * 1000));
+    ds.timerPaused = false;
+  }
+  showToast('Auto-picked: ' + (S.teams.find(t => t.id === tid)?.name || 'Unknown'));
+  render();
+}
+
+function pauseDraftClock(){
+  const ds = S.ds;
+  if(!ds.pickDeadline) return;
+  const deadline = ds.pickDeadline.toMillis ? ds.pickDeadline.toMillis() : ds.pickDeadline;
+  const remaining = Math.max(0, deadline - Date.now());
+  ds.timerPaused = true;
+  ds.pausedRemaining = remaining;
+  ds.pickDeadline = null;
+  stopDraftClock();
+  saveState();
+  render();
+}
+
+function resumeDraftClock(){
+  const ds = S.ds;
+  if(!ds.timerPaused) return;
+  const deadline = new Date(Date.now() + (ds.pausedRemaining || ds.timerDuration * 1000));
+  ds.pickDeadline = firebase.firestore.Timestamp.fromDate(deadline);
+  ds.timerPaused = false;
+  ds.pausedRemaining = null;
+  startDraftClock();
+  saveState();
+  render();
+}
+
+async function setDraftClock(seconds){
+  if(!await requireAdmin()) return;
+  S.draftClockDuration = seconds;
+  saveState();
   render();
 }
 
