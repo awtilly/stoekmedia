@@ -22,6 +22,14 @@ service cloud.firestore {
       match /fcmTokens/{playerId} {
         allow read, write: if true;
       }
+
+      // Game results subcollection — write-once (create only, no update/delete)
+      match /gameResults/{gameId} {
+        allow read: if true;
+        allow create: if true;
+        allow update: if false;
+        allow delete: if false;
+      }
     }
   }
 }

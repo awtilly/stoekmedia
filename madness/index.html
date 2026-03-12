@@ -2116,10 +2116,65 @@ async function refreshLiveScores() {
   if (data) {
     liveScores = espn.parseScoreboardEvents(data);
     liveLastRefresh = Date.now();
+    checkGameFinals();
     // Only re-render if we're on the live tab
     if (S.phase === 'live') {
       const c = document.getElementById('c');
       if (c) renderLive(c);
+    }
+  }
+}
+
+/* ── Game Final Detection ── */
+const _reportedFinals = new Set();
+
+async function checkGameFinals() {
+  if (!roomId || !S.teams || S.teams.length === 0) return;
+
+  // Build a set of ESPN IDs for teams in this room
+  const roomEspnIds = new Set(S.teams.map(t => t.espnId).filter(Boolean));
+
+  for (const game of liveScores) {
+    if (game.state !== 'post' || !game.completed) continue;
+    if (_reportedFinals.has(game.id)) continue;
+
+    // Check if either team in this game belongs to this room
+    const awayInRoom = roomEspnIds.has(game.away.espnId);
+    const homeInRoom = roomEspnIds.has(game.home.espnId);
+    if (!awayInRoom && !homeInRoom) continue;
+
+    _reportedFinals.add(game.id);
+
+    // Determine winner/loser
+    const winner = game.away.winner ? game.away : game.home;
+    const loser = game.away.winner ? game.home : game.away;
+    const isUpset = winner.seed && loser.seed && winner.seed > loser.seed;
+
+    // Compute current leaderboard rankings BEFORE this result
+    const rankingsBefore = scores().map(s => s.pid);
+
+    // Write to gameResults subcollection -- Cloud Function will trigger
+    try {
+      await db.collection('rooms').doc(roomId)
+        .collection('gameResults').doc(game.id)
+        .set({
+          awayName: game.away.name,
+          awayScore: game.away.score,
+          awaySeed: game.away.seed || null,
+          homeName: game.home.name,
+          homeScore: game.home.score,
+          homeSeed: game.home.seed || null,
+          winnerName: winner.name,
+          winnerSeed: winner.seed || null,
+          loserName: loser.name,
+          loserSeed: loser.seed || null,
+          isUpset,
+          rankingsBefore,
+          reportedAt: firebase.firestore.FieldValue.serverTimestamp(),
+          reportedBy: getMyPlayerId() || 'unknown'
+        });
+    } catch (err) {
+      console.warn('Failed to report game final:', game.id, err);
     }
   }
 }
