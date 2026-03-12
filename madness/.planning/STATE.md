@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: in-progress
-stopped_at: Completed 02-01-PLAN.md
-last_updated: "2026-03-12T02:00:00.000Z"
-last_activity: 2026-03-12 -- Completed 02-01 (Player Identity)
+status: executing
+stopped_at: Completed 02-02-PLAN.md
+last_updated: "2026-03-12T02:01:50.012Z"
+last_activity: 2026-03-12 -- Completed 02-02 (Draft Clock)
 progress:
   total_phases: 3
   completed_phases: 1
-  total_plans: 3
-  completed_plans: 1
-  percent: 33
+  total_plans: 5
+  completed_plans: 4
+  percent: 80
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-03-11)
 ## Current Position
 
 Phase: 2 of 3 (Player Identity & Draft Clock)
-Plan: 1 of 3 in current phase -- COMPLETE
+Plan: 2 of 3 in current phase -- COMPLETE
 Status: In Progress
-Last activity: 2026-03-12 -- Completed 02-01 (Player Identity)
+Last activity: 2026-03-12 -- Completed 02-02 (Draft Clock)
 
-Progress: [███-------] 33%
+Progress: [████████--] 80%
 
 ## Performance Metrics
 
@@ -53,6 +53,7 @@ Progress: [███-------] 33%
 | Phase 01 P01 | 2min | 2 tasks | 3 files |
 | Phase 01 P02 | 2min | 2 tasks | 1 files |
 | Phase 02 P01 | 5min | 2 tasks | 1 files |
+| Phase 02 P02 | 5min | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -73,6 +74,9 @@ Recent decisions affecting current work:
 - [Phase 02]: Legacy passphrase players migrated to PIN on next reclaim (one-time prompt)
 - [Phase 02]: Name collision check prevents duplicate player names in selfRegister() and addPlayer()
 - [Phase 02]: Removed S.phase = 'leaderboard' from claimPlayer -- render() handles tab routing naturally
+- [Phase 02]: Absolute Firestore Timestamps for draft clock (pickDeadline) to survive background tab throttling
+- [Phase 02]: Active drafter is primary auto-picker on expiry; 3-second fallback for other clients avoids race conditions
+- [Phase 02]: Admin override preserved in pickTeam() -- adminUnlocked bypasses turn check
 
 ### Pending Todos
 
@@ -87,6 +91,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-12T02:00:00Z
-Stopped at: Completed 02-01-PLAN.md
+Last session: 2026-03-12T02:01:50Z
+Stopped at: Completed 02-02-PLAN.md
 Resume file: None

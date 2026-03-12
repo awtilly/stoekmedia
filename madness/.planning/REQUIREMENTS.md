@@ -19,16 +19,16 @@ Requirements for the 2026 tournament release. Each maps to roadmap phases.
 - [x] **AUTH-02**: New players enter display name + 4-digit PIN on first join via the link
 - [x] **AUTH-03**: Identity persists via localStorage — no re-entry needed after first login
 - [x] **AUTH-04**: PIN only needed to reclaim identity on new device or cleared browser
-- [ ] **AUTH-05**: Only the current drafter can make a pick, enforced by Firestore security rules
-- [ ] **AUTH-06**: UI disables pick controls for non-active drafters
+- [x] **AUTH-05**: Only the current drafter can make a pick, enforced by Firestore security rules
+- [x] **AUTH-06**: UI disables pick controls for non-active drafters
 
 ### Draft Clock
 
-- [ ] **DRFT-01**: Configurable timer duration per room (60s, 90s, 120s, no limit)
-- [ ] **DRFT-02**: Visual countdown with color thresholds (green > yellow > red)
-- [ ] **DRFT-03**: Timer syncs across all players via Firestore server timestamps (pickDeadline)
-- [ ] **DRFT-04**: Auto-pick highest available seed when timer expires
-- [ ] **DRFT-05**: Commissioner can pause and resume the clock
+- [x] **DRFT-01**: Configurable timer duration per room (60s, 90s, 120s, no limit)
+- [x] **DRFT-02**: Visual countdown with color thresholds (green > yellow > red)
+- [x] **DRFT-03**: Timer syncs across all players via Firestore server timestamps (pickDeadline)
+- [x] **DRFT-04**: Auto-pick highest available seed when timer expires
+- [x] **DRFT-05**: Commissioner can pause and resume the clock
 - [ ] **DRFT-06**: Audio alert at 10 seconds remaining
 - [ ] **DRFT-07**: Haptic alert on timer events (conditional — drop entirely if iOS unsupported)
 
@@ -104,13 +104,13 @@ Which phases cover which requirements. Updated during roadmap creation.
 | AUTH-02 | Phase 2 | Complete |
 | AUTH-03 | Phase 2 | Complete |
 | AUTH-04 | Phase 2 | Complete |
-| AUTH-05 | Phase 2 | Pending |
-| AUTH-06 | Phase 2 | Pending |
-| DRFT-01 | Phase 2 | Pending |
-| DRFT-02 | Phase 2 | Pending |
-| DRFT-03 | Phase 2 | Pending |
-| DRFT-04 | Phase 2 | Pending |
-| DRFT-05 | Phase 2 | Pending |
+| AUTH-05 | Phase 2 | Complete |
+| AUTH-06 | Phase 2 | Complete |
+| DRFT-01 | Phase 2 | Complete |
+| DRFT-02 | Phase 2 | Complete |
+| DRFT-03 | Phase 2 | Complete |
+| DRFT-04 | Phase 2 | Complete |
+| DRFT-05 | Phase 2 | Complete |
 | DRFT-06 | Phase 2 | Pending |
 | DRFT-07 | Phase 2 | Pending |
 | SHAR-01 | Phase 1 | Complete |
