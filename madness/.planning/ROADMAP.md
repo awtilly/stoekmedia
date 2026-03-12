@@ -28,11 +28,11 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. User can tap a share button and send a room invite via the OS share sheet (or clipboard on unsupported browsers)
   4. User can share leaderboard standings as formatted text via the OS share sheet
   5. The phone screen stays on while the Live Scores tab is active, even if the user does not touch the screen
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 01-01: TBD
-- [ ] 01-02: TBD
+- [ ] 01-01-PLAN.md -- Service worker rewrite (network-first), manifest branding, app shortcuts, tab param handler
+- [ ] 01-02-PLAN.md -- Native share (room links + leaderboard), screen wake lock with visibility re-acquisition
 
 ### Phase 2: Player Identity & Draft Clock
 **Goal**: Players join rooms via shareable links, maintain persistent identity, and draft under time pressure with a synced countdown clock
@@ -74,6 +74,6 @@ Phases execute in numeric order: 1 -> 2 -> 3
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation & Client-Side Enhancements | 0/? | Not started | - |
+| 1. Foundation & Client-Side Enhancements | 0/2 | Not started | - |
 | 2. Player Identity & Draft Clock | 0/? | Not started | - |
 | 3. Badge & Push Notifications | 0/? | Not started | - |
