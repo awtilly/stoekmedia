@@ -60,12 +60,12 @@ Plans:
   2. A user who has closed the app receives a push notification when it becomes their turn to draft
   3. A user receives push notifications for game final scores and leaderboard changes
   4. The app asks for notification permission at a contextually appropriate moment (after joining a draft, not on first visit), with guided onboarding for iOS users who must install the PWA first
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 03-01: TBD
-- [ ] 03-02: TBD
-- [ ] 03-03: TBD
+- [ ] 03-01-PLAN.md -- Badge API + FCM client setup + permission UX + token management
+- [ ] 03-02-PLAN.md -- Cloud Functions infrastructure + draft turn push notification
+- [ ] 03-03-PLAN.md -- Game final + leaderboard change push notifications
 
 ## Progress
 
@@ -76,4 +76,4 @@ Phases execute in numeric order: 1 -> 2 -> 3
 |-------|----------------|--------|-----------|
 | 1. Foundation & Client-Side Enhancements | 2/2 | Complete | 2026-03-12 |
 | 2. Player Identity & Draft Clock | 3/3 | Complete   | 2026-03-12 |
-| 3. Badge & Push Notifications | 0/? | Not started | - |
+| 3. Badge & Push Notifications | 0/3 | Not started | - |
