@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: completed
-stopped_at: Completed 01-02-PLAN.md
-last_updated: "2026-03-12T01:16:14.925Z"
-last_activity: 2026-03-12 -- Completed 01-02 (Sharing & Wake Lock)
+status: in-progress
+stopped_at: Completed 02-01-PLAN.md
+last_updated: "2026-03-12T02:00:00.000Z"
+last_activity: 2026-03-12 -- Completed 02-01 (Player Identity)
 progress:
   total_phases: 3
   completed_phases: 1
-  total_plans: 2
-  completed_plans: 2
-  percent: 100
+  total_plans: 3
+  completed_plans: 1
+  percent: 33
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-11)
 
 **Core value:** The draft and live scoring experience must feel like a native app -- instant, tactile, and always connected
-**Current focus:** Phase 1: Foundation & Client-Side Enhancements
+**Current focus:** Phase 2: Player Identity & Draft Clock
 
 ## Current Position
 
-Phase: 1 of 3 (Foundation & Client-Side Enhancements) -- COMPLETE
-Plan: 2 of 2 in current phase
-Status: Phase Complete
-Last activity: 2026-03-12 -- Completed 01-02 (Sharing & Wake Lock)
+Phase: 2 of 3 (Player Identity & Draft Clock)
+Plan: 1 of 3 in current phase -- COMPLETE
+Status: In Progress
+Last activity: 2026-03-12 -- Completed 02-01 (Player Identity)
 
-Progress: [██████████] 100%
+Progress: [███-------] 33%
 
 ## Performance Metrics
 
@@ -52,6 +52,7 @@ Progress: [██████████] 100%
 *Updated after each plan completion*
 | Phase 01 P01 | 2min | 2 tasks | 3 files |
 | Phase 01 P02 | 2min | 2 tasks | 1 files |
+| Phase 02 P01 | 5min | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -68,6 +69,10 @@ Recent decisions affecting current work:
 - [Phase 01]: Live scores shortcut works without room context (tab is room-independent)
 - [Phase 01]: Kept copyRoomLink() for backward compat, added shareRoomLink() with Web Share API
 - [Phase 01]: Wake lock lifecycle tied to startLiveRefresh/stopLiveRefresh for all code paths
+- [Phase 02]: Mandatory 4-digit PIN replaces optional passphrase for all players
+- [Phase 02]: Legacy passphrase players migrated to PIN on next reclaim (one-time prompt)
+- [Phase 02]: Name collision check prevents duplicate player names in selfRegister() and addPlayer()
+- [Phase 02]: Removed S.phase = 'leaderboard' from claimPlayer -- render() handles tab routing naturally
 
 ### Pending Todos
 
@@ -82,6 +87,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-12T01:11:44.297Z
-Stopped at: Completed 01-02-PLAN.md
+Last session: 2026-03-12T02:00:00Z
+Stopped at: Completed 02-01-PLAN.md
 Resume file: None

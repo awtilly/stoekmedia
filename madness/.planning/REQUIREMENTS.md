@@ -15,10 +15,10 @@ Requirements for the 2026 tournament release. Each maps to roadmap phases.
 
 ### Player Identity & Draft Security
 
-- [ ] **AUTH-01**: Creator can share a join link that opens directly to the room
-- [ ] **AUTH-02**: New players enter display name + 4-digit PIN on first join via the link
-- [ ] **AUTH-03**: Identity persists via localStorage — no re-entry needed after first login
-- [ ] **AUTH-04**: PIN only needed to reclaim identity on new device or cleared browser
+- [x] **AUTH-01**: Creator can share a join link that opens directly to the room
+- [x] **AUTH-02**: New players enter display name + 4-digit PIN on first join via the link
+- [x] **AUTH-03**: Identity persists via localStorage — no re-entry needed after first login
+- [x] **AUTH-04**: PIN only needed to reclaim identity on new device or cleared browser
 - [ ] **AUTH-05**: Only the current drafter can make a pick, enforced by Firestore security rules
 - [ ] **AUTH-06**: UI disables pick controls for non-active drafters
 
@@ -100,10 +100,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | FNDN-01 | Phase 1 | Complete |
 | FNDN-02 | Phase 1 | Complete |
 | FNDN-03 | Phase 1 | Complete |
-| AUTH-01 | Phase 2 | Pending |
-| AUTH-02 | Phase 2 | Pending |
-| AUTH-03 | Phase 2 | Pending |
-| AUTH-04 | Phase 2 | Pending |
+| AUTH-01 | Phase 2 | Complete |
+| AUTH-02 | Phase 2 | Complete |
+| AUTH-03 | Phase 2 | Complete |
+| AUTH-04 | Phase 2 | Complete |
 | AUTH-05 | Phase 2 | Pending |
 | AUTH-06 | Phase 2 | Pending |
 | DRFT-01 | Phase 2 | Pending |
