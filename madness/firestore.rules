@@ -17,6 +17,11 @@ service cloud.firestore {
 
       // Delete: disallowed — use update to reset instead
       allow delete: if false;
+
+      // FCM token subcollection — non-sensitive (opaque tokens, friend-group scale)
+      match /fcmTokens/{playerId} {
+        allow read, write: if true;
+      }
     }
   }
 }
