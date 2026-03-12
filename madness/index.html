@@ -2041,6 +2041,7 @@ function startLiveRefresh() {
   autoResolvePlayIns();
   refreshLiveScores();
   liveRefreshTimer = setInterval(refreshLiveScores, 30000); // every 30s
+  requestWakeLock();
 }
 
 function stopLiveRefresh() {
@@ -2048,7 +2049,33 @@ function stopLiveRefresh() {
     clearInterval(liveRefreshTimer);
     liveRefreshTimer = null;
   }
+  releaseWakeLock();
 }
+
+let wakeLock = null;
+
+async function requestWakeLock() {
+  if (!('wakeLock' in navigator)) return;
+  try {
+    wakeLock = await navigator.wakeLock.request('screen');
+    wakeLock.addEventListener('release', () => { wakeLock = null; });
+  } catch (err) {
+    console.warn('Wake Lock failed:', err.message);
+  }
+}
+
+function releaseWakeLock() {
+  if (wakeLock) {
+    wakeLock.release();
+    wakeLock = null;
+  }
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && S.phase === 'live') {
+    requestWakeLock();
+  }
+});
 
 let S = {
   phase: "setup",
@@ -2793,10 +2820,10 @@ function render(){
 }
 
 function navigate(p){
-  if (S.phase === 'live' && p !== 'live') stopLiveRefresh();
+  if (S.phase === 'live' && p !== 'live') { stopLiveRefresh(); releaseWakeLock(); }
   S.phase = p;
   saveState();
-  if (p === 'live') startLiveRefresh();
+  if (p === 'live') { startLiveRefresh(); requestWakeLock(); }
   else render();
   // Page transition + scroll to top
   requestAnimationFrame(() => {
