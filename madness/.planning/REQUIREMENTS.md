@@ -9,9 +9,9 @@ Requirements for the 2026 tournament release. Each maps to roadmap phases.
 
 ### Foundation
 
-- [ ] **FNDN-01**: Service worker uses network-first strategy for index.html so updates reach installed PWAs
-- [ ] **FNDN-02**: Manifest updated with enhanced splash screen branding (background_color, theme_color, larger icons, display_override)
-- [ ] **FNDN-03**: App shortcuts in manifest for Live Scores, Bracket, and Leaderboard tabs
+- [x] **FNDN-01**: Service worker uses network-first strategy for index.html so updates reach installed PWAs
+- [x] **FNDN-02**: Manifest updated with enhanced splash screen branding (background_color, theme_color, larger icons, display_override)
+- [x] **FNDN-03**: App shortcuts in manifest for Live Scores, Bracket, and Leaderboard tabs
 
 ### Player Identity & Draft Security
 
@@ -97,9 +97,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FNDN-01 | Phase 1 | Pending |
-| FNDN-02 | Phase 1 | Pending |
-| FNDN-03 | Phase 1 | Pending |
+| FNDN-01 | Phase 1 | Complete |
+| FNDN-02 | Phase 1 | Complete |
+| FNDN-03 | Phase 1 | Complete |
 | AUTH-01 | Phase 2 | Pending |
 | AUTH-02 | Phase 2 | Pending |
 | AUTH-03 | Phase 2 | Pending |
