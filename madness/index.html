@@ -2288,17 +2288,50 @@ function setMyPlayerId(id){ if(roomId) localStorage.setItem('mm4_me_' + roomId, 
 async function claimPlayer(id){
   const player = S.players.find(p => p.id === id);
   if(!player) return;
-  if(player.passphraseHash){
-    const pass = await appPrompt("Enter your passphrase to join as " + player.name + ":", { title: 'Passphrase' });
+  // If player has a PIN hash, require PIN entry
+  if(player.pinHash){
+    const pin = await appPrompt('Enter your 4-digit PIN:', { title: 'Verify Identity' });
+    if(!pin) return;
+    const hash = await hashPin(pin.trim());
+    if(hash !== player.pinHash){
+      await appAlert('Incorrect PIN.');
+      return;
+    }
+  } else if(player.passphraseHash){
+    // Legacy passphrase support: prompt, verify, then migrate to PIN
+    const pass = await appPrompt('Enter your passphrase:', { title: 'Verify Identity' });
     if(!pass) return;
     const hash = await hashPin(pass.trim());
     if(hash !== player.passphraseHash){
-      await appAlert("Incorrect passphrase.");
+      await appAlert('Incorrect passphrase.');
       return;
+    }
+    // Migrate: prompt for new PIN
+    const newPin = await appPrompt('Set a 4-digit PIN to replace your passphrase:', { title: 'Upgrade to PIN', placeholder: '4-digit PIN' });
+    if(newPin && /^\d{4}$/.test(newPin.trim())){
+      player.pinHash = await hashPin(newPin.trim());
+      delete player.passphraseHash;
+      saveState();
     }
   }
   setMyPlayerId(id);
-  S.phase = 'leaderboard';
+  render();
+}
+
+async function selfRegister(){
+  const name = document.getElementById('join-name').value.trim();
+  const pin = document.getElementById('join-pin').value.trim();
+  if(!name){ showToast('Enter your name'); return; }
+  if(!/^\d{4}$/.test(pin)){ showToast('PIN must be 4 digits'); return; }
+  if(S.players.some(p => p.name.toLowerCase() === name.toLowerCase())){
+    showToast('That name is taken. Tap your name below to rejoin.');
+    return;
+  }
+  const pinHash = await hashPin(pin);
+  const player = { id: generateId(), name, pinHash, teamIds: [] };
+  S.players.push(player);
+  setMyPlayerId(player.id);
+  saveState();
   render();
 }
 
@@ -2309,14 +2342,24 @@ function renderJoinScreen(){
       <h1><span>March Madness</span> Draft</h1>
       <p class="lobby-sub">Welcome to room <strong>${roomId}</strong></p>
       <div class="lobby-card">
-        <h3>Who are you?</h3>
-        ${players.length > 0 ? `
-          <p>Select your name to continue.${players.some(p => p.passphraseHash) ? ' You will need your passphrase.' : ''}</p>
-          <div style="display:flex;flex-direction:column;gap:6px">
-            ${players.map(p => `<button class="btn btn-primary" style="width:100%;justify-content:center" onclick="claimPlayer('${p.id}')">${escapeHtml(p.name)}</button>`).join('')}
-          </div>
-        ` : `<p>The commissioner hasn't added players yet. Check back soon!</p>`}
+        <h3>Join as New Player</h3>
+        <p>Enter your name and a 4-digit PIN to join the draft.</p>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <input id="join-name" type="text" placeholder="Your name" style="width:100%" autocomplete="off">
+          <input id="join-pin" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" placeholder="4-digit PIN" style="width:100%" autocomplete="off">
+          <button class="btn btn-primary" style="width:100%;justify-content:center" onclick="selfRegister()">Join</button>
+        </div>
       </div>
+      ${players.length > 0 ? `
+        <div class="lobby-or">or</div>
+        <div class="lobby-card">
+          <h3>Returning Player?</h3>
+          <p>Tap your name and enter your PIN to rejoin.</p>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            ${players.map(p => `<button class="btn btn-secondary" style="width:100%;justify-content:center" onclick="claimPlayer('${p.id}')">${escapeHtml(p.name)}</button>`).join('')}
+          </div>
+        </div>
+      ` : ''}
       <div style="margin-top:16px;display:flex;gap:8px;justify-content:center">
         <button class="btn btn-secondary btn-sm" onclick="goHome()">Switch Tournament</button>
       </div>
@@ -2932,12 +2975,14 @@ async function addPlayer(){
   const el = document.getElementById("pn");
   const n = el.value.trim();
   if(!n) return;
-  const pass = await appPrompt("Set a passphrase for " + n + ".\nThey'll need this to claim their player.\n\nLeave blank for no passphrase.", { title: 'Player Passphrase', placeholder: 'Passphrase (optional)' });
-  let passphraseHash = null;
-  if(pass && pass.trim()){
-    passphraseHash = await hashPin(pass.trim());
+  if(S.players.some(p => p.name.toLowerCase() === n.toLowerCase())){
+    showToast('That name is already taken');
+    return;
   }
-  S.players.push({id: generateId(), name: n, teamIds: [], passphraseHash});
+  const pin = await appPrompt('Set a 4-digit PIN for ' + n + ':', { title: 'Player PIN', placeholder: '4-digit PIN' });
+  if(!pin || !/^\d{4}$/.test(pin.trim())){ showToast('PIN must be 4 digits'); return; }
+  const pinHash = await hashPin(pin.trim());
+  S.players.push({id: generateId(), name: n, teamIds: [], pinHash});
   render();
   setTimeout(() => document.getElementById("pn")?.focus(), 0);
 }
