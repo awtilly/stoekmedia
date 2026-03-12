@@ -76,4 +76,4 @@ Phases execute in numeric order: 1 -> 2 -> 3
 |-------|----------------|--------|-----------|
 | 1. Foundation & Client-Side Enhancements | 2/2 | Complete | 2026-03-12 |
 | 2. Player Identity & Draft Clock | 3/3 | Complete   | 2026-03-12 |
-| 3. Badge & Push Notifications | 0/3 | Not started | - |
+| 3. Badge & Push Notifications | 1/3 | In Progress | - |

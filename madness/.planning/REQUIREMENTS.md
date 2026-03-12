@@ -45,17 +45,17 @@ Requirements for the 2026 tournament release. Each maps to roadmap phases.
 
 ### Badge
 
-- [ ] **BDGE-01**: App icon badge shows pending pick count when it's user's turn to draft
-- [ ] **BDGE-02**: Badge clears when user makes their pick or turn passes
+- [x] **BDGE-01**: App icon badge shows pending pick count when it's user's turn to draft
+- [x] **BDGE-02**: Badge clears when user makes their pick or turn passes
 
 ### Push Notifications
 
 - [ ] **PUSH-01**: "It's your turn to draft" push notification when user's pick is up
 - [ ] **PUSH-02**: "Game just went final" notification with score and upset alert
 - [ ] **PUSH-03**: "Leaderboard shake-up" notification when rankings change
-- [ ] **PUSH-04**: FCM token management — store per player per room in Firestore
+- [x] **PUSH-04**: FCM token management — store per player per room in Firestore
 - [ ] **PUSH-05**: Firebase Cloud Functions deployed for server-side push triggers
-- [ ] **PUSH-06**: Contextual permission prompt (e.g., after joining draft, not on first visit)
+- [x] **PUSH-06**: Contextual permission prompt (e.g., after joining draft, not on first visit)
 
 ## v2 Requirements
 
@@ -118,14 +118,14 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SHAR-03 | Phase 1 | Complete |
 | LIVE-01 | Phase 1 | Complete |
 | LIVE-02 | Phase 1 | Complete |
-| BDGE-01 | Phase 3 | Pending |
-| BDGE-02 | Phase 3 | Pending |
+| BDGE-01 | Phase 3 | Complete |
+| BDGE-02 | Phase 3 | Complete |
 | PUSH-01 | Phase 3 | Pending |
 | PUSH-02 | Phase 3 | Pending |
 | PUSH-03 | Phase 3 | Pending |
-| PUSH-04 | Phase 3 | Pending |
+| PUSH-04 | Phase 3 | Complete |
 | PUSH-05 | Phase 3 | Pending |
-| PUSH-06 | Phase 3 | Pending |
+| PUSH-06 | Phase 3 | Complete |
 
 **Coverage:**
 - v1 requirements: 29 total
