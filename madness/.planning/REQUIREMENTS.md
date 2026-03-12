@@ -29,8 +29,8 @@ Requirements for the 2026 tournament release. Each maps to roadmap phases.
 - [x] **DRFT-03**: Timer syncs across all players via Firestore server timestamps (pickDeadline)
 - [x] **DRFT-04**: Auto-pick highest available seed when timer expires
 - [x] **DRFT-05**: Commissioner can pause and resume the clock
-- [ ] **DRFT-06**: Audio alert at 10 seconds remaining
-- [ ] **DRFT-07**: Haptic alert on timer events (conditional — drop entirely if iOS unsupported)
+- [x] **DRFT-06**: Audio alert at 10 seconds remaining
+- [x] **DRFT-07**: Haptic alert on timer events (conditional — drop entirely if iOS unsupported)
 
 ### Sharing & Engagement
 
@@ -111,8 +111,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DRFT-03 | Phase 2 | Complete |
 | DRFT-04 | Phase 2 | Complete |
 | DRFT-05 | Phase 2 | Complete |
-| DRFT-06 | Phase 2 | Pending |
-| DRFT-07 | Phase 2 | Pending |
+| DRFT-06 | Phase 2 | Complete |
+| DRFT-07 | Phase 2 | Complete |
 | SHAR-01 | Phase 1 | Complete |
 | SHAR-02 | Phase 1 | Complete |
 | SHAR-03 | Phase 1 | Complete |
