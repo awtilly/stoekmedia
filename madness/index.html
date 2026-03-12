@@ -3432,6 +3432,7 @@ async function setPreset(k){
 /* ── Boot ── */
 const params = new URLSearchParams(window.location.search);
 const urlRoom = params.get("room");
+const tabParam = params.get("tab");
 
 if(urlRoom){
   roomId = urlRoom.toUpperCase();
@@ -3442,9 +3443,17 @@ if(urlRoom){
   syncGames();
   checkAdminSession();
   connectToRoom(roomId);
+  if (tabParam && ['live','bracket','leaderboard','draft','setup'].includes(tabParam)) {
+    S.phase = tabParam;
+  }
   render();
 } else {
-  renderLobby();
+  if (tabParam === 'live') {
+    S.phase = 'live';
+    startLiveRefresh();
+  } else {
+    renderLobby();
+  }
 }
 
 /* ── Service Worker & Install Banner ── */
