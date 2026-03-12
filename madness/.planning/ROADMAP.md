@@ -14,7 +14,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [ ] **Phase 1: Foundation & Client-Side Enhancements** - Cache fix, manifest polish, native share, wake lock, haptics
 - [x] **Phase 2: Player Identity & Draft Clock** - Join flow, PIN security, Firestore rules, timed draft with auto-pick (completed 2026-03-12)
-- [ ] **Phase 3: Badge & Push Notifications** - App icon badge, FCM setup, Cloud Functions, notification UX
+- [x] **Phase 3: Badge & Push Notifications** - App icon badge, FCM setup, Cloud Functions, notification UX (completed 2026-03-12)
 
 ## Phase Details
 
@@ -63,8 +63,8 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 03-01-PLAN.md -- Badge API + FCM client setup + permission UX + token management
-- [ ] 03-02-PLAN.md -- Cloud Functions infrastructure + draft turn push notification
+- [x] 03-01-PLAN.md -- Badge API + FCM client setup + permission UX + token management
+- [x] 03-02-PLAN.md -- Cloud Functions infrastructure + draft turn push notification
 - [x] 03-03-PLAN.md -- Game final + leaderboard change push notifications
 
 ## Progress
@@ -76,4 +76,4 @@ Phases execute in numeric order: 1 -> 2 -> 3
 |-------|----------------|--------|-----------|
 | 1. Foundation & Client-Side Enhancements | 2/2 | Complete | 2026-03-12 |
 | 2. Player Identity & Draft Clock | 3/3 | Complete   | 2026-03-12 |
-| 3. Badge & Push Notifications | 2/3 | In Progress | - |
+| 3. Badge & Push Notifications | 3/3 | Complete | 2026-03-12 |
