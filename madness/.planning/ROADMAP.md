@@ -44,12 +44,12 @@ Plans:
   3. A player on a new device can reclaim their identity by entering their name and PIN
   4. Only the player whose turn it is can make a draft pick -- all other players see disabled pick controls
   5. A visible countdown timer ticks down during each pick, changes color as time runs low, plays an audio alert at 10 seconds, and auto-picks the highest available seed on expiry
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 02-01: TBD
-- [ ] 02-02: TBD
-- [ ] 02-03: TBD
+- [ ] 02-01-PLAN.md -- Player self-registration, 4-digit PIN identity, localStorage persistence, reclaim flow
+- [ ] 02-02-PLAN.md -- Turn-based draft enforcement, countdown timer, auto-pick, pause/resume, timer config
+- [ ] 02-03-PLAN.md -- Audio alert (Web Audio API beep at 10s) and haptic feedback (Android vibrate + iOS checkbox trick)
 
 ### Phase 3: Badge & Push Notifications
 **Goal**: Users who step away from the app are pulled back in by icon badges and push notifications for draft turns, game results, and leaderboard changes
@@ -74,6 +74,6 @@ Phases execute in numeric order: 1 -> 2 -> 3
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation & Client-Side Enhancements | 0/2 | Not started | - |
-| 2. Player Identity & Draft Clock | 0/? | Not started | - |
+| 1. Foundation & Client-Side Enhancements | 2/2 | Complete | 2026-03-12 |
+| 2. Player Identity & Draft Clock | 0/3 | Not started | - |
 | 3. Badge & Push Notifications | 0/? | Not started | - |
