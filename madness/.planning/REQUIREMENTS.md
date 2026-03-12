@@ -34,14 +34,14 @@ Requirements for the 2026 tournament release. Each maps to roadmap phases.
 
 ### Sharing & Engagement
 
-- [ ] **SHAR-01**: Native share via Web Share API with clipboard fallback for room links
-- [ ] **SHAR-02**: Share room code/link via OS share sheet (Messages, WhatsApp, etc.)
-- [ ] **SHAR-03**: Share leaderboard standings as formatted text
+- [x] **SHAR-01**: Native share via Web Share API with clipboard fallback for room links
+- [x] **SHAR-02**: Share room code/link via OS share sheet (Messages, WhatsApp, etc.)
+- [x] **SHAR-03**: Share leaderboard standings as formatted text
 
 ### Live Experience
 
-- [ ] **LIVE-01**: Screen wake lock keeps display active on Live Scores tab
-- [ ] **LIVE-02**: Wake lock re-acquires automatically on tab visibility change
+- [x] **LIVE-01**: Screen wake lock keeps display active on Live Scores tab
+- [x] **LIVE-02**: Wake lock re-acquires automatically on tab visibility change
 
 ### Badge
 
@@ -113,11 +113,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DRFT-05 | Phase 2 | Pending |
 | DRFT-06 | Phase 2 | Pending |
 | DRFT-07 | Phase 2 | Pending |
-| SHAR-01 | Phase 1 | Pending |
-| SHAR-02 | Phase 1 | Pending |
-| SHAR-03 | Phase 1 | Pending |
-| LIVE-01 | Phase 1 | Pending |
-| LIVE-02 | Phase 1 | Pending |
+| SHAR-01 | Phase 1 | Complete |
+| SHAR-02 | Phase 1 | Complete |
+| SHAR-03 | Phase 1 | Complete |
+| LIVE-01 | Phase 1 | Complete |
+| LIVE-02 | Phase 1 | Complete |
 | BDGE-01 | Phase 3 | Pending |
 | BDGE-02 | Phase 3 | Pending |
 | PUSH-01 | Phase 3 | Pending |
