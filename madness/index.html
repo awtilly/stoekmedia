@@ -2144,6 +2144,12 @@ let isOnline = navigator.onLine;
 window.addEventListener('online', () => { isOnline = true; render(); showToast('Back online'); });
 window.addEventListener('offline', () => { isOnline = false; render(); showToast('You are offline'); });
 
+// Warm up AudioContext on first user interaction (required for autoplay policy)
+document.addEventListener('click', function _warmup(){
+  warmupAudio();
+  document.removeEventListener('click', _warmup);
+}, { once: true });
+
 /* ── Toast Notifications ── */
 function showToast(message, duration = 3000){
   let toast = document.getElementById('toast');
@@ -3347,6 +3353,7 @@ function renderDraft(c){
 
 async function startDraft(){
   if(!await requireAdmin()) return;
+  _beeped = false;
   const duration = S.draftClockDuration || 0;
   S.ds = {
     order: snakeOrder(S.players.map(p => p.id), S.teams.length),
@@ -3365,6 +3372,7 @@ async function pickTeam(tid){
   const myId = getMyPlayerId();
   const ds = S.ds;
   if(ds.complete) return;
+  _beeped = false;
   // Turn enforcement: only the current drafter can pick (admin override preserved)
   if(!adminUnlocked && myId !== ds.order[ds.cp]){
     showToast("It's not your turn!");
@@ -3389,6 +3397,7 @@ async function undoDraft(){
   if(!await requireAdmin()) return;
   const ds = S.ds;
   if(ds.cp === 0) return;
+  _beeped = false;
   ds.cp--;
   ds.complete = false;
   const p = S.players.find(p => p.id === ds.order[ds.cp]);
@@ -3409,6 +3418,64 @@ async function resetDraft(){
   S.ds = {order:[], cp:0, started:false, complete:false};
   S.players.forEach(p => p.teamIds = []);
   render();
+}
+
+/* -- Draft Clock Audio & Haptics -- */
+let _audioCtx = null;
+let _hapticCheckbox = null;
+let _beeped = false; // reset on each new pick
+
+function warmupAudio(){
+  if(!_audioCtx){
+    _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if(_audioCtx.state === 'suspended') _audioCtx.resume();
+}
+
+function playTimerBeep(){
+  try {
+    warmupAudio();
+    const osc = _audioCtx.createOscillator();
+    const gain = _audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(_audioCtx.destination);
+    osc.frequency.value = 880; // A5 note
+    osc.type = 'sine';
+    gain.gain.value = 0.3;
+    osc.start();
+    gain.gain.exponentialRampToValueAtTime(0.01, _audioCtx.currentTime + 0.3);
+    osc.stop(_audioCtx.currentTime + 0.3);
+  } catch(e){
+    // Audio silently degrades if AudioContext not available
+  }
+}
+
+function triggerHaptic(){
+  // Android: standard Vibration API
+  if(navigator.vibrate){
+    navigator.vibrate(50);
+    return;
+  }
+  // iOS Safari 17.4+: hidden checkbox switch trick
+  try {
+    if(!_hapticCheckbox){
+      _hapticCheckbox = document.createElement('input');
+      _hapticCheckbox.type = 'checkbox';
+      _hapticCheckbox.setAttribute('switch', '');
+      _hapticCheckbox.style.cssText = 'position:fixed;top:-100px;opacity:0;pointer-events:none';
+      const label = document.createElement('label');
+      label.style.cssText = 'position:fixed;top:-100px;opacity:0;pointer-events:none';
+      const id = 'haptic-' + Date.now();
+      _hapticCheckbox.id = id;
+      label.htmlFor = id;
+      _hapticCheckbox._label = label;
+      document.body.appendChild(_hapticCheckbox);
+      document.body.appendChild(label);
+    }
+    _hapticCheckbox._label.click();
+  } catch(e){
+    // Haptics silently degrade if not supported
+  }
 }
 
 /* -- Draft Clock -- */
@@ -3436,6 +3503,13 @@ function updateDraftClock(){
     el.className = 'draft-timer ' + (seconds > 30 ? 'timer-green' : seconds > 10 ? 'timer-yellow' : 'timer-red');
   }
 
+  // Audio + haptic alert at 10 seconds (once per pick)
+  if(seconds === 10 && !_beeped){
+    _beeped = true;
+    playTimerBeep();
+    triggerHaptic();
+  }
+
   // Auto-pick on expiry (only active drafter's client, or admin)
   if(remaining === 0){
     stopDraftClock();
@@ -3454,6 +3528,7 @@ function updateDraftClock(){
 }
 
 function autoPickHighestSeed(){
+  _beeped = false;
   const ds = S.ds;
   if(ds.complete) return;
   const all = S.players.flatMap(p => p.teamIds);
@@ -3488,6 +3563,7 @@ function pauseDraftClock(){
 }
 
 function resumeDraftClock(){
+  _beeped = false;
   const ds = S.ds;
   if(!ds.timerPaused) return;
   const deadline = new Date(Date.now() + (ds.pausedRemaining || ds.timerDuration * 1000));
