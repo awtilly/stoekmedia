@@ -1862,6 +1862,7 @@ button, a, .pick-btn, .preset-btn, .round-tab, .live-filter-btn, .icon-btn {
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging-compat.js"></script>
 </head>
 <body>
 <div class="container" id="app"></div>
@@ -2135,6 +2136,38 @@ db.enablePersistence({ synchronizeTabs: true }).catch(err => {
     console.warn('Firestore persistence not supported in this browser');
   }
 });
+
+/* ── FCM Push Notifications ── */
+const VAPID_KEY = ''; // TODO: Replace with VAPID key from Firebase Console -> Project Settings -> Cloud Messaging -> Web Push certificates
+
+async function initFCM(){
+  try {
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    const messaging = firebase.messaging();
+    const swReg = await navigator.serviceWorker.ready;
+    const token = await messaging.getToken({ vapidKey: VAPID_KEY, serviceWorkerRegistration: swReg });
+    if (token && roomId) {
+      const myId = getMyPlayerId();
+      if (myId) {
+        db.collection('rooms').doc(roomId).collection('fcmTokens').doc(myId).set({
+          tokens: firebase.firestore.FieldValue.arrayUnion(token),
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+      }
+    }
+  } catch(err) {
+    console.warn('FCM init failed:', err);
+  }
+}
+
+if ('Notification' in window) {
+  firebase.messaging().onMessage((payload) => {
+    const data = payload.data || {};
+    const title = data.title || 'March Madness Draft';
+    const body = data.body || '';
+    showToast(title + ': ' + body);
+  });
+}
 
 let roomId = null;
 let isRemoteUpdate = false;
