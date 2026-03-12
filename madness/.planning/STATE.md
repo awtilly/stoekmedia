@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: in-progress
-stopped_at: Completed 03-01-PLAN.md
-last_updated: "2026-03-12T15:29:26Z"
-last_activity: 2026-03-12 -- Completed 03-01 (FCM Client Infrastructure)
+stopped_at: Completed 03-03-PLAN.md
+last_updated: "2026-03-12T15:38:51Z"
+last_activity: 2026-03-12 -- Completed 03-03 (Game Final & Leaderboard Push Notifications)
 progress:
   total_phases: 3
   completed_phases: 2
   total_plans: 8
-  completed_plans: 6
-  percent: 75
+  completed_plans: 7
+  percent: 88
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-03-11)
 ## Current Position
 
 Phase: 3 of 3 (Badge & Push Notifications) -- IN PROGRESS
-Plan: 1 of 3 in current phase -- COMPLETE
+Plan: 3 of 3 in current phase (03-02 pending)
 Status: Phase 3 In Progress
-Last activity: 2026-03-12 -- Completed 03-01 (FCM Client Infrastructure)
+Last activity: 2026-03-12 -- Completed 03-03 (Game Final & Leaderboard Push Notifications)
 
-Progress: [███████░░░] 75%
+Progress: [████████░░] 88%
 
 ## Performance Metrics
 
@@ -56,6 +56,7 @@ Progress: [███████░░░] 75%
 | Phase 02 P02 | 5min | 2 tasks | 1 files |
 | Phase 02 P03 | 2min | 1 tasks | 1 files |
 | Phase 03 P01 | 4min | 2 tasks | 5 files |
+| Phase 03 P03 | 3min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -87,6 +88,11 @@ Recent decisions affecting current work:
 - [Phase 03]: FCM token refreshed on every connectToRoom snapshot for rotation resilience
 - [Phase 03]: iOS non-standalone users see guided Home Screen install overlay instead of permission prompt
 - [Phase 03]: fcmTokens subcollection open read/write -- no Firebase Auth in sessionless PIN model
+- [Phase 03]: gameResults subcollection is write-once (create-only rules) with ESPN game ID as doc ID for idempotency
+- [Phase 03]: onDocumentCreated trigger (not onDocumentUpdated) for exactly one notification per game final
+- [Phase 03]: Leaderboard notification gated on actual ranking change to prevent spam
+- [Phase 03]: cleanupStaleTokens extracted as shared helper for all notification functions
+- [Phase 03]: notifyDraftTurn + notifyGameFinal bundled in functions/index.js (Plan 02 functions dir created here)
 
 ### Pending Todos
 
@@ -101,6 +107,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-12T15:29:26Z
-Stopped at: Completed 03-01-PLAN.md
-Resume file: None
+Last session: 2026-03-12T15:38:51Z
+Stopped at: Completed 03-03-PLAN.md
+Resume file: .planning/phases/03-badge-push-notifications/03-03-SUMMARY.md

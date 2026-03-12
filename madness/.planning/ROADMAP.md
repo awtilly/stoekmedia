@@ -65,7 +65,7 @@ Plans:
 Plans:
 - [ ] 03-01-PLAN.md -- Badge API + FCM client setup + permission UX + token management
 - [ ] 03-02-PLAN.md -- Cloud Functions infrastructure + draft turn push notification
-- [ ] 03-03-PLAN.md -- Game final + leaderboard change push notifications
+- [x] 03-03-PLAN.md -- Game final + leaderboard change push notifications
 
 ## Progress
 
@@ -76,4 +76,4 @@ Phases execute in numeric order: 1 -> 2 -> 3
 |-------|----------------|--------|-----------|
 | 1. Foundation & Client-Side Enhancements | 2/2 | Complete | 2026-03-12 |
 | 2. Player Identity & Draft Clock | 3/3 | Complete   | 2026-03-12 |
-| 3. Badge & Push Notifications | 1/3 | In Progress | - |
+| 3. Badge & Push Notifications | 2/3 | In Progress | - |

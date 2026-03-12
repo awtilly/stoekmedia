@@ -51,8 +51,8 @@ Requirements for the 2026 tournament release. Each maps to roadmap phases.
 ### Push Notifications
 
 - [ ] **PUSH-01**: "It's your turn to draft" push notification when user's pick is up
-- [ ] **PUSH-02**: "Game just went final" notification with score and upset alert
-- [ ] **PUSH-03**: "Leaderboard shake-up" notification when rankings change
+- [x] **PUSH-02**: "Game just went final" notification with score and upset alert
+- [x] **PUSH-03**: "Leaderboard shake-up" notification when rankings change
 - [x] **PUSH-04**: FCM token management — store per player per room in Firestore
 - [ ] **PUSH-05**: Firebase Cloud Functions deployed for server-side push triggers
 - [x] **PUSH-06**: Contextual permission prompt (e.g., after joining draft, not on first visit)
@@ -121,8 +121,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | BDGE-01 | Phase 3 | Complete |
 | BDGE-02 | Phase 3 | Complete |
 | PUSH-01 | Phase 3 | Pending |
-| PUSH-02 | Phase 3 | Pending |
-| PUSH-03 | Phase 3 | Pending |
+| PUSH-02 | Phase 3 | Complete |
+| PUSH-03 | Phase 3 | Complete |
 | PUSH-04 | Phase 3 | Complete |
 | PUSH-05 | Phase 3 | Pending |
 | PUSH-06 | Phase 3 | Complete |
