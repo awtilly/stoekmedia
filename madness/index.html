@@ -1839,7 +1839,7 @@ button, a, .pick-btn, .preset-btn, .round-tab, .live-filter-btn, .icon-btn {
   }
 
   .install-banner {
-    padding-bottom: calc(14px + env(safe-area-inset-bottom));
+    bottom: calc(50px + env(safe-area-inset-bottom));
   }
 }
 
@@ -3132,7 +3132,7 @@ function navigate(p){
   S.phase = p;
   saveState();
   if (p === 'live') { startLiveRefresh(); requestWakeLock(); }
-  else render();
+  render();
   // Page transition + scroll to top
   requestAnimationFrame(() => {
     const c = document.getElementById('c');
