@@ -1960,7 +1960,8 @@ const ESPN_BASE = 'https://site.api.espn.com/apis/site/v2/sports/basketball/mens
 const espn = {
   _cache: {},
   async fetchScoreboard(date) {
-    const dateStr = date || new Date().toISOString().slice(0,10).replace(/-/g,'');
+    const n = new Date();
+    const dateStr = date || (n.getFullYear() + String(n.getMonth()+1).padStart(2,'0') + String(n.getDate()).padStart(2,'0'));
     const url = `${ESPN_BASE}/scoreboard?dates=${dateStr}&limit=200`;
     try {
       const r = await fetch(url);
@@ -2116,7 +2117,9 @@ let liveRefreshTimer = null;
 let liveLastRefresh = 0;
 
 async function refreshLiveScores() {
-  const dateStr = S.liveScoresDate || new Date().toISOString().slice(0,10).replace(/-/g,'');
+  const now = new Date();
+  const localToday = now.getFullYear() + String(now.getMonth()+1).padStart(2,'0') + String(now.getDate()).padStart(2,'0');
+  const dateStr = S.liveScoresDate || localToday;
   const data = await espn.fetchScoreboard(dateStr);
   if (data) {
     liveScores = espn.parseScoreboardEvents(data);
@@ -3234,15 +3237,6 @@ async function resetAll(){
 /* ── Setup Page ── */
 function renderSetup(c){
   c.innerHTML = `<div class="section-title">Tournament Setup</div><p class="section-desc">Add players in draft order.</p>
-  <div class="card" style="margin-bottom:14px"><span class="label">Draft Clock</span>
-    <p style="font-size:13px;color:var(--g500);margin-bottom:10px">Time limit per pick. Auto-picks highest seed when time expires.</p>
-    <div class="row" style="flex-wrap:wrap;gap:6px">
-      ${[{v:0,l:'No Limit'},{v:60,l:'60s'},{v:90,l:'90s'},{v:120,l:'120s'}].map(o =>
-        `<button class="preset-btn ${(S.draftClockDuration||0)===o.v?'active':''}" onclick="setDraftClock(${o.v})">${o.l}</button>`
-      ).join('')}
-    </div>
-  </div>
-  <div class="card" style="margin-bottom:14px"><span class="label">Year</span><input type="number" value="${S.year}" style="width:100px" onchange="changeYear(this.value)"></div>
   <div class="card"><span class="label">Players (${S.players.length})</span>
   <div class="row" style="margin-bottom:12px"><input id="pn" placeholder="Player name..." style="flex:1" onkeydown="if(event.key==='Enter')addPlayer()"><button class="btn btn-primary" onclick="addPlayer()">Add</button></div>
   ${S.players.length === 0 ? '<p style="color:var(--g400);text-align:center;padding:14px;font-size:13px">No players yet</p>' : ''}
@@ -3421,7 +3415,7 @@ async function refreshTeamData(){
 function renderLive(c){
   const hasLive = liveScores.some(g => g.state === 'in');
   const now = new Date();
-  const todayStr = now.toISOString().slice(0,10).replace(/-/g,'');
+  const todayStr = now.getFullYear() + String(now.getMonth()+1).padStart(2,'0') + String(now.getDate()).padStart(2,'0');
   const currentDate = S.liveScoresDate || todayStr;
   const displayDate = currentDate.replace(/(\d{4})(\d{2})(\d{2})/, '$2/$3/$1');
 
@@ -3531,7 +3525,8 @@ function renderLiveInPlace(){
 }
 
 function changeLiveDate(delta){
-  const current = S.liveScoresDate || new Date().toISOString().slice(0,10).replace(/-/g,'');
+  const n = new Date();
+  const current = S.liveScoresDate || (n.getFullYear() + String(n.getMonth()+1).padStart(2,'0') + String(n.getDate()).padStart(2,'0'));
   const y = parseInt(current.slice(0,4));
   const m = parseInt(current.slice(4,6)) - 1;
   const d = parseInt(current.slice(6,8));
@@ -4019,6 +4014,16 @@ function renderSettings(c){
         <div style="font-size:13px;color:var(--g500)">${adminUnlocked?'You can edit players, teams, draft, and scoring.':'Enter PIN to make changes.'}</div></div>
       ${adminUnlocked ? `<button class="btn btn-secondary btn-sm" onclick="lockAdmin()">Lock</button>` : `<button class="btn btn-primary btn-sm" onclick="requireAdmin().then(ok=>{if(ok)render()})">Unlock</button>`}
     </div></div>` : ''}
+  <div class="card" style="margin-bottom:14px"><span class="label">Draft Clock</span>
+    <p style="font-size:13px;color:var(--g500);margin-bottom:10px">Time limit per pick. Auto-picks highest seed when time expires.</p>
+    <div class="row" style="flex-wrap:wrap;gap:6px">
+      ${[{v:0,l:'No Limit'},{v:60,l:'60s'},{v:90,l:'90s'},{v:120,l:'120s'}].map(o =>
+        `<button class="preset-btn ${(S.draftClockDuration||0)===o.v?'active':''}" onclick="setDraftClock(${o.v})">${o.l}</button>`
+      ).join('')}
+    </div>
+  </div>
+  <div class="card" style="margin-bottom:14px"><div class="row" style="justify-content:space-between;align-items:center"><div><div style="font-weight:700;margin-bottom:4px">Year</div><div style="font-size:13px;color:var(--g500)">Auto-detected: ${S.year}</div></div>
+    <input type="number" value="${S.year}" style="width:90px" onchange="changeYear(this.value)"></div></div>
   <div class="card" style="border-color:var(--red)"><span class="label" style="color:var(--red)">Danger Zone</span>
     <div class="row" style="justify-content:space-between;align-items:center">
       <div><div style="font-weight:700;margin-bottom:4px">New Tournament</div><div style="font-size:13px;color:var(--g500)">Delete this room and start fresh.</div></div>
