@@ -1662,7 +1662,7 @@ button, a, .pick-btn, .preset-btn, .round-tab, .live-filter-btn, .icon-btn {
     flex-direction: column;
     align-items: center;
     gap: 2px;
-    padding: 6px 0;
+    padding: 4px 0 0;
     border: none;
     background: none;
     cursor: pointer;
@@ -3051,9 +3051,9 @@ function bottomNavHTML(canD, canT) {
   const tabs = [
     { id: 'setup', label: 'Setup', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>' },
     { id: 'draft', label: 'Draft', disabled: !canD, icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>' },
-    { id: 'bracket', label: 'Bracket', disabled: !canT, icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 7 4 4 20 4 20 7"/><line x1="12" y1="4" x2="12" y2="20"/><path d="M8 20h8"/></svg>' },
+    { id: 'bracket', label: 'Bracket', disabled: !canT, icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4v4c0 2 2 4 4 4s4-2 4-4V4"/><path d="M12 4v4c0 2 2 4 4 4s4-2 4-4V4"/><path d="M8 12v2c0 2 2 4 4 4s4-2 4-4v-2"/><line x1="12" y1="18" x2="12" y2="22"/></svg>' },
     { id: 'leaderboard', label: 'Board', disabled: !canT, icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg>' },
-    { id: 'live', label: 'Live', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>' }
+    { id: 'live', label: 'Scores', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M4.93 4.93c4.08 2.03 6.17 4.12 8.17 8.17"/><path d="M19.07 4.93c-4.08 2.03-6.17 4.12-8.17 8.17"/><line x1="2" y1="12" x2="22" y2="12"/></svg>' }
   ];
   return `<nav class="bottom-nav">${tabs.map(t =>
     `<button class="bottom-nav-btn ${S.phase===t.id?'active':''}" ${t.disabled?'disabled':''} onclick="navigate('${t.id}')">${t.icon}<span>${t.label}</span></button>`
