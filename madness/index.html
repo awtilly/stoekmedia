@@ -1839,7 +1839,7 @@ button, a, .pick-btn, .preset-btn, .round-tab, .live-filter-btn, .icon-btn {
   }
 
   .install-banner {
-    bottom: calc(50px + env(safe-area-inset-bottom));
+    padding-bottom: calc(14px + env(safe-area-inset-bottom));
   }
 }
 
@@ -2774,6 +2774,7 @@ function renderLobby(){
         <button class="btn btn-secondary" onclick="startLocal()">Play Offline Instead</button>
       </div>
     </div>`;
+  repositionInstallBanner();
 }
 
 function startLocal(){
@@ -3120,6 +3121,7 @@ function render(){
       el.className = 'draft-timer ' + (secs > 30 ? 'timer-green' : secs > 10 ? 'timer-yellow' : 'timer-red');
     }
   }
+  repositionInstallBanner();
   } catch(e) {
     console.error('Render error:', e);
     const app = document.getElementById("app");
@@ -4088,11 +4090,25 @@ function showInstallBanner(){
     ${isIOS ? '' : '<button class="btn-install" onclick="installApp()">Install</button>'}
     <button class="btn-dismiss" onclick="dismissInstallBanner()">&times;</button>`;
   document.body.appendChild(banner);
+  repositionInstallBanner();
 }
 
 function dismissInstallBanner(){
   const banner = document.getElementById('install-banner');
   if(banner) banner.remove();
+}
+
+function repositionInstallBanner(){
+  const banner = document.getElementById('install-banner');
+  if(!banner) return;
+  const bottomNav = document.querySelector('.bottom-nav');
+  if(bottomNav && window.innerWidth <= 700){
+    banner.style.bottom = bottomNav.offsetHeight + 'px';
+    banner.style.paddingBottom = '14px';
+  } else {
+    banner.style.bottom = '';
+    banner.style.paddingBottom = '';
+  }
 }
 
 async function installApp(){
