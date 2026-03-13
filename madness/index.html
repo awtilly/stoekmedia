@@ -1860,6 +1860,11 @@ button, a, .pick-btn, .preset-btn, .round-tab, .live-filter-btn, .icon-btn {
   50% { opacity: 0.6; }
 }
 
+.active-pick .draft-timer { display:inline; font-size:24px; margin:0; }
+.active-pick .pick-row { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.active-pick .last-pick { font-size:12px; color:var(--g400); display:flex; align-items:center; gap:6px; margin-bottom:6px; }
+.active-pick .up-next { font-size:12px; color:var(--g400); margin-top:6px; }
+
 /* ── Notification Prompt ── */
 .notif-banner {
   background: #2a2a44;
@@ -3080,7 +3085,7 @@ function render(){
   }
   saveState();
   const canD = S.players.length >= 2 && S.teams.length >= S.players.length;
-  const canT = S.ds.complete;
+  const canT = S.ds.started || S.ds.complete;
   const app = document.getElementById("app");
   app.innerHTML = `
     <div class="header">
@@ -3109,7 +3114,7 @@ function render(){
   // Start/stop draft clock based on current view
   if(S.phase === 'draft' && S.ds.started && !S.ds.complete && S.ds.pickDeadline && !S.ds.timerPaused){
     startDraftClock();
-  } else {
+  } else if(_draftClockInterval){
     stopDraftClock();
   }
   // Show paused time in timer element
@@ -3560,7 +3565,26 @@ function renderDraft(c){
         ? '<button class="btn btn-primary btn-sm" onclick="resumeDraftClock()">Resume Clock</button>'
         : '<button class="btn btn-secondary btn-sm" onclick="pauseDraftClock()">Pause Clock</button>'}
     ` : ''}<button class="btn btn-secondary btn-sm" onclick="undoDraft()" ${ds.cp === 0 ? 'disabled' : ''}>Undo</button><button class="btn btn-danger btn-sm" onclick="resetDraft()">Reset</button></div></div>
-  ${!ds.complete ? `<div class="card active-pick" style="margin-bottom:14px"><div style="font-size:12px;font-weight:700;color:var(--g500);text-transform:uppercase;letter-spacing:.8px">Pick ${ds.cp+1} of ${ds.order.length} \u2014 Round ${Math.floor(ds.cp/S.players.length)+1}</div><div style="font-size:20px;font-weight:800;color:var(--gold)">${escapeHtml(cp?.name || '')}'s Pick</div><div id="draft-timer" class="draft-timer" style="display:${ds.pickDeadline || ds.timerPaused ? 'block' : 'none'}"></div><div class="progress-bar"><div class="progress-fill" style="width:${(ds.cp/ds.order.length)*100}%"></div></div></div>` : ''}
+  ${!ds.complete ? (() => {
+    let lastPickHTML = '';
+    if(ds.cp > 0){
+      const prevPid = ds.order[ds.cp - 1];
+      const prevPlayer = S.players.find(p => p.id === prevPid);
+      if(prevPlayer && prevPlayer.teamIds.length > 0){
+        const lastTid = prevPlayer.teamIds[prevPlayer.teamIds.length - 1];
+        const lastTeam = S.teams.find(t => t.id === lastTid);
+        if(lastTeam) lastPickHTML = `<div class="last-pick">Last: <strong>${escapeHtml(prevPlayer.name)}</strong> picked ${teamLogoHTML(lastTeam, 16)} #${lastTeam.seed} ${escapeHtml(teamDisplayName(lastTeam))}</div>`;
+      }
+    }
+    const upNextNames = [];
+    for(let i = 1; i <= 2 && ds.cp + i < ds.order.length; i++){
+      const nid = ds.order[ds.cp + i];
+      const np = S.players.find(p => p.id === nid);
+      if(np && !upNextNames.includes(np.name)) upNextNames.push(np.name);
+    }
+    const upNextHTML = upNextNames.length ? `<div class="up-next">Up next: ${upNextNames.map(n => escapeHtml(n)).join(', ')}</div>` : '';
+    return `<div class="card active-pick" style="margin-bottom:14px">${lastPickHTML}<div style="font-size:12px;font-weight:700;color:var(--g500);text-transform:uppercase;letter-spacing:.8px">Pick ${ds.cp+1} of ${ds.order.length} — Round ${Math.floor(ds.cp/S.players.length)+1}</div><div class="pick-row"><div style="font-size:20px;font-weight:800;color:var(--gold)">${escapeHtml(cp?.name || '')}'s Pick</div><div id="draft-timer" class="draft-timer" style="display:${ds.pickDeadline || ds.timerPaused ? 'inline' : 'none'}"></div></div>${upNextHTML}<div class="progress-bar"><div class="progress-fill" style="width:${(ds.cp/ds.order.length)*100}%"></div></div></div>`;
+  })() : ''}
   <div class="draft-grid"><div>
     <div class="row" style="margin-bottom:10px;gap:8px;flex-wrap:wrap">
       <select onchange="S.fr=this.value;render()" style="width:130px"><option value="All" ${S.fr==='All'?'selected':''}>All Regions</option>${REGIONS.map(r => `<option value="${r}" ${S.fr===r?'selected':''}>${r}</option>`).join('')}</select>
@@ -3704,7 +3728,7 @@ function triggerHaptic(){
 let _draftClockInterval = null;
 
 function startDraftClock(){
-  stopDraftClock();
+  if(_draftClockInterval) return;
   _draftClockInterval = setInterval(updateDraftClock, 250);
 }
 
