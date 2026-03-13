@@ -7,26 +7,38 @@ service cloud.firestore {
 
       // Create: require 64-char hashed admin PIN and state
       allow create: if request.resource.data.adminPin is string
-                    && request.resource.data.adminPin.size() == 64
+                    && request.resource.data.adminPin.size() >= 64
                     && request.resource.data.keys().hasAll(['adminPin', 'state']);
 
-      // Update: if adminPin is being changed, it must be 64 chars (hash)
-      allow update: if (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['adminPin'])
-                       || (request.resource.data.adminPin is string
-                           && request.resource.data.adminPin.size() == 64));
+      // Update: prevent removing adminPin; if changing it, must be >= 64 chars (hash);
+      // require updatedAt server timestamp on every update
+      allow update: if request.resource.data.keys().hasAll(['adminPin'])
+                    && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['adminPin'])
+                        || (request.resource.data.adminPin is string
+                            && request.resource.data.adminPin.size() >= 64))
+                    && request.resource.data.updatedAt == request.time;
 
       // Delete: disallowed — use update to reset instead
       allow delete: if false;
 
-      // FCM token subcollection — non-sensitive (opaque tokens, friend-group scale)
+      // FCM token subcollection — allow create/update but not delete; validate tokens field
       match /fcmTokens/{playerId} {
-        allow read, write: if true;
+        allow read: if true;
+        allow create: if request.resource.data.keys().hasAll(['tokens'])
+                      && request.resource.data.tokens is list;
+        allow update: if request.resource.data.keys().hasAll(['tokens'])
+                      && request.resource.data.tokens is list;
+        allow delete: if false;
       }
 
-      // Game results subcollection — write-once (create only, no update/delete)
+      // Game results subcollection — write-once with field validation
       match /gameResults/{gameId} {
         allow read: if true;
-        allow create: if true;
+        allow create: if request.resource.data.keys().hasAll(['winnerName', 'awayName', 'homeName', 'reportedAt'])
+                      && request.resource.data.winnerName is string
+                      && request.resource.data.awayName is string
+                      && request.resource.data.homeName is string
+                      && request.resource.data.reportedAt is timestamp;
         allow update: if false;
         allow delete: if false;
       }

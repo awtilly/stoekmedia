@@ -1958,7 +1958,6 @@ const generateId = () => crypto.randomUUID();
 const ESPN_BASE = 'https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball';
 
 const espn = {
-  _cache: {},
   async fetchScoreboard(date) {
     const n = new Date();
     const dateStr = date || (n.getFullYear() + String(n.getMonth()+1).padStart(2,'0') + String(n.getDate()).padStart(2,'0'));
@@ -2223,8 +2222,10 @@ function releaseWakeLock() {
 }
 
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible' && S.phase === 'live') {
-    requestWakeLock();
+  if (document.visibilityState === 'visible') {
+    if (S.phase === 'live') startLiveRefresh();
+  } else {
+    stopLiveRefresh();
   }
 });
 
@@ -2293,13 +2294,17 @@ async function initFCM(){
   }
 }
 
-if ('Notification' in window) {
-  firebase.messaging().onMessage((payload) => {
-    const data = payload.data || {};
-    const title = data.title || 'March Madness Draft';
-    const body = data.body || '';
-    showToast(title + ': ' + body);
-  });
+try {
+  if ('Notification' in window) {
+    firebase.messaging().onMessage((payload) => {
+      const data = payload.data || {};
+      const title = data.title || 'March Madness Draft';
+      const body = data.body || '';
+      showToast(title + ': ' + body);
+    });
+  }
+} catch(e) {
+  console.warn('FCM onMessage setup failed:', e);
 }
 
 /* ── Badge API ── */
@@ -2360,7 +2365,7 @@ async function requestNotificationPermission(){
 }
 
 let roomId = null;
-let isRemoteUpdate = false;
+let _roomGeneration = 0;
 let unsubRoom = null;
 let isOnline = navigator.onLine;
 
@@ -2374,6 +2379,7 @@ document.addEventListener('click', function _warmup(){
 }, { once: true });
 
 /* ── Toast Notifications ── */
+let _toastTimer = null;
 function showToast(message, duration = 3000){
   let toast = document.getElementById('toast');
   if(!toast){
@@ -2384,8 +2390,8 @@ function showToast(message, duration = 3000){
   }
   toast.textContent = message;
   toast.className = 'toast show';
-  clearTimeout(toast._tid);
-  toast._tid = setTimeout(() => { toast.className = 'toast'; }, duration);
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => { toast.className = 'toast'; }, duration);
 }
 
 /* ── In-App Modal System ── */
@@ -2463,12 +2469,37 @@ function appAlert(message, { title = '' } = {}) {
   return _showModal(html);
 }
 
-/* ── Security: SHA-256 Hashing ── */
-async function hashPin(pin){
-  const data = new TextEncoder().encode(pin);
+/* ── Security: SHA-256 Hashing (salted) ── */
+function generateSalt(len = 16) {
+  const arr = new Uint8Array(len);
+  crypto.getRandomValues(arr);
+  return Array.from(arr, b => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function rawHash(input) {
+  const data = new TextEncoder().encode(input);
   const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  return Array.from(new Uint8Array(hashBuffer), b => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function hashPin(pin) {
+  const salt = generateSalt();
+  const hash = await rawHash(salt + pin);
+  return salt + ':' + hash;
+}
+
+async function verifyPin(pin, stored) {
+  // New salted format: "salt:hash"
+  if (stored.includes(':')) {
+    const [salt, hash] = stored.split(':');
+    return (await rawHash(salt + pin)) === hash;
+  }
+  // Legacy unsalted 64-char hex hash — verify then migrate
+  return (await rawHash(pin)) === stored;
+}
+
+async function migratePin(pin) {
+  return await hashPin(pin);
 }
 
 /* ── Admin PIN Protection ── */
@@ -2495,6 +2526,8 @@ function lockAdmin(){
   render();
 }
 
+let _pinFailCount = 0;
+
 async function requireAdmin(){
   if(!roomId) return true;
   if(adminUnlocked) return true;
@@ -2504,25 +2537,46 @@ async function requireAdmin(){
     const pin = await appPrompt("This room has no admin PIN yet.\nSet a 4-digit PIN to protect editing:", { title: 'Set Admin PIN', placeholder: '4-digit PIN' });
     if(!pin || !/^\d{4}$/.test(pin.trim())){ await appAlert("PIN must be exactly 4 digits."); return false; }
     const hashed = await hashPin(pin.trim());
-    await db.collection("rooms").doc(roomId).set({ adminPin: hashed }, { merge: true });
+    await db.collection("rooms").doc(roomId).set({ adminPin: hashed, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
     unlockAdmin();
     return true;
   }
+
+  // Rate-limit: exponential backoff after failures
+  if (_pinFailCount > 0) {
+    const delay = Math.min(1000 * Math.pow(2, _pinFailCount - 1), 8000);
+    await new Promise(r => setTimeout(r, delay));
+  }
+
   const entry = await appPrompt("Enter 4-digit admin PIN:", { title: 'Admin PIN' });
   if(!entry) return false;
-  /* Legacy plaintext PIN migration (hash is always 64 hex chars) */
-  if(data.adminPin.length !== 64){
+
+  /* Legacy plaintext PIN migration (no colon, not 64 hex chars) */
+  if(!data.adminPin.includes(':') && data.adminPin.length !== 64){
     if(entry.trim() === data.adminPin){
       const hashed = await hashPin(entry.trim());
-      await db.collection("rooms").doc(roomId).set({ adminPin: hashed }, { merge: true });
+      await db.collection("rooms").doc(roomId).set({ adminPin: hashed, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+      _pinFailCount = 0;
       unlockAdmin();
       return true;
     }
+    _pinFailCount++;
     await appAlert("Incorrect PIN.");
     return false;
   }
-  const hashed = await hashPin(entry.trim());
-  if(hashed === data.adminPin){ unlockAdmin(); return true; }
+
+  const ok = await verifyPin(entry.trim(), data.adminPin);
+  if(ok){
+    // Migrate unsalted hash to salted on successful verify
+    if(!data.adminPin.includes(':')){
+      const salted = await migratePin(entry.trim());
+      await db.collection("rooms").doc(roomId).set({ adminPin: salted, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+    }
+    _pinFailCount = 0;
+    unlockAdmin();
+    return true;
+  }
+  _pinFailCount++;
   await appAlert("Incorrect PIN.");
   return false;
 }
@@ -2538,17 +2592,22 @@ async function claimPlayer(id){
   if(player.pinHash){
     const pin = await appPrompt('Enter your 4-digit PIN:', { title: 'Verify Identity' });
     if(!pin) return;
-    const hash = await hashPin(pin.trim());
-    if(hash !== player.pinHash){
+    const ok = await verifyPin(pin.trim(), player.pinHash);
+    if(!ok){
       await appAlert('Incorrect PIN.');
       return;
+    }
+    // Migrate unsalted to salted
+    if(!player.pinHash.includes(':')){
+      player.pinHash = await migratePin(pin.trim());
+      saveState();
     }
   } else if(player.passphraseHash){
     // Legacy passphrase support: prompt, verify, then migrate to PIN
     const pass = await appPrompt('Enter your passphrase:', { title: 'Verify Identity' });
     if(!pass) return;
-    const hash = await hashPin(pass.trim());
-    if(hash !== player.passphraseHash){
+    const ok = await verifyPin(pass.trim(), player.passphraseHash);
+    if(!ok){
       await appAlert('Incorrect passphrase.');
       return;
     }
@@ -2634,11 +2693,12 @@ function renderJoinScreen(){
 /* ── State Persistence ── */
 const VIEW_LOCAL = ['phase','bracketRegion','fr','fs','liveScoresDate','liveScoresFilter'];
 
+let _isRemoteUpdate = false;
 let _firestoreWriteTimer = null;
 function _debouncedFirestoreWrite(){
   clearTimeout(_firestoreWriteTimer);
   _firestoreWriteTimer = setTimeout(() => {
-    if(!roomId || isRemoteUpdate) return;
+    if(!roomId || _isRemoteUpdate) return;
     const shared = {};
     for(const k in S){ if(!VIEW_LOCAL.includes(k)) shared[k] = S[k]; }
     db.collection("rooms").doc(roomId).set({
@@ -2653,7 +2713,7 @@ function _debouncedFirestoreWrite(){
 
 function saveState(){
   try { localStorage.setItem("mm4", JSON.stringify(S)); } catch(e){}
-  if(roomId && !isRemoteUpdate) _debouncedFirestoreWrite();
+  if(roomId && !_isRemoteUpdate) _debouncedFirestoreWrite();
 }
 
 function loadState(){
@@ -2709,14 +2769,16 @@ function joinRoom(){
 function connectToRoom(code){
   if(unsubRoom) unsubRoom();
   saveRecentRoom(code);
+  const gen = ++_roomGeneration;
   unsubRoom = db.collection("rooms").doc(code).onSnapshot(doc => {
+    if(gen !== _roomGeneration) return; // stale listener
     if(!doc.exists){
       saveState();
       return;
     }
     const data = doc.data();
     if(data && data.state){
-      isRemoteUpdate = true;
+      _isRemoteUpdate = true;
       const local = {};
       for(const k of VIEW_LOCAL) local[k] = S[k];
       const remote = JSON.parse(data.state);
@@ -2728,8 +2790,8 @@ function connectToRoom(code){
       localStorage.setItem("mm4", JSON.stringify(S));
       render();
       updateAppBadge();
-      if (Notification.permission === 'granted') initFCM();
-      isRemoteUpdate = false;
+      if ('Notification' in window && Notification.permission === 'granted') initFCM().catch(() => {});
+      _isRemoteUpdate = false;
     }
   }, err => {
     console.warn("Firestore listen error:", err);
@@ -2814,8 +2876,8 @@ function startLocal(){
 /* ── Utility Functions ── */
 function seedClass(s){ return s <= 4 ? "seed-top" : s <= 8 ? "seed-mid" : "seed-low"; }
 function seedBadge(s){ return `<span class="seed-badge ${seedClass(s)}">${s}</span>`; }
-function escapeHtml(s){ const d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
-function owner(tid){ const p = S.players.find(p => p.teamIds.includes(tid)); return p ? p.name : ""; }
+function escapeHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+function owner(tid){ const pl = S.players.find(p => p.teamIds.includes(tid)); return pl ? pl.name : ""; }
 
 function teamDisplayName(t) {
   if (t.playIn && !t.playInResolved) return t.playInTeams.map(pt => pt.name).join(' / ');
@@ -2824,10 +2886,10 @@ function teamDisplayName(t) {
 function teamLogoHTML(t, size) {
   if (t.playIn && !t.playInResolved) {
     return t.playInTeams.map(pt =>
-      pt.logo ? `<img src="${pt.logo}" style="width:${size}px;height:${size}px;object-fit:contain">` : ''
+      pt.logo ? `<img src="${escapeHtml(pt.logo)}" loading="lazy" style="width:${size}px;height:${size}px;object-fit:contain">` : ''
     ).join('');
   }
-  return t.logo ? `<img src="${t.logo}" style="width:${size}px;height:${size}px;object-fit:contain">` : '';
+  return t.logo ? `<img src="${escapeHtml(t.logo)}" loading="lazy" style="width:${size}px;height:${size}px;object-fit:contain">` : '';
 }
 function teamRecordDisplay(t) {
   if (t.playIn && !t.playInResolved) return t.playInTeams.map(pt => pt.record).filter(Boolean).join(' / ');
@@ -3104,10 +3166,11 @@ function render(){
     if(!myId || !S.players.some(p => p.id === myId)){ renderJoinScreen(); return; }
   }
   // Redirect non-admin away from settings
-  if(S.phase === 'settings' && !adminUnlocked){ S.phase = 'draft'; }
+  let phaseChanged = false;
+  if(S.phase === 'settings' && !adminUnlocked){ S.phase = 'draft'; phaseChanged = true; }
   // Redirect legacy 'setup' phase to 'draft'
-  if(S.phase === 'setup'){ S.phase = 'draft'; }
-  saveState();
+  if(S.phase === 'setup'){ S.phase = 'draft'; phaseChanged = true; }
+  if(phaseChanged) saveState();
   const canD = S.players.length >= 2 && S.teams.length >= S.players.length;
   const canT = S.ds.started || S.ds.complete;
   const app = document.getElementById("app");
@@ -3336,13 +3399,21 @@ async function deleteTeam(id){
 async function parseBulkImport(){
   if(!await requireAdmin()) return;
   const lines = document.getElementById("bt").value.split("\n").filter(l => l.trim());
+  let skipped = 0;
   for(const l of lines){
     const m = l.match(/^(.+?)\s*,\s*(\d{1,2})\s*,\s*(\w[\w\s]*?)\s*$/);
     if(m){
+      const seed = Number(m[2]);
+      if(seed < 1 || seed > 16){ skipped++; continue; }
       const reg = REGIONS.find(r => r.toLowerCase() === m[3].trim().toLowerCase());
-      if(reg) S.teams.push({id: generateId(), name: m[1].trim(), seed: Number(m[2]), region: reg});
+      if(!reg){ skipped++; continue; }
+      const name = m[1].trim();
+      // Skip duplicates (same name+seed+region)
+      if(S.teams.some(t => t.name === name && t.seed === seed && t.region === reg)){ skipped++; continue; }
+      S.teams.push({id: generateId(), name, seed, region: reg});
     }
   }
+  if(skipped > 0) showToast(`${skipped} line(s) skipped (invalid seed, region, or duplicate)`);
   render();
 }
 
@@ -3640,8 +3711,8 @@ async function pickTeam(tid){
     showToast("It's not your turn!");
     return;
   }
-  const p = S.players.find(p => p.id === ds.order[ds.cp]);
-  if(p) p.teamIds.push(tid);
+  const pl = S.players.find(p => p.id === ds.order[ds.cp]);
+  if(pl) pl.teamIds.push(tid);
   ds.cp++;
   if(ds.cp >= ds.order.length){
     ds.complete = true;
@@ -3663,8 +3734,8 @@ async function undoDraft(){
   _beeped = false;
   ds.cp--;
   ds.complete = false;
-  const p = S.players.find(p => p.id === ds.order[ds.cp]);
-  if(p) p.teamIds.pop();
+  const pl = S.players.find(p => p.id === ds.order[ds.cp]);
+  if(pl) pl.teamIds.pop();
   // Reset timer for the restored pick
   if(ds.timerDuration && ds.timerDuration > 0){
     ds.pickDeadline = firebase.firestore.Timestamp.fromDate(new Date(Date.now() + ds.timerDuration * 1000));
@@ -3753,6 +3824,8 @@ function stopDraftClock(){
   if(_draftClockInterval){ clearInterval(_draftClockInterval); _draftClockInterval = null; }
 }
 
+window.addEventListener('beforeunload', stopDraftClock);
+
 function updateDraftClock(){
   const ds = S.ds;
   if(!ds.pickDeadline || ds.timerPaused || ds.complete){ return; }
@@ -3779,14 +3852,8 @@ function updateDraftClock(){
     const myId = getMyPlayerId();
     if(myId === ds.order[ds.cp] || adminUnlocked){
       autoPickHighestSeed();
-    } else {
-      // Fallback: non-active clients wait 3 seconds, then attempt auto-pick
-      setTimeout(() => {
-        if(S.ds.cp === ds.cp && !S.ds.complete){
-          autoPickHighestSeed();
-        }
-      }, 3000);
     }
+    // Other clients will receive the pick via Firestore listener
   }
 }
 
@@ -3798,8 +3865,8 @@ function autoPickHighestSeed(){
   const available = S.teams.filter(t => !all.includes(t.id)).sort((a,b) => a.seed - b.seed);
   if(available.length === 0) return;
   const tid = available[0].id;
-  const p = S.players.find(p => p.id === ds.order[ds.cp]);
-  if(p) p.teamIds.push(tid);
+  const pl = S.players.find(p => p.id === ds.order[ds.cp]);
+  if(pl) pl.teamIds.push(tid);
   ds.cp++;
   if(ds.cp >= ds.order.length){
     ds.complete = true;
@@ -4128,7 +4195,7 @@ function showInstallBanner(){
   if(isStandalone()) return;
   if(document.getElementById('install-banner')) return;
 
-  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
   const banner = document.createElement('div');
   banner.id = 'install-banner';
   banner.className = 'install-banner';
@@ -4184,7 +4251,7 @@ window.addEventListener('appinstalled', () => {
 });
 
 // On iOS, show the banner after a short delay since there's no beforeinstallprompt
-if(/iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream && !isStandalone()){
+if(/iPad|iPhone|iPod/.test(navigator.userAgent) && !isStandalone()){
   setTimeout(showInstallBanner, 2000);
 }
 </script>

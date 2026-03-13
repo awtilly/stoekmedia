@@ -19,8 +19,8 @@ messaging.onBackgroundMessage((payload) => {
   const body = data.body || '';
   const options = {
     body,
-    icon: './icons/icon-192.png',
-    badge: './icons/icon-192.png',
+    icon: '/madness/icons/icon-192.png',
+    badge: '/madness/icons/icon-192.png',
     tag: data.tag || 'default',
     data: { url: data.url || './' }
   };

@@ -181,7 +181,12 @@ exports.notifyGameFinal = onDocumentCreated('rooms/{roomId}/gameResults/{gameId}
         }
       };
 
-      await getMessaging().sendEachForMulticast(leaderMessage);
+      const leaderResponse = await getMessaging().sendEachForMulticast(leaderMessage);
+
+      // Clean up stale tokens from leaderboard notification
+      const leaderTokenMap = {};
+      validTokens.forEach(t => { leaderTokenMap[t] = tokenMap[t]; });
+      await cleanupStaleTokens(leaderResponse, validTokens, leaderTokenMap, roomId);
     }
   }
 });
