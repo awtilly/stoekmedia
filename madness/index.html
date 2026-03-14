@@ -1228,6 +1228,48 @@ td.val {
   line-height: 1;
 }
 
+/* ── Update Banner ── */
+.update-banner {
+  position: fixed;
+  top: calc(12px + env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--gold);
+  color: #fff;
+  padding: 10px 16px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  z-index: 9999;
+  box-shadow: 0 4px 16px rgba(0,0,0,.25);
+  max-width: 90vw;
+}
+
+.update-banner .btn-install {
+  background: #fff;
+  color: var(--gold);
+  border: none;
+  padding: 5px 14px;
+  border-radius: 6px;
+  font-weight: 700;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.update-banner .btn-dismiss {
+  background: none;
+  border: none;
+  color: rgba(255,255,255,.7);
+  font-size: 18px;
+  cursor: pointer;
+  padding: 0 2px;
+  line-height: 1;
+}
+
 /* ── Offline Badge ── */
 .offline-badge {
   background: var(--red);
@@ -2157,6 +2199,7 @@ async function checkGameFinals() {
   // Build a set of ESPN IDs for teams in this room
   const roomEspnIds = new Set(S.teams.map(t => t.espnId).filter(Boolean));
   let advanced = false;
+  let shouldSync = false;
 
   for (const game of liveScores) {
     if (game.state !== 'post' || !game.completed) continue;
@@ -2178,10 +2221,14 @@ async function checkGameFinals() {
     const rankingsBefore = scores().map(s => s.pid);
 
     // Write to gameResults subcollection -- Cloud Function will trigger
+    // Check-before-write: only the first client to report triggers Firestore sync
+    let isFirstReporter = false;
     try {
-      await db.collection('rooms').doc(roomId)
-        .collection('gameResults').doc(game.id)
-        .set({
+      const resultRef = db.collection('rooms').doc(roomId)
+        .collection('gameResults').doc(game.id);
+      const existing = await resultRef.get();
+      if (!existing.exists) {
+        await resultRef.set({
           awayName: game.away.name,
           awayScore: game.away.score,
           awaySeed: game.away.seed || null,
@@ -2197,17 +2244,28 @@ async function checkGameFinals() {
           reportedAt: firebase.firestore.FieldValue.serverTimestamp(),
           reportedBy: getMyPlayerId() || 'unknown'
         });
+        isFirstReporter = true;
+      }
     } catch (err) {
       console.warn('Failed to report game final:', game.id, err);
     }
 
-    // Auto-advance bracket
-    if (autoAdvanceBracket(game)) advanced = true;
+    // Auto-advance bracket locally for all clients (instant feedback)
+    if (autoAdvanceBracket(game)) {
+      advanced = true;
+      if (isFirstReporter) shouldSync = true;
+    }
   }
 
   if (advanced) {
     syncGames();
-    saveState();
+    // Only the first reporter writes bracket state to Firestore;
+    // other clients get it via the onSnapshot listener
+    if (shouldSync) {
+      saveState();
+    } else {
+      try { localStorage.setItem("mm4", JSON.stringify(S)); } catch(e){}
+    }
     render();
   }
 }
@@ -2583,24 +2641,36 @@ async function migratePin(pin) {
 /* ── Admin PIN Protection ── */
 let adminUnlocked = false;
 
+const ADMIN_SESSION_HOURS = 4;
 function adminSessionKey(){ return roomId ? 'mm4_admin_' + roomId : null; }
 
 function checkAdminSession(){
   if(!roomId){ adminUnlocked = false; return; }
   const k = adminSessionKey();
-  adminUnlocked = k ? sessionStorage.getItem(k) === '1' : false;
+  if(!k){ adminUnlocked = false; return; }
+  try {
+    const raw = localStorage.getItem(k);
+    if(!raw){ adminUnlocked = false; return; }
+    const ts = Number(raw);
+    if(Date.now() - ts > ADMIN_SESSION_HOURS * 3600 * 1000){
+      localStorage.removeItem(k);
+      adminUnlocked = false;
+    } else {
+      adminUnlocked = true;
+    }
+  } catch(e){ adminUnlocked = false; }
 }
 
 function unlockAdmin(){
   adminUnlocked = true;
   const k = adminSessionKey();
-  if(k) sessionStorage.setItem(k, '1');
+  if(k) localStorage.setItem(k, String(Date.now()));
 }
 
 function lockAdmin(){
   adminUnlocked = false;
   const k = adminSessionKey();
-  if(k) sessionStorage.removeItem(k);
+  if(k) localStorage.removeItem(k);
   render();
 }
 
@@ -2985,6 +3055,7 @@ async function resolvePlayIn(teamId, winnerIdx) {
   team.color = winner.color;
   team.record = winner.record;
   team.playInResolved = true;
+  saveState();
   render();
 }
 
@@ -2997,9 +3068,13 @@ async function showResolvePlayIn(teamId) {
   else if (choice === 1) resolvePlayIn(teamId, 1);
 }
 
+let _lastAutoResolve = 0;
 async function autoResolvePlayIns() {
+  const now = Date.now();
+  if (now - _lastAutoResolve < 3600000) return; // once per hour max
   const unresolved = S.teams.filter(t => t.playIn && !t.playInResolved);
   if (unresolved.length === 0) return;
+  _lastAutoResolve = now;
   const dateCandidates = [];
   for (let d = 14; d <= 21; d++) dateCandidates.push(`${S.year}03${String(d).padStart(2,'0')}`);
   const results = await Promise.allSettled(dateCandidates.map(ds => espn.fetchScoreboard(ds)));
@@ -3291,7 +3366,7 @@ function render(){
   } catch(e) {
     console.error('Render error:', e);
     const app = document.getElementById("app");
-    if(app) app.innerHTML = `<div style="padding:40px;text-align:center"><h2 style="color:var(--red,#c00)">Something went wrong</h2><p style="margin:12px 0;color:#666">${e.message || 'An unexpected error occurred.'}</p><button class="btn btn-primary" onclick="location.reload()">Reload</button></div>`;
+    if(app) app.innerHTML = `<div style="padding:40px;text-align:center"><h2 style="color:var(--red,#c00)">Something went wrong</h2><p style="margin:12px 0;color:#666">${escapeHtml(e.message || 'An unexpected error occurred.')}</p><button class="btn btn-primary" onclick="location.reload()">Reload</button></div>`;
   }
 }
 
@@ -4293,7 +4368,26 @@ if(urlRoom){
 
 /* ── Service Worker & Install Banner ── */
 if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('sw.js').catch(err => console.warn('SW registration failed:', err));
+  navigator.serviceWorker.register('sw.js').then(reg => {
+    reg.addEventListener('updatefound', () => {
+      const newSW = reg.installing;
+      if(!newSW) return;
+      newSW.addEventListener('statechange', () => {
+        if(newSW.state === 'activated' && navigator.serviceWorker.controller){
+          showUpdateBanner();
+        }
+      });
+    });
+  }).catch(err => console.warn('SW registration failed:', err));
+}
+
+function showUpdateBanner(){
+  if(document.getElementById('update-banner')) return;
+  const banner = document.createElement('div');
+  banner.id = 'update-banner';
+  banner.className = 'update-banner';
+  banner.innerHTML = `<span>A new version is available.</span><button class="btn-install" onclick="location.reload()">Refresh</button><button class="btn-dismiss" onclick="this.parentElement.remove()">&times;</button>`;
+  document.body.appendChild(banner);
 }
 
 let deferredInstallPrompt = null;

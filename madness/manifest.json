@@ -41,7 +41,7 @@
     },
     {
       "name": "Leaderboard",
-      "short_name": "Board",
+      "short_name": "Leaders",
       "url": "./?tab=leaderboard",
       "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" }]
     }
