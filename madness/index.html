@@ -3155,7 +3155,7 @@ function bottomNavHTML(_, canT) {
   const tabs = [
     { id: 'draft', label: 'Draft', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>' },
     { id: 'bracket', label: 'Bracket', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h4v4H3z"/><path d="M3 16h4v4H3z"/><path d="M17 10h4v4H17z"/><path d="M7 6h4v0"/><path d="M7 18h4v0"/><path d="M11 6v12"/><path d="M11 12h6"/></svg>' },
-    { id: 'leaderboard', label: 'Board', disabled: !canT, icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg>' },
+    { id: 'leaderboard', label: 'Board', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg>' },
     { id: 'live', label: 'Scores', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><line x1="12" y1="4" x2="12" y2="20"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M6 8h2"/><path d="M16 8h2"/><path d="M6 16h2"/><path d="M16 16h2"/></svg>' }
   ];
   return `<nav class="bottom-nav">${tabs.map(t =>
@@ -3201,7 +3201,7 @@ function render(){
     <nav class="top-nav">
       <button class="${S.phase==='draft'?'active':''}" onclick="navigate('draft')">Draft</button>
       <button class="${S.phase==='bracket'?'active':''}" onclick="navigate('bracket')">Bracket</button>
-      <button class="${S.phase==='leaderboard'?'active':''}" ${canT?'':'disabled'} onclick="navigate('leaderboard')">Leaderboard</button>
+      <button class="${S.phase==='leaderboard'?'active':''}" onclick="navigate('leaderboard')">Leaderboard</button>
       <button class="${S.phase==='live'?'active':''}" onclick="navigate('live')">Live Scores</button>
       ${adminUnlocked ? `<button class="${S.phase==='settings'?'active':''}" onclick="navigate('settings')">Settings</button>` : ''}
     </nav>
