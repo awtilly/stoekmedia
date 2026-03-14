@@ -3640,19 +3640,30 @@ function renderDraft(c){
     </div>`;
     return;
   }
+  const myId = getMyPlayerId();
+  // After draft is complete, show only the player's own roster
+  if(ds.complete){
+    const myP = myId ? S.players.find(p => p.id === myId) : null;
+    const pt = myP ? S.teams.filter(t => myP.teamIds.includes(t.id)).sort((a,b) => a.seed - b.seed) : [];
+    c.innerHTML = `<div class="section-title">Your Team</div>
+    ${myP ? `<div class="card"><span class="label">Team ${escapeHtml(myP.name)} (${pt.length} teams)</span>
+      ${pt.map(t => { const w = (S.games||[]).filter(g => g.wid===t.id).length; const el = (S.games||[]).some(g => (g.t1===t.id||g.t2===t.id) && g.wid && g.wid!==t.id); return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--g100)">${teamLogoHTML(t, 24)}${seedBadge(t.seed)}<div style="flex:1"><div style="font-weight:600">${escapeHtml(teamDisplayName(t))}</div><div style="font-size:11px;color:var(--g400)">${t.region}</div></div><div style="text-align:right">${el ? '<span style="color:var(--red);font-weight:700">Eliminated</span>' : `<span style="color:var(--green);font-weight:700">${w > 0 ? w + 'W' : 'Alive'}</span>`}</div></div>`}).join('')}
+    </div>` : '<div class="card" style="text-align:center;padding:20px;color:var(--g400)">Join as a player to see your team.</div>'}
+    ${adminUnlocked ? `<div style="margin-top:14px"><div class="row" style="gap:6px;justify-content:center"><button class="btn btn-secondary btn-sm" onclick="undoDraft()" ${ds.cp === 0 ? 'disabled' : ''}>Undo Last Pick</button><button class="btn btn-danger btn-sm" onclick="resetDraft()">Reset Draft</button></div></div>` : ''}`;
+    return;
+  }
   const all = S.players.flatMap(p => p.teamIds);
   const av = S.teams.filter(t => !all.includes(t.id)).filter(t => S.fr === "All" || t.region === S.fr).filter(t => S.fs === "All" || t.seed === Number(S.fs)).sort((a,b) => a.seed - b.seed || a.name.localeCompare(b.name));
   const cid = ds.order[ds.cp], cp = S.players.find(p => p.id === cid);
-  const myId = getMyPlayerId();
   const isMyTurn = adminUnlocked || myId === ds.order[ds.cp];
   c.innerHTML = `<div class="row" style="justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
-    <div class="section-title">${ds.complete ? 'Draft Complete' : 'Snake Draft'}</div>
-    <div class="row" style="gap:6px">${adminUnlocked && ds.timerDuration > 0 && !ds.complete ? `
+    <div class="section-title">Snake Draft</div>
+    <div class="row" style="gap:6px">${adminUnlocked && ds.timerDuration > 0 ? `
       ${ds.timerPaused
         ? '<button class="btn btn-primary btn-sm" onclick="resumeDraftClock()">Resume Clock</button>'
         : '<button class="btn btn-secondary btn-sm" onclick="pauseDraftClock()">Pause Clock</button>'}
     ` : ''}<button class="btn btn-secondary btn-sm" onclick="undoDraft()" ${ds.cp === 0 ? 'disabled' : ''}>Undo</button><button class="btn btn-danger btn-sm" onclick="resetDraft()">Reset</button></div></div>
-  ${!ds.complete ? (() => {
+  ${(() => {
     let lastPickHTML = '';
     if(ds.cp > 0){
       const prevPid = ds.order[ds.cp - 1];
@@ -3674,15 +3685,15 @@ function renderDraft(c){
     const _isMyTurn = _turnMyId === ds.order[ds.cp];
     const _turnMsg = _isMyTurn ? `<div class="turn-indicator your-turn">Your turn to pick!</div>` : `<div class="turn-indicator waiting">Waiting for ${escapeHtml(cp?.name || '')}...</div>`;
     return `<div class="card active-pick" style="margin-bottom:14px">${lastPickHTML}<div style="font-size:12px;font-weight:700;color:var(--g500);text-transform:uppercase;letter-spacing:.8px">Pick ${ds.cp+1} of ${ds.order.length} — Round ${Math.floor(ds.cp/S.players.length)+1}</div><div class="pick-row"><div style="font-size:20px;font-weight:800;color:var(--gold)">${escapeHtml(cp?.name || '')}'s Pick</div><div id="draft-timer" class="draft-timer" style="display:${ds.pickDeadline || ds.timerPaused ? 'inline' : 'none'}"></div></div>${upNextHTML}<div class="progress-bar"><div class="progress-fill" style="width:${(ds.cp/ds.order.length)*100}%"></div></div></div>${_turnMyId ? _turnMsg : ''}`;
-  })() : ''}
+  })()}
   <div class="draft-grid"><div>
     <div class="row" style="margin-bottom:10px;gap:8px;flex-wrap:wrap">
       <select onchange="S.fr=this.value;render()" style="width:130px"><option value="All" ${S.fr==='All'?'selected':''}>All Regions</option>${REGIONS.map(r => `<option value="${r}" ${S.fr===r?'selected':''}>${r}</option>`).join('')}</select>
       <select onchange="S.fs=this.value;render()" style="width:110px"><option value="All" ${S.fs==='All'?'selected':''}>All Seeds</option>${SEEDS.map(s => `<option value="${s}" ${String(S.fs)===String(s)?'selected':''}>Seed ${s}</option>`).join('')}</select>
       <span style="color:var(--g400);font-size:12px">${av.length} available</span></div>
-    <div class="draft-teams">${av.map(t => `<button class="pick-btn" onclick="pickTeam('${t.id}')" ${!isMyTurn || ds.complete ? 'disabled' : ''}>${teamLogoHTML(t, 20)}${seedBadge(t.seed)}<div><div style="font-weight:600">${escapeHtml(teamDisplayName(t))}</div><div style="font-size:11px;color:var(--g400)">${t.region}${teamRecordDisplay(t) ? ` · ${teamRecordDisplay(t)}` : ''}</div></div></button>`).join('')}</div></div>
+    <div class="draft-teams">${av.map(t => `<button class="pick-btn" onclick="pickTeam('${t.id}')" ${!isMyTurn ? 'disabled' : ''}>${teamLogoHTML(t, 20)}${seedBadge(t.seed)}<div><div style="font-weight:600">${escapeHtml(teamDisplayName(t))}</div><div style="font-size:11px;color:var(--g400)">${t.region}${teamRecordDisplay(t) ? ` · ${teamRecordDisplay(t)}` : ''}</div></div></button>`).join('')}</div></div>
   <div><span class="label">Rosters</span>
-    ${S.players.map(p => {const pt = S.teams.filter(t => p.teamIds.includes(t.id)).sort((a,b) => a.seed - b.seed); const act = p.id === cid && !ds.complete; const _isMe = p.id === myId; return `<div class="roster-card ${act?'active':''}"><div class="row" style="justify-content:space-between;margin-bottom:4px"><span style="font-weight:700;font-size:13px;color:${act?'var(--gold)':'var(--black)'}">${escapeHtml(p.name)}${_isMe?' <span class="you-label">(you)</span>':''}</span><span style="color:var(--g400);font-size:11px">${pt.length}</span></div>${pt.map(t => `<div style="display:flex;align-items:center;gap:5px;font-size:12px;padding:1px 0">${teamLogoHTML(t, 20)}${seedBadge(t.seed)} ${escapeHtml(teamDisplayName(t))}</div>`).join('')}</div>`}).join('')}
+    ${S.players.map(p => {const pt = S.teams.filter(t => p.teamIds.includes(t.id)).sort((a,b) => a.seed - b.seed); const act = p.id === cid; const _isMe = p.id === myId; return `<div class="roster-card ${act?'active':''}"><div class="row" style="justify-content:space-between;margin-bottom:4px"><span style="font-weight:700;font-size:13px;color:${act?'var(--gold)':'var(--black)'}">${escapeHtml(p.name)}${_isMe?' <span class="you-label">(you)</span>':''}</span><span style="color:var(--g400);font-size:11px">${pt.length}</span></div>${pt.map(t => `<div style="display:flex;align-items:center;gap:5px;font-size:12px;padding:1px 0">${teamLogoHTML(t, 20)}${seedBadge(t.seed)} ${escapeHtml(teamDisplayName(t))}</div>`).join('')}</div>`}).join('')}
   </div></div>`;
 }
 
@@ -4078,7 +4089,8 @@ function renderLeaderboard(c){
   const myId = getMyPlayerId();
   const myIdx = myId ? sc.findIndex(s => s.pid === myId) : -1;
   const mySc = myIdx >= 0 ? sc[myIdx] : null;
-  const myAlive = mySc ? S.teams.filter(t => mySc.pid && S.players.find(p=>p.id===mySc.pid)?.teamIds.includes(t.id)).filter(t => !(S.games||[]).some(g => (g.t1===t.id||g.t2===t.id) && g.wid && g.wid!==t.id)).length : 0;
+  function aliveCount(pid){ const p = S.players.find(p=>p.id===pid); if(!p) return 0; return p.teamIds.filter(tid => !(S.games||[]).some(g => (g.t1===tid||g.t2===tid) && g.wid && g.wid!==tid)).length; }
+  const myAlive = mySc ? aliveCount(mySc.pid) : 0;
   c.innerHTML = `<div class="section-title">Leaderboard</div>
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
     <p class="section-desc" style="margin:0"></p>
@@ -4092,11 +4104,11 @@ function renderLeaderboard(c){
     ${myIdx > 0 ? `<div class="stat">${sc[myIdx-1].tot - mySc.tot} pts behind #${myIdx}</div>` : ''}${myIdx < sc.length-1 && myIdx >= 0 ? `<div class="stat">${mySc.tot - sc[myIdx+1].tot} pts ahead of #${myIdx+2}</div>` : ''}</div>
   </div></div>` : ''}
   <div class="row" style="gap:12px;margin-bottom:24px;flex-wrap:wrap">
-    ${sc.slice(0,3).map((s,i) => `<div class="podium-card ${i===0?'first':''} ${s.pid===myId?'mine':''}"><div style="font-size:28px;margin-bottom:2px">${md[i]||''}</div><div style="font-size:16px;font-weight:800">${escapeHtml(s.name)}${s.pid===myId?' <span class="you-label">(you)</span>':''}</div><div class="podium-pts">${s.tot}</div><div style="font-size:11px;color:var(--g400)">points</div></div>`).join('')}</div>
-  <div class="card" style="margin-bottom:14px"><span class="label">Points by Round</span><div style="overflow-x:auto"><table><thead><tr><th>Player</th>${[1,2,3,4,5,6].map(r => `<th style="text-align:center;font-size:10px">${RN[r].replace('Round of ','R')}</th>`).join('')}<th style="text-align:center;color:var(--gold)">Total</th></tr></thead><tbody>
-    ${sc.map((s,i) => `<tr class="${s.pid===myId?'lb-row-mine':''}" style="background:${i%2===0?'var(--g50)':'var(--white)'}"><td style="font-weight:700"><span style="color:var(--g300);margin-right:6px">#${i+1}</span>${escapeHtml(s.name)}${s.pid===myId?' <span class="you-label">(you)</span>':''}</td>${[1,2,3,4,5,6].map(r => `<td class="${s.rp[r]>0?'val':'dim'}">${s.rp[r]}</td>`).join('')}<td class="pts">${s.tot}</td></tr>`).join('')}</tbody></table></div></div>
+    ${sc.slice(0,3).map((s,i) => `<div class="podium-card ${i===0?'first':''} ${s.pid===myId?'mine':''}"><div style="font-size:28px;margin-bottom:2px">${md[i]||''}</div><div style="font-size:16px;font-weight:800">${escapeHtml(s.name)}${s.pid===myId?' <span class="you-label">(you)</span>':''}</div><div class="podium-pts">${s.tot}</div><div style="font-size:11px;color:var(--g400)">points</div><div style="font-size:11px;color:var(--g400)">${aliveCount(s.pid)} alive</div></div>`).join('')}</div>
+  <div class="card" style="margin-bottom:14px"><span class="label">Points by Round</span><div style="overflow-x:auto"><table><thead><tr><th>Player</th>${[1,2,3,4,5,6].map(r => `<th style="text-align:center;font-size:10px">${RN[r].replace('Round of ','R')}</th>`).join('')}<th style="text-align:center;color:var(--gold)">Total</th><th style="text-align:center;font-size:10px">Alive</th></tr></thead><tbody>
+    ${sc.map((s,i) => `<tr class="${s.pid===myId?'lb-row-mine':''}" style="background:${i%2===0?'var(--g50)':'var(--white)'}"><td style="font-weight:700"><span style="color:var(--g300);margin-right:6px">#${i+1}</span>${escapeHtml(s.name)}${s.pid===myId?' <span class="you-label">(you)</span>':''}</td>${[1,2,3,4,5,6].map(r => `<td class="${s.rp[r]>0?'val':'dim'}">${s.rp[r]}</td>`).join('')}<td class="pts">${s.tot}</td><td style="text-align:center;font-size:12px;color:var(--g500)">${aliveCount(s.pid)}</td></tr>`).join('')}</tbody></table></div></div>
   <div class="card" style="margin-bottom:14px"><span class="label">Score Bars</span>
-    ${sc.map(s => `<div class="row" style="margin-bottom:6px"><span style="width:70px;font-weight:700;font-size:13px;text-align:right">${escapeHtml(s.name)}${s.pid===myId?' <span class="you-label">you</span>':''}</span><div class="bar-container"><div class="bar-fill ${s.pid===myId?'mine':''}" style="width:${(s.tot/mx)*100}%"></div></div><span style="width:36px;font-weight:800;font-size:14px;color:var(--gold)">${s.tot}</span></div>`).join('')}</div>
+    ${sc.map(s => `<div class="row" style="margin-bottom:6px"><span style="width:70px;font-weight:700;font-size:13px;text-align:right">${escapeHtml(s.name)}${s.pid===myId?' <span class="you-label">you</span>':''}</span><div class="bar-container"><div class="bar-fill ${s.pid===myId?'mine':''}" style="width:${(s.tot/mx)*100}%"></div></div><span style="width:36px;font-weight:800;font-size:14px;color:var(--gold)">${s.tot}</span><span style="width:40px;font-size:11px;color:var(--g400);text-align:center">${aliveCount(s.pid)}&#x1f7e2;</span></div>`).join('')}</div>
   <div class="card"><span class="label">Team Rosters & Status</span>
     ${S.players.map(p => {const isMe = p.id === myId; const pt = S.teams.filter(t => p.teamIds.includes(t.id)).sort((a,b) => a.seed - b.seed); return `<div class="${isMe?'roster-mine':''}" style="${isMe?'':'margin-bottom:14px'}"><h4 style="font-weight:700;margin-bottom:6px;font-size:14px">${escapeHtml(p.name)}${isMe?' <span class="you-label">(you)</span>':''}</h4><div class="row" style="flex-wrap:wrap;gap:5px">${pt.map(t => {const w = (S.games||[]).filter(g => g.wid===t.id).length; const el = (S.games||[]).some(g => (g.t1===t.id||g.t2===t.id) && g.wid && g.wid!==t.id); return `<span class="tag ${el?'tag-elim':'tag-alive'}">${teamLogoHTML(t, 16)}${seedBadge(t.seed)} ${escapeHtml(teamDisplayName(t))}${w>0?`<span style="color:var(--green);font-weight:700">W${w}</span>`:''}${el?'<span style="color:var(--red)">\u2715</span>':''}</span>`}).join('')}</div></div>`}).join('')}</div>`;
 }
