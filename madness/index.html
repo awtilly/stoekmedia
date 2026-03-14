@@ -2156,6 +2156,7 @@ async function checkGameFinals() {
 
   // Build a set of ESPN IDs for teams in this room
   const roomEspnIds = new Set(S.teams.map(t => t.espnId).filter(Boolean));
+  let advanced = false;
 
   for (const game of liveScores) {
     if (game.state !== 'post' || !game.completed) continue;
@@ -2199,7 +2200,68 @@ async function checkGameFinals() {
     } catch (err) {
       console.warn('Failed to report game final:', game.id, err);
     }
+
+    // Auto-advance bracket
+    if (autoAdvanceBracket(game)) advanced = true;
   }
+
+  if (advanced) {
+    syncGames();
+    saveState();
+    render();
+  }
+}
+
+function autoAdvanceBracket(game) {
+  const winner = game.away.winner ? game.away : game.home;
+  const winnerTeam = S.teams.find(t => t.espnId === winner.espnId);
+  if (!winnerTeam) return false;
+
+  // Check regional bracket slots (indices 0-14 per region)
+  for (const region of REGIONS) {
+    for (let gi = 0; gi < 15; gi++) {
+      if (S.bracket[region][gi]) continue; // already filled
+      const t0 = getTeamForSlot(region, gi, 0);
+      const t1 = getTeamForSlot(region, gi, 1);
+      if (!t0 || !t1) continue;
+      if ((t0.espnId === game.away.espnId && t1.espnId === game.home.espnId) ||
+          (t0.espnId === game.home.espnId && t1.espnId === game.away.espnId)) {
+        S.bracket[region][gi] = winnerTeam.id;
+        return true;
+      }
+    }
+  }
+
+  // Check Final Four semis (ff[0], ff[1])
+  const ffPairs = [[0,1],[2,3]];
+  for (let fi = 0; fi < 2; fi++) {
+    if (S.bracket.ff[fi]) continue;
+    const t0id = S.bracket[REGIONS[ffPairs[fi][0]]][14];
+    const t1id = S.bracket[REGIONS[ffPairs[fi][1]]][14];
+    if (!t0id || !t1id) continue;
+    const t0 = S.teams.find(t => t.id === t0id);
+    const t1 = S.teams.find(t => t.id === t1id);
+    if (!t0 || !t1) continue;
+    if ((t0.espnId === game.away.espnId && t1.espnId === game.home.espnId) ||
+        (t0.espnId === game.home.espnId && t1.espnId === game.away.espnId)) {
+      S.bracket.ff[fi] = winnerTeam.id;
+      return true;
+    }
+  }
+
+  // Check Championship (ff[2])
+  if (!S.bracket.ff[2] && S.bracket.ff[0] && S.bracket.ff[1]) {
+    const t0 = S.teams.find(t => t.id === S.bracket.ff[0]);
+    const t1 = S.teams.find(t => t.id === S.bracket.ff[1]);
+    if (t0 && t1 &&
+        ((t0.espnId === game.away.espnId && t1.espnId === game.home.espnId) ||
+         (t0.espnId === game.home.espnId && t1.espnId === game.away.espnId))) {
+      S.bracket.ff[2] = winnerTeam.id;
+      return true;
+    }
+  }
+
+  return false;
 }
 
 function startLiveRefresh() {
