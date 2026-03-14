@@ -3931,7 +3931,6 @@ function renderBracket(c){
   const reg = S.bracketRegion;
   c.innerHTML = `
     <div class="section-title">Bracket</div>
-    <p class="section-desc">Click to advance. Right-click or long-press to clear a pick.</p>
     <div style="display:flex;gap:4px;margin-bottom:16px;overflow-x:auto;-webkit-overflow-scrolling:touch">
       ${REGIONS.map(r => `<button class="round-tab" style="${reg===r?'background:var(--gold-bg);color:var(--gold)':''};flex-shrink:0" onclick="S.bracketRegion='${r}';render()">${r}</button>`).join('')}
       <button class="round-tab" style="${reg==='ff'?'background:var(--gold-bg);color:var(--gold)':''};flex-shrink:0" onclick="S.bracketRegion='ff';render()">Final Four</button>
@@ -4078,9 +4077,7 @@ function renderFF(){
         </div>
       </div>
     </div>
-    <div style="text-align:center;margin-top:12px;font-size:12px;color:var(--g400)">
-      Click to advance. Right-click or long-press to clear. Region winners feed into the Final Four automatically.
-    </div>`;
+    `;
 }
 
 /* ── Leaderboard Page ── */
