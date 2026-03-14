@@ -3181,10 +3181,8 @@ function render(){
     const myId = getMyPlayerId();
     if(!myId || !S.players.some(p => p.id === myId)){ renderJoinScreen(); return; }
   }
-  // Redirect non-admin away from settings
-  let phaseChanged = false;
-  if(S.phase === 'settings' && !adminUnlocked){ S.phase = 'draft'; phaseChanged = true; }
   // Redirect legacy phases to 'draft'
+  let phaseChanged = false;
   if(S.phase === 'setup' || S.phase === 'teams'){ S.phase = 'draft'; phaseChanged = true; }
   if(phaseChanged) saveState();
   const canD = S.players.length >= 2 && S.teams.length >= S.players.length;
@@ -3196,14 +3194,14 @@ function render(){
         <button class="settings-gear" onclick="goHome()" title="Back to Lobby"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></button>
         <div><h1><span>March Madness</span> Draft</h1><div class="header-sub">${S.players.length} player${S.players.length!==1?'s':''} \u2014 ${(() => { const _hMyId = getMyPlayerId(); const _hMyP = _hMyId ? S.players.find(p => p.id === _hMyId) : null; if(!_hMyP) return S.teams.length + ' teams'; const myTids = _hMyP.teamIds || []; const alive = myTids.filter(tid => !(S.games||[]).some(g => (g.t1===tid||g.t2===tid) && g.wid && g.wid!==tid)).length; return alive + '/' + myTids.length + ' teams alive'; })()}${roomId ? ` \u00b7 <span class="room-badge" onclick="shareRoomLink()" title="Share room link"><span class="sync-dot"></span>${roomId}</span>` : ''}${!isOnline ? ' <span class="offline-badge">Offline</span>' : ''}</div></div>
       </div>
-      ${adminUnlocked ? `<button class="settings-gear" onclick="navigate('settings')" title="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg></button>` : ''}
+      <button class="settings-gear" onclick="openSettings()" title="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg></button>
     </div>
     <nav class="top-nav">
       <button class="${S.phase==='draft'?'active':''}" onclick="navigate('draft')">Draft</button>
       <button class="${S.phase==='bracket'?'active':''}" onclick="navigate('bracket')">Bracket</button>
       <button class="${S.phase==='leaderboard'?'active':''}" onclick="navigate('leaderboard')">Leaderboard</button>
       <button class="${S.phase==='live'?'active':''}" onclick="navigate('live')">Live Scores</button>
-      ${adminUnlocked ? `<button class="${S.phase==='settings'?'active':''}" onclick="navigate('settings')">Settings</button>` : ''}
+      <button class="${S.phase==='settings'?'active':''}" onclick="openSettings()">Settings</button>
     </nav>
     <div class="content-scroll">
       <div id="c"></div>
@@ -3234,6 +3232,14 @@ function render(){
     const app = document.getElementById("app");
     if(app) app.innerHTML = `<div style="padding:40px;text-align:center"><h2 style="color:var(--red,#c00)">Something went wrong</h2><p style="margin:12px 0;color:#666">${e.message || 'An unexpected error occurred.'}</p><button class="btn btn-primary" onclick="location.reload()">Reload</button></div>`;
   }
+}
+
+async function openSettings(){
+  if(!adminUnlocked){
+    const ok = await requireAdmin();
+    if(!ok) return;
+  }
+  navigate('settings');
 }
 
 function navigate(p){
