@@ -3153,7 +3153,6 @@ function scores(){
 /* ── Bottom Nav ── */
 function bottomNavHTML(_, canT) {
   const tabs = [
-    { id: 'teams', label: 'Teams', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>' },
     { id: 'draft', label: 'Draft', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>' },
     { id: 'bracket', label: 'Bracket', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h4v4H3z"/><path d="M3 16h4v4H3z"/><path d="M17 10h4v4H17z"/><path d="M7 6h4v0"/><path d="M7 18h4v0"/><path d="M11 6v12"/><path d="M11 12h6"/></svg>' },
     { id: 'leaderboard', label: 'Board', disabled: !canT, icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg>' },
@@ -3185,8 +3184,8 @@ function render(){
   // Redirect non-admin away from settings
   let phaseChanged = false;
   if(S.phase === 'settings' && !adminUnlocked){ S.phase = 'draft'; phaseChanged = true; }
-  // Redirect legacy 'setup' phase to 'draft'
-  if(S.phase === 'setup'){ S.phase = 'draft'; phaseChanged = true; }
+  // Redirect legacy phases to 'draft'
+  if(S.phase === 'setup' || S.phase === 'teams'){ S.phase = 'draft'; phaseChanged = true; }
   if(phaseChanged) saveState();
   const canD = S.players.length >= 2 && S.teams.length >= S.players.length;
   const canT = S.ds.started || S.ds.complete;
@@ -3200,7 +3199,6 @@ function render(){
       ${adminUnlocked ? `<button class="settings-gear" onclick="navigate('settings')" title="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg></button>` : ''}
     </div>
     <nav class="top-nav">
-      <button class="${S.phase==='teams'?'active':''}" onclick="navigate('teams')">Teams</button>
       <button class="${S.phase==='draft'?'active':''}" onclick="navigate('draft')">Draft</button>
       <button class="${S.phase==='bracket'?'active':''}" onclick="navigate('bracket')">Bracket</button>
       <button class="${S.phase==='leaderboard'?'active':''}" ${canT?'':'disabled'} onclick="navigate('leaderboard')">Leaderboard</button>
@@ -3213,7 +3211,7 @@ function render(){
     </div>
     ${bottomNavHTML(canD, canT)}`;
   const c = document.getElementById("c");
-  ({teams:renderTeams, draft:renderDraft, bracket:renderBracket, leaderboard:renderLeaderboard, live:renderLive, settings:renderSettings})[S.phase]?.(c);
+  ({draft:renderDraft, bracket:renderBracket, leaderboard:renderLeaderboard, live:renderLive, settings:renderSettings})[S.phase]?.(c);
   // Start/stop draft clock based on current view
   if(S.phase === 'draft' && S.ds.started && !S.ds.complete && S.ds.pickDeadline && !S.ds.timerPaused){
     startDraftClock();
@@ -4204,7 +4202,7 @@ if(urlRoom){
   syncGames();
   checkAdminSession();
   connectToRoom(roomId);
-  if (tabParam && ['live','bracket','leaderboard','draft','teams'].includes(tabParam)) {
+  if (tabParam && ['live','bracket','leaderboard','draft'].includes(tabParam)) {
     S.phase = tabParam;
   }
   render();
