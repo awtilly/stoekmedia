@@ -80,9 +80,9 @@
       <div id="dashboard-content" class="gd-hidden">
 
         <!-- Welcome + Quick Actions -->
-        <div class="gd-welcome" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:var(--space-sm);">
+        <div class="gd-welcome gd-flex-between gd-flex-wrap gd-gap-sm">
           <h1>Welcome back, <em id="welcome-name"></em></h1>
-          <div class="gd-quick-actions" style="margin:0;">
+          <div class="gd-quick-actions gd-mb-0">
             <button class="gd-btn gd-btn-primary" onclick="openDashboardAddClient()">+ New Client</button>
             <button class="gd-btn" onclick="openDashboardAddListing()">+ Add Listing</button>
           </div>
@@ -165,10 +165,10 @@
 
         <!-- URL Fetch Section -->
         <div class="gd-url-fetch-section">
-          <div class="gd-form-group" style="margin-bottom:0;">
+          <div class="gd-form-group gd-mb-0">
             <label>Import from URL</label>
-            <div style="display:flex;gap:0.5rem;">
-              <input type="url" id="dl-url" class="gd-input" placeholder="Paste a Zillow, Realtor.com, or other listing URL..." style="flex:1;">
+            <div class="gd-flex gd-gap-sm">
+              <input type="url" id="dl-url" class="gd-input gd-flex-1" placeholder="Paste a Zillow, Realtor.com, or other listing URL...">
               <button id="dl-fetch-btn" class="gd-btn gd-btn-primary" onclick="fetchDashboardListingFromUrl()">Fetch</button>
             </div>
           </div>
@@ -266,7 +266,7 @@
             </div>
           </div>
 
-          <div class="gd-form-section" style="border-bottom:none;">
+          <div class="gd-form-section gd-border-0">
             <div class="gd-form-section-title">Notes</div>
             <div class="gd-form-group">
               <textarea id="dl-notes" class="gd-input" rows="2" placeholder="Internal notes..."></textarea>
@@ -274,7 +274,7 @@
           </div>
 
           <!-- Match to Clients -->
-          <div class="gd-form-section" style="border-bottom:none;">
+          <div class="gd-form-section gd-border-0">
             <div class="gd-form-section-title">Match to Clients</div>
             <div class="gd-form-group">
               <label for="dl-client-select">Select clients to match this listing to</label>

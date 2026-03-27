@@ -117,7 +117,7 @@
                 </div>
                 <div class="gd-form-group">
                   <label for="set-emailSignature">Email Signature</label>
-                  <p class="gd-text-muted" style="margin: 0 0 0.25rem 0; font-size: 0.8rem;">Automatically appended to all outgoing emails.</p>
+                  <p class="gd-text-muted gd-text-muted-sm gd-mb-0">Automatically appended to all outgoing emails.</p>
                   <textarea id="set-emailSignature" class="gd-input gd-signature-textarea" rows="5" placeholder="Best regards,&#10;Your Name&#10;Company Name&#10;(555) 123-4567"></textarea>
                 </div>
                 <button class="gd-btn gd-btn-primary" onclick="saveProfile()">Save Profile</button>
@@ -128,11 +128,11 @@
             <div class="gd-tab-content" id="tab-documents">
               <div class="gd-card gd-settings-card">
                 <h3>Document Templates</h3>
-                <p class="gd-text-muted" style="margin: 0 0 1rem 0; font-size: 0.85rem;">
+                <p class="gd-text-muted gd-text-muted-sm gd-mb-md">
                   Upload reusable documents (purchase agreements, disclosures, etc.) that can be pulled into any client's signature flow.
                 </p>
-                <div class="gd-form-row" style="align-items: flex-end;">
-                  <div class="gd-form-group" style="flex: 1;">
+                <div class="gd-form-row" style="align-items:flex-end;">
+                  <div class="gd-form-group gd-flex-1">
                     <label for="tpl-category">Category</label>
                     <select id="tpl-category" class="gd-input">
                       <option value="contracts">Contracts</option>
@@ -147,9 +147,9 @@
                     <input type="file" id="tpl-file-input" accept=".pdf,.doc,.docx" multiple hidden>
                   </div>
                 </div>
-                <div id="tpl-progress" class="gd-hidden" style="margin-bottom: 1rem;">
+                <div id="tpl-progress" class="gd-hidden gd-mb-md">
                   <div class="gd-progress-bar"><div id="tpl-progress-fill" class="gd-progress-fill" style="width:0%"></div></div>
-                  <span id="tpl-progress-text" class="gd-text-muted" style="font-size:0.8rem;">Uploading...</span>
+                  <span id="tpl-progress-text" class="gd-text-muted gd-text-muted-sm">Uploading...</span>
                 </div>
                 <div id="template-list"></div>
               </div>
@@ -163,7 +163,7 @@
                   <span class="gd-settings-status-dot gd-connected"></span>
                   E-signatures powered by BoldSign &mdash; Connected
                 </div>
-                <p class="gd-text-muted" style="margin: 0.5rem 0 0 0; font-size: 0.85rem;">
+                <p class="gd-text-muted gd-text-muted-sm gd-mt-sm">
                   All e-signature requests are sent through the platform's BoldSign account. Contact admin to configure a dedicated BoldSign account.
                 </p>
                 <div id="boldsign-diagnostics" class="gd-diagnostics" style="display:none;">

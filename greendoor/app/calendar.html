@@ -86,7 +86,7 @@
             <button class="gd-btn gd-btn-sm" onclick="calNext()">&rarr;</button>
           </div>
           <div class="gd-calendar-title" id="cal-title">February 2026</div>
-          <div style="display:flex;gap:0.5rem;align-items:center;">
+          <div class="gd-flex-center gd-gap-sm">
             <div class="gd-calendar-view-toggle">
               <button class="gd-calendar-view-btn" data-view="month" onclick="setCalView('month')">Month</button>
               <button class="gd-calendar-view-btn active" data-view="week" onclick="setCalView('week')">Week</button>
@@ -123,7 +123,7 @@
 
   <!-- Add Event Modal -->
   <div id="event-modal" class="gd-modal-overlay">
-    <div class="gd-modal" style="max-width: 480px;">
+    <div class="gd-modal gd-modal-sm">
       <div class="gd-modal-header">
         <h3 id="event-modal-title">Add Event</h3>
         <button class="gd-modal-close" onclick="closeEventModal()" aria-label="Close">&times;</button>

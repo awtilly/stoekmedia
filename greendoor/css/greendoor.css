@@ -613,6 +613,70 @@ body.gd-light .gd-stat-card:nth-child(4) { animation-delay: 0.2s; }
   }
 }
 
+/* --- Utility Classes (replace inline styles) --- */
+.gd-flex { display: flex; }
+.gd-flex-between { display: flex; justify-content: space-between; align-items: center; }
+.gd-flex-center { display: flex; align-items: center; }
+.gd-flex-wrap { flex-wrap: wrap; }
+.gd-gap-xs { gap: 0.25rem; }
+.gd-gap-sm { gap: 0.5rem; }
+.gd-gap-md { gap: 0.75rem; }
+.gd-gap-lg { gap: 1rem; }
+.gd-flex-1 { flex: 1; min-width: 0; }
+.gd-text-muted-sm { font-size: 0.8rem; color: #64748b; }
+.gd-text-muted-xs { font-size: 0.75rem; color: #94a3b8; }
+.gd-mb-0 { margin-bottom: 0 !important; }
+.gd-mt-sm { margin-top: 0.5rem; }
+.gd-mt-md { margin-top: 1rem; }
+.gd-mt-lg { margin-top: 1.5rem; }
+.gd-mb-md { margin-bottom: 1rem; }
+.gd-text-center { text-align: center; }
+.gd-border-0 { border: none !important; }
+.gd-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0; }
+.gd-col-full { grid-column: 1 / -1; }
+
+/* --- Page Header --- */
+.gd-page-header {
+  margin-bottom: 1.5rem;
+}
+.gd-page-header h2 {
+  font-size: clamp(1.3rem, 2.5vw, 1.6rem);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: #0f172a;
+  margin: 0;
+}
+
+/* --- Modal Size Variants --- */
+body.gd-light .gd-modal-sm { max-width: 420px; }
+body.gd-light .gd-modal-md { max-width: 560px; }
+body.gd-light .gd-modal-lg { max-width: 800px; }
+
+/* --- Collapsible Section --- */
+.gd-collapsible-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  padding: 12px 0;
+  user-select: none;
+}
+.gd-collapsible-header::after {
+  content: '\\25B8';
+  font-size: 0.75rem;
+  color: #94a3b8;
+  transition: transform 0.2s ease;
+}
+.gd-collapsible-header.open::after {
+  transform: rotate(90deg);
+}
+.gd-collapsible-body {
+  display: none;
+}
+.gd-collapsible-body.open {
+  display: block;
+}
+
 /* --- Print --- */
 @media print {
   .gd-sidebar, .gd-topbar, .gd-sidebar-overlay { display: none !important; }

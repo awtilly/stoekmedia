@@ -122,7 +122,7 @@
             </div>
           </div>
 
-          <div class="gd-two-col" style="margin-top: var(--space-lg);">
+          <div class="gd-two-col gd-mt-lg">
             <!-- New Users This Month -->
             <div class="gd-card">
               <h3>New Users This Month</h3>
@@ -141,7 +141,7 @@
           </div>
 
           <!-- Recent Logins -->
-          <div class="gd-card" style="margin-top: var(--space-lg);">
+          <div class="gd-card gd-mt-lg">
             <h3>Recent Logins</h3>
             <div class="gd-table-wrap">
               <table class="gd-table">
@@ -153,7 +153,7 @@
                   </tr>
                 </thead>
                 <tbody id="recent-logins-tbody">
-                  <tr><td colspan="3" style="text-align:center; color: var(--color-text-muted);">Loading...</td></tr>
+                  <tr><td colspan="3" class="gd-text-center gd-text-muted-sm">Loading...</td></tr>
                 </tbody>
               </table>
             </div>
@@ -190,7 +190,7 @@
                 </tr>
               </thead>
               <tbody id="realtors-tbody">
-                <tr><td colspan="8" style="text-align:center; color: var(--color-text-muted);">Loading...</td></tr>
+                <tr><td colspan="8" class="gd-text-center gd-text-muted-sm">Loading...</td></tr>
               </tbody>
             </table>
           </div>
@@ -226,11 +226,11 @@
                 </tr>
               </thead>
               <tbody id="audit-tbody">
-                <tr><td colspan="5" style="text-align:center; color: var(--color-text-muted);">Select a filter and click Filter, or switch to this tab to load.</td></tr>
+                <tr><td colspan="5" class="gd-text-center gd-text-muted-sm">Select a filter and click Filter, or switch to this tab to load.</td></tr>
               </tbody>
             </table>
           </div>
-          <div style="text-align: center; margin-top: var(--space-md);">
+          <div class="gd-text-center gd-mt-md">
             <button class="gd-btn gd-btn-sm gd-hidden" id="audit-load-more" onclick="loadAuditLog(false)">Load More</button>
           </div>
         </div>
@@ -250,7 +250,7 @@
                 </tr>
               </thead>
               <tbody id="invitations-tbody">
-                <tr><td colspan="6" style="text-align:center; color: var(--color-text-muted);">Loading...</td></tr>
+                <tr><td colspan="6" class="gd-text-center gd-text-muted-sm">Loading...</td></tr>
               </tbody>
             </table>
           </div>
@@ -271,7 +271,7 @@
                 <label for="platform-support-email">Support Email</label>
                 <input type="email" id="platform-support-email" class="gd-input" placeholder="support@example.com">
               </div>
-              <button class="gd-btn gd-btn-primary gd-btn-sm" style="margin-top: var(--space-sm);" onclick="savePlatformGeneral()">Save</button>
+              <button class="gd-btn gd-btn-primary gd-btn-sm gd-mt-sm" onclick="savePlatformGeneral()">Save</button>
             </div>
 
             <!-- Default Email -->
@@ -289,12 +289,12 @@
                 <label for="email-footer">Email Footer</label>
                 <textarea id="email-footer" class="gd-input" rows="3" placeholder="Sent via GreenDoor CRM"></textarea>
               </div>
-              <button class="gd-btn gd-btn-primary gd-btn-sm" style="margin-top: var(--space-sm);" onclick="savePlatformEmail()">Save</button>
+              <button class="gd-btn gd-btn-primary gd-btn-sm gd-mt-sm" onclick="savePlatformEmail()">Save</button>
             </div>
           </div>
 
           <!-- Feature Flags -->
-          <div class="gd-card" style="margin-top: var(--space-lg);">
+          <div class="gd-card gd-mt-lg">
             <h3>Feature Flags</h3>
             <div class="gd-admin-feature-grid">
               <label class="gd-admin-feature-row">
@@ -329,9 +329,9 @@
           </div>
 
           <!-- Danger Zone -->
-          <div class="gd-card gd-admin-danger-card" style="margin-top: var(--space-lg);">
+          <div class="gd-card gd-admin-danger-card gd-mt-lg">
             <h3>Danger Zone</h3>
-            <p style="font-size: 0.85rem; color: var(--color-text-muted); margin-bottom: var(--space-md);">These actions are irreversible. Proceed with caution.</p>
+            <p class="gd-text-muted-sm gd-mb-md">These actions are irreversible. Proceed with caution.</p>
             <button class="gd-btn gd-btn-danger gd-btn-sm" onclick="exportPlatformData()">Export All Platform Data</button>
           </div>
         </div>
@@ -342,7 +342,7 @@
 
   <!-- ===================== MODAL: INVITE REALTOR ===================== -->
   <div class="gd-modal-overlay" id="invite-modal">
-    <div class="gd-modal" style="max-width: 440px;">
+    <div class="gd-modal gd-modal-sm">
       <div class="gd-modal-header">
         <h3>Invite Realtor</h3>
         <button class="gd-modal-close" onclick="closeInviteModal()">&times;</button>
@@ -357,7 +357,7 @@
           <input type="email" id="invite-email" class="gd-input" placeholder="jane@example.com">
         </div>
         <div class="gd-form-group">
-          <label for="invite-company">Company <span style="color: #9ca3af;">(optional)</span></label>
+          <label for="invite-company">Company <span class="gd-text-muted-xs">(optional)</span></label>
           <input type="text" id="invite-company" class="gd-input" placeholder="ABC Realty">
         </div>
         <p id="invite-error" class="gd-login-error"></p>
@@ -371,7 +371,7 @@
 
   <!-- ===================== MODAL: REALTOR DETAIL ===================== -->
   <div class="gd-modal-overlay" id="realtor-detail-modal">
-    <div class="gd-modal" style="max-width: 560px;">
+    <div class="gd-modal gd-modal-md">
       <div class="gd-modal-header">
         <h3>Realtor Details</h3>
         <button class="gd-modal-close" onclick="closeRealtorDetail()">&times;</button>
@@ -415,7 +415,7 @@
         <!-- Usage Stats -->
         <div class="gd-form-section">
           <div class="gd-form-section-title">Usage Stats</div>
-          <div class="gd-admin-stats-grid" style="margin-bottom: 0;">
+          <div class="gd-admin-stats-grid gd-mb-0">
             <div class="gd-stat-card" style="padding: var(--space-sm);">
               <div class="gd-stat-number" id="rd-clients" style="font-size: 1.5rem;">0</div>
               <div class="gd-stat-label">Clients</div>
@@ -436,16 +436,16 @@
         </div>
 
         <!-- Admin Notes -->
-        <div class="gd-form-section" style="border-bottom: none; margin-bottom: 0; padding-bottom: 0;">
+        <div class="gd-form-section gd-mb-0" style="border-bottom: none; padding-bottom: 0;">
           <div class="gd-form-section-title">Admin Notes</div>
-          <div class="gd-form-group" style="margin-bottom: 0;">
+          <div class="gd-form-group gd-mb-0">
             <textarea id="rd-notes" class="gd-input" rows="3" placeholder="Internal notes about this realtor..."></textarea>
           </div>
         </div>
       </div>
       <div class="gd-modal-footer">
         <button class="gd-btn gd-btn-danger gd-btn-sm" id="rd-offboard-btn" onclick="startOffboard()">Offboard Realtor</button>
-        <div style="flex: 1;"></div>
+        <div class="gd-flex-1"></div>
         <button class="gd-btn gd-btn-ghost" onclick="closeRealtorDetail()">Close</button>
         <button class="gd-btn gd-btn-primary" onclick="saveRealtorNotes()">Save Changes</button>
       </div>
@@ -454,7 +454,7 @@
 
   <!-- ===================== MODAL: OFFBOARD WIZARD ===================== -->
   <div class="gd-modal-overlay" id="offboard-modal">
-    <div class="gd-modal" style="max-width: 640px;">
+    <div class="gd-modal gd-modal-lg">
       <div class="gd-modal-header">
         <h3>Offboard Realtor</h3>
         <button class="gd-modal-close" onclick="closeOffboardModal()">&times;</button>
@@ -483,15 +483,15 @@
 
         <!-- Step 1: Review -->
         <div class="gd-admin-wizard-content" id="offboard-step-1">
-          <div class="gd-admin-danger-card" style="margin-bottom: var(--space-md); padding: var(--space-md);">
+          <div class="gd-admin-danger-card gd-mb-md" style="padding: var(--space-md);">
             <p style="font-weight: 500; color: var(--gd-red); margin-bottom: var(--space-sm);">You are about to offboard this realtor.</p>
-            <p style="font-size: 0.85rem; color: var(--color-text-muted);">This will disable their account and optionally reassign or delete their data. This action cannot be easily reversed.</p>
+            <p class="gd-text-muted-sm">This will disable their account and optionally reassign or delete their data. This action cannot be easily reversed.</p>
           </div>
           <div class="gd-form-row" style="margin-bottom: var(--space-sm);">
             <div class="gd-form-group"><label>Name</label><div id="ob-name" class="gd-admin-detail-value">—</div></div>
             <div class="gd-form-group"><label>Email</label><div id="ob-email" class="gd-admin-detail-value">—</div></div>
           </div>
-          <div class="gd-admin-stats-grid" style="margin-bottom: 0;">
+          <div class="gd-admin-stats-grid gd-mb-0">
             <div class="gd-stat-card" style="padding: var(--space-sm);">
               <div class="gd-stat-number" id="ob-clients" style="font-size: 1.3rem;">0</div>
               <div class="gd-stat-label">Clients</div>
@@ -513,15 +513,15 @@
 
         <!-- Step 2: Client Disposition -->
         <div class="gd-admin-wizard-content gd-hidden" id="offboard-step-2">
-          <div style="margin-bottom: var(--space-md);">
+          <div class="gd-mb-md">
             <label style="font-size: 0.78rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.1em; color: var(--color-text-muted);">Bulk Action</label>
-            <div style="display: flex; gap: var(--space-sm); margin-top: var(--space-xs);">
-              <select class="gd-input" id="ob-bulk-action" style="flex: 1;">
+            <div class="gd-flex gd-gap-sm gd-mt-sm">
+              <select class="gd-input gd-flex-1" id="ob-bulk-action">
                 <option value="">Select action for all...</option>
                 <option value="unassign">Leave All Unassigned</option>
                 <option value="delete">Delete All</option>
               </select>
-              <select class="gd-input gd-hidden" id="ob-bulk-reassign-target" style="flex: 1;"></select>
+              <select class="gd-input gd-hidden gd-flex-1" id="ob-bulk-reassign-target"></select>
               <button class="gd-btn gd-btn-sm" onclick="applyBulkClientAction()">Apply</button>
             </div>
           </div>
@@ -535,7 +535,7 @@
                 </tr>
               </thead>
               <tbody id="ob-clients-tbody">
-                <tr><td colspan="3" style="text-align:center; color: var(--color-text-muted);">No clients.</td></tr>
+                <tr><td colspan="3" class="gd-text-center gd-text-muted-sm">No clients.</td></tr>
               </tbody>
             </table>
           </div>
@@ -543,7 +543,7 @@
 
         <!-- Step 3: Data Handling -->
         <div class="gd-admin-wizard-content gd-hidden" id="offboard-step-3">
-          <p style="font-size: 0.85rem; color: var(--color-text-muted); margin-bottom: var(--space-md);">Select which data to clean up for this realtor.</p>
+          <p class="gd-text-muted-sm gd-mb-md">Select which data to clean up for this realtor.</p>
           <label class="gd-admin-checkbox-row">
             <input type="checkbox" id="ob-delete-files"> Delete uploaded files from Storage
           </label>
@@ -560,7 +560,7 @@
 
         <!-- Step 4: Confirm -->
         <div class="gd-admin-wizard-content gd-hidden" id="offboard-step-4">
-          <div id="ob-summary" style="font-size: 0.85rem; line-height: 1.8; margin-bottom: var(--space-md);"></div>
+          <div id="ob-summary" class="gd-text-muted-sm gd-mb-md" style="line-height: 1.8;"></div>
           <div class="gd-form-group">
             <label for="ob-confirm-email">Type realtor's email to confirm</label>
             <input type="text" id="ob-confirm-email" class="gd-input" placeholder="realtor@example.com">
@@ -571,7 +571,7 @@
 
       <div class="gd-modal-footer">
         <button class="gd-btn gd-btn-ghost gd-hidden" id="ob-back-btn" onclick="offboardPrev()">Back</button>
-        <div style="flex: 1;"></div>
+        <div class="gd-flex-1"></div>
         <button class="gd-btn gd-btn-ghost" onclick="closeOffboardModal()">Cancel</button>
         <button class="gd-btn gd-btn-primary" id="ob-next-btn" onclick="offboardNext()">Next</button>
         <button class="gd-btn gd-btn-danger gd-hidden" id="ob-confirm-btn" onclick="executeOffboard()">Offboard</button>

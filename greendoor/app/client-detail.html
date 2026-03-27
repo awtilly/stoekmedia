@@ -272,7 +272,7 @@
               </div>
             </div>
 
-            <div style="display: flex; gap: var(--space-sm); justify-content: space-between; align-items: center; flex-wrap: wrap;">
+            <div class="gd-flex-between gd-flex-wrap gd-gap-sm">
               <button type="button" class="gd-btn gd-btn-primary" onclick="saveOverview()">Save Changes</button>
               <button type="button" class="gd-btn gd-btn-danger" onclick="deleteClient()">Delete Client</button>
             </div>
@@ -384,13 +384,13 @@
                 <option value="closed">Closed</option>
               </select>
             </div>
-            <div style="display:flex;gap:0.5rem;">
+            <div class="gd-flex gd-gap-sm">
               <button class="gd-btn gd-btn-sm" onclick="openAddListingModal()">+ Add Listing</button>
               <button class="gd-btn gd-btn-primary gd-btn-sm" onclick="openMatchListingPanel()">+ Match a Listing</button>
             </div>
           </div>
           <div id="properties-grid" class="gd-property-grid">
-            <div class="gd-empty" style="grid-column: 1/-1;">
+            <div class="gd-empty gd-col-full">
               <div class="gd-empty-icon">&#127968;</div>
               <div class="gd-empty-text">No matched listings yet</div>
             </div>
@@ -410,7 +410,7 @@
             </div>
             <div id="checklist-content" style="display:none;">
               <div id="checklist-overall-progress"></div>
-              <div id="checklist-add-custom" style="margin-bottom: 16px;">
+              <div id="checklist-add-custom" class="gd-mb-md">
                 <button class="gd-btn gd-btn-sm" onclick="showAddChecklistItem()">+ Add Custom Item</button>
                 <div id="checklist-add-form" class="gd-checklist-add-form"></div>
               </div>
@@ -466,7 +466,7 @@
 
   <!-- Match-a-Listing Panel -->
   <div id="match-listing-modal" class="gd-modal-overlay">
-    <div class="gd-modal" style="max-width: 700px;">
+    <div class="gd-modal gd-modal-lg">
       <div class="gd-modal-header">
         <h3>Match a Listing</h3>
         <button class="gd-modal-close" onclick="closeMatchListingPanel()" aria-label="Close">&times;</button>
@@ -487,7 +487,7 @@
 
   <!-- Edit Match Modal -->
   <div id="edit-match-modal" class="gd-modal-overlay">
-    <div class="gd-modal" style="max-width: 500px;">
+    <div class="gd-modal gd-modal-md">
       <div class="gd-modal-header">
         <h3 id="edit-match-title">Edit Match</h3>
         <button class="gd-modal-close" onclick="closeEditMatchModal()" aria-label="Close">&times;</button>
@@ -546,7 +546,7 @@
 
   <!-- Copy to Client Modal -->
   <div id="copy-client-modal" class="gd-modal-overlay">
-    <div class="gd-modal" style="max-width: 540px;">
+    <div class="gd-modal gd-modal-md">
       <div class="gd-modal-header">
         <h3>Copy Properties to Client</h3>
         <button class="gd-modal-close" onclick="closeCopyToClientModal()" aria-label="Close">&times;</button>
@@ -562,7 +562,7 @@
           <input type="text" id="copy-client-search" class="gd-input" placeholder="Search by name or email..." oninput="filterCopyClients()">
         </div>
         <div id="copy-client-list" class="gd-copy-client-list"></div>
-        <div id="copy-progress" class="gd-hidden" style="display:flex;align-items:center;gap:0.5rem;padding:0.5rem 0;">
+        <div id="copy-progress" class="gd-hidden gd-flex-center gd-gap-sm" style="padding:0.5rem 0;">
           <div class="gd-spinner"></div>
           <span class="gd-text-muted">Copying properties...</span>
         </div>
@@ -576,7 +576,7 @@
 
   <!-- Signature Modal (Multi-doc/signer) -->
   <div id="signature-modal" class="gd-modal-overlay">
-    <div class="gd-modal" style="max-width: 740px;">
+    <div class="gd-modal gd-modal-lg">
       <div class="gd-modal-header">
         <h3>&#9997; Send for Signature</h3>
         <button class="gd-modal-close" onclick="closeSignatureModal()" aria-label="Close">&times;</button>
@@ -591,8 +591,8 @@
         <div class="gd-form-group">
           <label>Documents</label>
           <div id="sig-files-list" class="gd-sig-files-list"></div>
-          <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
-            <select id="sig-add-existing" class="gd-input" style="flex:1;min-width:150px;">
+          <div class="gd-flex gd-gap-sm gd-flex-wrap">
+            <select id="sig-add-existing" class="gd-input gd-flex-1" style="min-width:150px;">
               <option value="">+ Add from existing files...</option>
             </select>
             <div class="gd-file-input-wrapper" style="flex-shrink:0;">
@@ -649,7 +649,7 @@
         <iframe id="boldsign-embed-iframe" class="gd-boldsign-iframe" allow="clipboard-write"></iframe>
       </div>
       <div class="gd-modal-footer">
-        <span class="gd-text-muted" style="flex:1;">Drag signature fields onto the document, then click Send in the editor above.</span>
+        <span class="gd-text-muted gd-flex-1">Drag signature fields onto the document, then click Send in the editor above.</span>
         <button class="gd-btn" onclick="closeBoldSignEmbed()">Cancel</button>
       </div>
     </div>
@@ -681,7 +681,7 @@
 
   <!-- Send Document Modal -->
   <div id="send-doc-modal" class="gd-modal-overlay">
-    <div class="gd-modal" style="max-width: 540px;">
+    <div class="gd-modal gd-modal-md">
       <div class="gd-modal-header">
         <h3>Send Documents</h3>
         <button class="gd-modal-close" onclick="closeSendDocModal()" aria-label="Close">&times;</button>
@@ -721,7 +721,7 @@
 
   <!-- Showing Modal -->
   <div id="showing-modal" class="gd-modal-overlay">
-    <div class="gd-modal" style="max-width: 540px;">
+    <div class="gd-modal gd-modal-md">
       <div class="gd-modal-header">
         <h3 id="showing-modal-title">Add Showing</h3>
         <button class="gd-modal-close" onclick="closeShowingModal()" aria-label="Close">&times;</button>
@@ -774,7 +774,7 @@
 
   <!-- Complete Showing Modal -->
   <div id="complete-showing-modal" class="gd-modal-overlay">
-    <div class="gd-modal" style="max-width: 480px;">
+    <div class="gd-modal gd-modal-sm">
       <div class="gd-modal-header">
         <h3>Complete Showing</h3>
         <button class="gd-modal-close" onclick="closeCompleteShowingModal()" aria-label="Close">&times;</button>
@@ -811,7 +811,7 @@
 
   <!-- Follow-up Modal -->
   <div id="followup-modal" class="gd-modal-overlay">
-    <div class="gd-modal" style="max-width: 480px;">
+    <div class="gd-modal gd-modal-sm">
       <div class="gd-modal-header">
         <h3>Add Follow-up</h3>
         <button class="gd-modal-close" onclick="closeFollowUpModal()" aria-label="Close">&times;</button>
@@ -858,10 +858,10 @@
 
         <!-- URL Fetch Section -->
         <div class="gd-url-fetch-section">
-          <div class="gd-form-group" style="margin-bottom:0;">
+          <div class="gd-form-group gd-mb-0">
             <label>Import from URL</label>
-            <div style="display:flex;gap:0.5rem;">
-              <input type="url" id="al-url" class="gd-input" placeholder="Paste a Zillow, Realtor.com, or other listing URL..." style="flex:1;">
+            <div class="gd-flex gd-gap-sm">
+              <input type="url" id="al-url" class="gd-input gd-flex-1" placeholder="Paste a Zillow, Realtor.com, or other listing URL...">
               <button id="al-fetch-btn" class="gd-btn gd-btn-primary" onclick="fetchListingFromUrl()">Fetch</button>
             </div>
           </div>
@@ -959,7 +959,7 @@
             </div>
           </div>
 
-          <div class="gd-form-section" style="border-bottom:none;">
+          <div class="gd-form-section gd-border-0">
             <div class="gd-form-section-title">Notes</div>
             <div class="gd-form-group">
               <textarea id="al-notes" class="gd-input" rows="2" placeholder="Internal notes..."></textarea>
