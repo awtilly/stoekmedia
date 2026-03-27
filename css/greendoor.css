@@ -209,7 +209,7 @@ body.gd-light nav.nav.scrolled {
 }
 
 .gd-topbar-title {
-  font-size: 0.95rem;
+  font-size: 1.05rem;
   font-weight: 600;
   color: #1e293b;
   letter-spacing: -0.01em;
@@ -250,8 +250,8 @@ body.gd-light .gd-page {
 }
 
 body.gd-light .gd-content {
-  padding: 28px 32px 80px;
-  max-width: 1200px;
+  padding: 28px 32px 48px !important;
+  max-width: 1400px !important;
   margin: 0 auto;
 }
 
@@ -260,7 +260,7 @@ body.gd-light .gd-stat-card {
   background: #ffffff;
   border: 1px solid #e5e7eb;
   border-radius: var(--gd-radius-md);
-  padding: 20px 24px;
+  padding: 24px 28px !important;
   box-shadow: var(--gd-shadow-xs);
   transition: all 0.2s ease;
   text-align: left;
@@ -273,7 +273,7 @@ body.gd-light .gd-stat-card:hover {
 }
 
 body.gd-light .gd-stat-number {
-  font-size: clamp(1.5rem, 3vw, 1.75rem);
+  font-size: clamp(2rem, 2.5vw, 2.75rem) !important;
   font-weight: 700;
   letter-spacing: -0.02em;
   color: #0f172a;
@@ -295,6 +295,7 @@ body.gd-light .gd-card {
   border-radius: var(--gd-radius-md);
   box-shadow: var(--gd-shadow-xs);
   transition: box-shadow 0.2s ease;
+  padding: 24px !important;
 }
 
 body.gd-light .gd-card:hover {
@@ -303,6 +304,7 @@ body.gd-light .gd-card:hover {
 
 body.gd-light .gd-card h3 {
   font-weight: 600;
+  font-size: 1.15rem !important;
   letter-spacing: -0.01em;
   color: #0f172a;
 }
@@ -311,17 +313,17 @@ body.gd-light .gd-card h3 {
 body.gd-light .gd-table th {
   background: #f8fafc;
   font-weight: 600;
-  font-size: 0.75rem;
+  font-size: 0.8rem !important;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
   color: #64748b;
   border-bottom: 1px solid #e5e7eb;
-  padding: 10px 16px;
+  padding: 12px 16px !important;
 }
 
 body.gd-light .gd-table td {
-  padding: 12px 16px;
-  font-size: 0.875rem;
+  padding: 14px 16px !important;
+  font-size: 0.9rem !important;
   color: #334155;
   border-bottom: 1px solid #f1f5f9;
 }
@@ -347,8 +349,8 @@ body.gd-light .gd-table a:hover {
 body.gd-light .gd-input {
   border: 1.5px solid #e2e8f0;
   border-radius: var(--gd-radius-sm);
-  padding: 10px 14px;
-  font-size: 0.875rem;
+  padding: 11px 14px !important;
+  font-size: 0.9rem !important;
   font-family: 'Inter', sans-serif;
   background: #ffffff;
   color: #0f172a;
@@ -370,10 +372,14 @@ body.gd-light select.gd-input {
 }
 
 body.gd-light .gd-form-group label {
-  font-size: 0.8rem;
+  font-size: 0.82rem;
   font-weight: 500;
   color: #475569;
-  margin-bottom: 6px;
+  margin-bottom: 8px !important;
+}
+
+body.gd-light .gd-form-group {
+  margin-bottom: 20px !important;
 }
 
 body.gd-light .gd-form-section-title {
@@ -390,9 +396,9 @@ body.gd-light .gd-form-section-title {
 body.gd-light .gd-btn {
   border-radius: var(--gd-radius-sm);
   font-weight: 500;
-  font-size: 0.85rem;
+  font-size: 0.88rem !important;
   font-family: 'Inter', sans-serif;
-  padding: 9px 16px;
+  padding: 10px 20px !important;
   transition: all 0.15s ease;
   border: 1.5px solid #d1d5db;
   background: #ffffff;
@@ -422,9 +428,9 @@ body.gd-light .gd-btn-primary:hover {
 /* --- Component Overrides: Badges --- */
 body.gd-light [class*="gd-badge-"] {
   border-radius: 6px;
-  font-size: 0.7rem;
+  font-size: 0.75rem !important;
   font-weight: 600;
-  padding: 3px 8px;
+  padding: 4px 10px !important;
   letter-spacing: 0.01em;
 }
 
@@ -497,10 +503,19 @@ body.gd-light .gd-tab.active {
   font-weight: 600;
 }
 
+/* --- Component Overrides: Layout Gaps --- */
+body.gd-light .gd-stats-row {
+  gap: 20px !important;
+}
+
+body.gd-light .gd-two-col {
+  gap: 28px !important;
+}
+
 /* --- Component Overrides: Activity --- */
 body.gd-light .gd-activity-item {
   border-radius: var(--gd-radius-sm);
-  padding: 12px 14px;
+  padding: 14px 16px !important;
   transition: background 0.15s ease;
 }
 
@@ -521,15 +536,19 @@ body.gd-light .gd-activity-icon {
 /* --- Component Overrides: Section Headers --- */
 body.gd-light .gd-section-header h2 {
   font-family: 'Inter', sans-serif;
-  font-size: clamp(1.2rem, 2.5vw, 1.5rem);
+  font-size: clamp(1.3rem, 2.5vw, 1.6rem) !important;
   font-weight: 600;
   letter-spacing: -0.01em;
   color: #0f172a;
 }
 
+body.gd-light .gd-section-header {
+  margin-bottom: 24px !important;
+}
+
 /* --- Component Overrides: Welcome --- */
 body.gd-light .gd-welcome h1 {
-  font-size: clamp(1.4rem, 3vw, 1.8rem);
+  font-size: clamp(1.6rem, 3vw, 2rem) !important;
   font-weight: 600;
   letter-spacing: -0.02em;
   color: #0f172a;
@@ -653,7 +672,7 @@ body.gd-light .gd-stat-card:nth-child(4) { animation-delay: 0.2s; }
   margin-bottom: 1.5rem;
 }
 .gd-page-header h2 {
-  font-size: clamp(1.4rem, 3vw, 1.8rem);
+  font-size: clamp(1.5rem, 3vw, 2rem);
   font-weight: 600;
   letter-spacing: -0.02em;
   color: #0f172a;
@@ -792,15 +811,15 @@ body.gd-light .gd-modal-lg { max-width: 800px; }
   background: #ffffff;
   border: 1px solid #e5e7eb;
   border-radius: var(--gd-radius-sm);
-  padding: 10px 12px;
+  padding: 12px 14px;
   cursor: grab;
   transition: all 0.15s ease;
   user-select: none;
 }
 .gd-pipeline-card:hover { border-color: #d1d5db; box-shadow: var(--gd-shadow-sm); }
 .gd-pipeline-card.dragging { opacity: 0.5; transform: rotate(2deg); }
-.gd-pipeline-card-name { font-size: 0.82rem; font-weight: 500; color: #0f172a; margin-bottom: 4px; }
-.gd-pipeline-card-meta { display: flex; gap: 8px; font-size: 0.68rem; color: #94a3b8; }
+.gd-pipeline-card-name { font-size: 0.88rem; font-weight: 500; color: #0f172a; margin-bottom: 4px; }
+.gd-pipeline-card-meta { display: flex; gap: 8px; font-size: 0.75rem; color: #94a3b8; }
 
 @media (max-width: 1024px) {
   .gd-pipeline-board {
