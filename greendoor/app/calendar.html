@@ -150,15 +150,27 @@
         <div class="gd-sig-option-row">
           <input type="checkbox" id="ev-allday"> <label for="ev-allday">All day</label>
         </div>
-        <div class="gd-form-group">
-          <label for="ev-color">Color</label>
-          <select id="ev-color" class="gd-input">
-            <option value="#3b82f6">Blue</option>
-            <option value="#22c55e">Green</option>
-            <option value="#f59e0b">Amber</option>
-            <option value="#ef4444">Red</option>
-            <option value="#8b5cf6">Purple</option>
-          </select>
+        <div class="gd-form-row">
+          <div class="gd-form-group">
+            <label for="ev-color">Color</label>
+            <select id="ev-color" class="gd-input">
+              <option value="#3b82f6">Blue</option>
+              <option value="#22c55e">Green</option>
+              <option value="#f59e0b">Amber</option>
+              <option value="#ef4444">Red</option>
+              <option value="#8b5cf6">Purple</option>
+            </select>
+          </div>
+          <div class="gd-form-group" id="ev-recurrence-group">
+            <label for="ev-recurrence">Repeat</label>
+            <select id="ev-recurrence" class="gd-input">
+              <option value="none">Does not repeat</option>
+              <option value="daily">Daily</option>
+              <option value="weekly">Weekly</option>
+              <option value="biweekly">Every 2 weeks</option>
+              <option value="monthly">Monthly</option>
+            </select>
+          </div>
         </div>
         <div class="gd-form-group">
           <label for="ev-client">Client (optional)</label>

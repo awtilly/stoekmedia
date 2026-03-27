@@ -103,6 +103,13 @@ window.saveClient = async function () {
   const user = auth.currentUser;
   if (!user) return;
 
+  // Duplicate detection by email
+  const dupeMatch = allClients.find(c => c.email && c.email.toLowerCase() === email.toLowerCase());
+  if (dupeMatch) {
+    const confirmed = confirm(`A client with email "${email}" already exists (${dupeMatch.fullName}). Add anyway?`);
+    if (!confirmed) return;
+  }
+
   const data = {
     realtorId: user.uid,
     fullName,
