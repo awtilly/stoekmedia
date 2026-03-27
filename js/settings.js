@@ -47,6 +47,7 @@ onAuthStateChanged(auth, async (user) => {
   }
 
   await loadTemplates(user.uid);
+  await loadSequences(user.uid);
   renderEmailSenderStatus(profile);
   renderShowingTimeIntegration(profile);
 
@@ -524,5 +525,162 @@ window.disconnectShowingTime = async function () {
   } catch (e) {
     console.error("Disconnect ShowingTime error:", e);
     showToast("Failed to disconnect ShowingTime.", "error");
+  }
+};
+
+/* ===== FOLLOW-UP SEQUENCES ===== */
+const createSequenceFn = httpsCallable(functions, "createSequence");
+const getCalendarFeedUrlFn = httpsCallable(functions, "getCalendarFeedUrl");
+
+let stepCounter = 1;
+
+async function loadSequences(uid) {
+  const q = query(collection(db, "followUpSequences"), where("realtorId", "==", uid), orderBy("createdAt", "desc"));
+  const snap = await getDocs(q);
+  const container = document.getElementById("sequences-list");
+  if (!container) return;
+
+  if (snap.empty) {
+    container.innerHTML = '<p class="gd-text-muted-sm">No sequences yet. Create one to start automating follow-ups.</p>';
+    return;
+  }
+
+  container.innerHTML = snap.docs.map(d => {
+    const s = d.data();
+    const stepCount = s.steps?.length || 0;
+    return `
+      <div class="gd-card gd-settings-card" style="margin-bottom:0.75rem;padding:14px 18px;">
+        <div class="gd-flex-between">
+          <div>
+            <strong>${escapeHtml(s.name)}</strong>
+            <span class="gd-text-muted-xs" style="margin-left:8px;">${stepCount} step${stepCount !== 1 ? "s" : ""}</span>
+          </div>
+          <button class="gd-btn gd-btn-sm" style="color:var(--gd-red);" onclick="deleteSequence('${d.id}')">Delete</button>
+        </div>
+        <div class="gd-text-muted-xs gd-mt-sm">
+          ${(s.steps || []).map((step, i) => `Day ${step.delayDays}: ${escapeHtml(step.subject)}`).join(" &rarr; ")}
+        </div>
+      </div>`;
+  }).join("");
+}
+
+window.openCreateSequenceModal = function () {
+  document.getElementById("seq-name").value = "";
+  document.getElementById("seq-steps").innerHTML = buildStepHTML(0);
+  stepCounter = 1;
+  document.getElementById("sequence-modal").classList.add("active");
+};
+
+window.closeCreateSequenceModal = function () {
+  document.getElementById("sequence-modal").classList.remove("active");
+};
+
+window.addSequenceStep = function () {
+  const container = document.getElementById("seq-steps");
+  const div = document.createElement("div");
+  div.className = "gd-seq-step";
+  div.dataset.step = stepCounter;
+  div.innerHTML = buildStepHTML(stepCounter).replace(/<div class="gd-seq-step"[^>]*>/, "").replace(/<\/div>$/, "");
+  container.appendChild(div);
+  stepCounter++;
+};
+
+function buildStepHTML(idx) {
+  return `
+    <div class="gd-seq-step" data-step="${idx}" style="border-top:${idx > 0 ? "1px solid #e5e7eb" : "none"};padding-top:${idx > 0 ? "12px" : "0"};margin-top:${idx > 0 ? "12px" : "0"};">
+      <div class="gd-form-row gd-gap-sm">
+        <div class="gd-form-group" style="max-width:100px;">
+          <label>Delay (days)</label>
+          <input type="number" class="gd-input seq-delay" value="${idx === 0 ? 0 : idx * 3}" min="0">
+        </div>
+        <div class="gd-form-group gd-flex-1">
+          <label>Subject</label>
+          <input type="text" class="gd-input seq-subject" placeholder="Email subject line">
+        </div>
+      </div>
+      <div class="gd-form-group">
+        <label>Body</label>
+        <textarea class="gd-input seq-body" rows="3" placeholder="Use {{clientName}}, {{clientFirstName}}, {{realtorName}}"></textarea>
+      </div>
+    </div>`;
+}
+
+window.saveSequence = async function () {
+  const name = document.getElementById("seq-name").value.trim();
+  if (!name) { showToast("Sequence name is required.", "error"); return; }
+
+  const stepEls = document.querySelectorAll(".gd-seq-step");
+  const steps = [];
+  for (const el of stepEls) {
+    const delay = parseInt(el.querySelector(".seq-delay").value) || 0;
+    const subject = el.querySelector(".seq-subject").value.trim();
+    const body = el.querySelector(".seq-body").value.trim();
+    if (!subject) { showToast("Each step needs a subject line.", "error"); return; }
+    steps.push({ delayDays: delay, subject, body });
+  }
+
+  if (!steps.length) { showToast("Add at least one step.", "error"); return; }
+
+  try {
+    await createSequenceFn({ name, steps });
+    showToast("Sequence created!");
+    closeCreateSequenceModal();
+    const user = auth.currentUser;
+    if (user) await loadSequences(user.uid);
+  } catch (e) {
+    console.error("Save sequence error:", e);
+    showToast("Failed to create sequence.", "error");
+  }
+};
+
+window.deleteSequence = async function (id) {
+  if (!confirm("Delete this sequence? Active enrollments will be cancelled.")) return;
+  try {
+    await updateDoc(doc(db, "followUpSequences", id), { isActive: false });
+
+    // Cancel active enrollments
+    const enrollSnap = await getDocs(query(
+      collection(db, "sequenceEnrollments"),
+      where("sequenceId", "==", id),
+      where("status", "==", "active")
+    ));
+    for (const d of enrollSnap.docs) {
+      await updateDoc(d.ref, { status: "cancelled" });
+    }
+
+    showToast("Sequence deleted.");
+    const user = auth.currentUser;
+    if (user) await loadSequences(user.uid);
+  } catch (e) {
+    console.error("Delete sequence error:", e);
+    showToast("Failed to delete sequence.", "error");
+  }
+};
+
+/* ===== CALENDAR FEED ===== */
+window.generateCalendarFeed = async function () {
+  const section = document.getElementById("calendar-feed-section");
+  if (!section) return;
+  section.innerHTML = '<div class="gd-spinner"></div>';
+
+  try {
+    const result = await getCalendarFeedUrlFn();
+    const url = result.data.feedUrl;
+    section.innerHTML = `
+      <div class="gd-form-group">
+        <label>Your Calendar Feed URL</label>
+        <div class="gd-flex gd-gap-sm">
+          <input type="text" class="gd-input gd-flex-1" value="${escapeHtml(url)}" readonly onclick="this.select()">
+          <button class="gd-btn" onclick="navigator.clipboard.writeText('${url}'); showToast('Copied!');">Copy</button>
+        </div>
+      </div>
+      <p class="gd-text-muted-xs gd-mt-sm">
+        <strong>Google Calendar:</strong> Settings &rarr; Add calendar &rarr; From URL &rarr; paste the URL above.<br>
+        <strong>Apple Calendar:</strong> File &rarr; New Calendar Subscription &rarr; paste the URL.<br>
+        <strong>Outlook:</strong> Add calendar &rarr; Subscribe from web &rarr; paste the URL.
+      </p>`;
+  } catch (e) {
+    console.error("Calendar feed error:", e);
+    section.innerHTML = '<p class="gd-text-muted-sm" style="color:var(--gd-red);">Failed to generate feed URL. Please try again.</p>';
   }
 };

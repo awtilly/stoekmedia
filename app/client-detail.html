@@ -2,35 +2,71 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Client — GreenDoor</title>
+  <!-- PWA -->
+  <link rel="manifest" href="/greendoor/app/manifest.json">
+  <meta name="theme-color" content="#22c55e">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="apple-touch-icon" href="/greendoor/app/icons/apple-touch-icon.png">
   <link rel="stylesheet" href="/assets/css/style.css">
   <link rel="stylesheet" href="/greendoor/css/greendoor.css">
 </head>
 <body class="gd-light">
 
-  <!-- Navigation -->
-  <nav class="nav scrolled">
-    <div class="container">
-      <a href="/greendoor/app/dashboard" class="nav-logo gd-nav-logo"><span class="gd-green">Green</span><span class="gd-door">Door</span><small class="gd-by-line">by stoekmedia</small></a>
-      <ul class="nav-links">
-        <li><a href="/greendoor/app/dashboard">Dashboard</a></li>
-        <li><a href="/greendoor/app/clients" class="gd-nav-active">Clients</a></li>
-        <li><a href="/greendoor/app/calendar">Calendar</a></li>
-        <li id="nav-admin-tab" style="display:none;"><a href="/greendoor/app/admin">Admin</a></li>
-        <li><a href="/greendoor/app/settings">Settings</a></li>
-        <li class="nav-crm-divider"></li>
-        <li><span id="nav-user-name" class="nav-user-name"></span></li>
-        <li><button class="nav-logout-btn" onclick="handleLogout()">Logout</button></li>
-      </ul>
-      <button class="nav-toggle" aria-label="Menu">
-        <span></span>
-        <span></span>
-        <span></span>
+  <!-- Sidebar -->
+  <aside class="gd-sidebar" id="gd-sidebar">
+    <div class="gd-sidebar-logo">
+      <a href="/greendoor/app/dashboard">
+        <span class="gd-green">Green</span><span class="gd-door">Door</span>
+      </a>
+    </div>
+    <nav class="gd-sidebar-nav">
+      <a href="/greendoor/app/dashboard">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+        <span>Dashboard</span>
+      </a>
+      <a href="/greendoor/app/clients" class="gd-nav-active">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        <span>Clients</span>
+      </a>
+      <a href="/greendoor/app/listings">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        <span>Listings</span>
+      </a>
+      <a href="/greendoor/app/calendar">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        <span>Calendar</span>
+      </a>
+      <a href="/greendoor/app/admin" id="nav-admin-tab" style="display:none;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+        <span>Admin</span>
+      </a>
+      <a href="/greendoor/app/settings">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+        <span>Settings</span>
+      </a>
+    </nav>
+    <div class="gd-sidebar-user">
+      <div class="gd-sidebar-avatar" id="sidebar-avatar"></div>
+      <span class="gd-sidebar-user-name" id="nav-user-name"></span>
+      <button class="gd-sidebar-logout" onclick="handleLogout()" title="Logout">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
       </button>
     </div>
-  </nav>
+  </aside>
+  <div class="gd-sidebar-overlay" onclick="document.getElementById('gd-sidebar').classList.remove('open')"></div>
 
+  <!-- Topbar -->
+  <header class="gd-topbar">
+    <button class="gd-sidebar-toggle" onclick="document.getElementById('gd-sidebar').classList.toggle('open')" aria-label="Menu">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </button>
+    <h1 class="gd-topbar-title">Client Detail</h1>
+  </header>
+
+  <div class="gd-app-layout">
   <div class="gd-page">
     <div class="gd-content">
 
@@ -236,7 +272,13 @@
               </div>
             </div>
 
-            <div style="display: flex; gap: var(--space-sm); justify-content: space-between; align-items: center; flex-wrap: wrap;">
+            <div class="gd-form-section">
+              <div class="gd-form-section-title">Custom Fields</div>
+              <div id="custom-fields-container"></div>
+              <button type="button" class="gd-btn gd-btn-sm gd-mt-sm" onclick="addCustomField()">+ Add Field</button>
+            </div>
+
+            <div class="gd-flex-between gd-flex-wrap gd-gap-sm">
               <button type="button" class="gd-btn gd-btn-primary" onclick="saveOverview()">Save Changes</button>
               <button type="button" class="gd-btn gd-btn-danger" onclick="deleteClient()">Delete Client</button>
             </div>
@@ -250,8 +292,10 @@
           <div class="gd-activity-actions">
             <button class="gd-btn gd-btn-sm" onclick="openActivityModal('note')">+ Add Note</button>
             <button class="gd-btn gd-btn-sm" onclick="openActivityModal('call')">+ Log Call</button>
-            <button class="gd-btn gd-btn-sm gd-btn-email" onclick="openActivityModal('email')">&#9993; Send Email</button>
+            <button class="gd-btn gd-btn-sm gd-btn-email" onclick="openActivityModal('email')">&#9993; Email</button>
+            <button class="gd-btn gd-btn-sm" onclick="openSmsModal()">&#128172; SMS</button>
             <button class="gd-btn gd-btn-sm" onclick="openFollowUpModal()">+ Follow-up</button>
+            <button class="gd-btn gd-btn-sm" onclick="openEnrollSequenceModal()">&#9889; Start Sequence</button>
           </div>
           <div id="activity-timeline" class="gd-timeline">
             <div class="gd-empty">
@@ -348,13 +392,13 @@
                 <option value="closed">Closed</option>
               </select>
             </div>
-            <div style="display:flex;gap:0.5rem;">
+            <div class="gd-flex gd-gap-sm">
               <button class="gd-btn gd-btn-sm" onclick="openAddListingModal()">+ Add Listing</button>
               <button class="gd-btn gd-btn-primary gd-btn-sm" onclick="openMatchListingPanel()">+ Match a Listing</button>
             </div>
           </div>
           <div id="properties-grid" class="gd-property-grid">
-            <div class="gd-empty" style="grid-column: 1/-1;">
+            <div class="gd-empty gd-col-full">
               <div class="gd-empty-icon">&#127968;</div>
               <div class="gd-empty-text">No matched listings yet</div>
             </div>
@@ -374,7 +418,7 @@
             </div>
             <div id="checklist-content" style="display:none;">
               <div id="checklist-overall-progress"></div>
-              <div id="checklist-add-custom" style="margin-bottom: 16px;">
+              <div id="checklist-add-custom" class="gd-mb-md">
                 <button class="gd-btn gd-btn-sm" onclick="showAddChecklistItem()">+ Add Custom Item</button>
                 <div id="checklist-add-form" class="gd-checklist-add-form"></div>
               </div>
@@ -430,7 +474,7 @@
 
   <!-- Match-a-Listing Panel -->
   <div id="match-listing-modal" class="gd-modal-overlay">
-    <div class="gd-modal" style="max-width: 700px;">
+    <div class="gd-modal gd-modal-lg">
       <div class="gd-modal-header">
         <h3>Match a Listing</h3>
         <button class="gd-modal-close" onclick="closeMatchListingPanel()" aria-label="Close">&times;</button>
@@ -451,7 +495,7 @@
 
   <!-- Edit Match Modal -->
   <div id="edit-match-modal" class="gd-modal-overlay">
-    <div class="gd-modal" style="max-width: 500px;">
+    <div class="gd-modal gd-modal-md">
       <div class="gd-modal-header">
         <h3 id="edit-match-title">Edit Match</h3>
         <button class="gd-modal-close" onclick="closeEditMatchModal()" aria-label="Close">&times;</button>
@@ -510,7 +554,7 @@
 
   <!-- Copy to Client Modal -->
   <div id="copy-client-modal" class="gd-modal-overlay">
-    <div class="gd-modal" style="max-width: 540px;">
+    <div class="gd-modal gd-modal-md">
       <div class="gd-modal-header">
         <h3>Copy Properties to Client</h3>
         <button class="gd-modal-close" onclick="closeCopyToClientModal()" aria-label="Close">&times;</button>
@@ -526,7 +570,7 @@
           <input type="text" id="copy-client-search" class="gd-input" placeholder="Search by name or email..." oninput="filterCopyClients()">
         </div>
         <div id="copy-client-list" class="gd-copy-client-list"></div>
-        <div id="copy-progress" class="gd-hidden" style="display:flex;align-items:center;gap:0.5rem;padding:0.5rem 0;">
+        <div id="copy-progress" class="gd-hidden gd-flex-center gd-gap-sm" style="padding:0.5rem 0;">
           <div class="gd-spinner"></div>
           <span class="gd-text-muted">Copying properties...</span>
         </div>
@@ -540,7 +584,7 @@
 
   <!-- Signature Modal (Multi-doc/signer) -->
   <div id="signature-modal" class="gd-modal-overlay">
-    <div class="gd-modal" style="max-width: 740px;">
+    <div class="gd-modal gd-modal-lg">
       <div class="gd-modal-header">
         <h3>&#9997; Send for Signature</h3>
         <button class="gd-modal-close" onclick="closeSignatureModal()" aria-label="Close">&times;</button>
@@ -555,8 +599,8 @@
         <div class="gd-form-group">
           <label>Documents</label>
           <div id="sig-files-list" class="gd-sig-files-list"></div>
-          <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
-            <select id="sig-add-existing" class="gd-input" style="flex:1;min-width:150px;">
+          <div class="gd-flex gd-gap-sm gd-flex-wrap">
+            <select id="sig-add-existing" class="gd-input gd-flex-1" style="min-width:150px;">
               <option value="">+ Add from existing files...</option>
             </select>
             <div class="gd-file-input-wrapper" style="flex-shrink:0;">
@@ -613,7 +657,7 @@
         <iframe id="boldsign-embed-iframe" class="gd-boldsign-iframe" allow="clipboard-write"></iframe>
       </div>
       <div class="gd-modal-footer">
-        <span class="gd-text-muted" style="flex:1;">Drag signature fields onto the document, then click Send in the editor above.</span>
+        <span class="gd-text-muted gd-flex-1">Drag signature fields onto the document, then click Send in the editor above.</span>
         <button class="gd-btn" onclick="closeBoldSignEmbed()">Cancel</button>
       </div>
     </div>
@@ -645,7 +689,7 @@
 
   <!-- Send Document Modal -->
   <div id="send-doc-modal" class="gd-modal-overlay">
-    <div class="gd-modal" style="max-width: 540px;">
+    <div class="gd-modal gd-modal-md">
       <div class="gd-modal-header">
         <h3>Send Documents</h3>
         <button class="gd-modal-close" onclick="closeSendDocModal()" aria-label="Close">&times;</button>
@@ -685,7 +729,7 @@
 
   <!-- Showing Modal -->
   <div id="showing-modal" class="gd-modal-overlay">
-    <div class="gd-modal" style="max-width: 540px;">
+    <div class="gd-modal gd-modal-md">
       <div class="gd-modal-header">
         <h3 id="showing-modal-title">Add Showing</h3>
         <button class="gd-modal-close" onclick="closeShowingModal()" aria-label="Close">&times;</button>
@@ -738,7 +782,7 @@
 
   <!-- Complete Showing Modal -->
   <div id="complete-showing-modal" class="gd-modal-overlay">
-    <div class="gd-modal" style="max-width: 480px;">
+    <div class="gd-modal gd-modal-sm">
       <div class="gd-modal-header">
         <h3>Complete Showing</h3>
         <button class="gd-modal-close" onclick="closeCompleteShowingModal()" aria-label="Close">&times;</button>
@@ -775,7 +819,7 @@
 
   <!-- Follow-up Modal -->
   <div id="followup-modal" class="gd-modal-overlay">
-    <div class="gd-modal" style="max-width: 480px;">
+    <div class="gd-modal gd-modal-sm">
       <div class="gd-modal-header">
         <h3>Add Follow-up</h3>
         <button class="gd-modal-close" onclick="closeFollowUpModal()" aria-label="Close">&times;</button>
@@ -822,10 +866,10 @@
 
         <!-- URL Fetch Section -->
         <div class="gd-url-fetch-section">
-          <div class="gd-form-group" style="margin-bottom:0;">
+          <div class="gd-form-group gd-mb-0">
             <label>Import from URL</label>
-            <div style="display:flex;gap:0.5rem;">
-              <input type="url" id="al-url" class="gd-input" placeholder="Paste a Zillow, Realtor.com, or other listing URL..." style="flex:1;">
+            <div class="gd-flex gd-gap-sm">
+              <input type="url" id="al-url" class="gd-input gd-flex-1" placeholder="Paste a Zillow, Realtor.com, or other listing URL...">
               <button id="al-fetch-btn" class="gd-btn gd-btn-primary" onclick="fetchListingFromUrl()">Fetch</button>
             </div>
           </div>
@@ -923,7 +967,7 @@
             </div>
           </div>
 
-          <div class="gd-form-section" style="border-bottom:none;">
+          <div class="gd-form-section gd-border-0">
             <div class="gd-form-section-title">Notes</div>
             <div class="gd-form-group">
               <textarea id="al-notes" class="gd-input" rows="2" placeholder="Internal notes..."></textarea>
@@ -973,11 +1017,63 @@
       </div>
     </div>
   </div>
+  </div><!-- /gd-app-layout -->
+
+  <!-- SMS Modal -->
+  <div id="sms-modal" class="gd-modal-overlay">
+    <div class="gd-modal gd-modal-sm">
+      <div class="gd-modal-header">
+        <h3>Send SMS</h3>
+        <button class="gd-modal-close" onclick="closeSmsModal()" aria-label="Close">&times;</button>
+      </div>
+      <div class="gd-modal-body">
+        <div class="gd-form-group">
+          <label for="sms-to">To</label>
+          <input type="tel" id="sms-to" class="gd-input" readonly>
+        </div>
+        <div class="gd-form-group">
+          <label for="sms-body">Message</label>
+          <textarea id="sms-body" class="gd-input" rows="4" maxlength="1600" placeholder="Type your message..."></textarea>
+          <span id="sms-char-count" class="gd-text-muted-xs gd-mt-sm">0 / 1600</span>
+        </div>
+      </div>
+      <div class="gd-modal-footer">
+        <button class="gd-btn" onclick="closeSmsModal()">Cancel</button>
+        <button class="gd-btn gd-btn-primary" id="sms-send-btn" onclick="sendSms()">Send SMS</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Enroll in Sequence Modal -->
+  <div id="enroll-seq-modal" class="gd-modal-overlay">
+    <div class="gd-modal gd-modal-sm">
+      <div class="gd-modal-header">
+        <h3>Start Follow-Up Sequence</h3>
+        <button class="gd-modal-close" onclick="closeEnrollSequenceModal()" aria-label="Close">&times;</button>
+      </div>
+      <div class="gd-modal-body">
+        <p class="gd-text-muted-sm gd-mb-md">Choose a sequence to automatically send timed follow-up emails to this client.</p>
+        <div class="gd-form-group">
+          <label for="enroll-seq-select">Sequence</label>
+          <select id="enroll-seq-select" class="gd-input">
+            <option value="">Loading sequences...</option>
+          </select>
+        </div>
+        <div id="enroll-seq-preview" class="gd-text-muted-xs"></div>
+        <div id="enroll-seq-active" class="gd-mt-md"></div>
+      </div>
+      <div class="gd-modal-footer">
+        <button class="gd-btn" onclick="closeEnrollSequenceModal()">Cancel</button>
+        <button class="gd-btn gd-btn-primary" onclick="enrollInSequence()">Start Sequence</button>
+      </div>
+    </div>
+  </div>
 
   <script src="/assets/js/main.js"></script>
   <script type="module" src="/greendoor/js/auth.js"></script>
   <script type="module" src="/greendoor/js/match-engine.js"></script>
   <script type="module" src="/greendoor/js/client-detail.js"></script>
+  <script type="module" src="/greendoor/js/bottom-tabs.js"></script>
   <script type="module" src="/greendoor/js/chatbot.js"></script>
 </body>
 </html>

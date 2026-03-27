@@ -159,7 +159,45 @@ function populateOverview(c) {
   document.querySelectorAll("#ov-propertyTypes input").forEach(cb => {
     cb.checked = types.includes(cb.value);
   });
+
+  // Render custom fields
+  renderCustomFields(c.customFields || {});
 }
+
+function renderCustomFields(fields) {
+  const container = document.getElementById("custom-fields-container");
+  if (!container) return;
+  container.innerHTML = "";
+  Object.entries(fields).forEach(([key, value]) => {
+    addCustomFieldRow(key, value);
+  });
+}
+
+function addCustomFieldRow(label, value) {
+  const container = document.getElementById("custom-fields-container");
+  if (!container) return;
+  const row = document.createElement("div");
+  row.className = "gd-custom-field-row gd-form-row gd-gap-sm";
+  row.style.marginBottom = "8px";
+  row.innerHTML = `
+    <div class="gd-form-group" style="max-width:160px;">
+      <input type="text" class="gd-input cf-label" value="${escapeHtml(label || "")}" placeholder="Field name">
+    </div>
+    <div class="gd-form-group gd-flex-1">
+      <input type="text" class="gd-input cf-value" value="${escapeHtml(value || "")}" placeholder="Value">
+    </div>
+    <button type="button" class="gd-btn gd-btn-sm" style="color:var(--gd-red);align-self:flex-end;margin-bottom:4px;" onclick="this.closest('.gd-custom-field-row').remove()">&times;</button>
+  `;
+  container.appendChild(row);
+}
+
+window.addCustomField = function () {
+  addCustomFieldRow("", "");
+  // Focus the new label input
+  const rows = document.querySelectorAll(".gd-custom-field-row");
+  const last = rows[rows.length - 1];
+  if (last) last.querySelector(".cf-label").focus();
+};
 
 /* --- Transaction type immediate save --- */
 document.getElementById("ov-transactionType").addEventListener("change", async (e) => {
@@ -265,8 +303,19 @@ window.saveOverview = async function () {
     notes: document.getElementById("ov-notes").value.trim(),
     closingDate: document.getElementById("ov-closingDate").value
       ? Timestamp.fromDate(new Date(document.getElementById("ov-closingDate").value + "T00:00:00"))
-      : null
+      : null,
+    customFields: collectCustomFields()
   };
+
+  function collectCustomFields() {
+    const fields = {};
+    document.querySelectorAll(".gd-custom-field-row").forEach(row => {
+      const label = row.querySelector(".cf-label")?.value?.trim();
+      const value = row.querySelector(".cf-value")?.value?.trim();
+      if (label) fields[label] = value || "";
+    });
+    return fields;
+  }
 
   try {
     await updateDoc(doc(db, "clients", clientId), data);
@@ -3415,4 +3464,147 @@ document.addEventListener("keydown", (e) => {
     if (aiPanel && aiPanel.classList.contains("open")) { window.toggleAiPanel(); }
   }
 });
+
+/* ===== SMS ===== */
+const sendSmsFn = httpsCallable(functions, "sendSMS");
+
+window.openSmsModal = function () {
+  if (!clientData?.phone) {
+    showToast("This client has no phone number on file.", "error");
+    return;
+  }
+  document.getElementById("sms-to").value = clientData.phone;
+  document.getElementById("sms-body").value = "";
+  document.getElementById("sms-char-count").textContent = "0 / 1600";
+  document.getElementById("sms-send-btn").disabled = false;
+  document.getElementById("sms-modal").classList.add("active");
+
+  document.getElementById("sms-body").oninput = (e) => {
+    document.getElementById("sms-char-count").textContent = `${e.target.value.length} / 1600`;
+  };
+};
+
+window.closeSmsModal = function () {
+  document.getElementById("sms-modal").classList.remove("active");
+};
+
+window.sendSms = async function () {
+  const body = document.getElementById("sms-body").value.trim();
+  if (!body) { showToast("Message cannot be empty.", "error"); return; }
+
+  const btn = document.getElementById("sms-send-btn");
+  btn.disabled = true;
+  btn.textContent = "Sending...";
+
+  try {
+    await sendSmsFn({ to: clientData.phone, body, clientId });
+    showToast("SMS sent!");
+    closeSmsModal();
+    // Refresh activity timeline
+    const user = auth.currentUser;
+    if (user) await loadActivities(user.uid);
+  } catch (e) {
+    console.error("SMS error:", e);
+    const msg = e.message?.includes("not configured") ? "Twilio SMS is not configured yet. Contact your admin." : "Failed to send SMS.";
+    showToast(msg, "error");
+  }
+  btn.disabled = false;
+  btn.textContent = "Send SMS";
+};
+
+/* ===== SEQUENCE ENROLLMENT ===== */
+const enrollClientInSequenceFn = httpsCallable(functions, "enrollClientInSequence");
+const cancelSequenceEnrollmentFn = httpsCallable(functions, "cancelSequenceEnrollment");
+
+window.openEnrollSequenceModal = async function () {
+  const user = auth.currentUser;
+  if (!user) return;
+
+  const select = document.getElementById("enroll-seq-select");
+  const preview = document.getElementById("enroll-seq-preview");
+  const activeDiv = document.getElementById("enroll-seq-active");
+  select.innerHTML = '<option value="">Loading...</option>';
+  preview.innerHTML = "";
+  activeDiv.innerHTML = "";
+
+  document.getElementById("enroll-seq-modal").classList.add("active");
+
+  // Load sequences
+  const seqSnap = await getDocs(query(
+    collection(db, "followUpSequences"),
+    where("realtorId", "==", user.uid),
+    where("isActive", "==", true)
+  ));
+
+  if (seqSnap.empty) {
+    select.innerHTML = '<option value="">No sequences — create one in Settings</option>';
+  } else {
+    select.innerHTML = '<option value="">— Select a sequence —</option>';
+    seqSnap.forEach(d => {
+      const s = d.data();
+      select.innerHTML += `<option value="${d.id}" data-steps='${JSON.stringify(s.steps)}'>${escapeHtml(s.name)} (${s.steps?.length || 0} steps)</option>`;
+    });
+  }
+
+  // Show active enrollments for this client
+  const enrollSnap = await getDocs(query(
+    collection(db, "sequenceEnrollments"),
+    where("clientId", "==", clientId),
+    where("status", "==", "active")
+  ));
+
+  if (!enrollSnap.empty) {
+    let html = '<div class="gd-form-section-title gd-mt-sm">Active Sequences</div>';
+    for (const d of enrollSnap.docs) {
+      const e = d.data();
+      const seqDoc = await getDoc(doc(db, "followUpSequences", e.sequenceId));
+      const seqName = seqDoc.exists ? seqDoc.data().name : "Unknown";
+      html += `<div class="gd-flex-between gd-mt-sm" style="padding:8px 12px;background:#f8fafc;border-radius:8px;">
+        <span class="gd-text-muted-sm">${escapeHtml(seqName)} — Step ${e.currentStep + 1}</span>
+        <button class="gd-btn gd-btn-sm" style="color:var(--gd-red);" onclick="cancelEnrollment('${d.id}')">Cancel</button>
+      </div>`;
+    }
+    activeDiv.innerHTML = html;
+  }
+
+  // Preview steps on select change
+  select.onchange = () => {
+    const opt = select.options[select.selectedIndex];
+    const steps = opt?.dataset?.steps ? JSON.parse(opt.dataset.steps) : [];
+    if (steps.length) {
+      preview.innerHTML = steps.map((s, i) => `<div style="margin-top:4px;">Day ${s.delayDays}: ${escapeHtml(s.subject)}</div>`).join("");
+    } else {
+      preview.innerHTML = "";
+    }
+  };
+};
+
+window.closeEnrollSequenceModal = function () {
+  document.getElementById("enroll-seq-modal").classList.remove("active");
+};
+
+window.enrollInSequence = async function () {
+  const sequenceId = document.getElementById("enroll-seq-select").value;
+  if (!sequenceId) { showToast("Select a sequence.", "error"); return; }
+
+  try {
+    await enrollClientInSequenceFn({ clientId, sequenceId });
+    showToast("Client enrolled in sequence!");
+    closeEnrollSequenceModal();
+  } catch (e) {
+    const msg = e.message?.includes("already enrolled") ? "Client is already in this sequence." : "Failed to enroll client.";
+    showToast(msg, "error");
+  }
+};
+
+window.cancelEnrollment = async function (enrollmentId) {
+  if (!confirm("Cancel this sequence? No more automated emails will be sent.")) return;
+  try {
+    await cancelSequenceEnrollmentFn({ enrollmentId });
+    showToast("Sequence cancelled.");
+    openEnrollSequenceModal(); // Refresh
+  } catch (e) {
+    showToast("Failed to cancel sequence.", "error");
+  }
+};
 

@@ -57,7 +57,7 @@ function renderClients(clients) {
       <td>${c.budgetMin || c.budgetMax ? formatCurrency(c.budgetMin) + " — " + formatCurrency(c.budgetMax) : "—"}</td>
       <td>${c.preferredLocations && c.preferredLocations.length ? c.preferredLocations[0] : "—"}</td>
       <td>${timeAgo(c.lastActivityDate)}</td>
-      <td><button class="gd-ai-icon-btn" onclick="event.stopPropagation(); showAiSummary('${c.id}', this)" title="AI Quick Summary">&#10024;</button></td>
+      <td><button class="gd-ai-icon-btn" onclick="event.stopPropagation(); showAiSummary('${c.id}', this)" title="Sage Summary">&#10024;</button></td>
     </tr>
   `).join("");
 }
@@ -102,6 +102,13 @@ window.saveClient = async function () {
 
   const user = auth.currentUser;
   if (!user) return;
+
+  // Duplicate detection by email
+  const dupeMatch = allClients.find(c => c.email && c.email.toLowerCase() === email.toLowerCase());
+  if (dupeMatch) {
+    const confirmed = confirm(`A client with email "${email}" already exists (${dupeMatch.fullName}). Add anyway?`);
+    if (!confirmed) return;
+  }
 
   const data = {
     realtorId: user.uid,

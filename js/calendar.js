@@ -392,6 +392,12 @@ window.openEventModal = function (eventId, prefillDate) {
   editingEventId = eventId || null;
   document.getElementById("event-modal-title").textContent = eventId ? "Edit Event" : "Add Event";
 
+  // Hide recurrence when editing (don't re-generate series)
+  const recGroup = document.getElementById("ev-recurrence-group");
+  if (recGroup) recGroup.style.display = eventId ? "none" : "";
+  const recSelect = document.getElementById("ev-recurrence");
+  if (recSelect) recSelect.value = "none";
+
   if (eventId) {
     const ev = allCalEvents.find(e => e.id === eventId);
     if (ev && ev.type === "event") {
@@ -440,13 +446,14 @@ window.saveEvent = async function () {
   const startDate = new Date(startVal);
   const endVal = document.getElementById("ev-end").value;
   const endDate = endVal ? new Date(endVal) : new Date(startDate.getTime() + 3600000);
+  const duration = endDate.getTime() - startDate.getTime();
 
-  const data = {
+  const recurrence = document.getElementById("ev-recurrence")?.value || "none";
+
+  const baseData = {
     realtorId: user.uid,
     title,
     description: document.getElementById("ev-description").value.trim(),
-    startDate: Timestamp.fromDate(startDate),
-    endDate: Timestamp.fromDate(endDate),
     allDay: document.getElementById("ev-allday").checked,
     color: document.getElementById("ev-color").value,
     clientId: document.getElementById("ev-client").value || null
@@ -454,12 +461,31 @@ window.saveEvent = async function () {
 
   try {
     if (editingEventId) {
-      await updateDoc(doc(db, "events", editingEventId), data);
+      await updateDoc(doc(db, "events", editingEventId), {
+        ...baseData,
+        startDate: Timestamp.fromDate(startDate),
+        endDate: Timestamp.fromDate(endDate)
+      });
       showToast("Event updated!");
     } else {
-      data.createdAt = serverTimestamp();
-      await addDoc(collection(db, "events"), data);
-      showToast("Event created!");
+      // Generate occurrences based on recurrence
+      const occurrences = generateOccurrences(startDate, recurrence);
+      const seriesId = recurrence !== "none" ? crypto.randomUUID() : null;
+
+      for (const occStart of occurrences) {
+        const occEnd = new Date(occStart.getTime() + duration);
+        await addDoc(collection(db, "events"), {
+          ...baseData,
+          startDate: Timestamp.fromDate(occStart),
+          endDate: Timestamp.fromDate(occEnd),
+          recurrence: recurrence !== "none" ? recurrence : null,
+          seriesId,
+          createdAt: serverTimestamp()
+        });
+      }
+
+      const count = occurrences.length;
+      showToast(count > 1 ? `${count} recurring events created!` : "Event created!");
     }
     closeEventModal();
     await loadCalendarData(user.uid);
@@ -469,6 +495,24 @@ window.saveEvent = async function () {
     showToast("Failed to save event.", "error");
   }
 };
+
+/* ---------- recurrence helpers ---------- */
+function generateOccurrences(startDate, recurrence) {
+  if (recurrence === "none") return [new Date(startDate)];
+
+  const dates = [];
+  const count = recurrence === "daily" ? 30 : recurrence === "weekly" ? 12 : recurrence === "biweekly" ? 12 : 6;
+
+  for (let i = 0; i < count; i++) {
+    const d = new Date(startDate);
+    if (recurrence === "daily") d.setDate(d.getDate() + i);
+    else if (recurrence === "weekly") d.setDate(d.getDate() + i * 7);
+    else if (recurrence === "biweekly") d.setDate(d.getDate() + i * 14);
+    else if (recurrence === "monthly") d.setMonth(d.getMonth() + i);
+    dates.push(d);
+  }
+  return dates;
+}
 
 window.editEvent = function (id) {
   openEventModal(id);

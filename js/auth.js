@@ -61,9 +61,15 @@ onAuthStateChanged(auth, async (user) => {
 function renderNavUser(profile) {
   const nameEl = document.getElementById("nav-user-name");
   const adminTab = document.getElementById("nav-admin-tab");
+  const avatarEl = document.getElementById("sidebar-avatar");
   if (nameEl) nameEl.textContent = profile.fullName || profile.email;
   if (adminTab) {
     adminTab.style.display = profile.role === "admin" ? "" : "none";
+  }
+  if (avatarEl) {
+    const name = profile.fullName || profile.email || "";
+    const initials = name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
+    avatarEl.textContent = initials;
   }
 }
 
@@ -230,4 +236,99 @@ export function escapeHtml(str) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
+}
+
+/* ── PWA: Service Worker & Install Banner ── */
+function isStandalone() {
+  return window.matchMedia('(display-mode: standalone)').matches ||
+         window.navigator.standalone === true;
+}
+
+// Service worker registration
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/greendoor/app/sw.js', { scope: '/greendoor/app/' })
+    .then(reg => {
+      reg.addEventListener('updatefound', () => {
+        const newSW = reg.installing;
+        if (!newSW) return;
+        newSW.addEventListener('statechange', () => {
+          if (newSW.state === 'activated' && navigator.serviceWorker.controller) {
+            showUpdateBanner();
+          }
+        });
+      });
+    })
+    .catch(err => console.warn('SW registration failed:', err));
+}
+
+// Update banner
+function showUpdateBanner() {
+  if (document.getElementById('gd-update-banner')) return;
+  const banner = document.createElement('div');
+  banner.id = 'gd-update-banner';
+  banner.className = 'gd-update-banner';
+  banner.innerHTML = 'A new version is available <button onclick="location.reload()">Refresh</button>';
+  document.body.appendChild(banner);
+}
+
+// Install banner
+let deferredInstallPrompt = null;
+
+function showInstallBanner() {
+  if (isStandalone()) return;
+  if (document.getElementById('gd-install-banner')) return;
+
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  const banner = document.createElement('div');
+  banner.id = 'gd-install-banner';
+  banner.className = 'gd-install-banner';
+  banner.innerHTML = `
+    <img class="gd-install-banner-icon" src="/greendoor/app/icons/icon-192.png" alt="GreenDoor">
+    <div class="gd-install-banner-text">
+      Install GreenDoor CRM
+      <small>${isIOS ? 'Tap Share then "Add to Home Screen"' : 'Add to your home screen for quick access'}</small>
+    </div>
+    ${!isIOS ? '<button class="gd-btn-install" id="gd-install-btn">Install</button>' : ''}
+    <button class="gd-btn-dismiss" id="gd-dismiss-btn">&times;</button>
+  `;
+  document.body.appendChild(banner);
+
+  document.getElementById('gd-dismiss-btn').addEventListener('click', dismissInstallBanner);
+  const installBtn = document.getElementById('gd-install-btn');
+  if (installBtn) installBtn.addEventListener('click', installApp);
+}
+
+function dismissInstallBanner() {
+  const banner = document.getElementById('gd-install-banner');
+  if (banner) banner.remove();
+  sessionStorage.setItem('gd-install-dismissed', '1');
+}
+
+async function installApp() {
+  if (!deferredInstallPrompt) return;
+  deferredInstallPrompt.prompt();
+  const result = await deferredInstallPrompt.userChoice;
+  deferredInstallPrompt = null;
+  dismissInstallBanner();
+  if (result.outcome === 'accepted') showToast('App installed!');
+}
+
+// Android/Chrome install prompt
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  if (!sessionStorage.getItem('gd-install-dismissed')) {
+    showInstallBanner();
+  }
+});
+
+window.addEventListener('appinstalled', () => {
+  deferredInstallPrompt = null;
+  dismissInstallBanner();
+  showToast('App installed!');
+});
+
+// iOS: show install banner after short delay
+if (/iPad|iPhone|iPod/.test(navigator.userAgent) && !isStandalone() && !sessionStorage.getItem('gd-install-dismissed')) {
+  setTimeout(showInstallBanner, 2000);
 }

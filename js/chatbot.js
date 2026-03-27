@@ -84,8 +84,8 @@ function injectChatHTML(page) {
   const fab = document.createElement("button");
   fab.className = "gd-ai-fab";
   fab.onclick = () => window.toggleAiPanel();
-  fab.title = "GreenDoor AI";
-  fab.setAttribute("aria-label", "Open AI assistant");
+  fab.title = "Ask Sage";
+  fab.setAttribute("aria-label", "Open Sage");
   fab.innerHTML = "&#10024;";
   document.body.appendChild(fab);
 
@@ -94,14 +94,14 @@ function injectChatHTML(page) {
   panel.className = "gd-ai-panel";
   panel.innerHTML = `
     <div class="gd-ai-panel-header">
-      <div class="gd-ai-panel-title"><span>&#10024;</span> GreenDoor AI</div>
+      <div class="gd-ai-panel-title"><span>&#10024;</span> Sage</div>
       <button class="gd-ai-panel-close" onclick="toggleAiPanel()" aria-label="Close AI panel">&times;</button>
     </div>
     <div class="gd-ai-quick-actions">${quickBtns}</div>
     <div id="ai-messages" class="gd-ai-messages"></div>
     <div class="gd-ai-input-area">
-      <button id="ai-mic-btn" class="gd-ai-mic" onclick="toggleVoiceInput()" aria-label="Voice input" title="Speak to GreenDoor AI">&#127908;</button>
-      <input type="text" id="ai-input" class="gd-ai-input" placeholder="Ask or speak to your AI assistant..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendAiMessage();}">
+      <button id="ai-mic-btn" class="gd-ai-mic" onclick="toggleVoiceInput()" aria-label="Voice input" title="Speak to Sage">&#127908;</button>
+      <input type="text" id="ai-input" class="gd-ai-input" placeholder="Ask Sage anything..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendAiMessage();}">
       <button id="ai-send-btn" class="gd-ai-send" onclick="sendAiMessage()" aria-label="Send message">&#10148;</button>
     </div>`;
   document.body.appendChild(panel);
@@ -120,6 +120,120 @@ function formatAiResponse(text) {
   return html;
 }
 
+/* ---------- action detection & buttons ---------- */
+function detectActions(text, page) {
+  const actions = [];
+  const lc = text.toLowerCase();
+
+  if (page !== "client-detail") return actions;
+
+  // Email draft detection
+  if (lc.includes("subject:") || (lc.includes("dear ") && lc.includes("\n")) || lc.match(/^hi \w+,?\n/m)) {
+    const subjectMatch = text.match(/subject:\s*(.+)/i);
+    const bodyStart = text.indexOf("\n", text.toLowerCase().indexOf("subject:"));
+    actions.push({
+      label: "Send This Email",
+      icon: "&#9993;",
+      handler: () => {
+        if (typeof window.openActivityModal === "function") {
+          window.openActivityModal("email");
+          setTimeout(() => {
+            const subEl = document.getElementById("act-subject");
+            const bodyEl = document.getElementById("act-body");
+            if (subEl && subjectMatch) subEl.value = subjectMatch[1].trim();
+            if (bodyEl) bodyEl.value = bodyStart > -1 ? text.slice(bodyStart).trim() : text;
+          }, 100);
+        }
+      }
+    });
+  }
+
+  // Follow-up detection
+  if (lc.includes("follow up") || lc.includes("follow-up") || lc.includes("check in") || lc.includes("check-in") || lc.includes("reach out") || lc.includes("reminder")) {
+    actions.push({
+      label: "Create Follow-Up",
+      icon: "&#9745;",
+      handler: () => {
+        if (typeof window.openFollowUpModal === "function") {
+          window.openFollowUpModal();
+          setTimeout(() => {
+            const titleEl = document.getElementById("fu-title");
+            // Extract a reasonable title from the response
+            const lines = text.split("\n").filter(l => l.trim());
+            const hint = lines.find(l => l.toLowerCase().includes("follow") || l.toLowerCase().includes("check in")) || lines[0] || "";
+            if (titleEl) titleEl.value = hint.replace(/[*#\-]/g, "").trim().slice(0, 80);
+          }, 100);
+        }
+      }
+    });
+  }
+
+  // Showing detection
+  if (lc.includes("showing") || lc.includes("schedule a visit") || lc.includes("tour the") || lc.includes("view the property")) {
+    actions.push({
+      label: "Schedule Showing",
+      icon: "&#127968;",
+      handler: () => {
+        if (typeof window.openShowingModal === "function") {
+          window.openShowingModal();
+        }
+      }
+    });
+  }
+
+  // Note/summary detection
+  if (lc.includes("summary") || lc.includes("here's what") || lc.includes("overview") || lc.includes("key points")) {
+    actions.push({
+      label: "Save as Note",
+      icon: "&#128221;",
+      handler: () => {
+        if (typeof window.openActivityModal === "function") {
+          window.openActivityModal("note");
+          setTimeout(() => {
+            const subEl = document.getElementById("act-subject");
+            const bodyEl = document.getElementById("act-body");
+            if (subEl) subEl.value = "Sage Summary";
+            if (bodyEl) bodyEl.value = text;
+          }, 100);
+        }
+      }
+    });
+  }
+
+  // Call logging detection
+  if (lc.includes("give them a call") || lc.includes("call them") || lc.includes("phone call") || lc.includes("reach out by phone")) {
+    actions.push({
+      label: "Log Call",
+      icon: "&#128222;",
+      handler: () => {
+        if (typeof window.openActivityModal === "function") {
+          window.openActivityModal("call");
+        }
+      }
+    });
+  }
+
+  return actions;
+}
+
+function renderActionButtons(actions) {
+  if (!actions.length) return null;
+  const container = document.createElement("div");
+  container.className = "gd-ai-actions";
+  actions.forEach(action => {
+    const btn = document.createElement("button");
+    btn.className = "gd-btn gd-btn-sm gd-ai-action-btn";
+    btn.innerHTML = `<span>${action.icon}</span> ${action.label}`;
+    btn.onclick = () => {
+      action.handler();
+      btn.disabled = true;
+      btn.textContent = "Done";
+    };
+    container.appendChild(btn);
+  });
+  return container;
+}
+
 /* ---------- message rendering ---------- */
 function addAiMessage(text, type, page) {
   const el = document.getElementById("ai-messages");
@@ -134,19 +248,10 @@ function addAiMessage(text, type, page) {
     div.className = "gd-ai-msg gd-ai-msg-ai";
     div.innerHTML = formatAiResponse(text);
 
-    // On client-detail, detect email drafts and add "Open in Email" button
-    if (page === "client-detail") {
-      const lc = text.toLowerCase();
-      if (lc.includes("subject:") || lc.includes("dear ") || lc.includes("hi ")) {
-        const btn = document.createElement("button");
-        btn.className = "gd-btn gd-btn-sm gd-btn-ai-email";
-        btn.textContent = "Open in Email";
-        btn.onclick = () => {
-          document.dispatchEvent(new CustomEvent("ai-email-draft", { detail: { text } }));
-        };
-        div.appendChild(btn);
-      }
-    }
+    // Detect actionable content and add buttons
+    const actions = detectActions(text, page);
+    const actionBtns = renderActionButtons(actions);
+    if (actionBtns) div.appendChild(actionBtns);
   }
   el.appendChild(div);
   el.scrollTop = el.scrollHeight;
@@ -325,7 +430,7 @@ window.toggleVoiceInput = function () {
   recognition.onend = () => {
     isListening = false;
     micBtn.classList.remove("listening");
-    input.placeholder = "Ask or speak to your AI assistant...";
+    input.placeholder = "Ask Sage anything...";
     recognition = null;
   };
 
