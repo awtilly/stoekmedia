@@ -209,12 +209,15 @@ body.gd-light nav.nav.scrolled {
 }
 
 .gd-topbar-title {
-  font-size: 1rem;
+  font-size: 0.95rem;
   font-weight: 600;
   color: #1e293b;
   letter-spacing: -0.01em;
   margin: 0;
   font-family: 'Inter', sans-serif;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .gd-sidebar-toggle {
@@ -248,7 +251,8 @@ body.gd-light .gd-page {
 
 body.gd-light .gd-content {
   padding: 28px 32px 80px;
-  max-width: 1400px;
+  max-width: 1200px;
+  margin: 0 auto;
 }
 
 /* --- Component Overrides: Stat Cards --- */
@@ -269,7 +273,7 @@ body.gd-light .gd-stat-card:hover {
 }
 
 body.gd-light .gd-stat-number {
-  font-size: 1.75rem;
+  font-size: clamp(1.5rem, 3vw, 1.75rem);
   font-weight: 700;
   letter-spacing: -0.02em;
   color: #0f172a;
@@ -281,7 +285,7 @@ body.gd-light .gd-stat-label {
   color: #64748b;
   text-transform: none;
   letter-spacing: 0;
-  margin-top: 2px;
+  margin-top: 4px;
 }
 
 /* --- Component Overrides: Cards --- */
@@ -514,9 +518,18 @@ body.gd-light .gd-activity-icon {
   font-size: 0.85rem;
 }
 
+/* --- Component Overrides: Section Headers --- */
+body.gd-light .gd-section-header h2 {
+  font-family: 'Inter', sans-serif;
+  font-size: clamp(1.2rem, 2.5vw, 1.5rem);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: #0f172a;
+}
+
 /* --- Component Overrides: Welcome --- */
 body.gd-light .gd-welcome h1 {
-  font-size: clamp(1.3rem, 2.5vw, 1.6rem);
+  font-size: clamp(1.4rem, 3vw, 1.8rem);
   font-weight: 600;
   letter-spacing: -0.02em;
   color: #0f172a;
@@ -640,7 +653,7 @@ body.gd-light .gd-stat-card:nth-child(4) { animation-delay: 0.2s; }
   margin-bottom: 1.5rem;
 }
 .gd-page-header h2 {
-  font-size: clamp(1.3rem, 2.5vw, 1.6rem);
+  font-size: clamp(1.4rem, 3vw, 1.8rem);
   font-weight: 600;
   letter-spacing: -0.02em;
   color: #0f172a;
@@ -785,7 +798,7 @@ body.gd-light .gd-modal-lg { max-width: 800px; }
   margin-top: 1px;
 }
 
-/* --- Mobile Responsive --- */
+/* --- Mobile Responsive (768px — tablet/phone) --- */
 @media (max-width: 768px) {
   .gd-sidebar {
     transform: translateX(-100%);
@@ -814,11 +827,175 @@ body.gd-light .gd-modal-lg { max-width: 800px; }
 
   body.gd-light .gd-content {
     padding: 20px 16px calc(72px + env(safe-area-inset-bottom, 0px));
+    margin: 0 auto;
+  }
+
+  /* Stat cards: center content, 2-col grid */
+  body.gd-light .gd-stat-card {
+    text-align: center;
+    padding: 16px;
+  }
+
+  body.gd-light .gd-stat-number {
+    font-size: 1.5rem;
+  }
+
+  /* Cards: tighter padding */
+  body.gd-light .gd-card {
+    padding: 16px;
+  }
+
+  body.gd-light .gd-card h3 {
+    font-size: 0.95rem;
+  }
+
+  /* Tables: smaller font */
+  body.gd-light .gd-table th {
+    font-size: 0.68rem;
+    padding: 8px 12px;
+  }
+
+  body.gd-light .gd-table td {
+    font-size: 0.82rem;
+    padding: 10px 12px;
+  }
+
+  /* Forms: compact */
+  body.gd-light .gd-input {
+    padding: 9px 12px;
+    font-size: 0.85rem;
+  }
+
+  /* Buttons: full width stacking */
+  body.gd-light .gd-quick-actions {
+    width: 100%;
+  }
+
+  body.gd-light .gd-quick-actions .gd-btn {
+    flex: 1;
+    text-align: center;
+    font-size: 0.82rem;
+    padding: 10px 12px;
+  }
+
+  /* Section headers: stack vertically */
+  body.gd-light .gd-section-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+
+  /* Tabs: smaller font, scrollable */
+  body.gd-light .gd-tab {
+    font-size: 0.8rem;
+    padding: 8px 12px;
+    white-space: nowrap;
+  }
+
+  /* Modals: near full width */
+  body.gd-light .gd-modal {
+    margin: 16px;
+    max-width: calc(100vw - 32px) !important;
+    border-radius: 14px;
+  }
+
+  body.gd-light .gd-modal-header {
+    padding: 16px 18px;
+  }
+
+  body.gd-light .gd-modal-header h3 {
+    font-size: 1rem;
   }
 
   /* Hide FAB on mobile — replaced by center AI tab */
   .gd-ai-fab {
     display: none !important;
+  }
+
+  /* Welcome: center on mobile */
+  body.gd-light .gd-welcome {
+    text-align: center;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  /* Client header: center on mobile */
+  body.gd-light .gd-client-header {
+    text-align: center;
+    padding: 20px 16px;
+  }
+
+  /* Settings layout: proper gap */
+  body.gd-light .gd-settings-layout {
+    gap: 1rem;
+  }
+
+  /* Two-col: stack with gap */
+  body.gd-light .gd-two-col {
+    gap: 1rem;
+  }
+}
+
+/* --- Small Phone (480px) --- */
+@media (max-width: 480px) {
+  body.gd-light .gd-content {
+    padding: 16px 12px calc(72px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .gd-topbar {
+    padding: 0 12px;
+  }
+
+  .gd-topbar-title {
+    font-size: 0.9rem;
+  }
+
+  body.gd-light .gd-stat-card {
+    padding: 14px;
+  }
+
+  body.gd-light .gd-stat-number {
+    font-size: 1.35rem;
+  }
+
+  body.gd-light .gd-stat-label {
+    font-size: 0.72rem;
+  }
+
+  body.gd-light .gd-btn {
+    font-size: 0.8rem;
+    padding: 8px 12px;
+  }
+
+  body.gd-light .gd-btn-primary {
+    font-size: 0.8rem;
+    padding: 8px 12px;
+  }
+
+  /* Activity items: compact */
+  body.gd-light .gd-activity-item {
+    padding: 10px;
+  }
+
+  /* Badges: smaller */
+  body.gd-light [class*="gd-badge-"] {
+    font-size: 0.62rem;
+    padding: 2px 6px;
+  }
+
+  /* Calendar: compact header */
+  body.gd-light .gd-calendar-header {
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  /* Filter rows: more gap when stacked */
+  body.gd-light .gd-filter-row {
+    gap: 0.75rem;
+  }
+
+  body.gd-light .gd-top-bar {
+    gap: 0.75rem;
   }
 }
 
