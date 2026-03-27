@@ -117,19 +117,6 @@ async function loadClient(uid) {
       await ensureClosingDocumentsFolder(clientId, uid);
     }
 
-    // Pre-seed and initialize checklist if transaction type already set
-    if (clientData.transactionType) {
-      try {
-        const closingDateVal = clientData.closingDate
-          ? (typeof clientData.closingDate.toDate === "function" ? clientData.closingDate.toDate() : new Date(clientData.closingDate))
-          : null;
-        await seedChecklist(db, clientId, clientData.transactionType, closingDateVal);
-      } catch (err) {
-        console.error("Checklist seed on load error:", err);
-      }
-      initChecklist(clientId, clientData);
-    }
-
     document.getElementById("detail-loading").classList.add("gd-hidden");
     document.getElementById("detail-content").classList.remove("gd-hidden");
   } catch (e) {
@@ -205,13 +192,9 @@ document.getElementById("ov-transactionType").addEventListener("change", async (
       ? (typeof clientData.closingDate.toDate === "function" ? clientData.closingDate.toDate() : new Date(clientData.closingDate))
       : null;
     await seedChecklist(db, clientId, value, closingDateVal);
-  } catch (err) {
-    console.error("Failed to seed checklist:", err);
-  }
-
-  // Always initialize checklist listener regardless of seed success
-  if (value) {
     initChecklist(clientId, clientData);
+  } catch (err) {
+    console.error("Failed to initialize checklist:", err);
   }
 
   try {
@@ -558,16 +541,11 @@ async function loadFolders(uid) {
     const q = query(
       collection(db, "folders"),
       where("clientId", "==", clientId),
-      where("realtorId", "==", uid)
+      where("realtorId", "==", uid),
+      orderBy("createdAt", "asc")
     );
     const snap = await getDocs(q);
     allFolders = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    // Sort client-side to avoid requiring a composite Firestore index
-    allFolders.sort((a, b) => {
-      const aTime = a.createdAt?.toMillis?.() || a.createdAt?.seconds * 1000 || 0;
-      const bTime = b.createdAt?.toMillis?.() || b.createdAt?.seconds * 1000 || 0;
-      return aTime - bTime;
-    });
   } catch (e) {
     console.error("Load folders error:", e);
   }
@@ -608,7 +586,7 @@ async function ensureDefaultFolders(clientId, uid) {
     }
   }
 
-  if (created || allFolders.length === 0) {
+  if (created) {
     await loadFolders(uid);
     renderFolderCards();
   }
