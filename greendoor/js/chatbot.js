@@ -84,8 +84,8 @@ function injectChatHTML(page) {
   const fab = document.createElement("button");
   fab.className = "gd-ai-fab";
   fab.onclick = () => window.toggleAiPanel();
-  fab.title = "GreenDoor AI";
-  fab.setAttribute("aria-label", "Open AI assistant");
+  fab.title = "Ask Sage";
+  fab.setAttribute("aria-label", "Open Sage");
   fab.innerHTML = "&#10024;";
   document.body.appendChild(fab);
 
@@ -94,14 +94,14 @@ function injectChatHTML(page) {
   panel.className = "gd-ai-panel";
   panel.innerHTML = `
     <div class="gd-ai-panel-header">
-      <div class="gd-ai-panel-title"><span>&#10024;</span> GreenDoor AI</div>
+      <div class="gd-ai-panel-title"><span>&#10024;</span> Sage</div>
       <button class="gd-ai-panel-close" onclick="toggleAiPanel()" aria-label="Close AI panel">&times;</button>
     </div>
     <div class="gd-ai-quick-actions">${quickBtns}</div>
     <div id="ai-messages" class="gd-ai-messages"></div>
     <div class="gd-ai-input-area">
-      <button id="ai-mic-btn" class="gd-ai-mic" onclick="toggleVoiceInput()" aria-label="Voice input" title="Speak to GreenDoor AI">&#127908;</button>
-      <input type="text" id="ai-input" class="gd-ai-input" placeholder="Ask or speak to your AI assistant..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendAiMessage();}">
+      <button id="ai-mic-btn" class="gd-ai-mic" onclick="toggleVoiceInput()" aria-label="Voice input" title="Speak to Sage">&#127908;</button>
+      <input type="text" id="ai-input" class="gd-ai-input" placeholder="Ask Sage anything..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendAiMessage();}">
       <button id="ai-send-btn" class="gd-ai-send" onclick="sendAiMessage()" aria-label="Send message">&#10148;</button>
     </div>`;
   document.body.appendChild(panel);
@@ -325,7 +325,7 @@ window.toggleVoiceInput = function () {
   recognition.onend = () => {
     isListening = false;
     micBtn.classList.remove("listening");
-    input.placeholder = "Ask or speak to your AI assistant...";
+    input.placeholder = "Ask Sage anything...";
     recognition = null;
   };
 

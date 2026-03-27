@@ -57,7 +57,7 @@ function renderClients(clients) {
       <td>${c.budgetMin || c.budgetMax ? formatCurrency(c.budgetMin) + " — " + formatCurrency(c.budgetMax) : "—"}</td>
       <td>${c.preferredLocations && c.preferredLocations.length ? c.preferredLocations[0] : "—"}</td>
       <td>${timeAgo(c.lastActivityDate)}</td>
-      <td><button class="gd-ai-icon-btn" onclick="event.stopPropagation(); showAiSummary('${c.id}', this)" title="AI Quick Summary">&#10024;</button></td>
+      <td><button class="gd-ai-icon-btn" onclick="event.stopPropagation(); showAiSummary('${c.id}', this)" title="Sage Summary">&#10024;</button></td>
     </tr>
   `).join("");
 }

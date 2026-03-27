@@ -7,7 +7,7 @@ const TOUR_STEPS = {
   dashboard: [
     { target: ".gd-sidebar-nav", title: "Navigation", description: "Jump between Dashboard, Clients, Listings, Calendar, and Settings." },
     { target: ".gd-quick-actions", title: "Quick Actions", description: "Add new clients and listings from here." },
-    { target: ".gd-ai-fab", title: "AI Assistant", description: "Click this anytime to chat with your AI assistant — draft emails, schedule showings, or get suggestions." }
+    { target: ".gd-ai-fab", title: "Sage", description: "Click this anytime to chat with Sage — draft emails, schedule showings, or get suggestions." }
   ],
   clients: [
     { target: "#search-input", title: "Search Clients", description: "Quickly find any client by name, email, or phone number." },

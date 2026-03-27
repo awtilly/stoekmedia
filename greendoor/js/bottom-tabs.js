@@ -22,7 +22,7 @@ const TAB_CONFIG = [
   },
   {
     id: "ai",
-    label: "AI",
+    label: "Sage",
     isCenter: true
   },
   {
@@ -68,9 +68,9 @@ function injectBottomTabs() {
   nav.innerHTML = TAB_CONFIG.map(tab => {
     if (tab.isCenter) {
       return `
-        <button class="gd-tab-item gd-tab-ai" aria-label="Open AI assistant">
+        <button class="gd-tab-item gd-tab-ai" aria-label="Ask Sage">
           <span class="gd-tab-ai-circle">&#10024;</span>
-          <span class="gd-tab-label">AI</span>
+          <span class="gd-tab-label">Sage</span>
         </button>`;
     }
 
