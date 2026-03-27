@@ -2,71 +2,35 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Calendar — GreenDoor</title>
-  <!-- PWA -->
-  <link rel="manifest" href="/greendoor/app/manifest.json">
-  <meta name="theme-color" content="#22c55e">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <link rel="apple-touch-icon" href="/greendoor/app/icons/apple-touch-icon.png">
   <link rel="stylesheet" href="/assets/css/style.css">
   <link rel="stylesheet" href="/greendoor/css/greendoor.css">
 </head>
 <body class="gd-light">
 
-  <!-- Sidebar -->
-  <aside class="gd-sidebar" id="gd-sidebar">
-    <div class="gd-sidebar-logo">
-      <a href="/greendoor/app/dashboard">
-        <span class="gd-green">Green</span><span class="gd-door">Door</span>
-      </a>
-    </div>
-    <nav class="gd-sidebar-nav">
-      <a href="/greendoor/app/dashboard">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
-        <span>Dashboard</span>
-      </a>
-      <a href="/greendoor/app/clients">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-        <span>Clients</span>
-      </a>
-      <a href="/greendoor/app/listings">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-        <span>Listings</span>
-      </a>
-      <a href="/greendoor/app/calendar" class="gd-nav-active">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-        <span>Calendar</span>
-      </a>
-      <a href="/greendoor/app/admin" id="nav-admin-tab" style="display:none;">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
-        <span>Admin</span>
-      </a>
-      <a href="/greendoor/app/settings">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
-        <span>Settings</span>
-      </a>
-    </nav>
-    <div class="gd-sidebar-user">
-      <div class="gd-sidebar-avatar" id="sidebar-avatar"></div>
-      <span class="gd-sidebar-user-name" id="nav-user-name"></span>
-      <button class="gd-sidebar-logout" onclick="handleLogout()" title="Logout">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+  <!-- Navigation -->
+  <nav class="nav scrolled">
+    <div class="container">
+      <a href="/greendoor/app/dashboard" class="nav-logo gd-nav-logo"><span class="gd-green">Green</span><span class="gd-door">Door</span><small class="gd-by-line">by stoekmedia</small></a>
+      <ul class="nav-links">
+        <li><a href="/greendoor/app/dashboard">Dashboard</a></li>
+        <li><a href="/greendoor/app/clients">Clients</a></li>
+        <li><a href="/greendoor/app/calendar" class="gd-nav-active">Calendar</a></li>
+        <li id="nav-admin-tab" style="display:none;"><a href="/greendoor/app/admin">Admin</a></li>
+        <li><a href="/greendoor/app/settings">Settings</a></li>
+        <li class="nav-crm-divider"></li>
+        <li><span id="nav-user-name" class="nav-user-name"></span></li>
+        <li><button class="nav-logout-btn" onclick="handleLogout()">Logout</button></li>
+      </ul>
+      <button class="nav-toggle" aria-label="Menu">
+        <span></span>
+        <span></span>
+        <span></span>
       </button>
     </div>
-  </aside>
-  <div class="gd-sidebar-overlay" onclick="document.getElementById('gd-sidebar').classList.remove('open')"></div>
+  </nav>
 
-  <!-- Topbar -->
-  <header class="gd-topbar">
-    <button class="gd-sidebar-toggle" onclick="document.getElementById('gd-sidebar').classList.toggle('open')" aria-label="Menu">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
-    </button>
-    <h1 class="gd-topbar-title">Calendar</h1>
-  </header>
-
-  <div class="gd-app-layout">
   <div class="gd-page">
     <div class="gd-content">
 
@@ -86,7 +50,7 @@
             <button class="gd-btn gd-btn-sm" onclick="calNext()">&rarr;</button>
           </div>
           <div class="gd-calendar-title" id="cal-title">February 2026</div>
-          <div class="gd-flex-center gd-gap-sm">
+          <div style="display:flex;gap:0.5rem;align-items:center;">
             <div class="gd-calendar-view-toggle">
               <button class="gd-calendar-view-btn" data-view="month" onclick="setCalView('month')">Month</button>
               <button class="gd-calendar-view-btn active" data-view="week" onclick="setCalView('week')">Week</button>
@@ -119,11 +83,10 @@
       </div>
     </div>
   </div>
-  </div><!-- /gd-app-layout -->
 
   <!-- Add Event Modal -->
   <div id="event-modal" class="gd-modal-overlay">
-    <div class="gd-modal gd-modal-sm">
+    <div class="gd-modal" style="max-width: 480px;">
       <div class="gd-modal-header">
         <h3 id="event-modal-title">Add Event</h3>
         <button class="gd-modal-close" onclick="closeEventModal()" aria-label="Close">&times;</button>
@@ -150,27 +113,15 @@
         <div class="gd-sig-option-row">
           <input type="checkbox" id="ev-allday"> <label for="ev-allday">All day</label>
         </div>
-        <div class="gd-form-row">
-          <div class="gd-form-group">
-            <label for="ev-color">Color</label>
-            <select id="ev-color" class="gd-input">
-              <option value="#3b82f6">Blue</option>
-              <option value="#22c55e">Green</option>
-              <option value="#f59e0b">Amber</option>
-              <option value="#ef4444">Red</option>
-              <option value="#8b5cf6">Purple</option>
-            </select>
-          </div>
-          <div class="gd-form-group" id="ev-recurrence-group">
-            <label for="ev-recurrence">Repeat</label>
-            <select id="ev-recurrence" class="gd-input">
-              <option value="none">Does not repeat</option>
-              <option value="daily">Daily</option>
-              <option value="weekly">Weekly</option>
-              <option value="biweekly">Every 2 weeks</option>
-              <option value="monthly">Monthly</option>
-            </select>
-          </div>
+        <div class="gd-form-group">
+          <label for="ev-color">Color</label>
+          <select id="ev-color" class="gd-input">
+            <option value="#3b82f6">Blue</option>
+            <option value="#22c55e">Green</option>
+            <option value="#f59e0b">Amber</option>
+            <option value="#ef4444">Red</option>
+            <option value="#8b5cf6">Purple</option>
+          </select>
         </div>
         <div class="gd-form-group">
           <label for="ev-client">Client (optional)</label>
@@ -190,7 +141,6 @@
   <script type="module" src="/greendoor/js/auth.js"></script>
   <script type="module" src="/greendoor/js/calendar.js"></script>
   <script type="module" src="/greendoor/js/tour.js"></script>
-  <script type="module" src="/greendoor/js/bottom-tabs.js"></script>
   <script type="module" src="/greendoor/js/chatbot.js"></script>
 </body>
 </html>

@@ -423,17 +423,6 @@ window.saveDashboardClient = async function () {
   const user = auth.currentUser;
   if (!user) return;
 
-  // Duplicate detection by email
-  try {
-    const dupeQ = query(collection(db, "clients"), where("realtorId", "==", user.uid), where("email", "==", email));
-    const dupeSnap = await getDocs(dupeQ);
-    if (!dupeSnap.empty) {
-      const existing = dupeSnap.docs[0].data();
-      const confirmed = confirm(`A client with email "${email}" already exists (${existing.fullName}). Add anyway?`);
-      if (!confirmed) return;
-    }
-  } catch (e) { /* proceed if check fails */ }
-
   const data = {
     realtorId: user.uid,
     fullName,
