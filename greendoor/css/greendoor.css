@@ -619,6 +619,108 @@ body.gd-light .gd-stat-card:nth-child(4) { animation-delay: 0.2s; }
   body.gd-light .gd-page { margin-left: 0; }
 }
 
+/* --- Bottom Tab Bar (Mobile) --- */
+.gd-bottom-tabs {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 56px;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  background: rgba(255, 255, 255, 0.92);
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  z-index: 1800;
+  box-shadow: 0 -1px 12px rgba(0, 0, 0, 0.04);
+}
+
+.gd-tab-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 56px;
+  gap: 3px;
+  text-decoration: none;
+  color: #94a3b8;
+  background: none;
+  border: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: color 0.15s ease;
+  position: relative;
+  padding: 0;
+  font-family: 'Inter', -apple-system, sans-serif;
+}
+
+.gd-tab-item:active {
+  transform: scale(0.9);
+}
+
+.gd-tab-item.active {
+  color: #16a34a;
+}
+
+.gd-tab-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+}
+
+.gd-tab-icon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.gd-tab-label {
+  font-size: 0.62rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  line-height: 1;
+}
+
+.gd-tab-item.active .gd-tab-label {
+  font-weight: 600;
+}
+
+/* --- AI Center Tab --- */
+.gd-tab-ai {
+  flex: 1.1;
+}
+
+.gd-tab-ai-circle {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  margin-top: -16px;
+  box-shadow: 0 4px 16px rgba(34, 197, 94, 0.35);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.gd-tab-ai:active .gd-tab-ai-circle {
+  transform: scale(0.92);
+  box-shadow: 0 2px 8px rgba(34, 197, 94, 0.25);
+}
+
+.gd-tab-ai .gd-tab-label {
+  color: #16a34a;
+  font-weight: 600;
+  margin-top: 1px;
+}
+
 /* --- Mobile Responsive --- */
 @media (max-width: 768px) {
   .gd-sidebar {
@@ -647,7 +749,12 @@ body.gd-light .gd-stat-card:nth-child(4) { animation-delay: 0.2s; }
   }
 
   body.gd-light .gd-content {
-    padding: 20px 16px 80px;
+    padding: 20px 16px calc(72px + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* Hide FAB on mobile — replaced by center AI tab */
+  .gd-ai-fab {
+    display: none !important;
   }
 }
 
