@@ -90,6 +90,7 @@
             <button class="gd-settings-tab" data-tab="documents">Documents</button>
             <button class="gd-settings-tab" data-tab="esignatures">E-Signatures</button>
             <button class="gd-settings-tab" data-tab="email">Email</button>
+            <button class="gd-settings-tab" data-tab="sequences">Sequences</button>
             <button class="gd-settings-tab" data-tab="integrations">Integrations</button>
             <button class="gd-settings-tab" data-tab="help">Help</button>
           </nav>
@@ -182,11 +183,30 @@
             </div>
 
             <!-- Integrations Panel -->
+            <!-- Sequences Panel -->
+            <div class="gd-tab-content" id="tab-sequences">
+              <div class="gd-card gd-settings-card">
+                <h3>Follow-Up Sequences</h3>
+                <p class="gd-text-muted-sm gd-mb-md">Automated email sequences that send on a schedule when you enroll a client. Create a sequence here, then enroll clients from their detail page.</p>
+                <button class="gd-btn gd-btn-primary" onclick="openCreateSequenceModal()">+ New Sequence</button>
+                <div id="sequences-list" class="gd-mt-md">
+                  <!-- Populated by settings.js -->
+                </div>
+              </div>
+            </div>
+
             <div class="gd-tab-content" id="tab-integrations">
               <div class="gd-card gd-settings-card">
-                <h3>Integrations</h3>
+                <h3>ShowingTime</h3>
                 <div id="showingtime-integration">
                   <!-- Rendered dynamically by settings.js -->
+                </div>
+              </div>
+              <div class="gd-card gd-settings-card gd-mt-md">
+                <h3>Calendar Sync</h3>
+                <p class="gd-text-muted-sm gd-mb-md">Subscribe to your GreenDoor calendar in Google Calendar, Apple Calendar, or Outlook. Events, showings, and follow-ups stay in sync automatically.</p>
+                <div id="calendar-feed-section">
+                  <button class="gd-btn gd-btn-primary" onclick="generateCalendarFeed()">Get Calendar Feed URL</button>
                 </div>
               </div>
             </div>
@@ -221,6 +241,46 @@
     </div>
   </div>
   </div><!-- /gd-app-layout -->
+
+  <!-- Create Sequence Modal -->
+  <div id="sequence-modal" class="gd-modal-overlay">
+    <div class="gd-modal gd-modal-md">
+      <div class="gd-modal-header">
+        <h3>New Follow-Up Sequence</h3>
+        <button class="gd-modal-close" onclick="closeCreateSequenceModal()" aria-label="Close">&times;</button>
+      </div>
+      <div class="gd-modal-body">
+        <div class="gd-form-group">
+          <label for="seq-name">Sequence Name *</label>
+          <input type="text" id="seq-name" class="gd-input" placeholder="e.g. New Lead Welcome">
+        </div>
+        <div class="gd-form-section-title gd-mt-md">Steps</div>
+        <div id="seq-steps">
+          <div class="gd-seq-step" data-step="0">
+            <div class="gd-form-row gd-gap-sm">
+              <div class="gd-form-group" style="max-width:100px;">
+                <label>Delay (days)</label>
+                <input type="number" class="gd-input seq-delay" value="0" min="0">
+              </div>
+              <div class="gd-form-group gd-flex-1">
+                <label>Subject</label>
+                <input type="text" class="gd-input seq-subject" placeholder="Email subject line">
+              </div>
+            </div>
+            <div class="gd-form-group">
+              <label>Body</label>
+              <textarea class="gd-input seq-body" rows="3" placeholder="Use {{clientName}}, {{clientFirstName}}, {{realtorName}}"></textarea>
+            </div>
+          </div>
+        </div>
+        <button class="gd-btn gd-btn-sm gd-mt-sm" onclick="addSequenceStep()">+ Add Step</button>
+      </div>
+      <div class="gd-modal-footer">
+        <button class="gd-btn" onclick="closeCreateSequenceModal()">Cancel</button>
+        <button class="gd-btn gd-btn-primary" onclick="saveSequence()">Create Sequence</button>
+      </div>
+    </div>
+  </div>
 
   <script src="/assets/js/main.js"></script>
   <script type="module" src="/greendoor/js/auth.js"></script>

@@ -3416,3 +3416,99 @@ document.addEventListener("keydown", (e) => {
   }
 });
 
+/* ===== SEQUENCE ENROLLMENT ===== */
+const enrollClientInSequenceFn = httpsCallable(functions, "enrollClientInSequence");
+const cancelSequenceEnrollmentFn = httpsCallable(functions, "cancelSequenceEnrollment");
+
+window.openEnrollSequenceModal = async function () {
+  const user = auth.currentUser;
+  if (!user) return;
+
+  const select = document.getElementById("enroll-seq-select");
+  const preview = document.getElementById("enroll-seq-preview");
+  const activeDiv = document.getElementById("enroll-seq-active");
+  select.innerHTML = '<option value="">Loading...</option>';
+  preview.innerHTML = "";
+  activeDiv.innerHTML = "";
+
+  document.getElementById("enroll-seq-modal").classList.add("active");
+
+  // Load sequences
+  const seqSnap = await getDocs(query(
+    collection(db, "followUpSequences"),
+    where("realtorId", "==", user.uid),
+    where("isActive", "==", true)
+  ));
+
+  if (seqSnap.empty) {
+    select.innerHTML = '<option value="">No sequences — create one in Settings</option>';
+  } else {
+    select.innerHTML = '<option value="">— Select a sequence —</option>';
+    seqSnap.forEach(d => {
+      const s = d.data();
+      select.innerHTML += `<option value="${d.id}" data-steps='${JSON.stringify(s.steps)}'>${escapeHtml(s.name)} (${s.steps?.length || 0} steps)</option>`;
+    });
+  }
+
+  // Show active enrollments for this client
+  const enrollSnap = await getDocs(query(
+    collection(db, "sequenceEnrollments"),
+    where("clientId", "==", clientId),
+    where("status", "==", "active")
+  ));
+
+  if (!enrollSnap.empty) {
+    let html = '<div class="gd-form-section-title gd-mt-sm">Active Sequences</div>';
+    for (const d of enrollSnap.docs) {
+      const e = d.data();
+      const seqDoc = await getDoc(doc(db, "followUpSequences", e.sequenceId));
+      const seqName = seqDoc.exists ? seqDoc.data().name : "Unknown";
+      html += `<div class="gd-flex-between gd-mt-sm" style="padding:8px 12px;background:#f8fafc;border-radius:8px;">
+        <span class="gd-text-muted-sm">${escapeHtml(seqName)} — Step ${e.currentStep + 1}</span>
+        <button class="gd-btn gd-btn-sm" style="color:var(--gd-red);" onclick="cancelEnrollment('${d.id}')">Cancel</button>
+      </div>`;
+    }
+    activeDiv.innerHTML = html;
+  }
+
+  // Preview steps on select change
+  select.onchange = () => {
+    const opt = select.options[select.selectedIndex];
+    const steps = opt?.dataset?.steps ? JSON.parse(opt.dataset.steps) : [];
+    if (steps.length) {
+      preview.innerHTML = steps.map((s, i) => `<div style="margin-top:4px;">Day ${s.delayDays}: ${escapeHtml(s.subject)}</div>`).join("");
+    } else {
+      preview.innerHTML = "";
+    }
+  };
+};
+
+window.closeEnrollSequenceModal = function () {
+  document.getElementById("enroll-seq-modal").classList.remove("active");
+};
+
+window.enrollInSequence = async function () {
+  const sequenceId = document.getElementById("enroll-seq-select").value;
+  if (!sequenceId) { showToast("Select a sequence.", "error"); return; }
+
+  try {
+    await enrollClientInSequenceFn({ clientId, sequenceId });
+    showToast("Client enrolled in sequence!");
+    closeEnrollSequenceModal();
+  } catch (e) {
+    const msg = e.message?.includes("already enrolled") ? "Client is already in this sequence." : "Failed to enroll client.";
+    showToast(msg, "error");
+  }
+};
+
+window.cancelEnrollment = async function (enrollmentId) {
+  if (!confirm("Cancel this sequence? No more automated emails will be sent.")) return;
+  try {
+    await cancelSequenceEnrollmentFn({ enrollmentId });
+    showToast("Sequence cancelled.");
+    openEnrollSequenceModal(); // Refresh
+  } catch (e) {
+    showToast("Failed to cancel sequence.", "error");
+  }
+};
+

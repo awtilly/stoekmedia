@@ -288,6 +288,7 @@
             <button class="gd-btn gd-btn-sm" onclick="openActivityModal('call')">+ Log Call</button>
             <button class="gd-btn gd-btn-sm gd-btn-email" onclick="openActivityModal('email')">&#9993; Send Email</button>
             <button class="gd-btn gd-btn-sm" onclick="openFollowUpModal()">+ Follow-up</button>
+            <button class="gd-btn gd-btn-sm" onclick="openEnrollSequenceModal()">&#9889; Start Sequence</button>
           </div>
           <div id="activity-timeline" class="gd-timeline">
             <div class="gd-empty">
@@ -1010,6 +1011,31 @@
     </div>
   </div>
   </div><!-- /gd-app-layout -->
+
+  <!-- Enroll in Sequence Modal -->
+  <div id="enroll-seq-modal" class="gd-modal-overlay">
+    <div class="gd-modal gd-modal-sm">
+      <div class="gd-modal-header">
+        <h3>Start Follow-Up Sequence</h3>
+        <button class="gd-modal-close" onclick="closeEnrollSequenceModal()" aria-label="Close">&times;</button>
+      </div>
+      <div class="gd-modal-body">
+        <p class="gd-text-muted-sm gd-mb-md">Choose a sequence to automatically send timed follow-up emails to this client.</p>
+        <div class="gd-form-group">
+          <label for="enroll-seq-select">Sequence</label>
+          <select id="enroll-seq-select" class="gd-input">
+            <option value="">Loading sequences...</option>
+          </select>
+        </div>
+        <div id="enroll-seq-preview" class="gd-text-muted-xs"></div>
+        <div id="enroll-seq-active" class="gd-mt-md"></div>
+      </div>
+      <div class="gd-modal-footer">
+        <button class="gd-btn" onclick="closeEnrollSequenceModal()">Cancel</button>
+        <button class="gd-btn gd-btn-primary" onclick="enrollInSequence()">Start Sequence</button>
+      </div>
+    </div>
+  </div>
 
   <script src="/assets/js/main.js"></script>
   <script type="module" src="/greendoor/js/auth.js"></script>
