@@ -3479,8 +3479,10 @@ window.openSmsModal = function () {
   document.getElementById("sms-send-btn").disabled = false;
   document.getElementById("sms-modal").classList.add("active");
 
-  document.getElementById("sms-body").oninput = (e) => {
-    document.getElementById("sms-char-count").textContent = `${e.target.value.length} / 1600`;
+  const smsBody = document.getElementById("sms-body");
+  if (smsBody) smsBody.oninput = (e) => {
+    const ct = document.getElementById("sms-char-count");
+    if (ct) ct.textContent = `${e.target.value.length} / 1600`;
   };
 };
 

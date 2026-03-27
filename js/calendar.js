@@ -470,7 +470,9 @@ window.saveEvent = async function () {
     } else {
       // Generate occurrences based on recurrence
       const occurrences = generateOccurrences(startDate, recurrence);
-      const seriesId = recurrence !== "none" ? crypto.randomUUID() : null;
+      const seriesId = recurrence !== "none"
+        ? (crypto.randomUUID?.() || Array.from(crypto.getRandomValues(new Uint8Array(16)), b => b.toString(16).padStart(2, "0")).join(""))
+        : null;
 
       for (const occStart of occurrences) {
         const occEnd = new Date(occStart.getTime() + duration);
@@ -508,7 +510,12 @@ function generateOccurrences(startDate, recurrence) {
     if (recurrence === "daily") d.setDate(d.getDate() + i);
     else if (recurrence === "weekly") d.setDate(d.getDate() + i * 7);
     else if (recurrence === "biweekly") d.setDate(d.getDate() + i * 14);
-    else if (recurrence === "monthly") d.setMonth(d.getMonth() + i);
+    else if (recurrence === "monthly") {
+      const targetMonth = d.getMonth() + i;
+      const maxDay = new Date(d.getFullYear(), targetMonth + 1, 0).getDate();
+      d.setMonth(targetMonth);
+      d.setDate(Math.min(startDate.getDate(), maxDay));
+    }
     dates.push(d);
   }
   return dates;

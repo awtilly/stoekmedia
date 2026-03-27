@@ -671,7 +671,7 @@ window.generateCalendarFeed = async function () {
         <label>Your Calendar Feed URL</label>
         <div class="gd-flex gd-gap-sm">
           <input type="text" class="gd-input gd-flex-1" value="${escapeHtml(url)}" readonly onclick="this.select()">
-          <button class="gd-btn" onclick="navigator.clipboard.writeText('${url}'); showToast('Copied!');">Copy</button>
+          <button class="gd-btn" id="copy-feed-btn">Copy</button>
         </div>
       </div>
       <p class="gd-text-muted-xs gd-mt-sm">
@@ -679,6 +679,9 @@ window.generateCalendarFeed = async function () {
         <strong>Apple Calendar:</strong> File &rarr; New Calendar Subscription &rarr; paste the URL.<br>
         <strong>Outlook:</strong> Add calendar &rarr; Subscribe from web &rarr; paste the URL.
       </p>`;
+    document.getElementById("copy-feed-btn").onclick = () => {
+      navigator.clipboard.writeText(url).then(() => showToast("Copied!"));
+    };
   } catch (e) {
     console.error("Calendar feed error:", e);
     section.innerHTML = '<p class="gd-text-muted-sm" style="color:var(--gd-red);">Failed to generate feed URL. Please try again.</p>';
