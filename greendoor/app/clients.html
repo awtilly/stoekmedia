@@ -86,6 +86,7 @@
           <option value="closed">Closed</option>
           <option value="inactive">Inactive</option>
         </select>
+        <button class="gd-btn" onclick="openImportModal()">Import CSV</button>
         <button class="gd-btn gd-btn-primary" onclick="openAddModal()">+ Add Client</button>
       </div>
 
@@ -217,8 +218,25 @@
     </div>
   </div>
 
+  <!-- CSV Import Modal -->
+  <div id="csv-import-modal" class="gd-modal-overlay">
+    <div class="gd-modal gd-modal-md">
+      <div class="gd-modal-header">
+        <h3>Import Clients</h3>
+        <button class="gd-modal-close" onclick="closeImportModal()" aria-label="Close">&times;</button>
+      </div>
+      <div class="gd-modal-body"></div>
+      <div class="gd-modal-footer">
+        <button id="csv-back-btn" class="gd-btn" onclick="csvPrevStep()" style="display:none;">Back</button>
+        <div class="gd-flex-1"></div>
+        <button id="csv-next-btn" class="gd-btn gd-btn-primary" onclick="csvNextStep()" disabled>Next</button>
+      </div>
+    </div>
+  </div>
+
   <script src="/assets/js/main.js"></script>
   <script type="module" src="/greendoor/js/auth.js"></script>
+  <script type="module" src="/greendoor/js/csv-import.js"></script>
   <script type="module" src="/greendoor/js/clients.js"></script>
   <script type="module" src="/greendoor/js/tour.js"></script>
   <script type="module" src="/greendoor/js/bottom-tabs.js"></script>
