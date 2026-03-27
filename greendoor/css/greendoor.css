@@ -1,4 +1,674 @@
 /* ============================================================
+   GreenDoor CRM — Premium UI Overhaul (2026)
+   Prepended override block for sidebar nav + refined design
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+/* --- Font & Token Overrides --- */
+:root {
+  --font-display: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --gd-radius-xs: 6px;
+  --gd-radius-sm: 8px;
+  --gd-radius-md: 12px;
+  --gd-radius-lg: 16px;
+  --gd-radius-xl: 20px;
+  --gd-shadow-xs: 0 1px 2px rgba(0,0,0,0.04);
+  --gd-shadow-sm: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  --gd-shadow-md: 0 4px 16px rgba(0,0,0,0.06), 0 1px 4px rgba(0,0,0,0.04);
+  --gd-shadow-lg: 0 8px 30px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.04);
+  --gd-shadow-xl: 0 16px 48px rgba(0,0,0,0.1), 0 4px 12px rgba(0,0,0,0.05);
+  --gd-sidebar-width: 240px;
+  --gd-topbar-height: 56px;
+}
+
+body.gd-light {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: #f9fafb;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* --- Hide old top nav --- */
+body.gd-light nav.nav,
+body.gd-light nav.nav.scrolled {
+  display: none !important;
+}
+
+/* --- Sidebar --- */
+.gd-sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: var(--gd-sidebar-width);
+  height: 100vh;
+  background: #0f172a;
+  color: #94a3b8;
+  display: flex;
+  flex-direction: column;
+  z-index: 100;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow-y: auto;
+  overflow-x: hidden;
+  border-right: 1px solid rgba(255,255,255,0.06);
+}
+
+.gd-sidebar-logo {
+  padding: 20px 20px 16px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+.gd-sidebar-logo a {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  text-decoration: none;
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.gd-sidebar-logo .gd-green {
+  color: #22c55e;
+}
+
+.gd-sidebar-logo .gd-door {
+  color: #f1f5f9;
+}
+
+/* --- Sidebar Nav --- */
+.gd-sidebar-nav {
+  flex: 1;
+  padding: 12px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.gd-sidebar-nav a {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: var(--gd-radius-sm);
+  color: #94a3b8;
+  text-decoration: none;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: all 0.15s ease;
+  position: relative;
+}
+
+.gd-sidebar-nav a:hover {
+  background: rgba(255,255,255,0.06);
+  color: #e2e8f0;
+}
+
+.gd-sidebar-nav a.gd-nav-active {
+  background: rgba(34, 197, 94, 0.12);
+  color: #ffffff;
+}
+
+.gd-sidebar-nav a.gd-nav-active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 20px;
+  background: #22c55e;
+  border-radius: 0 3px 3px 0;
+}
+
+.gd-sidebar-nav a svg {
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+.gd-sidebar-nav a:hover svg,
+.gd-sidebar-nav a.gd-nav-active svg {
+  opacity: 1;
+}
+
+/* --- Sidebar User --- */
+.gd-sidebar-user {
+  padding: 16px 14px;
+  border-top: 1px solid rgba(255,255,255,0.06);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.gd-sidebar-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  letter-spacing: 0.02em;
+}
+
+.gd-sidebar-user-name {
+  flex: 1;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #cbd5e1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gd-sidebar-logout {
+  background: none;
+  border: none;
+  color: #64748b;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.gd-sidebar-logout:hover {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+}
+
+/* --- Sidebar Overlay (mobile) --- */
+.gd-sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  backdrop-filter: blur(2px);
+  z-index: 99;
+}
+
+/* --- Topbar --- */
+.gd-topbar {
+  height: var(--gd-topbar-height);
+  border-bottom: 1px solid #e5e7eb;
+  display: flex;
+  align-items: center;
+  padding: 0 32px;
+  background: #ffffff;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  gap: 12px;
+}
+
+.gd-topbar-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1e293b;
+  letter-spacing: -0.01em;
+  margin: 0;
+  font-family: 'Inter', sans-serif;
+}
+
+.gd-sidebar-toggle {
+  display: none;
+  background: none;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 8px;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.gd-sidebar-toggle:hover {
+  background: #f1f5f9;
+  color: #1e293b;
+}
+
+/* --- Layout --- */
+.gd-app-layout {
+  display: flex;
+  min-height: 100vh;
+}
+
+body.gd-light .gd-page {
+  padding-top: 0;
+  margin-left: var(--gd-sidebar-width);
+  flex: 1;
+  min-width: 0;
+}
+
+body.gd-light .gd-content {
+  padding: 28px 32px 80px;
+  max-width: 1400px;
+}
+
+/* --- Component Overrides: Stat Cards --- */
+body.gd-light .gd-stat-card {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: var(--gd-radius-md);
+  padding: 20px 24px;
+  box-shadow: var(--gd-shadow-xs);
+  transition: all 0.2s ease;
+  text-align: left;
+}
+
+body.gd-light .gd-stat-card:hover {
+  box-shadow: var(--gd-shadow-md);
+  transform: translateY(-2px);
+  border-color: #d1d5db;
+}
+
+body.gd-light .gd-stat-number {
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #0f172a;
+}
+
+body.gd-light .gd-stat-label {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #64748b;
+  text-transform: none;
+  letter-spacing: 0;
+  margin-top: 2px;
+}
+
+/* --- Component Overrides: Cards --- */
+body.gd-light .gd-card {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: var(--gd-radius-md);
+  box-shadow: var(--gd-shadow-xs);
+  transition: box-shadow 0.2s ease;
+}
+
+body.gd-light .gd-card:hover {
+  box-shadow: var(--gd-shadow-sm);
+}
+
+body.gd-light .gd-card h3 {
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: #0f172a;
+}
+
+/* --- Component Overrides: Tables --- */
+body.gd-light .gd-table th {
+  background: #f8fafc;
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #64748b;
+  border-bottom: 1px solid #e5e7eb;
+  padding: 10px 16px;
+}
+
+body.gd-light .gd-table td {
+  padding: 12px 16px;
+  font-size: 0.875rem;
+  color: #334155;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+body.gd-light .gd-table tbody tr:nth-child(even) {
+  background: transparent;
+}
+
+body.gd-light .gd-table tbody tr:hover {
+  background: #f8fafc;
+}
+
+body.gd-light .gd-table a {
+  color: #0f172a;
+  font-weight: 500;
+}
+
+body.gd-light .gd-table a:hover {
+  color: #16a34a;
+}
+
+/* --- Component Overrides: Forms --- */
+body.gd-light .gd-input {
+  border: 1.5px solid #e2e8f0;
+  border-radius: var(--gd-radius-sm);
+  padding: 10px 14px;
+  font-size: 0.875rem;
+  font-family: 'Inter', sans-serif;
+  background: #ffffff;
+  color: #0f172a;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+body.gd-light .gd-input:focus {
+  border-color: #22c55e;
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.1);
+  outline: none;
+}
+
+body.gd-light .gd-input::placeholder {
+  color: #94a3b8;
+}
+
+body.gd-light select.gd-input {
+  cursor: pointer;
+}
+
+body.gd-light .gd-form-group label {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #475569;
+  margin-bottom: 6px;
+}
+
+body.gd-light .gd-form-section-title {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #16a34a;
+  border-left: 2px solid #22c55e;
+  padding-left: 10px;
+}
+
+/* --- Component Overrides: Buttons --- */
+body.gd-light .gd-btn {
+  border-radius: var(--gd-radius-sm);
+  font-weight: 500;
+  font-size: 0.85rem;
+  font-family: 'Inter', sans-serif;
+  padding: 9px 16px;
+  transition: all 0.15s ease;
+  border: 1.5px solid #d1d5db;
+  background: #ffffff;
+  color: #334155;
+}
+
+body.gd-light .gd-btn:hover {
+  background: #f8fafc;
+  border-color: #94a3b8;
+  color: #0f172a;
+}
+
+body.gd-light .gd-btn-primary {
+  background: #22c55e;
+  border-color: #22c55e;
+  color: #ffffff;
+  box-shadow: 0 1px 3px rgba(34, 197, 94, 0.3);
+}
+
+body.gd-light .gd-btn-primary:hover {
+  background: #16a34a;
+  border-color: #16a34a;
+  box-shadow: 0 2px 8px rgba(34, 197, 94, 0.35);
+  transform: translateY(-1px);
+}
+
+/* --- Component Overrides: Badges --- */
+body.gd-light [class*="gd-badge-"] {
+  border-radius: 6px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 3px 8px;
+  letter-spacing: 0.01em;
+}
+
+/* --- Component Overrides: Modals --- */
+body.gd-light .gd-modal-overlay {
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+}
+
+body.gd-light .gd-modal {
+  border-radius: 16px;
+  box-shadow: var(--gd-shadow-xl);
+  border: 1px solid #e5e7eb;
+}
+
+body.gd-light .gd-modal-header {
+  border-bottom: 1px solid #f1f5f9;
+  padding: 20px 24px;
+}
+
+body.gd-light .gd-modal-header h3 {
+  font-size: 1.05rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: #0f172a;
+}
+
+body.gd-light .gd-modal-close {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+body.gd-light .gd-modal-close:hover {
+  background: #f1f5f9;
+}
+
+body.gd-light .gd-modal-footer {
+  border-top: 1px solid #f1f5f9;
+  padding: 16px 24px;
+}
+
+/* --- Component Overrides: Tabs --- */
+body.gd-light .gd-tabs {
+  border-bottom: 1px solid #e5e7eb;
+  gap: 0;
+}
+
+body.gd-light .gd-tab {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #64748b;
+  padding: 10px 16px;
+  border-bottom: 2px solid transparent;
+  transition: all 0.15s ease;
+}
+
+body.gd-light .gd-tab:hover {
+  color: #334155;
+  background: transparent;
+}
+
+body.gd-light .gd-tab.active {
+  color: #0f172a;
+  border-bottom-color: #22c55e;
+  font-weight: 600;
+}
+
+/* --- Component Overrides: Activity --- */
+body.gd-light .gd-activity-item {
+  border-radius: var(--gd-radius-sm);
+  padding: 12px 14px;
+  transition: background 0.15s ease;
+}
+
+body.gd-light .gd-activity-item:hover {
+  background: #f8fafc;
+}
+
+body.gd-light .gd-activity-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+}
+
+/* --- Component Overrides: Welcome --- */
+body.gd-light .gd-welcome h1 {
+  font-size: clamp(1.3rem, 2.5vw, 1.6rem);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: #0f172a;
+  font-family: 'Inter', sans-serif;
+}
+
+body.gd-light .gd-welcome h1 em {
+  font-style: normal;
+  font-family: 'Inter', sans-serif;
+}
+
+/* --- Component Overrides: AI Briefing --- */
+body.gd-light .gd-ai-briefing-card {
+  background: linear-gradient(135deg, #f0fdf4, #ecfdf5);
+  border: 1px solid #bbf7d0;
+  border-radius: var(--gd-radius-md);
+}
+
+/* --- Component Overrides: Client Header --- */
+body.gd-light .gd-client-header {
+  border-radius: var(--gd-radius-md);
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  box-shadow: var(--gd-shadow-xs);
+}
+
+/* --- Component Overrides: Showings --- */
+body.gd-light .gd-showing-item {
+  border-radius: var(--gd-radius-sm);
+  border: 1px solid #e5e7eb;
+  transition: all 0.15s ease;
+}
+
+body.gd-light .gd-showing-item:hover {
+  border-color: #22c55e;
+  box-shadow: var(--gd-shadow-sm);
+}
+
+/* --- Component Overrides: Loading --- */
+body.gd-light .gd-spinner {
+  border-color: #e5e7eb;
+  border-top-color: #22c55e;
+}
+
+/* --- Component Overrides: Toast --- */
+body.gd-light .gd-toast {
+  border-radius: var(--gd-radius-md);
+  box-shadow: var(--gd-shadow-lg);
+  font-family: 'Inter', sans-serif;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+/* --- Component Overrides: Login Page --- */
+body.gd-light .gd-login-card {
+  border-radius: 16px;
+  box-shadow: var(--gd-shadow-lg);
+  border: 1px solid #e5e7eb;
+}
+
+body.gd-light .gd-login-card h2 {
+  font-family: 'Inter', sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+/* --- Animations --- */
+@keyframes gd-fade-in-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes gd-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+body.gd-light .gd-content {
+  animation: gd-fade-in-up 0.3s ease;
+}
+
+body.gd-light .gd-stat-card {
+  animation: gd-fade-in-up 0.35s ease backwards;
+}
+body.gd-light .gd-stat-card:nth-child(1) { animation-delay: 0.05s; }
+body.gd-light .gd-stat-card:nth-child(2) { animation-delay: 0.1s; }
+body.gd-light .gd-stat-card:nth-child(3) { animation-delay: 0.15s; }
+body.gd-light .gd-stat-card:nth-child(4) { animation-delay: 0.2s; }
+
+/* --- PWA Standalone Override --- */
+@media all and (display-mode: standalone) {
+  .gd-sidebar {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+}
+
+/* --- Print --- */
+@media print {
+  .gd-sidebar, .gd-topbar, .gd-sidebar-overlay { display: none !important; }
+  body.gd-light .gd-page { margin-left: 0; }
+}
+
+/* --- Mobile Responsive --- */
+@media (max-width: 768px) {
+  .gd-sidebar {
+    transform: translateX(-100%);
+    width: 260px;
+  }
+
+  .gd-sidebar.open {
+    transform: translateX(0);
+  }
+
+  .gd-sidebar.open ~ .gd-sidebar-overlay {
+    display: block;
+  }
+
+  body.gd-light .gd-page {
+    margin-left: 0;
+  }
+
+  .gd-sidebar-toggle {
+    display: flex;
+  }
+
+  .gd-topbar {
+    padding: 0 16px;
+  }
+
+  body.gd-light .gd-content {
+    padding: 20px 16px 80px;
+  }
+}
+
+/* --- Reduced Motion --- */
+@media (prefers-reduced-motion: reduce) {
+  .gd-sidebar,
+  body.gd-light .gd-content,
+  body.gd-light .gd-stat-card,
+  body.gd-light .gd-btn-primary,
+  body.gd-light .gd-stat-card:hover {
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
+  }
+}
+
+/* ============================================================
+   END — Premium UI Overhaul Prepend Block
+   ============================================================ */
+
+/* ============================================================
    GreenDoor CRM — Styles (extends Stoek Media base)
    ============================================================ */
 

@@ -61,9 +61,15 @@ onAuthStateChanged(auth, async (user) => {
 function renderNavUser(profile) {
   const nameEl = document.getElementById("nav-user-name");
   const adminTab = document.getElementById("nav-admin-tab");
+  const avatarEl = document.getElementById("sidebar-avatar");
   if (nameEl) nameEl.textContent = profile.fullName || profile.email;
   if (adminTab) {
     adminTab.style.display = profile.role === "admin" ? "" : "none";
+  }
+  if (avatarEl) {
+    const name = profile.fullName || profile.email || "";
+    const initials = name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
+    avatarEl.textContent = initials;
   }
 }
 

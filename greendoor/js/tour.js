@@ -5,7 +5,7 @@ const TOUR_PAGES = ["dashboard", "clients", "calendar", "settings"];
 
 const TOUR_STEPS = {
   dashboard: [
-    { target: ".nav-links", title: "Navigation", description: "Jump between Dashboard, Clients, Calendar, and Settings." },
+    { target: ".gd-sidebar-nav", title: "Navigation", description: "Jump between Dashboard, Clients, Listings, Calendar, and Settings." },
     { target: ".gd-quick-actions", title: "Quick Actions", description: "Add new clients and listings from here." },
     { target: ".gd-ai-fab", title: "AI Assistant", description: "Click this anytime to chat with your AI assistant — draft emails, schedule showings, or get suggestions." }
   ],
