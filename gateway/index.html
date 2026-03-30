@@ -399,7 +399,7 @@
           <h2 class="gw-section-title">Security You Can <span class="gw-serif">Actually Measure</span></h2>
           <p class="gw-section-desc" style="margin-bottom: var(--space-lg);">Most security companies give you a guard and an invoice. We give you data, accountability, and a partner who's been in your city since 2009.</p>
           <p class="gw-section-desc" style="margin-bottom: var(--space-lg);">Our proprietary operations platform tracks every shift, patrol, and incident in real time. You see exactly what you're paying for &mdash; no guesswork, no surprises.</p>
-          <a href="#contact" class="gw-btn gw-btn-gold">
+          <a href="#contact" class="gw-btn gw-btn-dark">
             <span>See It In Action</span>
             <svg viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </a>
@@ -830,11 +830,17 @@
       });
     });
 
-    // Nav background on scroll
+    // Nav: switch between dark (over hero) and light (over white content)
     const nav = document.querySelector('.gw-nav');
-    window.addEventListener('scroll', () => {
-      nav.classList.toggle('scrolled', window.scrollY > 50);
-    }, { passive: true });
+    const heroEl = document.querySelector('.gw-hero');
+    if (nav && heroEl) {
+      const navObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          nav.classList.toggle('light', !entry.isIntersecting);
+        });
+      }, { threshold: 0, rootMargin: '-80px 0px 0px 0px' });
+      navObserver.observe(heroEl);
+    }
 
     // Intersection Observer — scroll reveals + bar fills
     if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
