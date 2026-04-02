@@ -59,9 +59,9 @@ function renderClients(clients) {
     <tr>
       <td><a href="/greendoor/app/client-detail?id=${c.id}">${escapeHtml(c.fullName) || "—"}</a></td>
       <td><span class="gd-badge gd-badge-${c.status || "lead"}">${statusLabel(c.status || "lead")}</span></td>
-      <td>${c.budgetMin || c.budgetMax ? formatCurrency(c.budgetMin) + " — " + formatCurrency(c.budgetMax) : "—"}</td>
-      <td>${c.preferredLocations && c.preferredLocations.length ? c.preferredLocations[0] : "—"}</td>
-      <td>${timeAgo(c.lastActivityDate)}</td>
+      <td class="gd-hide-mobile">${c.budgetMin || c.budgetMax ? formatCurrency(c.budgetMin) + " — " + formatCurrency(c.budgetMax) : "—"}</td>
+      <td class="gd-hide-mobile">${c.preferredLocations && c.preferredLocations.length ? c.preferredLocations[0] : "—"}</td>
+      <td class="gd-hide-mobile">${timeAgo(c.lastActivityDate)}</td>
       <td><button class="gd-ai-icon-btn" onclick="event.stopPropagation(); showAiSummary('${c.id}', this)" title="Sage Summary">&#10024;</button></td>
     </tr>
   `).join("");

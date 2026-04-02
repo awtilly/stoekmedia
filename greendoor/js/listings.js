@@ -219,12 +219,12 @@ function renderList() {
           ${qm ? `<span class="gd-match-badge-inline" style="background:${qm.color}">${qm.score}%</span>` : ""}
         </td>
         <td>${l.listingPrice ? formatCurrency(l.listingPrice) : "—"}</td>
-        <td>${l.bedrooms ?? "—"}</td>
-        <td>${l.bathrooms ?? "—"}</td>
-        <td>${l.squareFeet ? Number(l.squareFeet).toLocaleString() : "—"}</td>
+        <td class="gd-hide-mobile">${l.bedrooms ?? "—"}</td>
+        <td class="gd-hide-mobile">${l.bathrooms ?? "—"}</td>
+        <td class="gd-hide-mobile">${l.squareFeet ? Number(l.squareFeet).toLocaleString() : "—"}</td>
         <td><span class="gd-badge gd-lst-${l.status || "active"}">${statusLabelListing(l.status)}</span></td>
-        <td>${dom > 0 ? dom : "—"}</td>
-        <td>${l.mlsNumber || "—"}</td>
+        <td class="gd-hide-mobile">${dom > 0 ? dom : "—"}</td>
+        <td class="gd-hide-mobile">${l.mlsNumber || "—"}</td>
       </tr>`;
   }).join("");
 }
