@@ -46,8 +46,14 @@ onAuthStateChanged(auth, async (user) => {
     if (diagEl) diagEl.style.display = "";
   }
 
-  await loadTemplates(user.uid);
-  await loadSequences(user.uid);
+  // Load templates and sequences — don't block page if they fail
+  const results = await Promise.allSettled([
+    loadTemplates(user.uid),
+    loadSequences(user.uid)
+  ]);
+  results.forEach((r, i) => {
+    if (r.status === "rejected") console.error(`Settings loader ${i} failed:`, r.reason);
+  });
   renderEmailSenderStatus(profile);
   renderShowingTimeIntegration(profile);
 
