@@ -32,35 +32,40 @@ document.addEventListener("DOMContentLoaded", () => {
 onAuthStateChanged(auth, async (user) => {
   if (!user) return;
 
-  const profile = await getCurrentUser();
-  if (!profile) return;
+  try {
+    const profile = await getCurrentUser();
+    if (!profile) return;
 
-  document.getElementById("set-fullName").value = profile.fullName || "";
-  document.getElementById("set-phone").value = profile.phone || "";
-  document.getElementById("set-company").value = profile.company || "";
-  document.getElementById("set-emailSignature").value = profile.emailSignature || "";
+    document.getElementById("set-fullName").value = profile.fullName || "";
+    document.getElementById("set-phone").value = profile.phone || "";
+    document.getElementById("set-company").value = profile.company || "";
+    document.getElementById("set-emailSignature").value = profile.emailSignature || "";
 
-  // Show diagnostics button for admins
-  if (profile.role === "admin") {
-    const diagEl = document.getElementById("boldsign-diagnostics");
-    if (diagEl) diagEl.style.display = "";
+    // Show diagnostics button for admins
+    if (profile.role === "admin") {
+      const diagEl = document.getElementById("boldsign-diagnostics");
+      if (diagEl) diagEl.style.display = "";
+    }
+
+    // Load templates and sequences — don't block page if they fail
+    const results = await Promise.allSettled([
+      loadTemplates(user.uid),
+      loadSequences(user.uid)
+    ]);
+    results.forEach((r, i) => {
+      if (r.status === "rejected") console.error(`Settings loader ${i} failed:`, r.reason);
+    });
+    renderEmailSenderStatus(profile);
+    renderShowingTimeIntegration(profile);
+
+    setTimeout(() => checkAndResumeTour(), 400);
+  } catch (e) {
+    console.error("Settings init error:", e);
+    showToast("Failed to load settings. Please refresh.", "error");
+  } finally {
+    document.getElementById("settings-loading").classList.add("gd-hidden");
+    document.getElementById("settings-content").classList.remove("gd-hidden");
   }
-
-  // Load templates and sequences — don't block page if they fail
-  const results = await Promise.allSettled([
-    loadTemplates(user.uid),
-    loadSequences(user.uid)
-  ]);
-  results.forEach((r, i) => {
-    if (r.status === "rejected") console.error(`Settings loader ${i} failed:`, r.reason);
-  });
-  renderEmailSenderStatus(profile);
-  renderShowingTimeIntegration(profile);
-
-  document.getElementById("settings-loading").classList.add("gd-hidden");
-  document.getElementById("settings-content").classList.remove("gd-hidden");
-
-  setTimeout(() => checkAndResumeTour(), 400);
 });
 
 window.saveProfile = async function () {

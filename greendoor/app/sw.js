@@ -46,7 +46,7 @@ self.addEventListener('notificationclick', (event) => {
 });
 
 /* ── Service Worker Cache ── */
-const CACHE_NAME = 'greendoor-v1';
+const CACHE_NAME = 'greendoor-v2';
 const PRECACHE_URLS = [
   '/greendoor/app/dashboard',
   '/greendoor/app/login',
@@ -101,7 +101,23 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // Cache-first for assets
+  // Network-first for JS files so deploys take effect immediately
+  if (url.pathname.endsWith('.js')) {
+    event.respondWith(
+      fetch(event.request)
+        .then(response => {
+          if (response.ok) {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then(c => c.put(event.request, clone));
+          }
+          return response;
+        })
+        .catch(() => caches.match(event.request))
+    );
+    return;
+  }
+
+  // Cache-first for static assets (CSS, images, fonts)
   event.respondWith(
     caches.match(event.request).then(cached => {
       if (cached) return cached;
