@@ -10,7 +10,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
 import {
   getCurrentUser, showToast, formatCurrency, formatDate, formatDateTime,
-  timeAgo, formatFileSize, statusLabel, escapeHtml, sanitizeUrl
+  timeAgo, formatFileSize, statusLabel, escapeHtml, sanitizeUrl, safeToDate
 } from "./auth.js";
 import { calculateMatchScore, matchScoreColor, matchScoreLabel } from "./match-engine.js";
 import { buildMergeFields, MO_FORM_STUBS, COMPLIANCE_STATUSES, COMPLIANCE_CATEGORIES, formatComplianceStatus } from "./compliance.js";
@@ -97,13 +97,18 @@ async function loadClient(uid) {
     document.getElementById("qs-files").textContent = fileCount.data().count;
 
     if (clientData.lastActivityDate) {
-      const lastDate = clientData.lastActivityDate.toDate ? clientData.lastActivityDate.toDate() : new Date(clientData.lastActivityDate);
-      const days = Math.floor((Date.now() - lastDate.getTime()) / 86400000);
-      document.getElementById("qs-days").textContent = days;
+      const lastDate = safeToDate(clientData.lastActivityDate);
+      if (lastDate) {
+        const days = Math.floor((Date.now() - lastDate.getTime()) / 86400000);
+        document.getElementById("qs-days").textContent = days;
+      }
     }
 
     populateOverview(clientData);
-    await Promise.all([loadActivities(uid), loadFiles(uid), loadFolders(uid), loadTemplateFiles(uid), loadMatches(uid), loadEnvelopes(uid), loadShowings(uid), loadFollowUps(uid), loadComplianceTemplates(uid)]);
+    const results = await Promise.allSettled([loadActivities(uid), loadFiles(uid), loadFolders(uid), loadTemplateFiles(uid), loadMatches(uid), loadEnvelopes(uid), loadShowings(uid), loadFollowUps(uid), loadComplianceTemplates(uid)]);
+    results.forEach((r, i) => {
+      if (r.status === "rejected") console.error(`Client detail loader ${i} failed:`, r.reason);
+    });
     startComplianceListener(clientId);
     await migrateExistingFolders(uid);
     renderFolderCards();
@@ -603,23 +608,15 @@ async function ensureClosingDocumentsFolder(clientId, uid) {
   const folderRef = doc(db, "folders", deterministicId);
 
   try {
-    // Check Firestore directly (in case allFolders is stale)
-    const snap = await getDoc(folderRef);
-    if (snap.exists()) {
-      // Already exists in Firestore but not in local state — reload
-      await loadFolders(uid);
-      renderFolderCards();
-      return;
-    }
-
-    // Create the system folder with deterministic ID
+    // Use setDoc with merge to make this idempotent — avoids race condition
+    // where two tabs could both see non-existence and try to create
     await setDoc(folderRef, {
       name: "Closing Documents",
       clientId: clientId,
       realtorId: uid,
       isSystem: true,
       createdAt: serverTimestamp()
-    });
+    }, { merge: true });
 
     // Reload folders to pick up the new system folder
     await loadFolders(uid);

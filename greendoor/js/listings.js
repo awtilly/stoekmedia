@@ -7,7 +7,7 @@ import {
 import {
   ref, uploadBytesResumable, getDownloadURL, deleteObject
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
-import { getCurrentUser, showToast, formatCurrency, formatDate, statusLabel, escapeHtml, sanitizeUrl } from "./auth.js";
+import { getCurrentUser, showToast, formatCurrency, formatDate, statusLabel, escapeHtml, sanitizeUrl, safeToDate } from "./auth.js";
 import { calculateMatchScore, matchScoreColor, matchScoreLabel } from "./match-engine.js";
 import { initAddressAutocomplete } from "./address-autocomplete.js";
 
@@ -21,6 +21,12 @@ let pendingPhotos = [];
 let viewMode = "grid"; // "grid" | "list"
 let quickMatchScores = {}; // listingId → { score, label, color }
 let autocompleteInstance = null;
+
+/* --- Debounce utility --- */
+function debounce(fn, ms) {
+  let timer;
+  return (...args) => { clearTimeout(timer); timer = setTimeout(() => fn(...args), ms); };
+}
 
 const FEATURE_SUGGESTIONS = [
   "Pool", "Garage", "Fireplace", "Hardwood Floors", "Open Floor Plan",
@@ -53,14 +59,14 @@ onAuthStateChanged(auth, async (user) => {
 /* ===== LOAD DATA ===== */
 async function loadListings(uid) {
   try {
-    // Load all listings (shared collection — any auth user can read)
-    const q = query(collection(db, "listings"), orderBy("createdAt", "desc"));
+    // Load listings with limit to avoid unbounded reads
+    const q = query(collection(db, "listings"), orderBy("createdAt", "desc"), limit(200));
     const snap = await getDocs(q);
     allListings = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     applyFilters();
   } catch (e) {
     console.error("Load listings error:", e);
-    showToast("Failed to load listings.", "error");
+    showToast("Could not load listings. Please refresh the page.", "error");
   }
 }
 
@@ -74,7 +80,7 @@ async function loadClients(uid) {
     const select = document.getElementById("qm-client");
     select.innerHTML = '<option value="">— Choose a client —</option>';
     allClients.forEach(c => {
-      select.innerHTML += `<option value="${c.id}">${c.fullName || "Unknown"}</option>`;
+      select.innerHTML += `<option value="${escapeHtml(c.id)}">${escapeHtml(c.fullName || "Unknown")}</option>`;
     });
   } catch (e) {
     console.error("Load clients error:", e);
@@ -83,9 +89,10 @@ async function loadClients(uid) {
 
 /* ===== FILTERS ===== */
 function initFilters() {
+  const debouncedApply = debounce(applyFilters, 300);
   const inputs = ["filter-address", "filter-price-min", "filter-price-max", "filter-beds", "filter-baths", "filter-status", "filter-sort"];
   inputs.forEach(id => {
-    document.getElementById(id).addEventListener("input", applyFilters);
+    document.getElementById(id).addEventListener("input", debouncedApply);
     document.getElementById(id).addEventListener("change", applyFilters);
   });
   document.querySelectorAll(".filter-type-cb").forEach(cb => cb.addEventListener("change", applyFilters));
@@ -171,10 +178,10 @@ function renderGrid() {
 
     return `
       <div class="gd-listing-card" onclick="openListingDetail('${l.id}')">
-        <div class="gd-listing-photo" ${photo ? `style="background-image:url('${photo}')"` : ""}>
+        <div class="gd-listing-photo" ${photo ? `style="background-image:url('${encodeURI(photo)}')"` : ""}>
           ${!photo ? '<span class="gd-listing-no-photo">&#127968;</span>' : ""}
-          <span class="gd-listing-status-badge gd-lst-${l.status || "active"}">${statusLabelListing(l.status)}</span>
-          ${qm ? `<span class="gd-match-badge-float" style="background:${qm.color}">${qm.score}%</span>` : ""}
+          <span class="gd-listing-status-badge gd-lst-${escapeHtml(l.status || "active")}">${statusLabelListing(l.status)}</span>
+          ${qm ? `<span class="gd-match-badge-float" style="background:${escapeHtml(qm.color)}">${qm.score}%</span>` : ""}
         </div>
         <div class="gd-listing-card-body">
           <div class="gd-listing-price">${l.listingPrice ? formatCurrency(l.listingPrice) : "—"}</div>
@@ -414,6 +421,10 @@ window.openAddListingModal = function (listingId) {
 };
 
 window.closeAddListingModal = function () {
+  // Revoke any blob URLs to prevent memory leaks
+  document.querySelectorAll("#lst-photo-preview img").forEach(img => {
+    if (img.src.startsWith("blob:")) URL.revokeObjectURL(img.src);
+  });
   document.getElementById("add-listing-modal").classList.remove("active");
 };
 

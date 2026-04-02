@@ -150,6 +150,7 @@ async function loadOverviewTab() {
 
 async function loadActivityChart() {
   const chartEl = document.getElementById("activity-chart");
+  chartEl.innerHTML = '<div class="gd-spinner" style="margin:1rem auto;"></div>';
   try {
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
@@ -204,15 +205,13 @@ async function loadUsersTab() {
     realtorsSnap.forEach(d => allRealtors.push({ id: d.id, ...d.data() }));
   }
 
-  // Fetch client counts per realtor
-  for (const r of allRealtors) {
-    try {
-      const c = await getCountFromServer(query(collection(db, "clients"), where("realtorId", "==", r.id)));
-      realtorClientCounts[r.id] = c.data().count;
-    } catch {
-      realtorClientCounts[r.id] = "—";
-    }
-  }
+  // Fetch client counts per realtor (parallel instead of sequential)
+  const countPromises = allRealtors.map(r =>
+    getCountFromServer(query(collection(db, "clients"), where("realtorId", "==", r.id)))
+      .then(c => { realtorClientCounts[r.id] = c.data().count; })
+      .catch(() => { realtorClientCounts[r.id] = "—"; })
+  );
+  await Promise.all(countPromises);
 
   renderRealtorTable();
 }

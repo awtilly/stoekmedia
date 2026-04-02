@@ -4,7 +4,7 @@ import {
   collection, query, where, orderBy, limit, getDocs, getCountFromServer, Timestamp,
   addDoc, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-import { getCurrentUser, timeAgo, formatDate, formatDateTime, escapeHtml, showToast } from "./auth.js";
+import { getCurrentUser, timeAgo, formatDate, formatDateTime, escapeHtml, showToast, safeToDate } from "./auth.js";
 import { startTour, checkAndResumeTour } from "./tour.js";
 import { calculateMatchScore } from "./match-engine.js";
 
@@ -179,9 +179,7 @@ async function loadBriefing() {
       if (c.status === "active_buyer") contextData.activeBuyers++;
       if (c.status === "active_seller") contextData.activeSellers++;
       if (c.status === "under_contract") contextData.underContract++;
-      const lastDate = c.lastActivityDate
-        ? (typeof c.lastActivityDate.toDate === "function" ? c.lastActivityDate.toDate() : new Date(c.lastActivityDate))
-        : null;
+      const lastDate = safeToDate(c.lastActivityDate);
       if (!lastDate || lastDate < fourteenDaysAgo) {
         contextData.staleClients.push({ name: c.fullName || "Unknown", daysSince: lastDate ? Math.floor((Date.now() - lastDate.getTime()) / 86400000) : null });
       }
@@ -484,7 +482,7 @@ window.saveDashboardClient = async function () {
     document.getElementById("dash-add-source").value = "";
   } catch (e) {
     console.error("Save client error:", e);
-    showToast("Failed to save client.", "error");
+    showToast("Could not save client. Check your connection and try again.", "error");
   }
 };
 
@@ -572,7 +570,7 @@ window.saveDashboardListing = async function () {
     closeDashboardAddListing();
   } catch (e) {
     console.error("Save listing error:", e);
-    showToast("Failed to save listing.", "error");
+    showToast("Could not save listing. Check your connection and try again.", "error");
     if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = "Save Listing"; }
   }
 };

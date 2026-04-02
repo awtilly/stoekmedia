@@ -10,6 +10,11 @@ const askAssistant = httpsCallable(functions, "askAssistant");
 
 let allClients = [];
 
+function debounce(fn, ms) {
+  let timer;
+  return (...args) => { clearTimeout(timer); timer = setTimeout(() => fn(...args), ms); };
+}
+
 onAuthStateChanged(auth, async (user) => {
   if (!user) return;
   await loadClients(user.uid);
@@ -27,7 +32,7 @@ async function loadClients(uid) {
     renderClients(allClients);
   } catch (e) {
     console.error("Load clients error:", e);
-    showToast("Failed to load clients.", "error");
+    showToast("Could not load clients. Please refresh the page.", "error");
   }
 
   document.getElementById("clients-loading").classList.add("gd-hidden");
@@ -63,7 +68,7 @@ function renderClients(clients) {
 }
 
 /* --- Search & Filter --- */
-document.getElementById("search-input").addEventListener("input", applyFilters);
+document.getElementById("search-input").addEventListener("input", debounce(applyFilters, 300));
 document.getElementById("status-filter").addEventListener("change", applyFilters);
 
 function applyFilters() {

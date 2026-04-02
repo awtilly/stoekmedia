@@ -160,7 +160,7 @@ export async function getCurrentUser() {
   });
 }
 
-/* --- Toast notifications --- */
+/* --- Toast notifications (stacking queue) --- */
 export function showToast(message, type = "success") {
   let container = document.querySelector(".gd-toast-container");
   if (!container) {
@@ -171,8 +171,31 @@ export function showToast(message, type = "success") {
   const toast = document.createElement("div");
   toast.className = `gd-toast ${type}`;
   toast.textContent = message;
+  toast.style.transition = "opacity 0.3s, transform 0.3s";
   container.appendChild(toast);
-  setTimeout(() => toast.remove(), 3000);
+
+  // Reflow existing toasts to stack properly
+  const toasts = container.querySelectorAll(".gd-toast");
+  toasts.forEach((t, i) => {
+    t.style.transform = `translateY(-${(toasts.length - 1 - i) * 4}px)`;
+  });
+
+  setTimeout(() => {
+    toast.style.opacity = "0";
+    toast.style.transform = "translateY(-10px)";
+    setTimeout(() => toast.remove(), 300);
+  }, 3000);
+}
+
+/* --- Safe timestamp conversion utility --- */
+export function safeToDate(ts) {
+  if (!ts) return null;
+  if (typeof ts.toDate === "function") {
+    try { return ts.toDate(); } catch { return null; }
+  }
+  if (ts instanceof Date) return isNaN(ts.getTime()) ? null : ts;
+  const d = new Date(ts);
+  return isNaN(d.getTime()) ? null : d;
 }
 
 /* --- Formatting helpers --- */
@@ -182,21 +205,21 @@ export function formatCurrency(num) {
 }
 
 export function formatDate(ts) {
-  if (!ts) return "—";
-  const date = ts.toDate ? ts.toDate() : new Date(ts);
+  const date = safeToDate(ts);
+  if (!date) return "—";
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
 export function formatDateTime(ts) {
-  if (!ts) return "—";
-  const date = ts.toDate ? ts.toDate() : new Date(ts);
+  const date = safeToDate(ts);
+  if (!date) return "—";
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) +
     " at " + date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
 }
 
 export function timeAgo(ts) {
-  if (!ts) return "—";
-  const date = ts.toDate ? ts.toDate() : new Date(ts);
+  const date = safeToDate(ts);
+  if (!date) return "—";
   const now = new Date();
   const seconds = Math.floor((now - date) / 1000);
   if (seconds < 60) return "just now";
