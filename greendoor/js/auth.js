@@ -309,7 +309,7 @@ function showInstallBanner() {
     <img class="gd-install-banner-icon" src="/greendoor/app/icons/icon-192.png" alt="GreenDoor">
     <div class="gd-install-banner-text">
       Install GreenDoor CRM
-      <small>${isIOS ? 'Tap Share then "Add to Home Screen"' : 'Add to your home screen for quick access'}</small>
+      <small>${isIOS ? 'Tap Share, then scroll down and tap "Add to Home Screen"' : 'Add to your home screen for quick access'}</small>
     </div>
     ${!isIOS ? '<button class="gd-btn-install" id="gd-install-btn">Install</button>' : ''}
     <button class="gd-btn-dismiss" id="gd-dismiss-btn">&times;</button>
@@ -324,7 +324,7 @@ function showInstallBanner() {
 function dismissInstallBanner() {
   const banner = document.getElementById('gd-install-banner');
   if (banner) banner.remove();
-  sessionStorage.setItem('gd-install-dismissed', '1');
+  localStorage.setItem('gd-install-dismissed', '1');
 }
 
 async function installApp() {
@@ -340,7 +340,7 @@ async function installApp() {
 window.addEventListener('beforeinstallprompt', e => {
   e.preventDefault();
   deferredInstallPrompt = e;
-  if (!sessionStorage.getItem('gd-install-dismissed')) {
+  if (!localStorage.getItem('gd-install-dismissed')) {
     showInstallBanner();
   }
 });
@@ -352,6 +352,6 @@ window.addEventListener('appinstalled', () => {
 });
 
 // iOS: show install banner after short delay
-if (/iPad|iPhone|iPod/.test(navigator.userAgent) && !isStandalone() && !sessionStorage.getItem('gd-install-dismissed')) {
-  setTimeout(showInstallBanner, 2000);
+if (/iPad|iPhone|iPod/.test(navigator.userAgent) && !isStandalone() && !localStorage.getItem('gd-install-dismissed')) {
+  setTimeout(showInstallBanner, 6000);
 }

@@ -46,16 +46,23 @@ self.addEventListener('notificationclick', (event) => {
 });
 
 /* ── Service Worker Cache ── */
-const CACHE_NAME = 'greendoor-v2';
+const CACHE_NAME = 'greendoor-v3';
 const PRECACHE_URLS = [
   '/greendoor/app/dashboard',
   '/greendoor/app/login',
   '/greendoor/app/clients',
   '/greendoor/app/calendar',
+  '/greendoor/app/settings',
+  '/greendoor/app/listings',
   '/greendoor/css/greendoor.css',
   '/assets/css/style.css',
-  '/greendoor/app/icons/icon-192.png'
+  '/greendoor/app/icons/icon-192.png',
+  '/greendoor/app/icons/icon-512.png',
+  '/greendoor/app/icons/apple-touch-icon.png',
+  '/greendoor/app/manifest.json'
 ];
+
+const OFFLINE_PAGE = '/greendoor/app/login';
 
 self.addEventListener('install', event => {
   event.waitUntil(
@@ -101,8 +108,8 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // Network-first for JS files so deploys take effect immediately
-  if (url.pathname.endsWith('.js')) {
+  // Network-first for JS and CSS so deploys take effect immediately
+  if (url.pathname.endsWith('.js') || url.pathname.endsWith('.css')) {
     event.respondWith(
       fetch(event.request)
         .then(response => {

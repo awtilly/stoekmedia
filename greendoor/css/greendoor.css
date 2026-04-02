@@ -28,6 +28,8 @@ body.gd-light {
   background: #f9fafb;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  -webkit-text-size-adjust: 100%;
+  overscroll-behavior: none;
 }
 
 /* --- Hide old top nav --- */
@@ -43,6 +45,7 @@ body.gd-light nav.nav.scrolled {
   left: 0;
   width: var(--gd-sidebar-width);
   height: 100vh;
+  height: 100dvh;
   background: #0f172a;
   color: #94a3b8;
   display: flex;
@@ -240,6 +243,7 @@ body.gd-light nav.nav.scrolled {
 .gd-app-layout {
   display: flex;
   min-height: 100vh;
+  min-height: 100dvh;
 }
 
 body.gd-light .gd-page {
@@ -431,6 +435,7 @@ body.gd-light [class*="gd-badge-"] {
 /* --- Component Overrides: Modals --- */
 body.gd-light .gd-modal-overlay {
   background: rgba(0, 0, 0, 0.5);
+  -webkit-backdrop-filter: blur(4px);
   backdrop-filter: blur(4px);
 }
 
@@ -619,10 +624,48 @@ body.gd-light .gd-stat-card:nth-child(2) { animation-delay: 0.1s; }
 body.gd-light .gd-stat-card:nth-child(3) { animation-delay: 0.15s; }
 body.gd-light .gd-stat-card:nth-child(4) { animation-delay: 0.2s; }
 
+/* --- iOS PWA Touch Behavior --- */
+.gd-btn,
+.gd-tab-item,
+.gd-sidebar-nav a,
+.gd-settings-tab,
+.gd-ai-fab,
+.gd-ai-quick-btn,
+.gd-ai-send,
+.gd-ai-mic,
+.gd-modal-close,
+input,
+select,
+textarea {
+  touch-action: manipulation;
+}
+
+.gd-btn,
+.gd-tab-item,
+.gd-sidebar-nav a,
+.gd-settings-tab,
+.gd-ai-fab,
+.gd-modal-close {
+  -webkit-touch-callout: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
 /* --- PWA Standalone Override --- */
 @media all and (display-mode: standalone) {
   .gd-sidebar {
     padding-top: env(safe-area-inset-top, 0px);
+  }
+  .gd-topbar {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+  .gd-login-page,
+  .gd-onboarding-page {
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .gd-modal-overlay {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 }
 
@@ -1778,6 +1821,7 @@ body.gd-light .gd-section-header h2 {
 .gd-page {
   padding-top: var(--nav-height);
   min-height: 100vh;
+  min-height: 100dvh;
 }
 
 .gd-content {
@@ -1842,6 +1886,7 @@ body.gd-light .nav .container {
 /* --- Login Page --- */
 .gd-login-page {
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2409,6 +2454,7 @@ textarea.gd-input {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.5);
+  -webkit-backdrop-filter: blur(4px);
   backdrop-filter: blur(4px);
   z-index: 2000;
   align-items: center;
@@ -2428,7 +2474,10 @@ textarea.gd-input {
   width: 100%;
   max-width: 560px;
   max-height: 90vh;
+  max-height: 90dvh;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
   position: relative;
   animation: gdModalIn 0.25s var(--gd-ease);
 }
@@ -4525,6 +4574,7 @@ body.gd-light .gd-breadcrumb-current {
 
 .gd-onboarding-page {
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -6146,6 +6196,7 @@ body.gd-light .gd-breadcrumb-current {
   right: 0;
   width: 340px;
   height: calc(100vh - var(--nav-height));
+  height: calc(100dvh - var(--nav-height));
   background: var(--color-bg-card);
   border-left: 1px solid var(--color-border);
   border-radius: var(--gd-radius-lg) 0 0 var(--gd-radius-lg);
@@ -8343,6 +8394,7 @@ body.gd-light .gd-confirm-warning { background: #fffbeb; color: #92400e; }
   .gd-preview-modal {
     max-width: 100%;
     max-height: 100vh;
+    max-height: 100dvh;
   }
 
   .gd-modal-overlay.active {
