@@ -56,6 +56,7 @@ onAuthStateChanged(auth, async (user) => {
       if (r.status === "rejected") console.error(`Settings loader ${i} failed:`, r.reason);
     });
     renderEmailSenderStatus(profile);
+    renderGmailConnection(profile);
     renderShowingTimeIntegration(profile);
 
     setTimeout(() => checkAndResumeTour(), 400);
@@ -255,110 +256,105 @@ window.runBoldSignTest = async function () {
   }
 };
 
-/* ===== EMAIL SENDER VERIFICATION ===== */
+/* ===== EMAIL SENDER STATUS ===== */
 
 function renderEmailSenderStatus(profile) {
   const el = document.getElementById("email-sender-status");
   if (!el) return;
 
-  const verified = profile.senderVerified === true;
-  const pending = profile.sendgridSenderId && !verified;
   const userEmail = profile.email || auth.currentUser?.email || "";
 
-  if (verified) {
+  el.innerHTML = `
+    <div class="gd-email-sender-row">
+      <div class="gd-email-sender-info">
+        <span class="gd-settings-status-dot gd-connected"></span>
+        <div>
+          <div class="gd-email-sender-label">Sending from <strong>greendoor@stoekmedia.com</strong></div>
+          <div class="gd-text-muted" style="font-size: 0.8rem;">Replies route to <strong>${escapeHtml(userEmail)}</strong>. Your name appears in the From line so clients still recognize you.</div>
+        </div>
+      </div>
+    </div>`;
+}
+
+/* ===== GMAIL OAUTH CONNECTION ===== */
+
+const GMAIL_SEND_SCOPE = "https://www.googleapis.com/auth/gmail.send openid email";
+
+function gmailRedirectUri() {
+  return `${window.location.origin}/greendoor/app/oauth-callback.html`;
+}
+
+function renderGmailConnection(profile) {
+  const el = document.getElementById("gmail-connection-status");
+  if (!el) return;
+
+  const oauth = profile.gmailOAuth || null;
+  if (oauth && oauth.email) {
     el.innerHTML = `
       <div class="gd-email-sender-row">
         <div class="gd-email-sender-info">
           <span class="gd-settings-status-dot gd-connected"></span>
           <div>
-            <div class="gd-email-sender-label">Sending as <strong>${escapeHtml(userEmail)}</strong></div>
-            <div class="gd-text-muted" style="font-size: 0.8rem;">Clients see your email address as the sender.</div>
+            <div class="gd-email-sender-label">Connected as <strong>${escapeHtml(oauth.email)}</strong></div>
+            <div class="gd-text-muted" style="font-size: 0.8rem;">Emails to your clients now send from your Gmail account with proper authentication.</div>
           </div>
         </div>
-        <button class="gd-btn gd-btn-outline gd-btn-sm" onclick="removeSenderVerification()">Remove</button>
-      </div>`;
-  } else if (pending) {
-    el.innerHTML = `
-      <div class="gd-email-sender-row">
-        <div class="gd-email-sender-info">
-          <span class="gd-settings-status-dot" style="background: #f59e0b;"></span>
-          <div>
-            <div class="gd-email-sender-label">Verification pending for <strong>${escapeHtml(userEmail)}</strong></div>
-            <div class="gd-text-muted" style="font-size: 0.8rem;">Check your inbox and click the verification link from SendGrid.</div>
-          </div>
-        </div>
-        <div style="display: flex; gap: 0.5rem;">
-          <button class="gd-btn gd-btn-primary gd-btn-sm" onclick="checkVerificationStatus()">Check Status</button>
-          <button class="gd-btn gd-btn-outline gd-btn-sm" onclick="requestVerification()">Resend</button>
-        </div>
+        <button class="gd-btn gd-btn-outline gd-btn-sm" onclick="disconnectGmail()">Disconnect</button>
       </div>`;
   } else {
     el.innerHTML = `
       <div class="gd-email-sender-row">
         <div class="gd-email-sender-info">
-          <span class="gd-settings-status-dot gd-connected"></span>
+          <span class="gd-settings-status-dot" style="background: #9ca3af;"></span>
           <div>
-            <div class="gd-email-sender-label">Sending from <strong>greendoor@stoekmedia.com</strong></div>
-            <div class="gd-text-muted" style="font-size: 0.8rem;">Your email (${escapeHtml(userEmail)}) is set as Reply-To. Verify your email to send directly from your address.</div>
+            <div class="gd-email-sender-label">Not connected</div>
+            <div class="gd-text-muted" style="font-size: 0.8rem;">Connect Gmail to send as your real email address. Otherwise we send via GreenDoor with replies routed to you.</div>
           </div>
         </div>
-        <button class="gd-btn gd-btn-primary gd-btn-sm" onclick="requestVerification()">Verify My Email</button>
+        <button class="gd-btn gd-btn-primary gd-btn-sm" onclick="connectGmail()">Connect Gmail</button>
       </div>`;
   }
 }
 
-window.requestVerification = async function () {
+window.connectGmail = async function () {
   try {
-    showToast("Sending verification email...");
-    const fn = httpsCallable(functions, "requestSenderVerification");
-    const { data } = await fn();
-
-    if (data.alreadyVerified) {
-      showToast("Your email is already verified!");
-    } else {
-      showToast("Verification email sent — check your inbox.");
+    showToast("Opening Google sign-in...");
+    const getConfig = httpsCallable(functions, "getGoogleOAuthConfig");
+    const { data } = await getConfig();
+    if (!data.configured) {
+      showToast("Gmail connection is not configured yet. Please contact support.", "error");
+      return;
     }
+    // Stash the current location so the callback can return us here.
+    sessionStorage.setItem("oauthReturnTo", window.location.pathname + window.location.search);
 
-    const profile = await getCurrentUser();
-    if (profile) renderEmailSenderStatus(profile);
+    const params = new URLSearchParams({
+      client_id: data.clientId,
+      redirect_uri: gmailRedirectUri(),
+      response_type: "code",
+      scope: GMAIL_SEND_SCOPE,
+      access_type: "offline",
+      include_granted_scopes: "true",
+      prompt: "consent" // force refresh_token issuance
+    });
+    window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
   } catch (e) {
-    console.error("Request verification error:", e);
-    showToast("Failed to send verification email.", "error");
+    console.error("connectGmail error:", e);
+    showToast("Failed to start Gmail connection.", "error");
   }
 };
 
-window.checkVerificationStatus = async function () {
+window.disconnectGmail = async function () {
+  if (!confirm("Disconnect your Gmail account? Emails will revert to sending via GreenDoor.")) return;
   try {
-    const fn = httpsCallable(functions, "checkSenderVerification");
-    const { data } = await fn();
-
-    if (data.verified) {
-      showToast("Email verified! Emails will now send from your address.");
-    } else {
-      showToast("Not yet verified. Check your inbox for the verification link.", "error");
-    }
-
-    const profile = await getCurrentUser();
-    if (profile) renderEmailSenderStatus(profile);
-  } catch (e) {
-    console.error("Check verification error:", e);
-    showToast("Failed to check verification status.", "error");
-  }
-};
-
-window.removeSenderVerification = async function () {
-  if (!confirm("Remove email verification? Emails will revert to sending from greendoor@stoekmedia.com.")) return;
-
-  try {
-    const fn = httpsCallable(functions, "removeSenderVerification");
+    const fn = httpsCallable(functions, "disconnectGmail");
     await fn();
-    showToast("Sender verification removed.");
-
+    showToast("Gmail disconnected.");
     const profile = await getCurrentUser();
-    if (profile) renderEmailSenderStatus(profile);
+    if (profile) renderGmailConnection(profile);
   } catch (e) {
-    console.error("Remove verification error:", e);
-    showToast("Failed to remove verification.", "error");
+    console.error("disconnectGmail error:", e);
+    showToast("Failed to disconnect Gmail.", "error");
   }
 };
 
@@ -456,6 +452,12 @@ window.saveShowingTimeFeed = async function () {
 
   if (!url.startsWith("webcal://") && !url.startsWith("https://") && !url.startsWith("http://")) {
     showToast("Feed URL must start with webcal://, https://, or http://", "error");
+    return;
+  }
+
+  // Soft check: ShowingTime feeds end in .ics or contain "showingtime" in the host
+  const looksLikeFeed = /\.ics(\?|$)/i.test(url) || /showingtime/i.test(url);
+  if (!looksLikeFeed && !confirm("This URL doesn't look like a ShowingTime .ics feed. Save anyway?")) {
     return;
   }
 
@@ -575,9 +577,36 @@ async function loadSequences(uid) {
   }).join("");
 }
 
+function makeStepEl(idx) {
+  const div = document.createElement("div");
+  div.className = "gd-seq-step";
+  div.dataset.step = idx;
+  if (idx > 0) {
+    div.style.cssText = "border-top:1px solid #e5e7eb;padding-top:12px;margin-top:12px;";
+  }
+  div.innerHTML = `
+    <div class="gd-form-row gd-gap-sm">
+      <div class="gd-form-group" style="max-width:100px;">
+        <label>Delay (days)</label>
+        <input type="number" class="gd-input seq-delay" value="${idx === 0 ? 0 : idx * 3}" min="0">
+      </div>
+      <div class="gd-form-group gd-flex-1">
+        <label>Subject</label>
+        <input type="text" class="gd-input seq-subject" placeholder="Email subject line">
+      </div>
+    </div>
+    <div class="gd-form-group">
+      <label>Body</label>
+      <textarea class="gd-input seq-body" rows="3" placeholder="Use {{clientName}}, {{clientFirstName}}, {{realtorName}}"></textarea>
+    </div>`;
+  return div;
+}
+
 window.openCreateSequenceModal = function () {
   document.getElementById("seq-name").value = "";
-  document.getElementById("seq-steps").innerHTML = buildStepHTML(0);
+  const container = document.getElementById("seq-steps");
+  container.innerHTML = "";
+  container.appendChild(makeStepEl(0));
   stepCounter = 1;
   document.getElementById("sequence-modal").classList.add("active");
 };
@@ -587,34 +616,9 @@ window.closeCreateSequenceModal = function () {
 };
 
 window.addSequenceStep = function () {
-  const container = document.getElementById("seq-steps");
-  const div = document.createElement("div");
-  div.className = "gd-seq-step";
-  div.dataset.step = stepCounter;
-  div.innerHTML = buildStepHTML(stepCounter).replace(/<div class="gd-seq-step"[^>]*>/, "").replace(/<\/div>$/, "");
-  container.appendChild(div);
+  document.getElementById("seq-steps").appendChild(makeStepEl(stepCounter));
   stepCounter++;
 };
-
-function buildStepHTML(idx) {
-  return `
-    <div class="gd-seq-step" data-step="${idx}" style="border-top:${idx > 0 ? "1px solid #e5e7eb" : "none"};padding-top:${idx > 0 ? "12px" : "0"};margin-top:${idx > 0 ? "12px" : "0"};">
-      <div class="gd-form-row gd-gap-sm">
-        <div class="gd-form-group" style="max-width:100px;">
-          <label>Delay (days)</label>
-          <input type="number" class="gd-input seq-delay" value="${idx === 0 ? 0 : idx * 3}" min="0">
-        </div>
-        <div class="gd-form-group gd-flex-1">
-          <label>Subject</label>
-          <input type="text" class="gd-input seq-subject" placeholder="Email subject line">
-        </div>
-      </div>
-      <div class="gd-form-group">
-        <label>Body</label>
-        <textarea class="gd-input seq-body" rows="3" placeholder="Use {{clientName}}, {{clientFirstName}}, {{realtorName}}"></textarea>
-      </div>
-    </div>`;
-}
 
 window.saveSequence = async function () {
   const name = document.getElementById("seq-name").value.trim();
@@ -631,6 +635,13 @@ window.saveSequence = async function () {
   }
 
   if (!steps.length) { showToast("Add at least one step.", "error"); return; }
+
+  for (let i = 1; i < steps.length; i++) {
+    if (steps[i].delayDays < steps[i - 1].delayDays) {
+      showToast("Step delays must be in increasing order (day 1 → day 7, not day 7 → day 1).", "error");
+      return;
+    }
+  }
 
   try {
     await createSequenceFn({ name, steps });

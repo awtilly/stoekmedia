@@ -49,7 +49,12 @@ service cloud.firestore {
 
     match /clients/{clientId} {
       allow read: if isAuthenticated() && (isOwner(resource.data.realtorId) || isAdmin());
-      allow create: if isAuthenticated() && incomingRealtorIdMatchesAuth();
+      allow create: if isAuthenticated()
+        && incomingRealtorIdMatchesAuth()
+        && request.resource.data.keys().hasAll(['fullName', 'realtorId'])
+        && request.resource.data.fullName is string
+        && request.resource.data.fullName.size() > 0
+        && request.resource.data.fullName.size() < 200;
       allow update: if isAuthenticated() && (isOwner(resource.data.realtorId) || isAdmin()) && realtorIdUnchanged();
       allow delete: if isAuthenticated() && (isOwner(resource.data.realtorId) || isAdmin());
 
@@ -104,7 +109,10 @@ service cloud.firestore {
     match /showings/{showingId} {
       allow read: if isAuthenticated() && (isOwner(resource.data.realtorId) || isAdmin());
       allow create: if isAuthenticated() && incomingRealtorIdMatchesAuth();
-      allow update: if isAuthenticated() && (isOwner(resource.data.realtorId) || isAdmin()) && realtorIdUnchanged();
+      allow update: if isAuthenticated()
+        && (isOwner(resource.data.realtorId) || isAdmin())
+        && realtorIdUnchanged()
+        && sourceUnchanged();
       allow delete: if isAuthenticated() && (isOwner(resource.data.realtorId) || isAdmin());
     }
 
@@ -135,7 +143,8 @@ service cloud.firestore {
     }
 
     match /listings/{listingId} {
-      allow read: if isAuthenticated();
+      allow read: if isAuthenticated()
+        && (resource.data.addedBy == request.auth.uid || isAdmin());
       allow create: if isAuthenticated()
         && request.resource.data.keys().hasAll(['address', 'addedBy', 'createdAt'])
         && request.resource.data.addedBy == request.auth.uid
@@ -171,6 +180,19 @@ service cloud.firestore {
       allow delete: if isAuthenticated() && (isOwner(resource.data.realtorId) || isAdmin());
     }
 
+    match /followUpSequences/{sequenceId} {
+      allow read: if isAuthenticated() && (isOwner(resource.data.realtorId) || isAdmin());
+      allow create: if isAuthenticated() && incomingRealtorIdMatchesAuth();
+      allow update: if isAuthenticated() && (isOwner(resource.data.realtorId) || isAdmin()) && realtorIdUnchanged();
+      allow delete: if isAuthenticated() && (isOwner(resource.data.realtorId) || isAdmin());
+    }
+
+    match /sequenceEnrollments/{enrollmentId} {
+      allow read: if isAuthenticated() && (isOwner(resource.data.realtorId) || isAdmin());
+      // Writes go through Cloud Functions (admin SDK bypasses rules); deny client writes.
+      allow write: if false;
+    }
+
     match /emailTemplates/{templateId} {
       allow read: if isAuthenticated() && (resource.data.createdBy == "system" || resource.data.createdBy == request.auth.uid || isAdmin());
       allow create: if isAuthenticated() && request.resource.data.createdBy == request.auth.uid;
@@ -200,6 +222,12 @@ service cloud.firestore {
                     && request.resource.data.email.size() < 255;
       // Only admins can read/manage requests
       allow read, update, delete: if isAuthenticated() && isAdmin();
+    }
+
+    // OAuth refresh/access tokens — Cloud Functions only (admin SDK bypasses).
+    // No client read or write under any circumstance.
+    match /oauthTokens/{userId} {
+      allow read, write: if false;
     }
   }
 }
