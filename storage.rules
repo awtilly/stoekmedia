@@ -10,13 +10,24 @@ service firebase.storage {
         && request.resource.size < 25 * 1024 * 1024;
     }
 
-    // Listing photos — any auth user can read, only auth users can write
-    // 10 MB max, images only
+    // Listing photos — owner can read/write; 10 MB max; images only
     match /listings/{listingId}/{allPaths=**} {
-      allow read: if request.auth != null;
+      function listingOwner() {
+        return firestore.get(/databases/(default)/documents/listings/$(listingId)).data.addedBy;
+      }
+      allow read: if request.auth != null && request.auth.uid == listingOwner();
       allow write: if request.auth != null
+        && request.auth.uid == listingOwner()
         && request.resource.size < 10 * 1024 * 1024
-        && request.resource.contentType.matches('image/.*');
+        && request.resource.contentType.matches('image/(jpeg|png|webp|gif)');
+    }
+
+    // Client subtree (closing documents, etc.) — only the client's realtor can read.
+    // Writes happen server-side via admin SDK (bypasses rules).
+    match /clients/{clientId}/{allPaths=**} {
+      allow read: if request.auth != null
+        && firestore.get(/databases/(default)/documents/clients/$(clientId)).data.realtorId == request.auth.uid;
+      allow write: if false;
     }
 
     // Document templates — owner only, 25 MB max

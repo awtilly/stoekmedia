@@ -713,11 +713,586 @@ exports.sendForSignatureV2 = onCall(
   }
 );
 
+/* ------------------------------------------------------------------ */
+/*  resolveDocuSealFieldValues                                         */
+/*                                                                     */
+/*  Builds DocuSeal `submitters[].values` from a template's            */
+/*  mergeFields, the docusealFieldMap (for seeded BoldSign-era         */
+/*  templates), and the actual client/listing/agent data.              */
+/*                                                                     */
+/*  Field-name resolution order:                                       */
+/*    1. field.docusealFieldName  (realtor-uploaded templates)         */
+/*    2. template.docusealFieldMap[field.boldSignFieldId]              */
+/*    3. field.boldSignFieldId    (last-ditch: same name in both)      */
+/* ------------------------------------------------------------------ */
+function resolveDocuSealFieldValues(template, clientData, listingData, agentProfile) {
+  const sources = {
+    client: clientData || {},
+    listing: listingData || {},
+    agent: agentProfile || {}
+  };
+  const fieldMap = template.docusealFieldMap || {};
+  const values = {};
+  const missing = [];
+
+  for (const field of (template.mergeFields || [])) {
+    let resolved;
+    if (field.source === "date") {
+      resolved = new Date().toLocaleDateString("en-US");
+    } else {
+      const [sourceKey, ...pathParts] = String(field.source || "").split(".");
+      let value = sources[sourceKey];
+      for (const part of pathParts) value = value?.[part];
+      resolved = value != null ? String(value) : "";
+    }
+
+    const dsName = field.docusealFieldName
+      || fieldMap[field.boldSignFieldId]
+      || field.boldSignFieldId;
+    if (!dsName) continue;
+    if (!resolved) missing.push(dsName);
+    values[dsName] = resolved;
+  }
+
+  return { values, missing };
+}
+
+/* ------------------------------------------------------------------ */
+/*  sendComplianceDocV2 — DocuSeal compliance-doc send                 */
+/*                                                                     */
+/*  Mirrors sendComplianceDoc (BoldSign) but routes through DocuSeal.  */
+/*  Reads template.docusealTemplateId + template.docusealFieldMap,     */
+/*  POSTs /submissions, writes clients/{clientId}/complianceDocs/{tid} */
+/*  with docusealSubmissionId so the webhook can find it.              */
+/* ------------------------------------------------------------------ */
+exports.sendComplianceDocV2 = onCall(
+  { region: "us-central1", secrets: [DOCUSEAL_API_KEY, DOCUSEAL_BASE_URL] },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "You must be signed in to send compliance documents.");
+    }
+    const uid = request.auth.uid;
+    const { templateId, clientId, listingId } = request.data || {};
+    if (!templateId || !clientId) {
+      throw new HttpsError("invalid-argument", "templateId and clientId are required.");
+    }
+
+    const apiKey = DOCUSEAL_API_KEY.value();
+    if (!isLiveSecret(apiKey)) {
+      throw new HttpsError("failed-precondition", "DocuSeal is not yet configured.");
+    }
+    const base = docusealBaseUrl();
+
+    const templateSnap = await db.doc(`documentTemplates/${templateId}`).get();
+    if (!templateSnap.exists) {
+      throw new HttpsError("not-found", "Document template not found.");
+    }
+    const template = templateSnap.data();
+    if (!template.docusealTemplateId) {
+      throw new HttpsError("failed-precondition", "Template not configured in DocuSeal. Open the template in Templates to finish setup.");
+    }
+
+    // Realtor-uploaded templates: enforce ownership
+    if (template.visibility === "private" && template.ownerId && template.ownerId !== uid) {
+      throw new HttpsError("permission-denied", "You don't have access to this template.");
+    }
+
+    const clientSnap = await db.doc(`clients/${clientId}`).get();
+    if (!clientSnap.exists) throw new HttpsError("not-found", "Client not found.");
+    const clientDataDoc = clientSnap.data();
+    if (!clientDataDoc.email) {
+      throw new HttpsError("failed-precondition", "Client email required for signature request.");
+    }
+
+    let listingData = null;
+    if (listingId) {
+      const listingSnap = await db.doc(`listings/${listingId}`).get();
+      if (listingSnap.exists) listingData = listingSnap.data();
+    }
+
+    const userSnap = await db.doc(`users/${uid}`).get();
+    if (!userSnap.exists) throw new HttpsError("not-found", "User profile not found.");
+    const agentProfile = userSnap.data();
+    const senderEmail = agentProfile.email || request.auth.token.email;
+
+    const { values } = resolveDocuSealFieldValues(template, clientDataDoc, listingData, agentProfile);
+
+    const subResp = await fetch(`${base}/submissions`, {
+      method: "POST",
+      headers: { "X-Auth-Token": apiKey, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        template_id: template.docusealTemplateId,
+        send_email: true,
+        message: {
+          subject: template.name,
+          body: `Please review and sign: ${template.name}`
+        },
+        submitters: [{
+          role: "Signer",
+          name: clientDataDoc.fullName || "Client",
+          email: clientDataDoc.email,
+          send_email: true,
+          // DocuSeal uses send_email_from when you want to brand the sender; the
+          // realtor's address goes here when supported by the DocuSeal account.
+          reply_to: senderEmail || undefined,
+          values
+        }]
+      })
+    });
+
+    if (!subResp.ok) {
+      const errText = await subResp.text();
+      console.error(`DocuSeal /submissions error (${subResp.status}):`, errText);
+      throw new HttpsError("internal", "Failed to send document via DocuSeal.");
+    }
+
+    const subJson = await subResp.json();
+    const submissionId = Array.isArray(subJson)
+      ? (subJson[0]?.submission_id || subJson[0]?.id)
+      : (subJson.submission_id || subJson.id);
+    if (!submissionId) {
+      console.error("DocuSeal /submissions returned no id:", subJson);
+      throw new HttpsError("internal", "DocuSeal did not return a submission id.");
+    }
+
+    const FieldValue = require("firebase-admin/firestore").FieldValue;
+    await db.doc(`clients/${clientId}/complianceDocs/${templateId}`).set({
+      templateId,
+      docusealSubmissionId: String(submissionId),
+      provider: "docuseal",
+      status: "sent",
+      sentAt: FieldValue.serverTimestamp(),
+      signedAt: null,
+      sentBy: uid,
+      listingId: listingId || null
+    });
+
+    return { documentId: String(submissionId), submissionId: String(submissionId), status: "sent", provider: "docuseal" };
+  }
+);
+
+/* ------------------------------------------------------------------ */
+/*  sendBulkComplianceDocsV2 — multi-template DocuSeal submission      */
+/*                                                                     */
+/*  DocuSeal accepts a single submission across multiple templates by  */
+/*  passing template_ids: [...]. If that call fails we fall back to    */
+/*  sequential /submissions calls per template (same shape boldSign    */
+/*  bulk uses on its sequential path).                                 */
+/* ------------------------------------------------------------------ */
+exports.sendBulkComplianceDocsV2 = onCall(
+  { region: "us-central1", secrets: [DOCUSEAL_API_KEY, DOCUSEAL_BASE_URL] },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "You must be signed in to send compliance documents.");
+    }
+    const uid = request.auth.uid;
+    const { templateIds, clientId, listingId } = request.data || {};
+    if (!templateIds || !Array.isArray(templateIds) || templateIds.length === 0 || !clientId) {
+      throw new HttpsError("invalid-argument", "templateIds (non-empty array) and clientId are required.");
+    }
+
+    const apiKey = DOCUSEAL_API_KEY.value();
+    if (!isLiveSecret(apiKey)) {
+      throw new HttpsError("failed-precondition", "DocuSeal is not yet configured.");
+    }
+    const base = docusealBaseUrl();
+
+    const userSnap = await db.doc(`users/${uid}`).get();
+    if (!userSnap.exists) throw new HttpsError("not-found", "User profile not found.");
+    const agentProfile = userSnap.data();
+    const senderEmail = agentProfile.email || request.auth.token.email;
+
+    const clientSnap = await db.doc(`clients/${clientId}`).get();
+    if (!clientSnap.exists) throw new HttpsError("not-found", "Client not found.");
+    const clientDataDoc = clientSnap.data();
+    if (!clientDataDoc.email) {
+      throw new HttpsError("failed-precondition", "Client email required for signature request.");
+    }
+
+    let listingData = null;
+    if (listingId) {
+      const listingSnap = await db.doc(`listings/${listingId}`).get();
+      if (listingSnap.exists) listingData = listingSnap.data();
+    }
+
+    const templateDocs = [];
+    for (const tid of templateIds) {
+      const tSnap = await db.doc(`documentTemplates/${tid}`).get();
+      if (!tSnap.exists) throw new HttpsError("not-found", `Template ${tid} not found.`);
+      const tData = tSnap.data();
+      if (!tData.docusealTemplateId) {
+        throw new HttpsError("failed-precondition", `Template "${tData.name || tid}" not configured in DocuSeal.`);
+      }
+      if (tData.visibility === "private" && tData.ownerId && tData.ownerId !== uid) {
+        throw new HttpsError("permission-denied", `You don't have access to template "${tData.name || tid}".`);
+      }
+      templateDocs.push({ id: tid, ...tData });
+    }
+
+    const FieldValue = require("firebase-admin/firestore").FieldValue;
+
+    // Merge all field values across templates into one submitter object. DocuSeal
+    // matches values by field name, so same-named fields share a single value.
+    const mergedValues = {};
+    for (const tdoc of templateDocs) {
+      const { values } = resolveDocuSealFieldValues(tdoc, clientDataDoc, listingData, agentProfile);
+      Object.assign(mergedValues, values);
+    }
+
+    // Attempt combined-template submission
+    try {
+      const combinedResp = await fetch(`${base}/submissions`, {
+        method: "POST",
+        headers: { "X-Auth-Token": apiKey, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          template_ids: templateDocs.map(t => t.docusealTemplateId),
+          send_email: true,
+          message: { subject: "Compliance Documents", body: "Please review and sign the following compliance documents." },
+          submitters: [{
+            role: "Signer",
+            name: clientDataDoc.fullName || "Client",
+            email: clientDataDoc.email,
+            reply_to: senderEmail || undefined,
+            values: mergedValues
+          }]
+        })
+      });
+
+      if (combinedResp.ok) {
+        const result = await combinedResp.json();
+        const submissionId = Array.isArray(result)
+          ? (result[0]?.submission_id || result[0]?.id)
+          : (result.submission_id || result.id);
+        if (submissionId) {
+          for (const tdoc of templateDocs) {
+            await db.doc(`clients/${clientId}/complianceDocs/${tdoc.id}`).set({
+              templateId: tdoc.id,
+              docusealSubmissionId: String(submissionId),
+              provider: "docuseal",
+              status: "sent",
+              sentAt: FieldValue.serverTimestamp(),
+              signedAt: null,
+              sentBy: uid,
+              listingId: listingId || null,
+              bulkEnvelopeId: String(submissionId)
+            });
+          }
+          return { mode: "envelope", documentId: String(submissionId), templateCount: templateIds.length };
+        }
+      } else {
+        const errText = await combinedResp.text();
+        console.warn(`DocuSeal combined /submissions failed (${combinedResp.status}): ${errText}. Falling back to sequential.`);
+      }
+    } catch (err) {
+      console.warn("DocuSeal combined submission threw, falling back to sequential:", err.message);
+    }
+
+    // Sequential fallback — one /submissions call per template
+    const documents = [];
+    for (const tdoc of templateDocs) {
+      const { values } = resolveDocuSealFieldValues(tdoc, clientDataDoc, listingData, agentProfile);
+      const r = await fetch(`${base}/submissions`, {
+        method: "POST",
+        headers: { "X-Auth-Token": apiKey, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          template_id: tdoc.docusealTemplateId,
+          send_email: true,
+          message: { subject: tdoc.name, body: `Please review and sign: ${tdoc.name}` },
+          submitters: [{
+            role: "Signer",
+            name: clientDataDoc.fullName || "Client",
+            email: clientDataDoc.email,
+            reply_to: senderEmail || undefined,
+            values
+          }]
+        })
+      });
+      if (!r.ok) {
+        const errText = await r.text();
+        console.error(`DocuSeal sequential send failed for ${tdoc.id} (${r.status}):`, errText);
+        continue;
+      }
+      const result = await r.json();
+      const submissionId = Array.isArray(result)
+        ? (result[0]?.submission_id || result[0]?.id)
+        : (result.submission_id || result.id);
+      if (!submissionId) continue;
+
+      await db.doc(`clients/${clientId}/complianceDocs/${tdoc.id}`).set({
+        templateId: tdoc.id,
+        docusealSubmissionId: String(submissionId),
+        provider: "docuseal",
+        status: "sent",
+        sentAt: FieldValue.serverTimestamp(),
+        signedAt: null,
+        sentBy: uid,
+        listingId: listingId || null
+      });
+      documents.push({ templateId: tdoc.id, documentId: String(submissionId) });
+    }
+
+    return { mode: "sequential", documents, templateCount: documents.length };
+  }
+);
+
+/* ------------------------------------------------------------------ */
+/*  checkSignatureStatusV2 — DocuSeal submission status                */
+/*                                                                     */
+/*  GET /submissions/{id}. Returns a normalized shape similar to the   */
+/*  BoldSign V1 callable so the frontend doesn't have to branch.       */
+/* ------------------------------------------------------------------ */
+exports.checkSignatureStatusV2 = onCall(
+  { region: "us-central1", secrets: [DOCUSEAL_API_KEY, DOCUSEAL_BASE_URL] },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "You must be signed in.");
+    const { submissionId, documentId } = request.data || {};
+    const id = submissionId || documentId;
+    if (!id) throw new HttpsError("invalid-argument", "submissionId is required.");
+
+    const apiKey = DOCUSEAL_API_KEY.value();
+    if (!isLiveSecret(apiKey)) {
+      throw new HttpsError("failed-precondition", "DocuSeal is not yet configured.");
+    }
+    const base = docusealBaseUrl();
+
+    const resp = await fetch(`${base}/submissions/${encodeURIComponent(id)}`, {
+      headers: { "X-Auth-Token": apiKey }
+    });
+    if (!resp.ok) {
+      const errText = await resp.text();
+      console.error(`DocuSeal status check failed (${resp.status}):`, errText);
+      throw new HttpsError("internal", "Failed to fetch signature status.");
+    }
+    const sub = await resp.json();
+
+    // DocuSeal exposes status on the submission (`completed_at`) and per-submitter
+    // (`completed_at` on each entry in `submitters`). Roll up to a single string.
+    const submitters = sub.submitters || [];
+    const allSigned = submitters.length > 0 && submitters.every(s => s.completed_at);
+    const anySigned = submitters.some(s => s.completed_at);
+    let status = "sent";
+    if (sub.completed_at || allSigned) status = "signed";
+    else if (anySigned) status = "partial";
+    else if (sub.declined_at || submitters.some(s => s.declined_at)) status = "declined";
+    else if (sub.expired_at) status = "expired";
+
+    return {
+      status,
+      submissionId: String(id),
+      submitters: submitters.map(s => ({
+        email: s.email,
+        name: s.name,
+        signedAt: s.completed_at || null,
+        declinedAt: s.declined_at || null,
+        openedAt: s.opened_at || null
+      }))
+    };
+  }
+);
+
+/* ------------------------------------------------------------------ */
+/*  createDocuSealBuilderToken — HS256 JWT for <docuseal-builder>     */
+/*                                                                     */
+/*  The DocuSeal builder web-component takes a `data-token` attribute  */
+/*  containing an HS256-signed JWT keyed by the account's API token.   */
+/*  Payload identifies the user + (optional) document/template being   */
+/*  edited. Token is short-lived (1h).                                 */
+/*                                                                     */
+/*  Accepts: { templateName?, documentUrls?: string[], templateId? }   */
+/*  Returns: { token, host }                                           */
+/* ------------------------------------------------------------------ */
+function base64UrlEncode(buf) {
+  return Buffer.from(buf).toString("base64")
+    .replace(/=/g, "")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_");
+}
+
+function signHs256Jwt(payload, secret) {
+  const header = { alg: "HS256", typ: "JWT" };
+  const headerSeg = base64UrlEncode(JSON.stringify(header));
+  const payloadSeg = base64UrlEncode(JSON.stringify(payload));
+  const data = `${headerSeg}.${payloadSeg}`;
+  const sig = crypto.createHmac("sha256", secret).update(data).digest();
+  return `${data}.${base64UrlEncode(sig)}`;
+}
+
+exports.createDocuSealBuilderToken = onCall(
+  { region: "us-central1", secrets: [DOCUSEAL_API_KEY, DOCUSEAL_BASE_URL] },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "You must be signed in.");
+    const apiKey = DOCUSEAL_API_KEY.value();
+    if (!isLiveSecret(apiKey)) {
+      throw new HttpsError("failed-precondition", "DocuSeal is not yet configured.");
+    }
+
+    const uid = request.auth.uid;
+    const { templateName, documentUrls, templateId } = request.data || {};
+
+    const userSnap = await db.doc(`users/${uid}`).get();
+    const userData = userSnap.exists ? userSnap.data() : {};
+    const userEmail = userData.email || request.auth.token.email;
+    if (!userEmail) {
+      throw new HttpsError("failed-precondition", "Your profile is missing an email address.");
+    }
+
+    const now = Math.floor(Date.now() / 1000);
+    const payload = {
+      user_email: userEmail,
+      integration_email: userEmail,
+      name: templateName || userData.fullName || "Untitled Template",
+      iat: now,
+      exp: now + 60 * 60
+    };
+    if (Array.isArray(documentUrls) && documentUrls.length > 0) {
+      payload.document_urls = documentUrls;
+    }
+    if (templateId) {
+      payload.template_id = Number(templateId) || templateId;
+    }
+
+    const token = signHs256Jwt(payload, apiKey);
+    return { token, host: docusealBaseUrl().replace(/^https?:\/\/api\./, "https://") };
+  }
+);
+
+/* ------------------------------------------------------------------ */
+/*  suggestFieldMappings — AI-assisted template field auto-mapping     */
+/*                                                                     */
+/*  Takes a list of field names the realtor just placed in the         */
+/*  DocuSeal builder (e.g. "Buyer Name", "Property Address",           */
+/*  "Date"). Returns a suggested source path for each one from the     */
+/*  same data sources the compliance-doc resolver supports.            */
+/*                                                                     */
+/*  Output shape:                                                      */
+/*    { mappings: [{ fieldName, source, confidence }] }                */
+/*                                                                     */
+/*  `source` is one of: client.*, listing.*, agent.*, "date",          */
+/*  or "manual" when the field doesn't map to any known data point.    */
+/* ------------------------------------------------------------------ */
+const FIELD_MAPPING_SOURCES = [
+  "client.fullName", "client.firstName", "client.lastName",
+  "client.email", "client.phone",
+  "listing.address.full", "listing.address.street",
+  "listing.address.city", "listing.address.state", "listing.address.zip",
+  "listing.listingPrice", "listing.mlsNumber",
+  "listing.beds", "listing.baths", "listing.sqft", "listing.yearBuilt",
+  "agent.fullName", "agent.email", "agent.phone",
+  "agent.brokerage", "agent.licenseNumber",
+  "date", "manual"
+];
+
+exports.suggestFieldMappings = onCall(
+  { region: "us-central1", secrets: [ANTHROPIC_API_KEY] },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "You must be signed in.");
+    const { fieldNames } = request.data || {};
+    if (!Array.isArray(fieldNames) || fieldNames.length === 0) {
+      throw new HttpsError("invalid-argument", "fieldNames (non-empty array) is required.");
+    }
+
+    // Per-user daily cap protects against runaway costs from a stuck client.
+    await enforceRateLimit(request.auth.uid, "suggestFieldMappings", 200);
+
+    const apiKey = ANTHROPIC_API_KEY.value();
+    if (!apiKey) {
+      // Soft failure: return all-manual rather than break the upload flow.
+      return {
+        mappings: fieldNames.map(n => ({ fieldName: n, source: "manual", confidence: 0 }))
+      };
+    }
+
+    const prompt = `You map PDF form field names to data sources in a real estate CRM.
+
+For each field name below, pick the single best source from this list:
+${FIELD_MAPPING_SOURCES.join(", ")}
+
+Rules:
+- Use "manual" if no source fits (the realtor will fill it in per-client).
+- "date" means today's date at send-time.
+- "client.fullName" is the buyer or seller's name on this transaction; pick this for fields like "Buyer Name", "Seller Name", "Client Name", "Name of Buyer".
+- "agent.*" is the realtor sending the document; pick this for "Agent Name", "Realtor", "Broker", etc.
+- "listing.address.full" is a single-line property address; the .street/.city/.state/.zip are component fields.
+
+Return ONLY a JSON array, one object per input field, in the same order:
+[{"fieldName":"<input>","source":"<chosen>","confidence":<0-1>}]
+
+Fields:
+${fieldNames.map((n, i) => `${i + 1}. ${n}`).join("\n")}`;
+
+    const resp = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 1024,
+        messages: [{ role: "user", content: prompt }]
+      })
+    });
+
+    if (!resp.ok) {
+      console.warn("suggestFieldMappings: Anthropic call failed", resp.status);
+      return {
+        mappings: fieldNames.map(n => ({ fieldName: n, source: "manual", confidence: 0 }))
+      };
+    }
+
+    const data = await resp.json();
+    const text = data.content?.[0]?.text || "[]";
+    const jsonMatch = text.match(/\[[\s\S]*\]/);
+    let parsed;
+    try {
+      parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : [];
+    } catch {
+      parsed = [];
+    }
+
+    // Validate + align to input order. Anything Haiku skipped or returned with
+    // an unknown source falls back to "manual" so the UI always has a row per
+    // field.
+    const byName = new Map();
+    for (const item of parsed) {
+      if (item && typeof item.fieldName === "string") byName.set(item.fieldName, item);
+    }
+    const mappings = fieldNames.map(name => {
+      const m = byName.get(name);
+      const source = m && FIELD_MAPPING_SOURCES.includes(m.source) ? m.source : "manual";
+      const confidence = m && typeof m.confidence === "number" ? Math.max(0, Math.min(1, m.confidence)) : 0;
+      return { fieldName: name, source, confidence };
+    });
+
+    return { mappings };
+  }
+);
+
 function verifyDocuSealSignature(signatureHeader, rawBody, secret) {
   if (!signatureHeader || !secret) return false;
-  const hmac = crypto.createHmac("sha256", secret).update(rawBody).digest("hex");
+
+  // DocuSeal sends "X-Docuseal-Signature: <timestamp>.<hex_signature>" where
+  // the signature is HMAC-SHA256 of `${timestamp}.${rawBody}` keyed by the
+  // webhook secret. The leading timestamp gives us replay protection.
+  const dotIdx = signatureHeader.indexOf(".");
+  if (dotIdx <= 0) return false;
+  const timestamp = signatureHeader.substring(0, dotIdx);
+  const signature = signatureHeader.substring(dotIdx + 1);
+  if (!timestamp || !signature) return false;
+
+  // Reject anything outside a 5-minute window to prevent replay.
+  const ts = Number(timestamp);
+  if (!Number.isFinite(ts)) return false;
+  const nowSec = Math.floor(Date.now() / 1000);
+  if (Math.abs(nowSec - ts) > 300) return false;
+
+  const rawString = Buffer.isBuffer(rawBody) ? rawBody.toString("utf8") : String(rawBody);
+  const signedPayload = `${timestamp}.${rawString}`;
+  const computed = crypto.createHmac("sha256", secret).update(signedPayload, "utf8").digest("hex");
+
   try {
-    return crypto.timingSafeEqual(Buffer.from(hmac), Buffer.from(signatureHeader));
+    return crypto.timingSafeEqual(Buffer.from(computed, "hex"), Buffer.from(signature, "hex"));
   } catch {
     return false;
   }
@@ -735,7 +1310,6 @@ exports.docusealWebhook = onRequest(
     }
 
     const body = req.body || {};
-    // DocuSeal emits {event_type, data, timestamp}. Only act on completed.
     if (body.event_type !== "form.completed" && body.event_type !== "submission.completed") {
       return res.status(200).send("OK");
     }
@@ -747,18 +1321,46 @@ exports.docusealWebhook = onRequest(
         return res.status(200).send("OK");
       }
 
-      // Find the originating complianceDoc / envelope record
-      const envelopeSnap = await db.collection("envelopes").doc(String(submissionId)).get();
-      if (!envelopeSnap.exists) {
-        console.warn("docusealWebhook: no envelope found for", submissionId);
+      // Compliance-doc path takes precedence: look for a complianceDocs record
+      // keyed by submission id first, fall back to ad-hoc envelope.
+      const FieldValue = require("firebase-admin/firestore").FieldValue;
+      const complianceSnap = await db.collectionGroup("complianceDocs")
+        .where("docusealSubmissionId", "==", String(submissionId))
+        .limit(1)
+        .get();
+
+      let clientId, realtorId, templateId, title, isCompliance;
+      if (!complianceSnap.empty) {
+        const docSnap = complianceSnap.docs[0];
+        templateId = docSnap.id;
+        clientId = docSnap.ref.parent.parent.id;
+        const complianceData = docSnap.data();
+        realtorId = complianceData.sentBy;
+        const tmplSnap = await db.doc(`documentTemplates/${templateId}`).get();
+        title = tmplSnap.exists && tmplSnap.data().name ? tmplSnap.data().name : templateId;
+        isCompliance = true;
+      } else {
+        const envelopeSnap = await db.collection("envelopes").doc(String(submissionId)).get();
+        if (!envelopeSnap.exists) {
+          console.warn("docusealWebhook: no compliance or envelope record for", submissionId);
+          return res.status(200).send("OK");
+        }
+        const envelope = envelopeSnap.data();
+        clientId = envelope.clientId;
+        realtorId = envelope.realtorId;
+        title = envelope.title || "document";
+        isCompliance = false;
+      }
+
+      if (!clientId) {
+        console.warn("docusealWebhook: missing clientId for submission", submissionId);
         return res.status(200).send("OK");
       }
-      const envelope = envelopeSnap.data();
-      const clientId = envelope.clientId;
-      const realtorId = envelope.realtorId;
 
       // Idempotency check
-      const fileDocId = `${clientId}_signed_docuseal_${submissionId}`;
+      const fileDocId = isCompliance
+        ? `${clientId}_signed_${templateId}`
+        : `${clientId}_signed_docuseal_${submissionId}`;
       const existing = await db.doc(`files/${fileDocId}`).get();
       if (existing.exists) return res.status(200).send("OK");
 
@@ -787,7 +1389,7 @@ exports.docusealWebhook = onRequest(
       const pdfBuffer = Buffer.from(await pdfResp.arrayBuffer());
 
       const dateStr = new Date().toISOString().split("T")[0];
-      const safeTitle = (envelope.title || "document").replace(/\s+/g, "_");
+      const safeTitle = String(title).replace(/\s+/g, "_");
       const fileName = `${safeTitle}_signed_${dateStr}.pdf`;
       const storagePath = `clients/${clientId}/closing-documents/${fileName}`;
 
@@ -799,23 +1401,98 @@ exports.docusealWebhook = onRequest(
         expires: Date.now() + 7 * 24 * 60 * 60 * 1000
       });
 
-      const FieldValue = require("firebase-admin/firestore").FieldValue;
-      await db.doc(`files/${fileDocId}`).set({
-        clientId,
-        realtorId,
-        fileName,
-        storagePath,
-        downloadUrl: signedUrl,
-        contentType: "application/pdf",
-        source: "docuseal",
-        submissionId,
-        createdAt: FieldValue.serverTimestamp()
-      });
-      await db.collection("envelopes").doc(String(submissionId)).update({
-        status: "signed",
-        signedAt: FieldValue.serverTimestamp(),
-        signedFileId: fileDocId
-      });
+      // Resolve (or create) the realtor's "Contracts" folder so signed PDFs surface
+      // under a real folder in the UI instead of being orphaned at root.
+      let contractsFolderId = null;
+      if (realtorId) {
+        try {
+          const existingFolder = await db.collection("folders")
+            .where("clientId", "==", clientId)
+            .where("realtorId", "==", realtorId)
+            .where("name", "==", "Contracts")
+            .limit(1)
+            .get();
+          if (!existingFolder.empty) {
+            contractsFolderId = existingFolder.docs[0].id;
+          } else {
+            const folderRef = await db.collection("folders").add({
+              name: "Contracts",
+              clientId,
+              realtorId,
+              isSystem: true,
+              createdAt: FieldValue.serverTimestamp()
+            });
+            contractsFolderId = folderRef.id;
+          }
+        } catch (err) {
+          console.warn("docusealWebhook: Could not resolve Contracts folder:", err.message);
+        }
+      }
+
+      const writes = [
+        db.doc(`files/${fileDocId}`).set({
+          clientId,
+          realtorId,
+          fileName,
+          storagePath,
+          downloadUrl: signedUrl,
+          folderId: contractsFolderId,
+          fileSize: pdfBuffer.length,
+          mimeType: "application/pdf",
+          contentType: "application/pdf",
+          signedSource: true,
+          signedAt: FieldValue.serverTimestamp(),
+          source: "docuseal",
+          docusealSubmissionId: String(submissionId),
+          ...(isCompliance ? { complianceTemplateId: templateId } : {}),
+          uploadedAt: FieldValue.serverTimestamp()
+        })
+      ];
+
+      if (isCompliance) {
+        writes.push(
+          db.doc(`clients/${clientId}/complianceDocs/${templateId}`).update({
+            status: "signed",
+            signedAt: FieldValue.serverTimestamp()
+          })
+        );
+      } else {
+        writes.push(
+          db.collection("envelopes").doc(String(submissionId)).update({
+            status: "signed",
+            signedAt: FieldValue.serverTimestamp(),
+            signedFileId: fileDocId
+          })
+        );
+      }
+
+      await Promise.all(writes);
+
+      // Auto-complete matching checklist items (mirrors boldSignWebhook CHKL-06).
+      // Runs for both compliance docs (templateId match) and ad-hoc envelopes
+      // (envelope-linked checklist item via linkedEnvelopeId).
+      try {
+        if (isCompliance) {
+          const checklistQuery = await db.collection(`clients/${clientId}/closingChecklist`)
+            .where("linkedTemplateId", "==", templateId)
+            .where("completed", "==", false)
+            .get();
+          if (!checklistQuery.empty) {
+            const checklistBatch = db.batch();
+            checklistQuery.docs.forEach(checkDoc => {
+              checklistBatch.update(checkDoc.ref, {
+                completed: true,
+                autoCompleted: true,
+                autoCompletedAt: FieldValue.serverTimestamp(),
+                completedAt: FieldValue.serverTimestamp()
+              });
+            });
+            await checklistBatch.commit();
+          }
+        }
+      } catch (checklistErr) {
+        console.error("docusealWebhook: Checklist auto-complete error:", checklistErr);
+      }
 
       return res.status(200).send("OK");
     } catch (err) {

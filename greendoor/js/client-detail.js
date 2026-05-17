@@ -6,7 +6,7 @@ import {
   getCountFromServer, limit, onSnapshot, writeBatch
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import {
-  ref, uploadBytesResumable, getDownloadURL, deleteObject
+  ref, uploadBytesResumable, getDownloadURL, deleteObject, listAll
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
 import {
   getCurrentUser, showToast, formatCurrency, formatDate, formatDateTime,
@@ -54,15 +54,41 @@ if (!clientId) {
 }
 
 /* --- Cloud Functions --- */
+// Provider transition: V2 callables route through DocuSeal. They throw
+// "failed-precondition" with a DocuSeal-mentioning message when the
+// DOCUSEAL_API_KEY secret is still __pending__; in that case we fall back
+// to the original BoldSign V1 callable so behavior is unchanged in prod
+// until Joe flips the secret.
+function withV2Fallback(v2Name, v1Name) {
+  const v2 = httpsCallable(functions, v2Name);
+  const v1 = httpsCallable(functions, v1Name);
+  return async (data) => {
+    try {
+      return await v2(data);
+    } catch (err) {
+      const code = err?.code || "";
+      const msg = err?.message || "";
+      if (code.includes("failed-precondition") && /DocuSeal/i.test(msg)) {
+        return await v1(data);
+      }
+      throw err;
+    }
+  };
+}
+
 const sendEmailFn = httpsCallable(functions, "sendEmail");
-const sendForSignatureFn = httpsCallable(functions, "sendForSignature");
-const checkSignatureStatusFn = httpsCallable(functions, "checkSignatureStatus");
+const sendForSignatureFn = withV2Fallback("sendForSignatureV2", "sendForSignature");
+const checkSignatureStatusFn = withV2Fallback("checkSignatureStatusV2", "checkSignatureStatus");
+// Ad-hoc per-send drag-drop builder. DocuSeal's analog (the <docuseal-builder>
+// web component) is wired into the new Templates page rather than per-send,
+// so this call stays on BoldSign until that flow is retired.
 const createEmbeddedSignatureRequestFn = httpsCallable(functions, "createEmbeddedSignatureRequest");
 const shareDocumentFn = httpsCallable(functions, "shareDocument");
 const parseListingUrlFn = httpsCallable(functions, "parseListingUrl");
-const sendComplianceDocFn = httpsCallable(functions, "sendComplianceDoc");
-const sendBulkComplianceDocsFn = httpsCallable(functions, "sendBulkComplianceDocs");
+const sendComplianceDocFn = withV2Fallback("sendComplianceDocV2", "sendComplianceDoc");
+const sendBulkComplianceDocsFn = withV2Fallback("sendBulkComplianceDocsV2", "sendBulkComplianceDocs");
 const createSenderIdentityFn = httpsCallable(functions, "createSenderIdentity");
+const cleanupClientStorageFn = httpsCallable(functions, "cleanupClientStorage");
 
 /* --- Auth gate --- */
 onAuthStateChanged(auth, async (user) => {
@@ -196,7 +222,7 @@ document.getElementById("ov-transactionType").addEventListener("change", async (
     const closingDateVal = clientData.closingDate
       ? (typeof clientData.closingDate.toDate === "function" ? clientData.closingDate.toDate() : new Date(clientData.closingDate))
       : null;
-    await seedChecklist(db, clientId, value, closingDateVal);
+    await seedChecklist(db, clientId, value, closingDateVal, user.uid);
     initChecklist(clientId, clientData);
   } catch (err) {
     console.error("Failed to initialize checklist:", err);
@@ -287,7 +313,28 @@ window.saveOverview = async function () {
   }
 };
 
-/* --- Delete client --- */
+/* --- Delete client (cascade across collections, subcollections, storage) --- */
+async function commitInBatches(refs) {
+  for (let i = 0; i < refs.length; i += 450) {
+    const batch = writeBatch(db);
+    for (const r of refs.slice(i, i + 450)) batch.delete(r);
+    await batch.commit();
+  }
+}
+
+async function deleteClientStorageTree(uid) {
+  // Recursively list and delete everything under files/{uid}/{clientId}/
+  const root = ref(storage, `files/${uid}/${clientId}`);
+  const stack = [root];
+  while (stack.length) {
+    const dir = stack.pop();
+    let listing;
+    try { listing = await listAll(dir); } catch { continue; }
+    stack.push(...listing.prefixes);
+    await Promise.all(listing.items.map(item => deleteObject(item).catch(() => {})));
+  }
+}
+
 window.deleteClient = async function () {
   if (!confirm("Are you sure? This will delete the client and all their activities, files, and properties.")) return;
 
@@ -295,23 +342,33 @@ window.deleteClient = async function () {
   if (!user) return;
 
   try {
-    const collections = ["activities", "files", "folders", "bookmarkedProperties", "clientListingMatches", "showings", "followUps"];
-    for (const col of collections) {
-      const q = query(collection(db, col), where("clientId", "==", clientId), where("realtorId", "==", user.uid));
-      const snap = await getDocs(q);
-      for (const d of snap.docs) {
-        await deleteDoc(doc(db, col, d.id));
-      }
+    showToast("Deleting client…");
+
+    const topLevel = ["activities", "files", "folders", "bookmarkedProperties", "clientListingMatches", "showings", "followUps", "envelopes"];
+    const refs = [];
+    for (const col of topLevel) {
+      const snap = await getDocs(
+        query(collection(db, col), where("clientId", "==", clientId), where("realtorId", "==", user.uid))
+      );
+      snap.forEach(d => refs.push(doc(db, col, d.id)));
     }
-    // Clean up subcollections
     const subcollections = ["complianceDocs", "closingChecklist"];
     for (const sub of subcollections) {
       const subSnap = await getDocs(collection(db, "clients", clientId, sub));
-      for (const d of subSnap.docs) {
-        await deleteDoc(d.ref);
-      }
+      subSnap.forEach(d => refs.push(d.ref));
     }
-    await deleteDoc(doc(db, "clients", clientId));
+    refs.push(doc(db, "clients", clientId));
+
+    await commitInBatches(refs);
+    // Two-leg storage cleanup:
+    // (1) realtor-owned files/{uid}/{clientId}/* — client SDK can delete directly.
+    // (2) clients/{clientId}/* (closing PDFs) — rules deny client writes, so the
+    //     callable function below uses admin SDK to sweep that subtree.
+    await deleteClientStorageTree(user.uid);
+    cleanupClientStorageFn({ clientId, expectedRealtorId: user.uid }).catch(err => {
+      console.warn("Server-side closing-doc cleanup failed:", err);
+    });
+
     showToast("Client deleted.");
     window.location.href = "/greendoor/app/clients";
   } catch (e) {
@@ -1037,7 +1094,6 @@ async function migrateExistingFolders(uid) {
 
     // Reload folders and files after migration
     await Promise.all([loadFolders(uid), loadFiles(uid)]);
-    console.log("Folder migration complete: created", uniqueFolders.length, "folders, updated", filesWithStringFolder.length, "files");
   } catch (e) {
     console.error("Folder migration error:", e);
   }
@@ -1332,8 +1388,8 @@ window.uploadAndSend = async function () {
   const file = fileInput.files[0];
   if (!file) { showToast("Select a file first.", "error"); return; }
 
-  const folder = currentFolderId ? (allFolders.find(f => f.id === currentFolderId)?.name || "general") : "general";
-  const storagePath = `files/${user.uid}/${clientId}/${folder}/${file.name}`;
+  const folderSegment = currentFolderId ? (allFolders.find(f => f.id === currentFolderId)?.name || "general") : "general";
+  const storagePath = `files/${user.uid}/${clientId}/${folderSegment}/${file.name}`;
   const storageRef = ref(storage, storagePath);
 
   try {
@@ -1342,7 +1398,7 @@ window.uploadAndSend = async function () {
     const downloadUrl = await getDownloadURL(snap.ref);
     const docRef = await addDoc(collection(db, "files"), {
       clientId, realtorId: user.uid, fileName: file.name, storagePath, downloadUrl,
-      folder, folderId: currentFolderId || null, fileSize: file.size, mimeType: file.type, uploadedAt: serverTimestamp()
+      folderId: currentFolderId || null, fileSize: file.size, mimeType: file.type, uploadedAt: serverTimestamp()
     });
     fileInput.value = "";
     await loadFiles(user.uid);
@@ -1408,12 +1464,16 @@ function populateSigExistingDropdown() {
     select.innerHTML += tplGroup;
   }
 
-  // Client files group
-  const clientFiles = allFiles.filter(f => ["contracts", "disclosures", "other"].includes(f.folder));
-  if (clientFiles.length > 0) {
+  // Client files group — show all files; user picks what to send
+  if (allFiles.length > 0) {
+    const folderName = (f) => {
+      if (f.folderId) return allFolders.find(fd => fd.id === f.folderId)?.name || "—";
+      if (f.folder) return f.folder;
+      return "Root";
+    };
     let fileGroup = '<optgroup label="Client Files">';
-    clientFiles.forEach(f => {
-      fileGroup += `<option value="${f.id}">${f.fileName} (${f.folder})</option>`;
+    allFiles.forEach(f => {
+      fileGroup += `<option value="${f.id}">${f.fileName} (${folderName(f)})</option>`;
     });
     fileGroup += '</optgroup>';
     select.innerHTML += fileGroup;
@@ -1471,6 +1531,10 @@ window.openSignatureModal = function () {
   document.getElementById("sig-send-btn").disabled = false;
   document.getElementById("sig-file-input").value = "";
 
+  if (!clientData?.email) {
+    showToast("This client has no email on file — add a signer email manually.", "warning");
+  }
+
   populateSigExistingDropdown();
   renderSigFiles();
   renderSigSigners();
@@ -1527,6 +1591,9 @@ document.getElementById("sig-file-input").addEventListener("change", async (e) =
 
   for (const file of files) {
     try {
+      // Land signature uploads in the Contracts folder when present, else at root.
+      const contractsFolder = allFolders.find(fd => /^contracts$/i.test(fd.name));
+      const contractsFolderId = contractsFolder?.id || null;
       const storagePath = `files/${user.uid}/${clientId}/contracts/${file.name}`;
       const storageRef = ref(storage, storagePath);
       await uploadBytesResumable(storageRef, file);
@@ -1534,7 +1601,7 @@ document.getElementById("sig-file-input").addEventListener("change", async (e) =
 
       await addDoc(collection(db, "files"), {
         clientId, realtorId: user.uid, fileName: file.name, storagePath, downloadUrl,
-        folder: "contracts", fileSize: file.size, mimeType: file.type, uploadedAt: serverTimestamp()
+        folderId: contractsFolderId, fileSize: file.size, mimeType: file.type, uploadedAt: serverTimestamp()
       });
 
       sigFiles.push({ fileUrl: downloadUrl, fileName: file.name });
@@ -1594,11 +1661,25 @@ window.submitSignature = async function () {
 };
 
 /* --- BoldSign Embed --- */
+let embedSentHandled = false;
+
+function handleEmbedSent() {
+  if (embedSentHandled) return;
+  embedSentHandled = true;
+  showToast("Document sent for signature!");
+  closeBoldSignEmbed();
+  const user = auth.currentUser;
+  if (user) {
+    Promise.all([loadFiles(user.uid), loadEnvelopes(user.uid)]);
+  }
+}
+
 function openBoldSignEmbed(sendUrl, documentId) {
   const modal = document.getElementById("boldsign-embed-modal");
   const iframe = document.getElementById("boldsign-embed-iframe");
   const loading = document.getElementById("boldsign-embed-loading");
 
+  embedSentHandled = false;
   loading.style.display = "";
   iframe.style.display = "none";
   iframe.src = sendUrl;
@@ -1613,28 +1694,15 @@ function openBoldSignEmbed(sendUrl, documentId) {
   embedUnsubscribe = onSnapshot(doc(db, "envelopes", documentId), (snap) => {
     if (!snap.exists()) return;
     const data = snap.data();
-    if (data.status && data.status !== "draft") {
-      showToast("Document sent for signature!");
-      closeBoldSignEmbed();
-      const user = auth.currentUser;
-      if (user) {
-        Promise.all([loadFiles(user.uid), loadEnvelopes(user.uid)]);
-      }
-    }
+    if (data.status && data.status !== "draft") handleEmbedSent();
   });
 
   // Fallback poll in case webhook is delayed
   embedPollInterval = setInterval(async () => {
+    if (embedSentHandled) return;
     try {
       const result = await checkSignatureStatusFn({ documentId });
-      if (result.data.status && result.data.status !== "draft") {
-        showToast("Document sent for signature!");
-        closeBoldSignEmbed();
-        const user = auth.currentUser;
-        if (user) {
-          Promise.all([loadFiles(user.uid), loadEnvelopes(user.uid)]);
-        }
-      }
+      if (result.data.status && result.data.status !== "draft") handleEmbedSent();
     } catch (e) {
       // Ignore poll errors
     }
@@ -1758,8 +1826,12 @@ async function loadMatches(uid) {
       }
     }
 
-    // Also cache all listings for match-a-listing panel
-    const allQ = query(collection(db, "listings"), orderBy("createdAt", "desc"));
+    // Cache this realtor's listings for match-a-listing panel
+    const allQ = query(
+      collection(db, "listings"),
+      where("addedBy", "==", uid),
+      orderBy("createdAt", "desc")
+    );
     const allSnap = await getDocs(allQ);
     allListingsCache = allSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
@@ -2322,7 +2394,7 @@ window.openShowingModal = function (showingId) {
       document.getElementById("show-duration").value = 60;
       document.getElementById("show-followup").checked = false;
       if (s.showingDate) {
-        const d = s.showingDate.toDate ? s.showingDate.toDate() : new Date(s.showingDate);
+        const d = safeToDate(s.showingDate) || new Date();
         const iso = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
         document.getElementById("show-date").value = iso;
       }
@@ -2500,7 +2572,7 @@ window.cancelShowing = async function (id) {
 
 /* --- Complete Showing Modal --- */
 
-document.getElementById("complete-stars").addEventListener("click", (e) => {
+document.getElementById("complete-stars")?.addEventListener("click", (e) => {
   const star = e.target.closest(".gd-star");
   if (!star) return;
   completeRating = parseInt(star.dataset.rating);
@@ -3406,7 +3478,8 @@ document.addEventListener("keydown", (e) => {
       { id: "followup-modal", close: () => closeFollowUpModal() }
     ];
     for (const m of modals) {
-      if (document.getElementById(m.id).classList.contains("active")) { m.close(); return; }
+      const el = document.getElementById(m.id);
+      if (el && el.classList.contains("active")) { m.close(); return; }
     }
     const aiPanel = document.getElementById("ai-panel");
     if (aiPanel && aiPanel.classList.contains("open")) { window.toggleAiPanel(); }

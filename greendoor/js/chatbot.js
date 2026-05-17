@@ -120,100 +120,104 @@ function formatAiResponse(text) {
   return html;
 }
 
-/* ---------- action detection & buttons ---------- */
-function detectActions(text, page) {
-  const actions = [];
-  const lc = text.toLowerCase();
-
-  if (page !== "client-detail") return actions;
-
-  // Email draft detection
-  if (lc.includes("subject:") || (lc.includes("dear ") && lc.includes("\n")) || lc.match(/^hi \w+,?\n/m)) {
-    const subjectMatch = text.match(/subject:\s*(.+)/i);
-    const bodyStart = text.indexOf("\n", text.toLowerCase().indexOf("subject:"));
-    actions.push({
-      label: "Send This Email",
-      icon: "&#9993;",
-      handler: () => {
-        if (typeof window.openActivityModal === "function") {
-          window.openActivityModal("email");
-          setTimeout(() => {
-            const subEl = document.getElementById("act-subject");
-            const bodyEl = document.getElementById("act-body");
-            if (subEl && subjectMatch) subEl.value = subjectMatch[1].trim();
-            if (bodyEl) bodyEl.value = bodyStart > -1 ? text.slice(bodyStart).trim() : text;
-          }, 100);
+/* ---------- structured action handlers ----------
+   Sage returns typed tool_use blocks from the model. Each block is rendered
+   as an approve-to-execute button. The handlers pre-fill the same modals
+   the realtor would open manually, so nothing happens without confirmation.
+*/
+const TOOL_RENDERERS = {
+  draft_email: (input) => ({
+    label: "Send This Email",
+    icon: "&#9993;",
+    handler: () => {
+      if (typeof window.openActivityModal !== "function") return;
+      window.openActivityModal("email");
+      setTimeout(() => {
+        const subEl = document.getElementById("act-subject");
+        const bodyEl = document.getElementById("act-body");
+        if (subEl && input.subject) subEl.value = input.subject;
+        if (bodyEl && input.body) bodyEl.value = input.body;
+      }, 100);
+    }
+  }),
+  create_followup: (input) => ({
+    label: "Create Follow-Up",
+    icon: "&#9745;",
+    handler: () => {
+      if (typeof window.openFollowUpModal !== "function") return;
+      window.openFollowUpModal();
+      setTimeout(() => {
+        const titleEl = document.getElementById("fu-title");
+        const dateEl = document.getElementById("fu-date");
+        const notesEl = document.getElementById("fu-notes");
+        if (titleEl && input.title) titleEl.value = input.title.slice(0, 80);
+        if (dateEl && Number.isInteger(input.days_from_now)) {
+          const d = new Date();
+          d.setDate(d.getDate() + input.days_from_now);
+          dateEl.value = d.toISOString().slice(0, 10);
         }
-      }
-    });
-  }
-
-  // Follow-up detection
-  if (lc.includes("follow up") || lc.includes("follow-up") || lc.includes("check in") || lc.includes("check-in") || lc.includes("reach out") || lc.includes("reminder")) {
-    actions.push({
-      label: "Create Follow-Up",
-      icon: "&#9745;",
-      handler: () => {
-        if (typeof window.openFollowUpModal === "function") {
-          window.openFollowUpModal();
-          setTimeout(() => {
-            const titleEl = document.getElementById("fu-title");
-            // Extract a reasonable title from the response
-            const lines = text.split("\n").filter(l => l.trim());
-            const hint = lines.find(l => l.toLowerCase().includes("follow") || l.toLowerCase().includes("check in")) || lines[0] || "";
-            if (titleEl) titleEl.value = hint.replace(/[*#\-]/g, "").trim().slice(0, 80);
-          }, 100);
+        if (notesEl && input.notes) notesEl.value = input.notes;
+      }, 100);
+    }
+  }),
+  schedule_showing: (input) => ({
+    label: "Schedule Showing",
+    icon: "&#127968;",
+    handler: () => {
+      if (typeof window.openShowingModal !== "function") return;
+      window.openShowingModal();
+      setTimeout(() => {
+        const addrEl = document.getElementById("showing-address");
+        const dateEl = document.getElementById("showing-date");
+        const timeEl = document.getElementById("showing-time");
+        const notesEl = document.getElementById("showing-notes");
+        if (addrEl && input.address) addrEl.value = input.address;
+        if (dateEl && input.date) dateEl.value = input.date;
+        if (timeEl && input.time) timeEl.value = input.time;
+        if (notesEl && input.notes) notesEl.value = input.notes;
+      }, 100);
+    }
+  }),
+  log_call: (input) => ({
+    label: "Log Call",
+    icon: "&#128222;",
+    handler: () => {
+      if (typeof window.openActivityModal !== "function") return;
+      window.openActivityModal("call");
+      setTimeout(() => {
+        const bodyEl = document.getElementById("act-body");
+        if (bodyEl && input.summary) {
+          bodyEl.value = input.duration_minutes
+            ? `(${input.duration_minutes} min) ${input.summary}`
+            : input.summary;
         }
-      }
-    });
-  }
+      }, 100);
+    }
+  }),
+  save_note: (input) => ({
+    label: "Save as Note",
+    icon: "&#128221;",
+    handler: () => {
+      if (typeof window.openActivityModal !== "function") return;
+      window.openActivityModal("note");
+      setTimeout(() => {
+        const subEl = document.getElementById("act-subject");
+        const bodyEl = document.getElementById("act-body");
+        if (subEl) subEl.value = input.title || "Sage Note";
+        if (bodyEl && input.body) bodyEl.value = input.body;
+      }, 100);
+    }
+  })
+};
 
-  // Showing detection
-  if (lc.includes("showing") || lc.includes("schedule a visit") || lc.includes("tour the") || lc.includes("view the property")) {
-    actions.push({
-      label: "Schedule Showing",
-      icon: "&#127968;",
-      handler: () => {
-        if (typeof window.openShowingModal === "function") {
-          window.openShowingModal();
-        }
-      }
-    });
-  }
-
-  // Note/summary detection
-  if (lc.includes("summary") || lc.includes("here's what") || lc.includes("overview") || lc.includes("key points")) {
-    actions.push({
-      label: "Save as Note",
-      icon: "&#128221;",
-      handler: () => {
-        if (typeof window.openActivityModal === "function") {
-          window.openActivityModal("note");
-          setTimeout(() => {
-            const subEl = document.getElementById("act-subject");
-            const bodyEl = document.getElementById("act-body");
-            if (subEl) subEl.value = "Sage Summary";
-            if (bodyEl) bodyEl.value = text;
-          }, 100);
-        }
-      }
-    });
-  }
-
-  // Call logging detection
-  if (lc.includes("give them a call") || lc.includes("call them") || lc.includes("phone call") || lc.includes("reach out by phone")) {
-    actions.push({
-      label: "Log Call",
-      icon: "&#128222;",
-      handler: () => {
-        if (typeof window.openActivityModal === "function") {
-          window.openActivityModal("call");
-        }
-      }
-    });
-  }
-
-  return actions;
+function renderToolActions(toolCalls) {
+  if (!Array.isArray(toolCalls) || !toolCalls.length) return [];
+  return toolCalls
+    .map(tc => {
+      const renderer = TOOL_RENDERERS[tc.name];
+      return renderer ? renderer(tc.input || {}) : null;
+    })
+    .filter(Boolean);
 }
 
 function renderActionButtons(actions) {
@@ -235,7 +239,7 @@ function renderActionButtons(actions) {
 }
 
 /* ---------- message rendering ---------- */
-function addAiMessage(text, type, page) {
+function addAiMessage(text, type, page, toolCalls) {
   const el = document.getElementById("ai-messages");
   const div = document.createElement("div");
   if (type === "user") {
@@ -248,8 +252,8 @@ function addAiMessage(text, type, page) {
     div.className = "gd-ai-msg gd-ai-msg-ai";
     div.innerHTML = formatAiResponse(text);
 
-    // Detect actionable content and add buttons
-    const actions = detectActions(text, page);
+    // Render buttons for any tool_use actions the model emitted
+    const actions = renderToolActions(toolCalls);
     const actionBtns = renderActionButtons(actions);
     if (actionBtns) div.appendChild(actionBtns);
   }
@@ -310,7 +314,8 @@ window.sendAiMessage = async function () {
     const result = await askAssistant(payload);
     removeTypingIndicator();
     const response = result.data.response;
-    addAiMessage(response, "ai", page);
+    const actions = result.data.actions;
+    addAiMessage(response, "ai", page, actions);
 
     // Append to session history
     chatHistory.push({ role: "user", content: question });
@@ -359,7 +364,8 @@ window.sendWithContext = async function (question, contextType, contextData) {
     const result = await askAssistant(payload);
     removeTypingIndicator();
     const response = result.data.response;
-    addAiMessage(response, "ai", page);
+    const actions = result.data.actions;
+    addAiMessage(response, "ai", page, actions);
 
     // Append to session history
     chatHistory.push({ role: "user", content: question });

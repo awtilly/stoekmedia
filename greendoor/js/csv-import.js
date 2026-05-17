@@ -225,6 +225,7 @@ function renderStep4() {
 /* --- Build mapped rows from CSV data --- */
 function buildMappedRows() {
   const { rows, mapping } = csvData;
+  const seenEmails = new Set();
   return rows.map(row => {
     const client = { _skip: false, _duplicate: false };
     let firstName = "", lastName = "";
@@ -258,10 +259,15 @@ function buildMappedRows() {
       client._skip = true;
     }
 
-    // Duplicate check
-    if (client.email && existingEmails.has(client.email.toLowerCase().trim())) {
-      client._skip = true;
-      client._duplicate = true;
+    // Duplicate check — against existing clients in Firestore AND against earlier rows in this CSV
+    if (client.email) {
+      const normalized = client.email.toLowerCase().trim();
+      if (existingEmails.has(normalized) || seenEmails.has(normalized)) {
+        client._skip = true;
+        client._duplicate = true;
+      } else {
+        seenEmails.add(normalized);
+      }
     }
 
     return client;

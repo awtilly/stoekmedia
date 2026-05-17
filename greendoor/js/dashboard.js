@@ -15,16 +15,7 @@ const parseListingUrlFn = httpsCallable(functions, "parseListingUrl");
 let dashboardClients = [];
 let dlFeatureTags = [];
 
-onAuthStateChanged(auth, async (user) => {
-  if (!user) return;
-
-  const profile = await getCurrentUser();
-  if (!profile) return;
-
-  document.getElementById("welcome-name").textContent = profile.fullName || "Agent";
-
-  const uid = user.uid;
-
+async function refreshStats(uid) {
   try {
     const [totalSnap, buyerSnap, sellerSnap, contractSnap] = await Promise.all([
       getCountFromServer(query(collection(db, "clients"), where("realtorId", "==", uid))),
@@ -32,7 +23,6 @@ onAuthStateChanged(auth, async (user) => {
       getCountFromServer(query(collection(db, "clients"), where("realtorId", "==", uid), where("status", "==", "active_seller"))),
       getCountFromServer(query(collection(db, "clients"), where("realtorId", "==", uid), where("status", "==", "under_contract")))
     ]);
-
     document.getElementById("stat-total").textContent = totalSnap.data().count;
     document.getElementById("stat-buyers").textContent = buyerSnap.data().count;
     document.getElementById("stat-sellers").textContent = sellerSnap.data().count;
@@ -40,7 +30,9 @@ onAuthStateChanged(auth, async (user) => {
   } catch (e) {
     console.error("Stats error:", e);
   }
+}
 
+async function refreshActivityFeed(uid) {
   try {
     const actQ = query(
       collection(db, "activities"),
@@ -50,39 +42,46 @@ onAuthStateChanged(auth, async (user) => {
     );
     const actSnap = await getDocs(actQ);
     const feedEl = document.getElementById("activity-feed");
+    if (actSnap.empty) return;
 
-    if (!actSnap.empty) {
-      const clientCache = {};
-      const getClientName = async (clientId) => {
-        if (clientCache[clientId]) return clientCache[clientId];
-        const clientsQ = query(collection(db, "clients"), where("realtorId", "==", uid));
-        const snap = await getDocs(clientsQ);
-        snap.forEach(d => { clientCache[d.id] = d.data().fullName || "Unknown"; });
-        return clientCache[clientId] || "Unknown";
-      };
+    // Single clients fetch, then build a name lookup.
+    const clientsSnap = await getDocs(query(collection(db, "clients"), where("realtorId", "==", uid)));
+    const nameById = {};
+    clientsSnap.forEach(d => { nameById[d.id] = d.data().fullName || "Unknown"; });
 
-      let html = "";
-      for (const d of actSnap.docs) {
-        const a = d.data();
-        const icons = { email: "&#128231;", call: "&#128222;", note: "&#128221;", sms: "&#128172;", file_share: "&#128193;", showing: "&#127968;" };
-        const icon = icons[a.type] || "&#128221;";
-        const clientName = await getClientName(a.clientId);
-        html += `
-          <div class="gd-activity-item">
-            <div class="gd-activity-icon">${icon}</div>
-            <div class="gd-activity-body">
-              <div class="gd-activity-subject">
-                <a href="/greendoor/app/client-detail?id=${a.clientId}">${escapeHtml(clientName)}</a> — ${escapeHtml(a.subject) || "Activity"}
-              </div>
-              <div class="gd-activity-meta">${timeAgo(a.timestamp)}</div>
+    const icons = { email: "&#128231;", call: "&#128222;", note: "&#128221;", sms: "&#128172;", file_share: "&#128193;", showing: "&#127968;" };
+    let html = "";
+    actSnap.forEach(d => {
+      const a = d.data();
+      const icon = icons[a.type] || "&#128221;";
+      const clientName = nameById[a.clientId] || "Unknown";
+      html += `
+        <div class="gd-activity-item">
+          <div class="gd-activity-icon">${icon}</div>
+          <div class="gd-activity-body">
+            <div class="gd-activity-subject">
+              <a href="/greendoor/app/client-detail?id=${a.clientId}">${escapeHtml(clientName)}</a> — ${escapeHtml(a.subject) || "Activity"}
             </div>
-          </div>`;
-      }
-      feedEl.innerHTML = html;
-    }
+            <div class="gd-activity-meta">${timeAgo(a.timestamp)}</div>
+          </div>
+        </div>`;
+    });
+    feedEl.innerHTML = html;
   } catch (e) {
     console.error("Activity feed error:", e);
   }
+}
+
+onAuthStateChanged(auth, async (user) => {
+  if (!user) return;
+
+  const profile = await getCurrentUser();
+  if (!profile) return;
+
+  document.getElementById("welcome-name").textContent = profile.fullName || "Agent";
+
+  const uid = user.uid;
+  await Promise.all([refreshStats(uid), refreshActivityFeed(uid)]);
 
   // --- Upcoming Showings ---
   try {
@@ -127,8 +126,10 @@ onAuthStateChanged(auth, async (user) => {
     setTimeout(() => checkAndResumeTour(), 600);
   }
 
-  // Seed email templates (no-op if already exist)
-  seedEmailTemplates().catch(() => {});
+  // Seed email templates once per user (function flips users/{uid}.templatesSeeded)
+  if (profile.templatesSeeded !== true) {
+    seedEmailTemplates().catch(() => {});
+  }
 
   // Load AI briefing
   loadBriefing();
@@ -200,7 +201,7 @@ async function loadBriefing() {
       showSnap.forEach(d => {
         const s = d.data();
         if (s.status === "cancelled") return;
-        const dt = s.showingDate?.toDate ? s.showingDate.toDate() : null;
+        const dt = safeToDate(s.showingDate);
         if (dt && dt <= todayEnd) {
           contextData.todayShowings.push({ address: s.address || "TBD", time: dt.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) });
         }
@@ -480,6 +481,8 @@ window.saveDashboardClient = async function () {
     document.getElementById("dash-add-status").value = "lead";
     document.getElementById("dash-add-timeline").value = "";
     document.getElementById("dash-add-source").value = "";
+
+    await Promise.all([refreshStats(user.uid), refreshActivityFeed(user.uid)]);
   } catch (e) {
     console.error("Save client error:", e);
     showToast("Could not save client. Check your connection and try again.", "error");
@@ -568,6 +571,8 @@ window.saveDashboardListing = async function () {
     const matchCount = selectedClients.length;
     showToast(matchCount > 0 ? `Listing added and matched to ${matchCount} client${matchCount > 1 ? "s" : ""}!` : "Listing added!");
     closeDashboardAddListing();
+
+    await refreshActivityFeed(user.uid);
   } catch (e) {
     console.error("Save listing error:", e);
     showToast("Could not save listing. Check your connection and try again.", "error");

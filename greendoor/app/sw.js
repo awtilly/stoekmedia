@@ -65,10 +65,18 @@ const PRECACHE_URLS = [
 const OFFLINE_PAGE = '/greendoor/app/login';
 
 self.addEventListener('install', event => {
+  // Precache, but do NOT skipWaiting automatically — that can interrupt in-flight
+  // requests on open tabs. The page prompts the user via auth.js update banner
+  // and posts { type: 'SKIP_WAITING' } when they choose to refresh.
   event.waitUntil(
     caches.open(CACHE_NAME).then(cache => cache.addAll(PRECACHE_URLS))
   );
-  self.skipWaiting();
+});
+
+self.addEventListener('message', event => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
 
 self.addEventListener('activate', event => {
@@ -124,7 +132,9 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // Cache-first for static assets (CSS, images, fonts)
+  // Cache-first for static assets (CSS, images, fonts).
+  // On total failure return an empty 503 — fallback to the login HTML for images
+  // shows the page literal in <img> tags, which is worse than a broken image icon.
   event.respondWith(
     caches.match(event.request).then(cached => {
       if (cached) return cached;
@@ -135,6 +145,6 @@ self.addEventListener('fetch', event => {
         }
         return response;
       });
-    }).catch(() => caches.match('/greendoor/app/login'))
+    }).catch(() => new Response('', { status: 503, statusText: 'Offline' }))
   );
 });

@@ -151,20 +151,10 @@ submitBtn.addEventListener("click", async () => {
 
   try {
     await confirmPasswordReset(auth, oobCode, pw);
-    showState("success");
-
-    // Auto sign in
-    await signInWithEmailAndPassword(auth, userEmail, pw);
-
-    // Redirect after brief delay so user sees success message
-    setTimeout(() => {
-      window.location.href = "/greendoor/app/dashboard";
-    }, 1000);
   } catch (err) {
     showState("form");
     submitBtn.disabled = false;
     submitBtn.textContent = "Set Password & Continue";
-
     if (err.code === "auth/expired-action-code") {
       formError.textContent = "This link has expired. Please request a new one.";
     } else if (err.code === "auth/weak-password") {
@@ -173,6 +163,25 @@ submitBtn.addEventListener("click", async () => {
       formError.textContent = "Something went wrong. Please try again.";
     }
     formError.style.display = "block";
+    return;
+  }
+
+  // Password is set; now sign in. If sign-in fails for any reason, fall back to the
+  // login page (the password did persist).
+  try {
+    await signInWithEmailAndPassword(auth, userEmail, pw);
+    showState("success");
+    // Let auth.js's onAuthStateChanged run first so it can route to onboarding/dashboard.
+    setTimeout(() => {
+      if (window.location.pathname.includes("/set-password")) {
+        window.location.href = "/greendoor/app/dashboard";
+      }
+    }, 1200);
+  } catch (err) {
+    showState("success");
+    setTimeout(() => {
+      window.location.href = "/greendoor/app/login";
+    }, 1500);
   }
 });
 

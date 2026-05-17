@@ -10,6 +10,12 @@
       ".git/**",
       "functions/**",
       "node_modules/**",
+      "madness/**",
+      "gateway/**",
+      "src/**",
+      "storage.rules",
+      "firestore.rules",
+      "firestore.indexes.json",
       "CLAUDE.md",
       "*.md"
     ],
@@ -21,7 +27,11 @@
     ]
   },
   "firestore": {
-    "rules": "firestore.rules"
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "storage": {
+    "rules": "storage.rules"
   },
   "functions": {
     "source": "functions"

@@ -5,7 +5,7 @@ import {
   doc, updateDoc, setDoc, addDoc, orderBy, limit, startAfter,
   Timestamp
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-import { getCurrentUser, formatDate, showToast, escapeHtml } from "./auth.js";
+import { getCurrentUser, formatDate, showToast, escapeHtml, safeToDate } from "./auth.js";
 
 /* ================================================================
    STATE
@@ -102,7 +102,7 @@ async function loadOverviewTab() {
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const newUsers = allRealtors.filter(r => {
       if (!r.createdAt || r.offboardedAt) return false;
-      const d = r.createdAt.toDate ? r.createdAt.toDate() : new Date(r.createdAt);
+      const d = safeToDate(r.createdAt) || new Date();
       return d >= monthStart;
     });
 
@@ -125,8 +125,8 @@ async function loadOverviewTab() {
     const loginSorted = [...allRealtors]
       .filter(r => r.lastLogin && !r.offboardedAt)
       .sort((a, b) => {
-        const aDate = a.lastLogin?.toDate ? a.lastLogin.toDate() : new Date(a.lastLogin);
-        const bDate = b.lastLogin?.toDate ? b.lastLogin.toDate() : new Date(b.lastLogin);
+        const aDate = safeToDate(a.lastLogin) || new Date(0);
+        const bDate = safeToDate(b.lastLogin) || new Date(0);
         return bDate - aDate;
       })
       .slice(0, 10);
@@ -157,7 +157,7 @@ async function loadActivityChart() {
     const tsThirty = Timestamp.fromDate(thirtyDaysAgo);
 
     const activitiesSnap = await getDocs(
-      query(collection(db, "activities"), where("createdAt", ">=", tsThirty))
+      query(collection(db, "activities"), where("timestamp", ">=", tsThirty))
     );
 
     const typeCounts = {};

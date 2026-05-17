@@ -3,8 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Calendar — GreenDoor</title>
-  <!-- PWA -->
+  <title>Templates — GreenDoor</title>
   <link rel="manifest" href="/greendoor/app/manifest.json">
   <meta name="theme-color" content="#22c55e">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -35,11 +34,11 @@
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
         <span>Listings</span>
       </a>
-      <a href="/greendoor/app/calendar" class="gd-nav-active">
+      <a href="/greendoor/app/calendar">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
         <span>Calendar</span>
       </a>
-      <a href="/greendoor/app/templates">
+      <a href="/greendoor/app/templates" class="gd-nav-active">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>
         <span>Templates</span>
       </a>
@@ -67,7 +66,7 @@
     <button class="gd-sidebar-toggle" onclick="document.getElementById('gd-sidebar').classList.toggle('open')" aria-label="Menu">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
     </button>
-    <h1 class="gd-topbar-title">Calendar</h1>
+    <h1 class="gd-topbar-title">Templates</h1>
   </header>
 
   <div class="gd-app-layout">
@@ -75,125 +74,118 @@
     <div class="gd-content">
 
       <!-- Loading -->
-      <div id="calendar-loading" class="gd-loading">
+      <div id="templates-loading" class="gd-loading">
         <div class="gd-spinner gd-spinner-lg"></div>
-        <span class="gd-loading-text">Loading calendar...</span>
+        <span class="gd-loading-text">Loading templates...</span>
       </div>
 
-      <div id="calendar-content" class="gd-hidden">
+      <!-- Templates Content -->
+      <div id="templates-content" class="gd-hidden">
 
         <!-- Header -->
-        <div class="gd-calendar-header">
-          <div class="gd-calendar-nav">
-            <button class="gd-btn gd-btn-sm" onclick="calPrev()">&larr;</button>
-            <button class="gd-btn gd-btn-sm" onclick="calToday()">Today</button>
-            <button class="gd-btn gd-btn-sm" onclick="calNext()">&rarr;</button>
-          </div>
-          <div class="gd-calendar-title" id="cal-title">February 2026</div>
-          <div class="gd-flex-center gd-gap-sm">
-            <div class="gd-calendar-view-toggle">
-              <button class="gd-calendar-view-btn" data-view="month" onclick="setCalView('month')">Month</button>
-              <button class="gd-calendar-view-btn active" data-view="week" onclick="setCalView('week')">Week</button>
-            </div>
-            <button class="gd-btn gd-btn-primary gd-btn-sm" onclick="openEventModal()">+ Event</button>
+        <div class="gd-listings-header">
+          <h1>Templates</h1>
+          <div class="gd-listings-header-actions">
+            <button class="gd-btn gd-btn-primary" onclick="openUploadTemplate()">+ Upload Template</button>
           </div>
         </div>
 
-        <!-- Legend -->
-        <div class="gd-calendar-legend">
-          <div class="gd-calendar-legend-item"><div class="gd-calendar-legend-dot gd-legend-showing"></div> Showings</div>
-          <div class="gd-calendar-legend-item"><div class="gd-calendar-legend-dot gd-legend-followup"></div> Follow-ups</div>
-          <div class="gd-calendar-legend-item"><div class="gd-calendar-legend-dot gd-legend-event"></div> Events</div>
-          <div class="gd-calendar-legend-item"><div class="gd-calendar-legend-dot gd-legend-showingtime"></div> ShowingTime</div>
-        </div>
+        <p class="gd-text-muted" style="margin: 0 0 1.25rem;">
+          Upload any PDF you use a lot (buyer intake, listing presentation, broker addendum). GreenDoor auto-fills client and listing data the moment you send.
+        </p>
 
-        <!-- Calendar Grid -->
-        <div id="cal-grid"></div>
-
-        <!-- Event Popover (positioned dynamically) -->
-        <div id="cal-popover" class="gd-cal-popover gd-hidden">
-          <div class="gd-cal-popover-header">
-            <div class="gd-cal-popover-title" id="pop-title"></div>
-            <button class="gd-cal-popover-close" onclick="closePopover()">&times;</button>
+        <!-- My Templates -->
+        <section style="margin-bottom: 2rem;">
+          <h2 style="font-size: 1.1rem; margin: 0 0 .75rem;">My Templates</h2>
+          <div id="my-templates-list" class="gd-card-grid"></div>
+          <div id="my-templates-empty" class="gd-empty gd-hidden">
+            <div class="gd-empty-icon">&#128196;</div>
+            <div class="gd-empty-text">You haven't uploaded any templates yet. Click <strong>Upload Template</strong> above to start.</div>
           </div>
-          <div class="gd-cal-popover-meta" id="pop-meta"></div>
-          <div class="gd-cal-popover-actions" id="pop-actions"></div>
-        </div>
+        </section>
+
+        <!-- Compliance Forms (seeded) -->
+        <section>
+          <h2 style="font-size: 1.1rem; margin: 0 0 .75rem;">Compliance Forms</h2>
+          <p class="gd-text-muted" style="margin: 0 0 .75rem; font-size: .9rem;">Pre-built Missouri residential forms. Available to all realtors.</p>
+          <div id="seeded-templates-list" class="gd-card-grid"></div>
+        </section>
 
       </div>
     </div>
   </div>
   </div><!-- /gd-app-layout -->
 
-  <!-- Add Event Modal -->
-  <div id="event-modal" class="gd-modal-overlay">
-    <div class="gd-modal gd-modal-sm">
+  <!-- Upload Modal -->
+  <div id="upload-modal" class="gd-modal gd-hidden">
+    <div class="gd-modal-content" style="max-width: 480px;">
       <div class="gd-modal-header">
-        <h3 id="event-modal-title">Add Event</h3>
-        <button class="gd-modal-close" onclick="closeEventModal()" aria-label="Close">&times;</button>
+        <h2>Upload Template</h2>
+        <button class="gd-modal-close" onclick="closeUploadTemplate()">&times;</button>
       </div>
       <div class="gd-modal-body">
         <div class="gd-form-group">
-          <label for="ev-title">Title *</label>
-          <input type="text" id="ev-title" class="gd-input">
+          <label for="upload-template-name">Template name</label>
+          <input id="upload-template-name" class="gd-input" type="text" placeholder="e.g. Buyer Intake Packet">
         </div>
         <div class="gd-form-group">
-          <label for="ev-description">Description</label>
-          <textarea id="ev-description" class="gd-input" rows="2"></textarea>
-        </div>
-        <div class="gd-form-row">
-          <div class="gd-form-group">
-            <label for="ev-start">Start *</label>
-            <input type="datetime-local" id="ev-start" class="gd-input">
-          </div>
-          <div class="gd-form-group">
-            <label for="ev-end">End</label>
-            <input type="datetime-local" id="ev-end" class="gd-input">
-          </div>
-        </div>
-        <div class="gd-sig-option-row">
-          <input type="checkbox" id="ev-allday"> <label for="ev-allday">All day</label>
-        </div>
-        <div class="gd-form-row">
-          <div class="gd-form-group">
-            <label for="ev-color">Color</label>
-            <select id="ev-color" class="gd-input">
-              <option value="#3b82f6">Blue</option>
-              <option value="#22c55e">Green</option>
-              <option value="#f59e0b">Amber</option>
-              <option value="#ef4444">Red</option>
-              <option value="#8b5cf6">Purple</option>
-            </select>
-          </div>
-          <div class="gd-form-group" id="ev-recurrence-group">
-            <label for="ev-recurrence">Repeat</label>
-            <select id="ev-recurrence" class="gd-input">
-              <option value="none">Does not repeat</option>
-              <option value="daily">Daily</option>
-              <option value="weekly">Weekly</option>
-              <option value="biweekly">Every 2 weeks</option>
-              <option value="monthly">Monthly</option>
-            </select>
-          </div>
+          <label for="upload-template-file">PDF file</label>
+          <input id="upload-template-file" type="file" accept="application/pdf" class="gd-input">
         </div>
         <div class="gd-form-group">
-          <label for="ev-client">Client (optional)</label>
-          <select id="ev-client" class="gd-input">
-            <option value="">— None —</option>
-          </select>
+          <label class="gd-checkbox-label">
+            <input type="checkbox" id="upload-template-checklist">
+            Add to closing checklist for future clients
+          </label>
         </div>
+        <div id="upload-status" class="gd-text-muted" style="font-size: .9rem; min-height: 1.25rem;"></div>
       </div>
       <div class="gd-modal-footer">
-        <button class="gd-btn" onclick="closeEventModal()">Cancel</button>
-        <button class="gd-btn gd-btn-primary" onclick="saveEvent()">Save</button>
+        <button class="gd-btn" onclick="closeUploadTemplate()">Cancel</button>
+        <button id="upload-template-go" class="gd-btn gd-btn-primary" onclick="startUploadTemplate()">Next: Place Fields</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Builder Modal (DocuSeal in-browser drag-drop field placement) -->
+  <div id="builder-modal" class="gd-modal gd-hidden">
+    <div class="gd-modal-content" style="max-width: 1100px; height: 90vh; display: flex; flex-direction: column;">
+      <div class="gd-modal-header">
+        <h2>Place fields on your document</h2>
+        <button class="gd-modal-close" onclick="closeBuilder()">&times;</button>
+      </div>
+      <div class="gd-modal-body" style="padding: 0; flex: 1; overflow: hidden;">
+        <p class="gd-text-muted" style="padding: .75rem 1rem; margin: 0; border-bottom: 1px solid var(--gd-border, #e5e7eb); font-size: .9rem;">
+          Drag fields onto the PDF. Use clear names (e.g. "Buyer Name", "Property Address") so GreenDoor can auto-fill them. When done, click <strong>Save & Continue</strong>.
+        </p>
+        <div id="builder-mount" style="height: calc(100% - 3rem);"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mapping Modal — confirm AI-suggested field → data source mapping -->
+  <div id="mapping-modal" class="gd-modal gd-hidden">
+    <div class="gd-modal-content" style="max-width: 640px;">
+      <div class="gd-modal-header">
+        <h2>Confirm auto-fill mapping</h2>
+        <button class="gd-modal-close" onclick="closeMappingModal()">&times;</button>
+      </div>
+      <div class="gd-modal-body">
+        <p class="gd-text-muted" style="margin-top:0;">
+          Sage suggested how each field maps to client and listing data. Review and adjust if anything looks off. Set to <em>Manual entry</em> for fields you'll fill in yourself each time.
+        </p>
+        <div id="mapping-list"></div>
+      </div>
+      <div class="gd-modal-footer">
+        <button class="gd-btn" onclick="closeMappingModal()">Back</button>
+        <button id="mapping-save-btn" class="gd-btn gd-btn-primary" onclick="saveTemplateFromMapping()">Save Template</button>
       </div>
     </div>
   </div>
 
   <script src="/assets/js/main.js"></script>
   <script type="module" src="/greendoor/js/auth.js"></script>
-  <script type="module" src="/greendoor/js/calendar.js"></script>
-  <script type="module" src="/greendoor/js/tour.js"></script>
+  <script type="module" src="/greendoor/js/templates.js"></script>
   <script type="module" src="/greendoor/js/bottom-tabs.js"></script>
   <script type="module" src="/greendoor/js/chatbot.js"></script>
 </body>

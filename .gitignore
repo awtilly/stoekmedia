@@ -1,6 +1,37 @@
-functions/.env
-functions/node_modules/
+# Dependencies
 node_modules/
+functions/node_modules/
+
+# Environment
+.env
+.env.*
+functions/.env
+functions/.env.*
+
+# Firebase
 .firebase/
+firebase-debug.log
+firestore-debug.log
+storage-debug.log
+ui-debug.log
+
+# Build output
+dist/
+build/
+
+# OS
 .DS_Store
+Thumbs.db
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+
+# Tooling
 .claude/
+.planning/

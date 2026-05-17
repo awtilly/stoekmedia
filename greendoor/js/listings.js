@@ -59,8 +59,12 @@ onAuthStateChanged(auth, async (user) => {
 /* ===== LOAD DATA ===== */
 async function loadListings(uid) {
   try {
-    // Load listings with limit to avoid unbounded reads
-    const q = query(collection(db, "listings"), orderBy("createdAt", "desc"), limit(200));
+    const q = query(
+      collection(db, "listings"),
+      where("addedBy", "==", uid),
+      orderBy("createdAt", "desc"),
+      limit(200)
+    );
     const snap = await getDocs(q);
     allListings = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     applyFilters();

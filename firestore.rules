@@ -138,8 +138,42 @@ service cloud.firestore {
     }
 
     match /documentTemplates/{templateId} {
-      allow read: if isAuthenticated();
-      allow write: if isAuthenticated() && isAdmin();
+      // Read: any signed-in user can see seeded compliance templates AND their
+      // own private templates. Brokerage-shared is reserved for a later phase.
+      allow read: if isAuthenticated() && (
+        resource.data.visibility == 'seeded'
+        || resource.data.ownerId == request.auth.uid
+        || isAdmin()
+      );
+
+      // Create: realtors may only create their own private templates.
+      // Admins may create anything (seeded forms).
+      allow create: if isAuthenticated() && (
+        isAdmin()
+        || (
+          request.resource.data.ownerId == request.auth.uid
+          && request.resource.data.visibility == 'private'
+        )
+      );
+
+      // Update: owner can edit their own private template (ownership +
+      // visibility must not change). Admin may edit anything.
+      allow update: if isAuthenticated() && (
+        isAdmin()
+        || (
+          resource.data.ownerId == request.auth.uid
+          && resource.data.visibility == 'private'
+          && request.resource.data.ownerId == resource.data.ownerId
+          && request.resource.data.visibility == resource.data.visibility
+        )
+      );
+
+      // Delete: owner may delete their own private template, admin anything.
+      // Seeded templates can only be removed by admin.
+      allow delete: if isAuthenticated() && (
+        isAdmin()
+        || (resource.data.ownerId == request.auth.uid && resource.data.visibility == 'private')
+      );
     }
 
     match /listings/{listingId} {

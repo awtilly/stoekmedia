@@ -271,27 +271,43 @@ function isStandalone() {
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/greendoor/app/sw.js', { scope: '/greendoor/app/' })
     .then(reg => {
+      // If a worker is already waiting on load, surface the banner immediately.
+      if (reg.waiting && navigator.serviceWorker.controller) {
+        showUpdateBanner(reg.waiting);
+      }
       reg.addEventListener('updatefound', () => {
         const newSW = reg.installing;
         if (!newSW) return;
         newSW.addEventListener('statechange', () => {
-          if (newSW.state === 'activated' && navigator.serviceWorker.controller) {
-            showUpdateBanner();
+          if (newSW.state === 'installed' && navigator.serviceWorker.controller) {
+            showUpdateBanner(newSW);
           }
         });
       });
     })
     .catch(err => console.warn('SW registration failed:', err));
+
+  // When the new SW takes over, reload once to pick up the new assets.
+  let reloadOnce = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (reloadOnce) return;
+    reloadOnce = true;
+    window.location.reload();
+  });
 }
 
 // Update banner
-function showUpdateBanner() {
+function showUpdateBanner(waitingWorker) {
   if (document.getElementById('gd-update-banner')) return;
   const banner = document.createElement('div');
   banner.id = 'gd-update-banner';
   banner.className = 'gd-update-banner';
-  banner.innerHTML = 'A new version is available <button onclick="location.reload()">Refresh</button>';
+  banner.innerHTML = 'A new version is available <button type="button">Refresh</button>';
   document.body.appendChild(banner);
+  banner.querySelector('button').addEventListener('click', () => {
+    if (waitingWorker) waitingWorker.postMessage({ type: 'SKIP_WAITING' });
+    else window.location.reload();
+  });
 }
 
 // Install banner

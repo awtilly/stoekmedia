@@ -20,7 +20,7 @@
 import { db, auth } from "./firebase-config.js";
 import {
   writeBatch, doc, collection, getDocs, serverTimestamp,
-  updateDoc, addDoc, deleteDoc, onSnapshot
+  updateDoc, addDoc, deleteDoc, onSnapshot, query, where
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { showToast, escapeHtml, formatDate } from "./auth.js";
 
@@ -546,7 +546,7 @@ export function parseTransactionType(transactionType) {
  * @param {string} transactionType - e.g. "SFH - Buyer"
  * @param {Date|null} closingDate - Closing date (JS Date) or null
  */
-export async function seedChecklist(db, clientId, transactionType, closingDate) {
+export async function seedChecklist(db, clientId, transactionType, closingDate, realtorId) {
   const { propType, side } = parseTransactionType(transactionType);
   if (!propType || !side) return;
 
@@ -586,6 +586,47 @@ export async function seedChecklist(db, clientId, transactionType, closingDate) 
       completedAt: null,
       completedBy: null
     }, { merge: true });
+  }
+
+  // Pull realtor-uploaded templates flagged for the checklist and add each as
+  // an extra item. linkedTemplateId points at the template doc so the same
+  // auto-complete-on-signed hook works for them as for seeded compliance forms.
+  if (realtorId) {
+    try {
+      const realtorTplSnap = await getDocs(query(
+        collection(db, "documentTemplates"),
+        where("ownerId", "==", realtorId),
+        where("checklistEnabled", "==", true)
+      ));
+      let extraSort = 1000;
+      for (const tplDoc of realtorTplSnap.docs) {
+        const tpl = tplDoc.data();
+        const itemRef = doc(db, "clients", clientId, "closingChecklist", `realtor_${tplDoc.id}`);
+        batch.set(itemRef, {
+          task: tpl.name || "Realtor template",
+          category: "Realtor Documents",
+          completed: false,
+          autoCompleted: false,
+          autoCompletedAt: null,
+          notApplicable: false,
+          notes: "",
+          sortOrder: extraSort++,
+          transactionSide: "both",
+          propertyTypes: [propType],
+          linkedTemplateId: tplDoc.id,
+          isCustom: false,
+          isSeeded: true,
+          isRealtorTemplate: true,
+          deadlineOffsetDays: null,
+          deadline: null,
+          seededAt: serverTimestamp(),
+          completedAt: null,
+          completedBy: null
+        }, { merge: true });
+      }
+    } catch (err) {
+      console.warn("seedChecklist: could not include realtor templates:", err.message);
+    }
   }
 
   await batch.commit();

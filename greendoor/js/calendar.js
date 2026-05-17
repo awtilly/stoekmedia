@@ -1,10 +1,10 @@
 import { auth, db } from "./firebase-config.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import {
-  collection, query, where, orderBy, getDocs, addDoc, updateDoc, deleteDoc,
-  doc, serverTimestamp, Timestamp
+  collection, query, where, orderBy, getDocs, addDoc, updateDoc, deleteDoc, getDoc,
+  doc, serverTimestamp, Timestamp, writeBatch
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-import { getCurrentUser, formatDateTime, showToast, escapeHtml } from "./auth.js";
+import { getCurrentUser, formatDateTime, showToast, escapeHtml, safeToDate } from "./auth.js";
 import { checkAndResumeTour } from "./tour.js";
 
 let currentView = "week";
@@ -55,13 +55,13 @@ async function loadCalendarData(uid) {
     const s = d.data();
     if (s.status === "cancelled") return;
     const isShowingTime = s.source === "showingtime";
-    const start = s.showingDate?.toDate ? s.showingDate.toDate() : new Date();
+    const start = safeToDate(s.showingDate) || new Date();
     allCalEvents.push({
       id: d.id,
       type: isShowingTime ? "showingtime" : "showing",
       title: s.address || (isShowingTime ? "ShowingTime" : "Showing"),
       start,
-      end: s.endDate?.toDate ? s.endDate.toDate() : new Date(start.getTime() + 3600000),
+      end: safeToDate(s.endDate) || new Date(start.getTime() + 3600000),
       clientId: s.clientId || null,
       color: "#22c55e",
       data: s
@@ -71,7 +71,7 @@ async function loadCalendarData(uid) {
   followUpsSnap.forEach(d => {
     const f = d.data();
     if (f.status === "completed" || f.status === "dismissed") return;
-    const due = f.dueDate?.toDate ? f.dueDate.toDate() : new Date();
+    const due = safeToDate(f.dueDate) || new Date();
     allCalEvents.push({
       id: d.id, type: "followup",
       title: f.title || "Follow-up",
@@ -88,8 +88,8 @@ async function loadCalendarData(uid) {
     allCalEvents.push({
       id: d.id, type: "event",
       title: e.title || "Event",
-      start: e.startDate?.toDate ? e.startDate.toDate() : new Date(),
-      end: e.endDate?.toDate ? e.endDate.toDate() : new Date(),
+      start: safeToDate(e.startDate) || new Date(),
+      end: safeToDate(e.endDate) || new Date(),
       allDay: e.allDay || false,
       clientId: e.clientId || null,
       color: e.color || "#3b82f6",
@@ -519,12 +519,55 @@ window.editEvent = function (id) {
 };
 
 window.deleteEvent = async function (id) {
-  if (!confirm("Delete this event?")) return;
   const user = auth.currentUser;
   if (!user) return;
 
   try {
-    await deleteDoc(doc(db, "events", id));
+    // Detect whether this event is part of a recurring series.
+    const eventSnap = await getDoc(doc(db, "events", id));
+    if (!eventSnap.exists()) {
+      showToast("Event not found.", "error");
+      return;
+    }
+    const seriesId = eventSnap.data().seriesId;
+
+    let scope = "single";
+    if (seriesId) {
+      const choice = prompt(
+        "Delete which events?\n  1 — just this occurrence\n  2 — this and all future occurrences in the series\n  3 — the entire series\n\nType 1, 2, or 3:",
+        "1"
+      );
+      if (choice == null) return; // cancelled
+      const trimmed = (choice || "").trim();
+      if (trimmed === "2") scope = "future";
+      else if (trimmed === "3") scope = "series";
+      else if (trimmed !== "1") { showToast("Cancelled.", "error"); return; }
+    } else {
+      if (!confirm("Delete this event?")) return;
+    }
+
+    if (scope === "single" || !seriesId) {
+      await deleteDoc(doc(db, "events", id));
+    } else {
+      const seriesQ = query(
+        collection(db, "events"),
+        where("realtorId", "==", user.uid),
+        where("seriesId", "==", seriesId)
+      );
+      const snap = await getDocs(seriesQ);
+      const thisStart = eventSnap.data().startDate?.toDate?.() || new Date(0);
+      const batch = writeBatch(db);
+      snap.forEach(d => {
+        if (scope === "series") {
+          batch.delete(d.ref);
+        } else if (scope === "future") {
+          const occStart = d.data().startDate?.toDate?.() || new Date(0);
+          if (occStart >= thisStart) batch.delete(d.ref);
+        }
+      });
+      await batch.commit();
+    }
+
     showToast("Event deleted.");
     closePopover();
     await loadCalendarData(user.uid);

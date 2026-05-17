@@ -5,7 +5,7 @@
   <!-- Homepage -->
   <url>
     <loc>https://stoekmedia.com/</loc>
-    <lastmod>2026-03-01</lastmod>
+    <lastmod>2026-05-15</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
@@ -13,7 +13,7 @@
   <!-- Software Hub -->
   <url>
     <loc>https://stoekmedia.com/software/</loc>
-    <lastmod>2026-03-01</lastmod>
+    <lastmod>2026-05-15</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
@@ -21,7 +21,7 @@
   <!-- GreenDoor CRM Landing Page -->
   <url>
     <loc>https://stoekmedia.com/greendoor/</loc>
-    <lastmod>2026-03-01</lastmod>
+    <lastmod>2026-05-15</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
@@ -29,7 +29,7 @@
   <!-- ShopCaddie Landing Page -->
   <url>
     <loc>https://stoekmedia.com/software/shopcaddie/</loc>
-    <lastmod>2026-03-01</lastmod>
+    <lastmod>2026-05-15</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
@@ -37,7 +37,7 @@
   <!-- Bookings / Contact -->
   <url>
     <loc>https://stoekmedia.com/bookings/</loc>
-    <lastmod>2026-03-01</lastmod>
+    <lastmod>2026-05-15</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
@@ -45,7 +45,7 @@
   <!-- About Page -->
   <url>
     <loc>https://stoekmedia.com/about/</loc>
-    <lastmod>2026-03-01</lastmod>
+    <lastmod>2026-05-15</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
@@ -53,19 +53,19 @@
   <!-- GreenDoor Comparison Pages -->
   <url>
     <loc>https://stoekmedia.com/greendoor/compare/follow-up-boss.html</loc>
-    <lastmod>2026-03-01</lastmod>
+    <lastmod>2026-05-15</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
     <loc>https://stoekmedia.com/greendoor/compare/kvcore.html</loc>
-    <lastmod>2026-03-01</lastmod>
+    <lastmod>2026-05-15</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
     <loc>https://stoekmedia.com/greendoor/compare/liondesk.html</loc>
-    <lastmod>2026-03-01</lastmod>
+    <lastmod>2026-05-15</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
@@ -73,7 +73,7 @@
   <!-- GreenDoor Roundup -->
   <url>
     <loc>https://stoekmedia.com/greendoor/best-real-estate-crm.html</loc>
-    <lastmod>2026-03-01</lastmod>
+    <lastmod>2026-05-15</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
@@ -81,31 +81,31 @@
   <!-- GreenDoor Feature Pages -->
   <url>
     <loc>https://stoekmedia.com/greendoor/features/ai-assistant.html</loc>
-    <lastmod>2026-03-01</lastmod>
+    <lastmod>2026-05-15</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
     <loc>https://stoekmedia.com/greendoor/features/e-signatures.html</loc>
-    <lastmod>2026-03-01</lastmod>
+    <lastmod>2026-05-15</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
     <loc>https://stoekmedia.com/greendoor/features/listing-matching.html</loc>
-    <lastmod>2026-03-01</lastmod>
+    <lastmod>2026-05-15</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
     <loc>https://stoekmedia.com/greendoor/features/showing-management.html</loc>
-    <lastmod>2026-03-01</lastmod>
+    <lastmod>2026-05-15</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
     <loc>https://stoekmedia.com/greendoor/features/email-automation.html</loc>
-    <lastmod>2026-03-01</lastmod>
+    <lastmod>2026-05-15</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
@@ -113,7 +113,7 @@
   <!-- GreenDoor Educational Content -->
   <url>
     <loc>https://stoekmedia.com/greendoor/what-is-real-estate-crm.html</loc>
-    <lastmod>2026-03-02</lastmod>
+    <lastmod>2026-05-15</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
@@ -121,13 +121,13 @@
   <!-- Blog -->
   <url>
     <loc>https://stoekmedia.com/blog/</loc>
-    <lastmod>2026-03-01</lastmod>
+    <lastmod>2026-05-15</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://stoekmedia.com/blog/why-we-built-greendoor.html</loc>
-    <lastmod>2026-03-01</lastmod>
+    <lastmod>2026-05-15</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
