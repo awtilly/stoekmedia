@@ -3043,15 +3043,26 @@ async function loadComplianceTemplates(uid) {
       allTemplates.push({ id: d.id, ...d.data() });
     });
 
-    // Filter by client transaction type (client-side)
+    // Realtor's own uploaded templates ("My Templates") — always shown,
+    // not filtered by transaction type. They live in the same collection
+    // but use visibility=private + ownerId match.
+    const myTemplates = allTemplates.filter(
+      t => t.visibility === "private" && t.ownerId === uid
+    );
+
+    // Seeded compliance forms — filter by client transaction type.
+    const seededTemplates = allTemplates.filter(t => t.visibility === "seeded");
+    let seededForClient;
     if (clientData && clientData.transactionType) {
-      complianceTemplates = allTemplates.filter(
+      seededForClient = seededTemplates.filter(
         t => t.transactionTypes && t.transactionTypes.includes(clientData.transactionType)
       );
     } else {
-      // No transaction type set -- show all but they will be disabled
-      complianceTemplates = allTemplates;
+      // No transaction type set -- show all seeded but they will be disabled
+      seededForClient = seededTemplates;
     }
+
+    complianceTemplates = [...myTemplates, ...seededForClient];
 
     renderComplianceList();
   } catch (err) {
@@ -3089,31 +3100,32 @@ function renderComplianceList() {
     return;
   }
 
-  // Group by category
-  const grouped = {};
-  for (const cat of COMPLIANCE_CATEGORIES) {
-    grouped[cat] = complianceTemplates.filter(t => t.category === cat);
-  }
+  // Render categories in order: realtor's own first, then seeded compliance.
+  const CATEGORIES = [
+    { key: "uploaded", label: "My Templates", ignoresTxnType: true },
+    ...COMPLIANCE_CATEGORIES.map(c => ({ key: c, label: c.charAt(0).toUpperCase() + c.slice(1), ignoresTxnType: false }))
+  ];
 
   let html = "";
-  for (const cat of COMPLIANCE_CATEGORIES) {
-    const items = grouped[cat];
+  for (const cat of CATEGORIES) {
+    const items = complianceTemplates.filter(t => t.category === cat.key);
     if (items.length === 0) continue;
 
-    const categoryLabel = cat.charAt(0).toUpperCase() + cat.slice(1);
-    html += `<div class="gd-compliance-category-header">${escapeHtml(categoryLabel)}</div>`;
+    html += `<div class="gd-compliance-category-header">${escapeHtml(cat.label)}</div>`;
 
     for (const template of items) {
       const docStatus = complianceDocs[template.id];
       const status = docStatus?.status || COMPLIANCE_STATUSES.NOT_SENT;
       const isSent = status !== COMPLIANCE_STATUSES.NOT_SENT;
-      const showSendButton = !noTxnType && !isSent;
+      // Uploaded templates don't depend on transaction type — always sendable.
+      const rowDisabled = noTxnType && !cat.ignoresTxnType;
+      const showSendButton = !rowDisabled && !isSent;
 
-      html += `<div class="gd-compliance-row ${noTxnType ? 'gd-disabled' : ''}">
+      html += `<div class="gd-compliance-row ${rowDisabled ? 'gd-disabled' : ''}">
         <input type="checkbox" class="gd-compliance-check" data-template-id="${escapeHtml(template.id)}"
-          ${isSent ? 'disabled' : ''} ${noTxnType ? 'disabled' : ''}>
+          ${isSent ? 'disabled' : ''} ${rowDisabled ? 'disabled' : ''}>
         <span class="gd-compliance-name">${escapeHtml(template.name)}</span>
-        <span class="gd-badge gd-badge-${escapeHtml(template.category)}">${escapeHtml(categoryLabel)}</span>
+        <span class="gd-badge gd-badge-${escapeHtml(template.category)}">${escapeHtml(cat.label)}</span>
         ${template.required ? '<span class="gd-required-asterisk">*</span>' : ''}
         ${formatComplianceStatus(status, docStatus?.signedAt)}
         ${showSendButton ? `<button class="gd-btn gd-btn-sm gd-btn-primary" onclick="openSendDialog('${escapeHtml(template.id)}')">Send</button>` : ''}

@@ -1446,6 +1446,7 @@ body.gd-light .gd-badge-inspections { background: #fffbeb; color: #d97706; }
 body.gd-light .gd-badge-financial { background: #f0fdf4; color: #16a34a; }
 body.gd-light .gd-badge-photos { background: #fdf2f8; color: #db2777; }
 body.gd-light .gd-badge-other { background: #f3f4f6; color: #6b7280; }
+body.gd-light .gd-badge-uploaded { background: #ecfdf5; color: #059669; }
 
 /* Light theme: modals */
 body.gd-light .gd-modal-overlay {
