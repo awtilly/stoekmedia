@@ -24,7 +24,7 @@
 }
 
 html {
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 
 body.gd-light {
@@ -34,7 +34,7 @@ body.gd-light {
   -moz-osx-font-smoothing: grayscale;
   -webkit-text-size-adjust: 100%;
   overscroll-behavior: none;
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 
 /* --- Hide old top nav --- */
@@ -256,14 +256,14 @@ body.gd-light .gd-page {
   margin-left: var(--gd-sidebar-width);
   flex: 1;
   min-width: 0;
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 
 body.gd-light .gd-content {
   padding: 28px 32px 80px;
   max-width: 1200px;
   margin: 0 auto;
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 
 /* --- Component Overrides: Stat Cards --- */
