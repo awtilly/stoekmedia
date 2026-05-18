@@ -135,6 +135,7 @@ async function loadClient(uid) {
     results.forEach((r, i) => {
       if (r.status === "rejected") console.error(`Client detail loader ${i} failed:`, r.reason);
     });
+    updateTabCounts();
     startComplianceListener(clientId);
     await migrateExistingFolders(uid);
     renderFolderCards();
@@ -397,19 +398,78 @@ window.deleteClient = async function () {
   }
 };
 
-/* ===== TABS ===== */
+/* ===== TABS =====
+   Underline indicator is a single absolutely-positioned element inside
+   .gd-tabs. We move + resize it via transform/width on tab switch so the
+   active state animates between tabs (Attio-style). */
+function updateTabIndicator() {
+  const bar = document.getElementById("cd-tabs");
+  const indicator = document.getElementById("cd-tab-indicator");
+  if (!bar || !indicator) return;
+  const active = bar.querySelector(".gd-tab.active");
+  if (!active) return;
+  const left = active.offsetLeft - bar.scrollLeft;
+  indicator.style.width = active.offsetWidth + "px";
+  indicator.style.transform = `translateX(${left}px)`;
+}
+
+function setTabCount(name, value) {
+  const el = document.querySelector(`.gd-tab-count[data-count="${name}"]`);
+  if (!el) return;
+  if (value == null || value === "" || value === 0) {
+    el.hidden = true;
+    el.textContent = "";
+  } else {
+    el.hidden = false;
+    el.textContent = String(value);
+  }
+}
+
+function updateTabCounts() {
+  // Activity: count the rendered timeline items (covers initial load + later writes)
+  const activityCount = document.querySelectorAll("#activity-timeline .gd-timeline-item").length;
+  setTabCount("activity", activityCount);
+  setTabCount("showings", Array.isArray(allShowings) ? allShowings.length : 0);
+  setTabCount("files", Array.isArray(allFiles) ? allFiles.length : 0);
+  setTabCount("properties", Array.isArray(allMatches) ? allMatches.length : 0);
+  // Checklist: read progress text from the rendered checklist (format: "N/M (X%)").
+  const progressText = document.querySelector("#tab-checklist .gd-checklist-progress-text");
+  if (progressText) {
+    const m = progressText.textContent.match(/(\d+)\s*\/\s*(\d+)/);
+    if (m) {
+      const done = +m[1], total = +m[2];
+      setTabCount("checklist", total ? `${total - done}/${total}` : "");
+    }
+  }
+}
+window.updateTabCounts = updateTabCounts;
+
 document.querySelectorAll(".gd-tab").forEach(tab => {
   tab.addEventListener("click", () => {
-    document.querySelectorAll(".gd-tab").forEach(t => t.classList.remove("active"));
+    document.querySelectorAll(".gd-tab").forEach(t => {
+      t.classList.remove("active");
+      t.setAttribute("aria-selected", "false");
+    });
     document.querySelectorAll(".gd-tab-content").forEach(c => c.classList.remove("active"));
     tab.classList.add("active");
+    tab.setAttribute("aria-selected", "true");
     document.getElementById("tab-" + tab.dataset.tab).classList.add("active");
+    updateTabIndicator();
     // Initialize checklist tab when activated
     if (tab.dataset.tab === "checklist" && clientData) {
       initChecklist(clientId, clientData);
+      // Allow the checklist to render before we read its progress.
+      setTimeout(updateTabCounts, 60);
     }
   });
 });
+
+// Position the underline on first paint + whenever the viewport changes
+// (font load, sidebar collapse, orientation change all shift tab widths).
+requestAnimationFrame(updateTabIndicator);
+window.addEventListener("load", () => requestAnimationFrame(updateTabIndicator));
+window.addEventListener("resize", updateTabIndicator);
+document.fonts?.ready?.then(updateTabIndicator);
 
 /* ===== ACTIVITY TAB ===== */
 async function loadActivities(uid) {
@@ -441,6 +501,7 @@ async function loadActivities(uid) {
         </div>`;
     });
     el.innerHTML = html;
+    if (typeof updateTabCounts === "function") updateTabCounts();
   } catch (e) {
     console.error("Load activities error:", e);
   }
@@ -1158,6 +1219,7 @@ async function loadTemplateFiles(uid) {
 }
 
 function renderFiles() {
+  if (typeof updateTabCounts === "function") updateTabCounts();
   const el = document.getElementById("files-list");
   let filtered = allFiles;
 
@@ -1872,6 +1934,7 @@ async function loadMatches(uid) {
 }
 
 window.renderMatches = function () {
+  if (typeof updateTabCounts === "function") updateTabCounts();
   const el = document.getElementById("properties-grid");
   selectedCompare.clear();
   updateCompareBar();
@@ -2336,6 +2399,11 @@ function renderShowings() {
   document.getElementById("ss-total").textContent = allShowings.length;
   document.getElementById("ss-upcoming").textContent = upcoming.length;
   document.getElementById("ss-completed").textContent = completed.length;
+  // Tab count reflects upcoming showings (the actionable number) — fall back
+  // to total if nothing is upcoming so the user still sees there's history.
+  if (typeof setTabCount === "function") {
+    setTabCount("showings", upcoming.length || allShowings.length);
+  }
 
   const ratings = completed.filter(s => s.clientRating).map(s => s.clientRating);
   document.getElementById("ss-avgrating").textContent = ratings.length

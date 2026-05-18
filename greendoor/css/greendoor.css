@@ -483,30 +483,106 @@ body.gd-light .gd-modal-footer {
   padding: 16px 24px;
 }
 
-/* --- Component Overrides: Tabs --- */
+/* --- Component Overrides: Tabs (Attio-style underline + Twenty count pills) ---
+   Tab strip is sticky under the page header. Active tab is indicated by a
+   single absolutely-positioned underline element that slides between tabs
+   (animated via transform); per-tab border-bottom is intentionally not used
+   so the slide animation works. */
 body.gd-light .gd-tabs {
+  position: sticky;
+  top: var(--gd-topbar-height);
+  z-index: 20;
+  display: flex;
+  gap: 4px;
+  padding: 0;
+  margin-bottom: 18px;
+  background: #ffffff;
   border-bottom: 1px solid #e5e7eb;
-  gap: 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  /* Right-edge fade hints at horizontal overflow on mobile. */
+  -webkit-mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 24px), transparent 100%);
+  mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 24px), transparent 100%);
 }
 
+body.gd-light .gd-tabs::-webkit-scrollbar { display: none; }
+
 body.gd-light .gd-tab {
-  font-size: 0.85rem;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.88rem;
   font-weight: 500;
   color: #64748b;
-  padding: 10px 16px;
-  border-bottom: 2px solid transparent;
-  transition: all 0.15s ease;
+  background: transparent;
+  border: none;
+  padding: 12px 14px;
+  border-radius: 8px 8px 0 0;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease;
+  /* No border-bottom; the indicator handles the active underline. */
 }
 
 body.gd-light .gd-tab:hover {
-  color: #334155;
-  background: transparent;
+  color: #0f172a;
+  background: #f8fafc;
 }
 
 body.gd-light .gd-tab.active {
   color: #0f172a;
-  border-bottom-color: #22c55e;
+  /* Weight stays the same as inactive — shifting weight feels jumpy when the
+     user clicks back and forth between tabs (Attio convention). */
+}
+
+body.gd-light .gd-tab:focus-visible {
+  outline: 2px solid #22c55e;
+  outline-offset: -4px;
+}
+
+.gd-tab-ico {
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+
+body.gd-light .gd-tab.active .gd-tab-ico { opacity: 1; }
+
+.gd-tab-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  font-size: 0.72rem;
   font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: #475569;
+  background: #f1f5f9;
+  border-radius: 999px;
+  line-height: 1;
+}
+
+body.gd-light .gd-tab.active .gd-tab-count {
+  color: #15803d;
+  background: #dcfce7;
+}
+
+/* Sliding underline indicator. Position is set in JS by translateX + width. */
+.gd-tab-indicator {
+  position: absolute;
+  bottom: -1px; /* sits on top of the .gd-tabs border-bottom */
+  left: 0;
+  width: 0;
+  height: 2px;
+  background: #22c55e;
+  border-radius: 2px 2px 0 0;
+  transform: translateX(0);
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+              width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
 }
 
 /* --- Component Overrides: Activity --- */
@@ -1098,11 +1174,18 @@ body.gd-light .gd-modal-lg { max-width: 800px; }
     gap: 0.75rem;
   }
 
-  /* Tabs: smaller font, scrollable */
   body.gd-light .gd-tab {
-    font-size: 0.8rem;
-    padding: 8px 12px;
-    white-space: nowrap;
+    font-size: 0.82rem;
+    padding: 10px 12px;
+    gap: 6px;
+  }
+  /* Bleed the tab strip to viewport edges so the right-fade and horizontal
+     scroll feel natural on phones. */
+  body.gd-light .gd-tabs {
+    margin-left: -16px;
+    margin-right: -16px;
+    padding-left: 16px;
+    padding-right: 16px;
   }
 
   /* Modals: near full width */

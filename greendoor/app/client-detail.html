@@ -107,13 +107,37 @@
         </div>
 
         <!-- Tabs -->
-        <div class="gd-tabs">
-          <button class="gd-tab active" data-tab="overview">Overview</button>
-          <button class="gd-tab" data-tab="activity">Activity</button>
-          <button class="gd-tab" data-tab="showings">Showings</button>
-          <button class="gd-tab" data-tab="files">Files</button>
-          <button class="gd-tab" data-tab="properties">Properties</button>
-          <button class="gd-tab" data-tab="checklist">Closing Checklist</button>
+        <div class="gd-tabs" id="cd-tabs" role="tablist">
+          <button class="gd-tab active" data-tab="overview" role="tab" aria-selected="true">
+            <svg class="gd-tab-ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="7" r="4"/><path d="M5.5 21a6.5 6.5 0 0 1 13 0"/></svg>
+            <span class="gd-tab-label">Overview</span>
+          </button>
+          <button class="gd-tab" data-tab="activity" role="tab" aria-selected="false">
+            <svg class="gd-tab-ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            <span class="gd-tab-label">Activity</span>
+            <span class="gd-tab-count" data-count="activity" hidden></span>
+          </button>
+          <button class="gd-tab" data-tab="showings" role="tab" aria-selected="false">
+            <svg class="gd-tab-ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            <span class="gd-tab-label">Showings</span>
+            <span class="gd-tab-count" data-count="showings" hidden></span>
+          </button>
+          <button class="gd-tab" data-tab="files" role="tab" aria-selected="false">
+            <svg class="gd-tab-ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            <span class="gd-tab-label">Files</span>
+            <span class="gd-tab-count" data-count="files" hidden></span>
+          </button>
+          <button class="gd-tab" data-tab="properties" role="tab" aria-selected="false">
+            <svg class="gd-tab-ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+            <span class="gd-tab-label">Properties</span>
+            <span class="gd-tab-count" data-count="properties" hidden></span>
+          </button>
+          <button class="gd-tab" data-tab="checklist" role="tab" aria-selected="false">
+            <svg class="gd-tab-ico" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+            <span class="gd-tab-label">Checklist</span>
+            <span class="gd-tab-count" data-count="checklist" hidden></span>
+          </button>
+          <span class="gd-tab-indicator" id="cd-tab-indicator" aria-hidden="true"></span>
         </div>
 
         <!-- ===== OVERVIEW TAB ===== -->
