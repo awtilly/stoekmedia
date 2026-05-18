@@ -1831,6 +1831,65 @@ const SAGE_DASHBOARD_TOOLS = [
         notes: { type: "string", description: "Any other detail mentioned." }
       }
     }
+  },
+  {
+    name: "update_client",
+    description: "Propose updating or adding information on an existing client's profile. The realtor MUST confirm before the change is saved. Use whenever the realtor says 'update Sarah's email', 'set John's budget to 400-500k', 'Sarah wants 3+ beds', 'Sarah is pre-approved for $500k', 'change John's status to under contract', 'Sarah's looking in Brentwood and Glendale', etc. Only include the fields the realtor actually mentioned — leave the rest out. For list fields (preferredLocations / propertyTypes / mustHaveFeatures / dealBreakers) send the COMPLETE new list as the realtor described it; this replaces the existing list. ClientId MUST come from RECENT CLIENTS — never invent.",
+    input_schema: {
+      type: "object",
+      properties: {
+        clientId: { type: "string", description: "Required. Exact id from RECENT CLIENTS." },
+        fullName: { type: "string" },
+        email: { type: "string" },
+        phone: { type: "string" },
+        status: {
+          type: "string",
+          enum: ["lead", "active_buyer", "active_seller", "under_contract", "closed", "inactive"]
+        },
+        transactionType: {
+          type: "string",
+          enum: ["buyer", "seller", "buyer_and_seller"]
+        },
+        source: { type: "string", description: "Lead source, e.g. Zillow, referral, open house." },
+        timeline: { type: "string", description: "Free-text timeline, e.g. '3 months', 'ASAP', 'spring 2027'." },
+        budgetMin: { type: "integer", description: "Lower bound of budget in dollars." },
+        budgetMax: { type: "integer", description: "Upper bound of budget in dollars." },
+        bedsMin: { type: "integer" },
+        bedsMax: { type: "integer" },
+        bathsMin: { type: "number" },
+        bathsMax: { type: "number" },
+        sqftMin: { type: "integer" },
+        sqftMax: { type: "integer" },
+        preferredLocations: {
+          type: "array",
+          items: { type: "string" },
+          description: "Full replacement list of preferred neighborhoods / cities."
+        },
+        propertyTypes: {
+          type: "array",
+          items: { type: "string" },
+          description: "Full replacement list, e.g. ['single_family', 'condo']."
+        },
+        mustHaveFeatures: {
+          type: "array",
+          items: { type: "string" },
+          description: "Full replacement list of must-haves."
+        },
+        dealBreakers: {
+          type: "array",
+          items: { type: "string" },
+          description: "Full replacement list of deal-breakers."
+        },
+        preApprovalStatus: {
+          type: "string",
+          description: "Free-text, e.g. 'approved', 'pending', 'denied', 'not yet started'."
+        },
+        preApprovalAmount: { type: "integer", description: "Pre-approval amount in dollars." },
+        notes: { type: "string", description: "Free-form notes — overwrites the existing notes field." },
+        closingDate: { type: "string", description: "Closing date in YYYY-MM-DD." }
+      },
+      required: ["clientId"]
+    }
   }
 ];
 
@@ -1997,6 +2056,7 @@ ACTIONS (use the specific tool, do NOT navigate):
 - "Send [doc name] to [client]" → \`send_compliance_doc\` with clientId + templateId. Match the doc name to a template in YOUR TEMPLATES. If no clear match, ask which template.
 - "Email [client] [the message]" / "Draft an email to [client] saying [X]" → \`draft_email\` with clientId, subject, body. Write a complete, polite email. Address by first name.
 - "Add a listing [URL]" or "Parse this URL" → \`add_listing\` with source_url. If they gave specs instead, fill address/price/beds/baths/sqft.
+- "Update [client]'s [field]" / "Set [client]'s [field] to X" / "[Client] is pre-approved for $X" / "[Client] wants 3+ beds" / "Change [client]'s status to Y" / "[Client]'s phone is X" → \`update_client\` with clientId and ONLY the fields the realtor mentioned. For list fields, send the complete new list. Match by name to RECENT CLIENTS; if no match, ask which client.
 
 STYLE:
 - Always reply with one short conversational sentence. Examples:

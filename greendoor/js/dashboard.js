@@ -379,6 +379,64 @@ const STATUS_LABELS = {
   under_contract: "Under Contract", closed: "Closed", inactive: "Inactive"
 };
 
+const TRANSACTION_TYPE_LABELS = {
+  buyer: "Buyer", seller: "Seller", buyer_and_seller: "Buyer & Seller"
+};
+
+// Pretty-print client field updates for the confirm-card preview.
+// Returns [{ label, value }] for the fields actually present in `input`.
+// Combines range fields (budget, beds, baths, sqft) into one row each.
+function previewClientUpdateRows(input) {
+  const rows = [];
+  const fmtMoney = (n) => `$${Number(n).toLocaleString()}`;
+  const fmtRange = (min, max, formatter = String) => {
+    if (min != null && max != null) return `${formatter(min)} – ${formatter(max)}`;
+    if (min != null) return `${formatter(min)}+`;
+    if (max != null) return `up to ${formatter(max)}`;
+    return null;
+  };
+
+  const push = (label, value) => {
+    if (value == null || value === "") return;
+    rows.push({ label, value: String(value) });
+  };
+
+  push("Name", input.fullName);
+  push("Email", input.email);
+  push("Phone", input.phone);
+  if (input.status) push("Status", STATUS_LABELS[input.status] || input.status);
+  if (input.transactionType) push("Type", TRANSACTION_TYPE_LABELS[input.transactionType] || input.transactionType);
+  push("Source", input.source);
+  push("Timeline", input.timeline);
+
+  const budget = fmtRange(input.budgetMin, input.budgetMax, fmtMoney);
+  if (budget) push("Budget", budget);
+
+  const beds = fmtRange(input.bedsMin, input.bedsMax);
+  if (beds) push("Beds", beds);
+  const baths = fmtRange(input.bathsMin, input.bathsMax);
+  if (baths) push("Baths", baths);
+  const sqft = fmtRange(input.sqftMin, input.sqftMax, (n) => `${Number(n).toLocaleString()} sq ft`);
+  if (sqft) push("Sq ft", sqft);
+
+  if (Array.isArray(input.preferredLocations) && input.preferredLocations.length)
+    push("Locations", input.preferredLocations.join(", "));
+  if (Array.isArray(input.propertyTypes) && input.propertyTypes.length)
+    push("Property types", input.propertyTypes.join(", "));
+  if (Array.isArray(input.mustHaveFeatures) && input.mustHaveFeatures.length)
+    push("Must-haves", input.mustHaveFeatures.join(", "));
+  if (Array.isArray(input.dealBreakers) && input.dealBreakers.length)
+    push("Deal-breakers", input.dealBreakers.join(", "));
+
+  if (input.preApprovalStatus) push("Pre-approval", input.preApprovalStatus);
+  if (input.preApprovalAmount != null) push("Pre-approval amount", fmtMoney(input.preApprovalAmount));
+
+  push("Notes", input.notes);
+  push("Closing", input.closingDate);
+
+  return rows;
+}
+
 const TOOL_EXECUTORS = {
   create_client: {
     title: "New Client",
@@ -539,6 +597,77 @@ const TOOL_EXECUTORS = {
       try { sessionStorage.setItem(`sage_email_draft_${input.clientId}`, JSON.stringify(draft)); } catch (_) {}
       executeNavigate({ target: "client", clientId: input.clientId, tab: "activity" });
       return { message: "Opening the client — your draft will appear in the email composer." };
+    }
+  },
+
+  update_client: {
+    title: "Update client",
+    icon: "&#9999;", // pencil
+    confirmLabel: "Save Changes",
+    preview: (input) => {
+      const rows = previewClientUpdateRows(input);
+      const name = clientName(input.clientId);
+      const header = previewRow("Client", name);
+      if (!rows.length) {
+        return `${header}<div class="gd-dash-card-body gd-text-muted">No fields specified — Sage didn't include any changes to apply.</div>`;
+      }
+      return header + rows.map(r => previewRow(r.label, r.value)).join("");
+    },
+    execute: async (input) => {
+      const uid = auth.currentUser.uid;
+      const allowed = [
+        "fullName", "email", "phone", "status", "transactionType", "source",
+        "timeline", "budgetMin", "budgetMax", "bedsMin", "bedsMax",
+        "bathsMin", "bathsMax", "sqftMin", "sqftMax",
+        "preferredLocations", "propertyTypes", "mustHaveFeatures", "dealBreakers",
+        "preApprovalStatus", "preApprovalAmount", "notes"
+      ];
+      const update = {};
+      const changedLabels = [];
+      for (const key of allowed) {
+        if (input[key] !== undefined && input[key] !== null) {
+          update[key] = input[key];
+          changedLabels.push(key);
+        }
+      }
+      if (input.closingDate) {
+        const dt = new Date(`${input.closingDate}T00:00:00`);
+        if (!isNaN(dt.getTime())) {
+          update.closingDate = Timestamp.fromDate(dt);
+          changedLabels.push("closingDate");
+        }
+      }
+      if (!changedLabels.length) {
+        throw new Error("Sage didn't specify any fields to change.");
+      }
+      update.updatedAt = serverTimestamp();
+      update.lastActivityDate = serverTimestamp();
+
+      await updateDoc(doc(db, "clients", input.clientId), update);
+      await addDoc(collection(db, "activities"), {
+        clientId: input.clientId,
+        realtorId: uid,
+        type: "note",
+        subject: "Client info updated via Sage",
+        body: `Fields updated: ${changedLabels.join(", ")}`,
+        timestamp: serverTimestamp()
+      });
+
+      // Keep the in-memory dashboard cache in sync so subsequent prompts see
+      // the new values without a page reload.
+      const cached = recentClients.find(c => c.id === input.clientId);
+      if (cached) {
+        if (update.fullName) cached.name = update.fullName;
+        if (update.status) cached.status = update.status;
+        if (update.email != null) cached.email = update.email;
+        if (update.phone != null) cached.phone = update.phone;
+      }
+
+      const name = clientName(input.clientId);
+      return {
+        message: `Updated **${name}** — ${changedLabels.length} field${changedLabels.length === 1 ? "" : "s"} changed.`,
+        followUp: { label: `Open ${name}'s profile`, action: () => executeNavigate({ target: "client", clientId: input.clientId }) }
+      };
     }
   },
 
