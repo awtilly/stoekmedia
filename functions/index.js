@@ -2940,11 +2940,14 @@ exports.sendForSignature = onCall({ region: "us-central1", secrets: [BOLDSIGN_AP
     throw new HttpsError("failed-precondition", "BOLDSIGN_API_KEY is not configured.");
   }
 
-  // Download file buffers from Firebase Storage URLs
+  // Download file buffers from Firebase Storage URLs. Frontend sends `fileUrl`;
+  // accept legacy `downloadUrl` too.
   const fileBuffers = [];
   for (const file of files) {
-    const resp = await fetch(file.downloadUrl);
-    if (!resp.ok) throw new HttpsError("internal", `Failed to download file: ${file.fileName}`);
+    const url = file.fileUrl || file.downloadUrl;
+    if (!url) throw new HttpsError("invalid-argument", `Missing fileUrl for file: ${file.fileName || "(unnamed)"}`);
+    const resp = await fetch(url);
+    if (!resp.ok) throw new HttpsError("internal", `Failed to download file ${file.fileName}: HTTP ${resp.status}`);
     const buffer = Buffer.from(await resp.arrayBuffer());
     fileBuffers.push({ ...file, buffer });
   }
@@ -3187,11 +3190,14 @@ exports.createEmbeddedSignatureRequest = onCall({ region: "us-central1", secrets
     throw new HttpsError("failed-precondition", "BOLDSIGN_API_KEY is not configured.");
   }
 
-  // Download files from Storage URLs
+  // Download files from Storage URLs. Frontend sends `fileUrl`; some legacy
+  // callers may send `downloadUrl` — accept either.
   const fileBuffers = [];
   for (const file of files) {
-    const resp = await fetch(file.downloadUrl);
-    if (!resp.ok) throw new HttpsError("internal", `Failed to download file: ${file.fileName}`);
+    const url = file.fileUrl || file.downloadUrl;
+    if (!url) throw new HttpsError("invalid-argument", `Missing fileUrl for file: ${file.fileName || "(unnamed)"}`);
+    const resp = await fetch(url);
+    if (!resp.ok) throw new HttpsError("internal", `Failed to download file ${file.fileName}: HTTP ${resp.status}`);
     const buffer = Buffer.from(await resp.arrayBuffer());
     fileBuffers.push({ ...file, buffer });
   }
