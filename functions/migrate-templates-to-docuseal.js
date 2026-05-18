@@ -8,10 +8,11 @@
  * What it writes per template:
  *   - docusealTemplateId: ""            (Joe fills this in after creating the
  *                                        template in the DocuSeal dashboard)
- *   - docusealFieldMap: {bold:bold, ...} (identity map by default — assumes
- *                                        same field names in DocuSeal as in
- *                                        BoldSign. Override per-template only
- *                                        where the names diverge.)
+ *   - docusealFieldMap: {fid:fid, ...}   (identity map by default — assumes
+ *                                        the placed DocuSeal field names match
+ *                                        the existing template fieldIds.
+ *                                        Override per-template only where the
+ *                                        names diverge.)
  *   - visibility: "seeded"               (Sprint 2 schema: distinguishes
  *                                        admin-seeded compliance forms from
  *                                        realtor-uploaded private templates)
@@ -47,7 +48,8 @@ async function migrate() {
     if (typeof data.docusealFieldMap === "undefined") {
       const map = {};
       for (const f of (data.mergeFields || [])) {
-        if (f.boldSignFieldId) map[f.boldSignFieldId] = f.boldSignFieldId;
+        const fid = f.fieldId || f.boldSignFieldId;
+        if (fid) map[fid] = fid;
       }
       patch.docusealFieldMap = map;
     }

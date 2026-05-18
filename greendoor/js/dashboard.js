@@ -18,26 +18,7 @@ import { getCurrentUser, showToast, escapeHtml, safeToDate } from "./auth.js";
 const askAssistantFn = httpsCallable(functions, "askAssistant");
 const parseListingUrlFn = httpsCallable(functions, "parseListingUrl");
 
-// Same V2→V1 fallback shim used in client-detail.js. DocuSeal V2 is the
-// primary path; BoldSign V1 is the silent fallback while DocuSeal secrets
-// are still __pending__ in Secret Manager.
-function withV2Fallback(v2Name, v1Name) {
-  const v2 = httpsCallable(functions, v2Name);
-  const v1 = httpsCallable(functions, v1Name);
-  return async (data) => {
-    try {
-      return await v2(data);
-    } catch (err) {
-      const code = err?.code || "";
-      const msg = err?.message || "";
-      if (code.includes("failed-precondition") && /DocuSeal/i.test(msg)) {
-        return await v1(data);
-      }
-      throw err;
-    }
-  };
-}
-const sendComplianceDocFn = withV2Fallback("sendComplianceDocV2", "sendComplianceDoc");
+const sendComplianceDocFn = httpsCallable(functions, "sendComplianceDocV2");
 
 let currentUser = null;
 let recentClients = [];   // [{ id, name, status, email, phone, lastContactDays }]
@@ -599,9 +580,10 @@ const TOOL_EXECUTORS = {
       } catch (err) {
         const code = err?.code || "";
         const msg = err?.message || "";
-        // V1 fallback didn't help — open the files tab so the realtor can use
-        // the legacy per-send drag-drop or pick a different template.
-        if (code.includes("failed-precondition") || /DocuSeal|BoldSign/i.test(msg)) {
+        // Template likely missing a DocuSeal template ID — route the realtor
+        // to the Files tab so they can pick a different template or finish
+        // setup in the Templates page.
+        if (code.includes("failed-precondition") || /DocuSeal/i.test(msg)) {
           showToast("Sage couldn't send automatically — opening the Files tab so you can finish manually.", "info");
           executeNavigate({ target: "client", clientId: input.clientId, tab: "files" });
           return { message: "Opening the Files tab to complete the send." };

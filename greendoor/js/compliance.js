@@ -68,33 +68,33 @@ const SFH_CONDO_MF_SELLER = [
 /* ------------------------------------------------------------------ */
 
 const BUYER_COMMON_FIELDS = [
-  { boldSignFieldId: "BuyerName", source: "client.fullName" },
-  { boldSignFieldId: "ClientEmail", source: "client.email" },
-  { boldSignFieldId: "PropertyAddress", source: "listing.address.full" },
-  { boldSignFieldId: "City", source: "listing.address.city" },
-  { boldSignFieldId: "State", source: "listing.address.state" },
-  { boldSignFieldId: "Zip", source: "listing.address.zip" },
-  { boldSignFieldId: "PurchasePrice", source: "listing.listingPrice" },
-  { boldSignFieldId: "MLSNumber", source: "listing.mlsNumber" },
-  { boldSignFieldId: "AgentName", source: "agent.fullName" },
-  { boldSignFieldId: "AgentEmail", source: "agent.email" },
-  { boldSignFieldId: "Brokerage", source: "agent.brokerage" },
-  { boldSignFieldId: "Date", source: "date" }
+  { fieldId: "BuyerName", source: "client.fullName" },
+  { fieldId: "ClientEmail", source: "client.email" },
+  { fieldId: "PropertyAddress", source: "listing.address.full" },
+  { fieldId: "City", source: "listing.address.city" },
+  { fieldId: "State", source: "listing.address.state" },
+  { fieldId: "Zip", source: "listing.address.zip" },
+  { fieldId: "PurchasePrice", source: "listing.listingPrice" },
+  { fieldId: "MLSNumber", source: "listing.mlsNumber" },
+  { fieldId: "AgentName", source: "agent.fullName" },
+  { fieldId: "AgentEmail", source: "agent.email" },
+  { fieldId: "Brokerage", source: "agent.brokerage" },
+  { fieldId: "Date", source: "date" }
 ];
 
 const SELLER_COMMON_FIELDS = [
-  { boldSignFieldId: "SellerName", source: "client.fullName" },
-  { boldSignFieldId: "ClientEmail", source: "client.email" },
-  { boldSignFieldId: "PropertyAddress", source: "listing.address.full" },
-  { boldSignFieldId: "City", source: "listing.address.city" },
-  { boldSignFieldId: "State", source: "listing.address.state" },
-  { boldSignFieldId: "Zip", source: "listing.address.zip" },
-  { boldSignFieldId: "ListingPrice", source: "listing.listingPrice" },
-  { boldSignFieldId: "MLSNumber", source: "listing.mlsNumber" },
-  { boldSignFieldId: "AgentName", source: "agent.fullName" },
-  { boldSignFieldId: "AgentEmail", source: "agent.email" },
-  { boldSignFieldId: "Brokerage", source: "agent.brokerage" },
-  { boldSignFieldId: "Date", source: "date" }
+  { fieldId: "SellerName", source: "client.fullName" },
+  { fieldId: "ClientEmail", source: "client.email" },
+  { fieldId: "PropertyAddress", source: "listing.address.full" },
+  { fieldId: "City", source: "listing.address.city" },
+  { fieldId: "State", source: "listing.address.state" },
+  { fieldId: "Zip", source: "listing.address.zip" },
+  { fieldId: "ListingPrice", source: "listing.listingPrice" },
+  { fieldId: "MLSNumber", source: "listing.mlsNumber" },
+  { fieldId: "AgentName", source: "agent.fullName" },
+  { fieldId: "AgentEmail", source: "agent.email" },
+  { fieldId: "Brokerage", source: "agent.brokerage" },
+  { fieldId: "Date", source: "date" }
 ];
 
 /* ------------------------------------------------------------------ */
@@ -105,7 +105,7 @@ export const MO_FORM_STUBS = [
   {
     name: "Purchase Agreement",
     description: "Standard MO residential purchase contract",
-    boldSignTemplateId: "",
+    docusealTemplateId: "",
     category: "contracts",
     transactionTypes: ALL_BUYER,
     state: "MO",
@@ -116,7 +116,7 @@ export const MO_FORM_STUBS = [
   {
     name: "Listing Agreement",
     description: "Standard MO residential listing agreement between seller and broker",
-    boldSignTemplateId: "",
+    docusealTemplateId: "",
     category: "contracts",
     transactionTypes: ALL_SELLER,
     state: "MO",
@@ -127,95 +127,95 @@ export const MO_FORM_STUBS = [
   {
     name: "Agency Disclosure",
     description: "Missouri agency relationship disclosure required for all transactions",
-    boldSignTemplateId: "",
+    docusealTemplateId: "",
     category: "disclosures",
     transactionTypes: ALL_TYPES,
     state: "MO",
     required: true,
     sortOrder: 3,
     mergeFields: [
-      { boldSignFieldId: "BuyerName", source: "client.fullName" },
-      { boldSignFieldId: "ClientEmail", source: "client.email" },
-      { boldSignFieldId: "AgentName", source: "agent.fullName" },
-      { boldSignFieldId: "AgentEmail", source: "agent.email" },
-      { boldSignFieldId: "Brokerage", source: "agent.brokerage" },
-      { boldSignFieldId: "Date", source: "date" }
+      { fieldId: "BuyerName", source: "client.fullName" },
+      { fieldId: "ClientEmail", source: "client.email" },
+      { fieldId: "AgentName", source: "agent.fullName" },
+      { fieldId: "AgentEmail", source: "agent.email" },
+      { fieldId: "Brokerage", source: "agent.brokerage" },
+      { fieldId: "Date", source: "date" }
     ]
   },
   {
     name: "Lead Paint Disclosure",
     description: "Federal lead-based paint disclosure for pre-1978 residential properties",
-    boldSignTemplateId: "",
+    docusealTemplateId: "",
     category: "disclosures",
     transactionTypes: SFH_CONDO_BUYER_SELLER,
     state: "MO",
     required: true,
     sortOrder: 4,
     mergeFields: [
-      { boldSignFieldId: "BuyerName", source: "client.fullName" },
-      { boldSignFieldId: "ClientEmail", source: "client.email" },
-      { boldSignFieldId: "PropertyAddress", source: "listing.address.full" },
-      { boldSignFieldId: "AgentName", source: "agent.fullName" },
-      { boldSignFieldId: "Date", source: "date" }
+      { fieldId: "BuyerName", source: "client.fullName" },
+      { fieldId: "ClientEmail", source: "client.email" },
+      { fieldId: "PropertyAddress", source: "listing.address.full" },
+      { fieldId: "AgentName", source: "agent.fullName" },
+      { fieldId: "Date", source: "date" }
     ]
   },
   {
     name: "HOA Addendum",
     description: "HOA disclosure addendum for condominium transactions",
-    boldSignTemplateId: "",
+    docusealTemplateId: "",
     category: "contracts",
     transactionTypes: CONDO_BUYER_SELLER,
     state: "MO",
     required: false,
     sortOrder: 5,
     mergeFields: [
-      { boldSignFieldId: "BuyerName", source: "client.fullName" },
-      { boldSignFieldId: "ClientEmail", source: "client.email" },
-      { boldSignFieldId: "PropertyAddress", source: "listing.address.full" },
-      { boldSignFieldId: "City", source: "listing.address.city" },
-      { boldSignFieldId: "State", source: "listing.address.state" },
-      { boldSignFieldId: "Zip", source: "listing.address.zip" },
-      { boldSignFieldId: "AgentName", source: "agent.fullName" },
-      { boldSignFieldId: "Date", source: "date" }
+      { fieldId: "BuyerName", source: "client.fullName" },
+      { fieldId: "ClientEmail", source: "client.email" },
+      { fieldId: "PropertyAddress", source: "listing.address.full" },
+      { fieldId: "City", source: "listing.address.city" },
+      { fieldId: "State", source: "listing.address.state" },
+      { fieldId: "Zip", source: "listing.address.zip" },
+      { fieldId: "AgentName", source: "agent.fullName" },
+      { fieldId: "Date", source: "date" }
     ]
   },
   {
     name: "Seller's Disclosure",
     description: "Missouri seller property condition disclosure statement",
-    boldSignTemplateId: "",
+    docusealTemplateId: "",
     category: "disclosures",
     transactionTypes: SFH_CONDO_MF_SELLER,
     state: "MO",
     required: true,
     sortOrder: 6,
     mergeFields: [
-      { boldSignFieldId: "SellerName", source: "client.fullName" },
-      { boldSignFieldId: "ClientEmail", source: "client.email" },
-      { boldSignFieldId: "PropertyAddress", source: "listing.address.full" },
-      { boldSignFieldId: "City", source: "listing.address.city" },
-      { boldSignFieldId: "State", source: "listing.address.state" },
-      { boldSignFieldId: "Zip", source: "listing.address.zip" },
-      { boldSignFieldId: "ListingPrice", source: "listing.listingPrice" },
-      { boldSignFieldId: "AgentName", source: "agent.fullName" },
-      { boldSignFieldId: "Date", source: "date" }
+      { fieldId: "SellerName", source: "client.fullName" },
+      { fieldId: "ClientEmail", source: "client.email" },
+      { fieldId: "PropertyAddress", source: "listing.address.full" },
+      { fieldId: "City", source: "listing.address.city" },
+      { fieldId: "State", source: "listing.address.state" },
+      { fieldId: "Zip", source: "listing.address.zip" },
+      { fieldId: "ListingPrice", source: "listing.listingPrice" },
+      { fieldId: "AgentName", source: "agent.fullName" },
+      { fieldId: "Date", source: "date" }
     ]
   },
   {
     name: "Buyer Representation Agreement",
     description: "Buyer broker representation agreement for Missouri residential transactions",
-    boldSignTemplateId: "",
+    docusealTemplateId: "",
     category: "contracts",
     transactionTypes: ALL_BUYER,
     state: "MO",
     required: true,
     sortOrder: 7,
     mergeFields: [
-      { boldSignFieldId: "BuyerName", source: "client.fullName" },
-      { boldSignFieldId: "ClientEmail", source: "client.email" },
-      { boldSignFieldId: "AgentName", source: "agent.fullName" },
-      { boldSignFieldId: "AgentEmail", source: "agent.email" },
-      { boldSignFieldId: "Brokerage", source: "agent.brokerage" },
-      { boldSignFieldId: "Date", source: "date" }
+      { fieldId: "BuyerName", source: "client.fullName" },
+      { fieldId: "ClientEmail", source: "client.email" },
+      { fieldId: "AgentName", source: "agent.fullName" },
+      { fieldId: "AgentEmail", source: "agent.email" },
+      { fieldId: "Brokerage", source: "agent.brokerage" },
+      { fieldId: "Date", source: "date" }
     ]
   },
 
@@ -223,7 +223,7 @@ export const MO_FORM_STUBS = [
   {
     name: "Financing Contingency Addendum",
     description: "Addendum specifying financing contingency terms and deadlines",
-    boldSignTemplateId: "",
+    docusealTemplateId: "",
     category: "contracts",
     transactionTypes: ALL_BUYER,
     state: "MO",
@@ -234,7 +234,7 @@ export const MO_FORM_STUBS = [
   {
     name: "Appraisal Contingency Addendum",
     description: "Addendum addressing appraisal contingency and resolution procedures",
-    boldSignTemplateId: "",
+    docusealTemplateId: "",
     category: "contracts",
     transactionTypes: ALL_BUYER,
     state: "MO",
@@ -245,7 +245,7 @@ export const MO_FORM_STUBS = [
   {
     name: "Inspection Contingency Addendum",
     description: "Addendum outlining inspection contingency terms and deadlines",
-    boldSignTemplateId: "",
+    docusealTemplateId: "",
     category: "contracts",
     transactionTypes: ALL_BUYER,
     state: "MO",
@@ -256,7 +256,7 @@ export const MO_FORM_STUBS = [
   {
     name: "Home Warranty Agreement",
     description: "Home warranty coverage agreement for residential purchase",
-    boldSignTemplateId: "",
+    docusealTemplateId: "",
     category: "contracts",
     transactionTypes: ALL_BUYER,
     state: "MO",
@@ -267,7 +267,7 @@ export const MO_FORM_STUBS = [
   {
     name: "Wire Fraud Advisory",
     description: "Advisory notice regarding wire fraud risks during closing",
-    boldSignTemplateId: "",
+    docusealTemplateId: "",
     category: "disclosures",
     transactionTypes: ALL_BUYER,
     state: "MO",
@@ -278,7 +278,7 @@ export const MO_FORM_STUBS = [
   {
     name: "MREC Broker Disclosure Form",
     description: "Missouri Real Estate Commission broker relationship disclosure",
-    boldSignTemplateId: "",
+    docusealTemplateId: "",
     category: "disclosures",
     transactionTypes: ALL_BUYER,
     state: "MO",
@@ -291,7 +291,7 @@ export const MO_FORM_STUBS = [
   {
     name: "Seller's Affidavit",
     description: "Seller affidavit regarding property ownership and liens",
-    boldSignTemplateId: "",
+    docusealTemplateId: "",
     category: "disclosures",
     transactionTypes: ALL_SELLER,
     state: "MO",
@@ -302,7 +302,7 @@ export const MO_FORM_STUBS = [
   {
     name: "Commission Disclosure",
     description: "Disclosure of commission structure and compensation terms",
-    boldSignTemplateId: "",
+    docusealTemplateId: "",
     category: "disclosures",
     transactionTypes: ALL_SELLER,
     state: "MO",
@@ -313,7 +313,7 @@ export const MO_FORM_STUBS = [
   {
     name: "Photography/Media Authorization",
     description: "Authorization for property photography and media usage for marketing",
-    boldSignTemplateId: "",
+    docusealTemplateId: "",
     category: "contracts",
     transactionTypes: ALL_SELLER,
     state: "MO",
@@ -324,7 +324,7 @@ export const MO_FORM_STUBS = [
   {
     name: "MLS Data Input Sheet",
     description: "Property data form for MLS listing entry",
-    boldSignTemplateId: "",
+    docusealTemplateId: "",
     category: "contracts",
     transactionTypes: ALL_SELLER,
     state: "MO",
@@ -335,7 +335,7 @@ export const MO_FORM_STUBS = [
   {
     name: "FIRPTA Certificate",
     description: "Foreign Investment in Real Property Tax Act certification (seller)",
-    boldSignTemplateId: "",
+    docusealTemplateId: "",
     category: "disclosures",
     transactionTypes: ALL_SELLER,
     state: "MO",
@@ -348,7 +348,7 @@ export const MO_FORM_STUBS = [
   {
     name: "Closing Date Extension Addendum",
     description: "Addendum to extend the closing date for the transaction",
-    boldSignTemplateId: "",
+    docusealTemplateId: "",
     category: "contracts",
     transactionTypes: ALL_TYPES,
     state: "MO",
@@ -359,7 +359,7 @@ export const MO_FORM_STUBS = [
   {
     name: "Repair Agreement/Amendment",
     description: "Agreement specifying negotiated repairs and amendments to the contract",
-    boldSignTemplateId: "",
+    docusealTemplateId: "",
     category: "contracts",
     transactionTypes: ALL_TYPES,
     state: "MO",
@@ -370,7 +370,7 @@ export const MO_FORM_STUBS = [
   {
     name: "Escrow Holdback Addendum",
     description: "Addendum for holdback of funds in escrow for post-closing items",
-    boldSignTemplateId: "",
+    docusealTemplateId: "",
     category: "contracts",
     transactionTypes: ALL_TYPES,
     state: "MO",
@@ -381,7 +381,7 @@ export const MO_FORM_STUBS = [
   {
     name: "Radon Disclosure",
     description: "Radon gas testing disclosure and acknowledgment",
-    boldSignTemplateId: "",
+    docusealTemplateId: "",
     category: "disclosures",
     transactionTypes: ALL_TYPES,
     state: "MO",
@@ -394,37 +394,37 @@ export const MO_FORM_STUBS = [
   {
     name: "Dual Agency Disclosure",
     description: "Disclosure and consent for dual agency representation",
-    boldSignTemplateId: "",
+    docusealTemplateId: "",
     category: "disclosures",
     transactionTypes: ALL_TYPES,
     state: "MO",
     required: false,
     sortOrder: 23,
     mergeFields: [
-      { boldSignFieldId: "BuyerName", source: "client.fullName" },
-      { boldSignFieldId: "ClientEmail", source: "client.email" },
-      { boldSignFieldId: "AgentName", source: "agent.fullName" },
-      { boldSignFieldId: "AgentEmail", source: "agent.email" },
-      { boldSignFieldId: "Brokerage", source: "agent.brokerage" },
-      { boldSignFieldId: "Date", source: "date" }
+      { fieldId: "BuyerName", source: "client.fullName" },
+      { fieldId: "ClientEmail", source: "client.email" },
+      { fieldId: "AgentName", source: "agent.fullName" },
+      { fieldId: "AgentEmail", source: "agent.email" },
+      { fieldId: "Brokerage", source: "agent.brokerage" },
+      { fieldId: "Date", source: "date" }
     ]
   },
   {
     name: "Informed Consent (Dual Agency)",
     description: "Buyer and seller informed consent for dual agency relationship",
-    boldSignTemplateId: "",
+    docusealTemplateId: "",
     category: "disclosures",
     transactionTypes: ALL_TYPES,
     state: "MO",
     required: false,
     sortOrder: 24,
     mergeFields: [
-      { boldSignFieldId: "BuyerName", source: "client.fullName" },
-      { boldSignFieldId: "ClientEmail", source: "client.email" },
-      { boldSignFieldId: "AgentName", source: "agent.fullName" },
-      { boldSignFieldId: "AgentEmail", source: "agent.email" },
-      { boldSignFieldId: "Brokerage", source: "agent.brokerage" },
-      { boldSignFieldId: "Date", source: "date" }
+      { fieldId: "BuyerName", source: "client.fullName" },
+      { fieldId: "ClientEmail", source: "client.email" },
+      { fieldId: "AgentName", source: "agent.fullName" },
+      { fieldId: "AgentEmail", source: "agent.email" },
+      { fieldId: "Brokerage", source: "agent.brokerage" },
+      { fieldId: "Date", source: "date" }
     ]
   }
 ];
@@ -435,8 +435,8 @@ export const MO_FORM_STUBS = [
 
 /**
  * Resolves a template's mergeFields array against live client, listing, and
- * agent data. Returns BoldSign-ready existingFormFields plus a list of any
- * fields that could not be resolved.
+ * agent data. Returns resolved field-value pairs plus a list of any fields
+ * that could not be resolved.
  *
  * @param {Object} template       - documentTemplates document (must have mergeFields array)
  * @param {Object|null} clientData  - client Firestore doc data
@@ -453,9 +453,11 @@ export function buildMergeFields(template, clientData, listingData, agentProfile
 
   const missing = [];
   const existingFormFields = (template.mergeFields || []).map(field => {
+    // Accept both `fieldId` (current) and `boldSignFieldId` (legacy data).
+    const fid = field.fieldId || field.boldSignFieldId;
     // Special case: "date" resolves to current date at send time
     if (field.source === "date") {
-      return { id: field.boldSignFieldId, value: new Date().toLocaleDateString("en-US") };
+      return { id: fid, value: new Date().toLocaleDateString("en-US") };
     }
 
     // Dot-path resolution: "listing.address.full" -> sources.listing.address.full
@@ -467,10 +469,10 @@ export function buildMergeFields(template, clientData, listingData, agentProfile
 
     const resolved = value != null ? String(value) : "";
     if (!resolved) {
-      missing.push(field.boldSignFieldId);
+      missing.push(fid);
     }
 
-    return { id: field.boldSignFieldId, value: resolved };
+    return { id: fid, value: resolved };
   });
 
   return { existingFormFields, missing };

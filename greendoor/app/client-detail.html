@@ -352,7 +352,6 @@
           <div class="gd-file-controls">
             <button class="gd-upload-circle" onclick="document.getElementById('file-input').click()" title="Upload file">+</button>
             <input type="file" id="file-input" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.xlsx,.csv" style="display:none;">
-            <button class="gd-btn gd-btn-signature gd-btn-sm" onclick="openSignatureModal()">&#9997; Send for Signature</button>
           </div>
 
           <div id="upload-progress" class="gd-progress-bar">
@@ -603,85 +602,6 @@
     </div>
   </div>
 
-  <!-- Signature Modal (Multi-doc/signer) -->
-  <div id="signature-modal" class="gd-modal-overlay">
-    <div class="gd-modal gd-modal-lg">
-      <div class="gd-modal-header">
-        <h3>&#9997; Send for Signature</h3>
-        <button class="gd-modal-close" onclick="closeSignatureModal()" aria-label="Close">&times;</button>
-      </div>
-      <div class="gd-modal-body">
-        <div class="gd-form-group">
-          <label for="sig-title">Envelope Title</label>
-          <input type="text" id="sig-title" class="gd-input" placeholder="e.g. Purchase Agreement">
-        </div>
-
-        <!-- Documents -->
-        <div class="gd-form-group">
-          <label>Documents</label>
-          <div id="sig-files-list" class="gd-sig-files-list"></div>
-          <div class="gd-flex gd-gap-sm gd-flex-wrap">
-            <select id="sig-add-existing" class="gd-input gd-flex-1" style="min-width:150px;">
-              <option value="">+ Add from existing files...</option>
-            </select>
-            <button type="button" class="gd-btn gd-btn-sm" style="flex-shrink:0;" onclick="document.getElementById('sig-file-input').click()">+ Upload New</button>
-            <input type="file" id="sig-file-input" accept=".pdf,.doc,.docx" multiple style="display:none;">
-          </div>
-        </div>
-
-        <!-- Signers -->
-        <div class="gd-form-group">
-          <label>Signers</label>
-          <div id="sig-signers-list" class="gd-sig-signers-list"></div>
-          <button class="gd-btn gd-btn-sm" onclick="addSigner()">+ Add Signer</button>
-        </div>
-
-        <!-- Options -->
-        <div class="gd-form-group">
-          <label for="sig-message">Message (optional)</label>
-          <textarea id="sig-message" class="gd-input" rows="2" placeholder="Please review and sign..."></textarea>
-        </div>
-        <div class="gd-sig-option-row">
-          <input type="checkbox" id="sig-signing-order"> <label for="sig-signing-order">Enable signing order</label>
-        </div>
-        <div class="gd-sig-option-row">
-          <label for="sig-expiry">Expiry (days):</label>
-          <input type="number" id="sig-expiry" class="gd-input" value="30" min="1" max="180" style="width:60px;">
-        </div>
-
-        <div id="sig-progress" class="gd-hidden">
-          <div class="gd-spinner"></div>
-          <span class="gd-text-muted" id="sig-progress-text">Sending to BoldSign...</span>
-        </div>
-      </div>
-      <div class="gd-modal-footer">
-        <button class="gd-btn" onclick="closeSignatureModal()">Cancel</button>
-        <button id="sig-send-btn" class="gd-btn gd-btn-signature" onclick="submitSignature()">&#9997; Place Fields &amp; Send</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- BoldSign Embed Modal -->
-  <div id="boldsign-embed-modal" class="gd-modal-overlay">
-    <div class="gd-modal gd-boldsign-embed-modal">
-      <div class="gd-modal-header">
-        <h3>Place Signature Fields</h3>
-        <button class="gd-modal-close" onclick="closeBoldSignEmbed()" aria-label="Close">&times;</button>
-      </div>
-      <div class="gd-modal-body gd-boldsign-embed-body">
-        <div id="boldsign-embed-loading" class="gd-loading">
-          <div class="gd-spinner gd-spinner-lg"></div>
-          <span class="gd-loading-text">Loading editor...</span>
-        </div>
-        <iframe id="boldsign-embed-iframe" class="gd-boldsign-iframe" allow="clipboard-write"></iframe>
-      </div>
-      <div class="gd-modal-footer">
-        <span class="gd-text-muted gd-flex-1">Drag signature fields onto the document, then click Send in the editor above.</span>
-        <button class="gd-btn" onclick="closeBoldSignEmbed()">Cancel</button>
-      </div>
-    </div>
-  </div>
-
   <!-- File Preview Modal -->
   <div id="file-preview-modal" class="gd-modal-overlay">
     <div class="gd-modal gd-preview-modal">
@@ -701,7 +621,6 @@
   <div id="file-action-bar" class="gd-file-action-bar">
     <span id="file-action-count">0 selected</span>
     <button class="gd-btn gd-btn-primary" onclick="openSendDocModal()">Send to Client</button>
-    <button class="gd-btn" onclick="openSignatureModalFromSelection()">Send for Signature</button>
     <button class="gd-btn" onclick="openBulkMoveMenu(this)">Move to...</button>
     <button class="gd-file-action-close" onclick="clearFileSelection()">&times;</button>
   </div>

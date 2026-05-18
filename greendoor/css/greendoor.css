@@ -3391,52 +3391,6 @@ body.gd-light .gd-breadcrumb-current {
   border: none;
 }
 
-/* --- BoldSign Embed Modal --- */
-.gd-boldsign-embed-modal {
-  max-width: 1400px;
-  width: 98vw;
-  max-height: 98vh;
-  display: flex;
-  flex-direction: column;
-  min-height: 600px;
-}
-
-.gd-boldsign-embed-body {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  position: relative;
-  padding: 0 !important;
-  overflow: hidden;
-}
-
-.gd-boldsign-embed-body .gd-loading {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  background: var(--color-bg-card);
-}
-
-.gd-boldsign-iframe {
-  width: 100%;
-  height: 90vh;
-  border: none;
-  flex: 1;
-}
-
-@media (max-width: 768px) {
-  .gd-boldsign-embed-modal {
-    width: 100%;
-    max-width: 100%;
-    max-height: 100dvh;
-    min-height: 100dvh;
-  }
-
-  .gd-boldsign-iframe {
-    height: 70vh;
-  }
-}
-
 /* --- Property Cards --- */
 .gd-property-grid {
   display: grid;

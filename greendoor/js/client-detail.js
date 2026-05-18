@@ -36,10 +36,6 @@ let realtorProfile = null;
 let editingShowingId = null;
 let completingShowingId = null;
 let completeRating = 0;
-let sigFiles = [];
-let sigSigners = [];
-let embedUnsubscribe = null;
-let embedPollInterval = null;
 let allTemplateFiles = [];
 let copyClientsList = [];
 let selectedCopyClientId = null;
@@ -54,52 +50,13 @@ if (!clientId) {
 }
 
 /* --- Cloud Functions --- */
-// Provider transition: V2 callables route through DocuSeal. They throw
-// "failed-precondition" with a DocuSeal-mentioning message when the
-// DOCUSEAL_API_KEY secret is still __pending__; in that case we fall back
-// to the original BoldSign V1 callable so behavior is unchanged in prod
-// until Joe flips the secret.
-function withV2Fallback(v2Name, v1Name) {
-  const v2 = httpsCallable(functions, v2Name);
-  const v1 = httpsCallable(functions, v1Name);
-  return async (data) => {
-    try {
-      return await v2(data);
-    } catch (err) {
-      const code = err?.code || "";
-      const msg = err?.message || "";
-      if (code.includes("failed-precondition") && /DocuSeal/i.test(msg)) {
-        return await v1(data);
-      }
-      throw err;
-    }
-  };
-}
-
+// All e-signature flows now go through DocuSeal.
 const sendEmailFn = httpsCallable(functions, "sendEmail");
-const checkSignatureStatusV2Fn = httpsCallable(functions, "checkSignatureStatusV2");
-const checkSignatureStatusV1Fn = httpsCallable(functions, "checkSignatureStatus");
-// Kept for embed-modal polling where we don't yet know the provider — the
-// V2→V1 fallback there is benign because the embed flow is always BoldSign.
-const checkSignatureStatusFn = withV2Fallback("checkSignatureStatusV2", "checkSignatureStatus");
-
-// Look up an envelope's provider and call the matching status checker.
-// Solves the "DocuSeal returns 404 internal for a BoldSign id, fallback
-// predicate misses, V1 never runs" bug from the action audit.
-async function checkSignatureStatusForEnvelope(documentId) {
-  const envSnap = await getDoc(doc(db, "envelopes", documentId));
-  const provider = envSnap.exists() ? (envSnap.data().provider || "boldsign") : "boldsign";
-  const fn = provider === "docuseal" ? checkSignatureStatusV2Fn : checkSignatureStatusV1Fn;
-  return fn({ documentId });
-}
-// Ad-hoc per-send drag-drop builder. DocuSeal's analog (the <docuseal-builder>
-// web component) is wired into the new Templates page rather than per-send,
-// so this call stays on BoldSign until that flow is retired.
-const createEmbeddedSignatureRequestFn = httpsCallable(functions, "createEmbeddedSignatureRequest");
+const checkSignatureStatusFn = httpsCallable(functions, "checkSignatureStatusV2");
 const shareDocumentFn = httpsCallable(functions, "shareDocument");
 const parseListingUrlFn = httpsCallable(functions, "parseListingUrl");
-const sendComplianceDocFn = withV2Fallback("sendComplianceDocV2", "sendComplianceDoc");
-const sendBulkComplianceDocsFn = withV2Fallback("sendBulkComplianceDocsV2", "sendBulkComplianceDocs");
+const sendComplianceDocFn = httpsCallable(functions, "sendComplianceDocV2");
+const sendBulkComplianceDocsFn = httpsCallable(functions, "sendBulkComplianceDocsV2");
 const revokeEnvelopeFn = httpsCallable(functions, "revokeEnvelope");
 const resendEnvelopeFn = httpsCallable(functions, "resendEnvelope");
 const cleanupClientStorageFn = httpsCallable(functions, "cleanupClientStorage");
@@ -1557,276 +1514,6 @@ window.closePreview = function () {
   document.getElementById("preview-content").innerHTML = "";
 };
 
-/* ===== BOLDSIGN E-SIGNATURES (Multi-doc/signer) ===== */
-
-function populateSigExistingDropdown() {
-  const select = document.getElementById("sig-add-existing");
-  select.innerHTML = '<option value="">+ Add from existing files...</option>';
-
-  // My Templates group
-  if (allTemplateFiles.length > 0) {
-    let tplGroup = '<optgroup label="My Templates">';
-    allTemplateFiles.forEach(t => {
-      const name = t.templateName || t.fileName;
-      tplGroup += `<option value="tpl:${t.id}">${name} (${t.category || 'other'})</option>`;
-    });
-    tplGroup += '</optgroup>';
-    select.innerHTML += tplGroup;
-  }
-
-  // Client files group — show all files; user picks what to send
-  if (allFiles.length > 0) {
-    const folderName = (f) => {
-      if (f.folderId) return allFolders.find(fd => fd.id === f.folderId)?.name || "—";
-      if (f.folder) return f.folder;
-      return "Root";
-    };
-    let fileGroup = '<optgroup label="Client Files">';
-    allFiles.forEach(f => {
-      fileGroup += `<option value="${f.id}">${f.fileName} (${folderName(f)})</option>`;
-    });
-    fileGroup += '</optgroup>';
-    select.innerHTML += fileGroup;
-  }
-}
-
-function renderSigFiles() {
-  const el = document.getElementById("sig-files-list");
-  if (sigFiles.length === 0) {
-    el.innerHTML = '<div class="gd-text-muted" style="font-size:0.8rem;">No documents added yet</div>';
-    return;
-  }
-  el.innerHTML = sigFiles.map((f, i) => `
-    <div class="gd-sig-file-row">
-      <span class="gd-sig-file-name">${f.fileName}</span>
-      <button class="gd-sig-file-remove" onclick="removeSigFile(${i})">&times;</button>
-    </div>`).join("");
-}
-
-window.removeSigFile = function (idx) {
-  sigFiles.splice(idx, 1);
-  renderSigFiles();
-};
-
-function renderSigSigners() {
-  const el = document.getElementById("sig-signers-list");
-  el.innerHTML = sigSigners.map((s, i) => `
-    <div class="gd-sig-signer-row">
-      <span class="gd-sig-signer-order">${i + 1}</span>
-      <input type="text" class="gd-input" placeholder="Name" value="${s.name}" onchange="sigSigners[${i}].name=this.value">
-      <input type="email" class="gd-input" placeholder="Email" value="${s.email}" onchange="sigSigners[${i}].email=this.value">
-      ${sigSigners.length > 1 ? `<button class="gd-sig-file-remove" onclick="removeSigner(${i})">&times;</button>` : ""}
-    </div>`).join("");
-}
-
-window.addSigner = function () {
-  sigSigners.push({ name: "", email: "", order: sigSigners.length + 1 });
-  renderSigSigners();
-};
-
-window.removeSigner = function (idx) {
-  sigSigners.splice(idx, 1);
-  sigSigners.forEach((s, i) => s.order = i + 1);
-  renderSigSigners();
-};
-
-window.openSignatureModal = function () {
-  sigFiles = [];
-  sigSigners = [{ name: clientData?.fullName || "", email: clientData?.email || "", order: 1 }];
-  document.getElementById("sig-title").value = "";
-  document.getElementById("sig-message").value = "";
-  document.getElementById("sig-expiry").value = "30";
-  document.getElementById("sig-signing-order").checked = false;
-  document.getElementById("sig-progress").classList.add("gd-hidden");
-  document.getElementById("sig-send-btn").disabled = false;
-  document.getElementById("sig-file-input").value = "";
-
-  if (!clientData?.email) {
-    showToast("This client has no email on file — add a signer email manually.", "warning");
-  }
-
-  populateSigExistingDropdown();
-  renderSigFiles();
-  renderSigSigners();
-  document.getElementById("signature-modal").classList.add("active");
-};
-
-window.openSignatureModalFromSelection = function () {
-  // Pre-populate with selected files
-  openSignatureModal();
-  const files = allFiles.filter(f => selectedFiles.has(f.id));
-  sigFiles = files.map(f => ({ fileUrl: f.downloadUrl, fileName: f.fileName }));
-  renderSigFiles();
-  clearFileSelection();
-};
-
-window.closeSignatureModal = function () {
-  document.getElementById("signature-modal").classList.remove("active");
-};
-
-// Add existing file from dropdown
-document.getElementById("sig-add-existing").addEventListener("change", (e) => {
-  const val = e.target.value;
-  if (!val) return;
-
-  if (val.startsWith("tpl:")) {
-    const tplId = val.substring(4);
-    const t = allTemplateFiles.find(x => x.id === tplId);
-    if (t && !sigFiles.some(sf => sf.fileUrl === t.downloadUrl)) {
-      sigFiles.push({ fileUrl: t.downloadUrl, fileName: t.templateName || t.fileName });
-      renderSigFiles();
-    }
-  } else {
-    const f = allFiles.find(x => x.id === val);
-    if (f && !sigFiles.some(sf => sf.fileUrl === f.downloadUrl)) {
-      sigFiles.push({ fileUrl: f.downloadUrl, fileName: f.fileName });
-      renderSigFiles();
-    }
-  }
-  e.target.value = "";
-});
-
-// Upload new files for signature
-document.getElementById("sig-file-input").addEventListener("change", async (e) => {
-  const user = auth.currentUser;
-  if (!user) return;
-
-  const files = e.target.files;
-  if (!files.length) return;
-
-  const progressEl = document.getElementById("sig-progress");
-  const progressText = document.getElementById("sig-progress-text");
-  progressEl.classList.remove("gd-hidden");
-  progressText.textContent = "Uploading documents...";
-
-  for (const file of files) {
-    try {
-      // Land signature uploads in the Contracts folder when present, else at root.
-      const contractsFolder = allFolders.find(fd => /^contracts$/i.test(fd.name));
-      const contractsFolderId = contractsFolder?.id || null;
-      const storagePath = `files/${user.uid}/${clientId}/contracts/${file.name}`;
-      const storageRef = ref(storage, storagePath);
-      await uploadBytesResumable(storageRef, file);
-      const downloadUrl = await getDownloadURL(storageRef);
-
-      await addDoc(collection(db, "files"), {
-        clientId, realtorId: user.uid, fileName: file.name, storagePath, downloadUrl,
-        folderId: contractsFolderId, fileSize: file.size, mimeType: file.type, uploadedAt: serverTimestamp()
-      });
-
-      sigFiles.push({ fileUrl: downloadUrl, fileName: file.name });
-    } catch (err) {
-      console.error("Upload error:", err);
-      showToast(`Failed to upload ${file.name}`, "error");
-    }
-  }
-
-  progressEl.classList.add("gd-hidden");
-  renderSigFiles();
-  await loadFiles(user.uid);
-  populateSigExistingDropdown();
-  e.target.value = "";
-});
-
-window.submitSignature = async function () {
-  const user = auth.currentUser;
-  if (!user) return;
-
-  // Read signer values from inputs
-  document.querySelectorAll("#sig-signers-list .gd-sig-signer-row").forEach((row, i) => {
-    const inputs = row.querySelectorAll("input");
-    sigSigners[i].name = inputs[0].value.trim();
-    sigSigners[i].email = inputs[1].value.trim();
-  });
-
-  if (sigFiles.length === 0) { showToast("Add at least one document.", "error"); return; }
-
-  const invalidSigner = sigSigners.find(s => !s.name || !s.email);
-  if (invalidSigner) { showToast("All signers need a name and email.", "error"); return; }
-
-  const progressEl = document.getElementById("sig-progress");
-  const progressText = document.getElementById("sig-progress-text");
-  progressEl.classList.remove("gd-hidden");
-  progressText.textContent = "Sending to BoldSign...";
-  document.getElementById("sig-send-btn").disabled = true;
-
-  try {
-    progressText.textContent = "Preparing signature editor...";
-    const result = await createEmbeddedSignatureRequestFn({
-      clientId,
-      files: sigFiles,
-      signers: sigSigners,
-      title: document.getElementById("sig-title").value.trim() || undefined,
-      message: document.getElementById("sig-message").value.trim() || undefined,
-      expiryDays: parseInt(document.getElementById("sig-expiry").value) || 30
-    });
-    closeSignatureModal();
-    openBoldSignEmbed(result.data.sendUrl, result.data.documentId);
-  } catch (err) {
-    console.error("Signature error:", err);
-    showToast(err.message || "Failed to create signature request.", "error");
-    progressEl.classList.add("gd-hidden");
-    document.getElementById("sig-send-btn").disabled = false;
-  }
-};
-
-/* --- BoldSign Embed --- */
-let embedSentHandled = false;
-
-function handleEmbedSent() {
-  if (embedSentHandled) return;
-  embedSentHandled = true;
-  showToast("Document sent for signature!");
-  closeBoldSignEmbed();
-  const user = auth.currentUser;
-  if (user) {
-    Promise.all([loadFiles(user.uid), loadEnvelopes(user.uid)]);
-  }
-}
-
-function openBoldSignEmbed(sendUrl, documentId) {
-  const modal = document.getElementById("boldsign-embed-modal");
-  const iframe = document.getElementById("boldsign-embed-iframe");
-  const loading = document.getElementById("boldsign-embed-loading");
-
-  embedSentHandled = false;
-  loading.style.display = "";
-  iframe.style.display = "none";
-  iframe.src = sendUrl;
-  iframe.onload = () => {
-    loading.style.display = "none";
-    iframe.style.display = "";
-  };
-
-  modal.classList.add("active");
-
-  // Firestore listener: auto-close when draft transitions to sent/viewed/completed
-  embedUnsubscribe = onSnapshot(doc(db, "envelopes", documentId), (snap) => {
-    if (!snap.exists()) return;
-    const data = snap.data();
-    if (data.status && data.status !== "draft") handleEmbedSent();
-  });
-
-  // Fallback poll in case webhook is delayed
-  embedPollInterval = setInterval(async () => {
-    if (embedSentHandled) return;
-    try {
-      const result = await checkSignatureStatusFn({ documentId });
-      if (result.data.status && result.data.status !== "draft") handleEmbedSent();
-    } catch (e) {
-      // Ignore poll errors
-    }
-  }, 15000);
-}
-
-window.closeBoldSignEmbed = function () {
-  const modal = document.getElementById("boldsign-embed-modal");
-  const iframe = document.getElementById("boldsign-embed-iframe");
-  modal.classList.remove("active");
-  iframe.src = "";
-  if (embedUnsubscribe) { embedUnsubscribe(); embedUnsubscribe = null; }
-  if (embedPollInterval) { clearInterval(embedPollInterval); embedPollInterval = null; }
-};
 
 /* --- Pending Signatures / Envelopes --- */
 async function loadEnvelopes(uid) {
@@ -1884,7 +1571,7 @@ async function loadEnvelopes(uid) {
 window.checkEnvelopeStatus = async function (documentId) {
   try {
     showToast("Checking status...");
-    const result = await checkSignatureStatusForEnvelope(documentId);
+    const result = await checkSignatureStatusFn({ documentId });
     showToast("Status: " + statusLabel(result.data.status));
     const user = auth.currentUser;
     if (user) {
@@ -3492,7 +3179,7 @@ function closeComplianceConfirm() {
 /**
  * handleBulkComplianceSend
  *
- * Collects selected template IDs and sends them as a single BoldSign
+ * Collects selected template IDs and sends them as a single DocuSeal
  * envelope via sendBulkComplianceDocsFn. Falls back gracefully if
  * envelope bundling is unavailable.
  */
