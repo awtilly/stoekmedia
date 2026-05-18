@@ -2936,12 +2936,20 @@ textarea.gd-input {
   flex-wrap: wrap;
 }
 
-/* Label-for pattern for file inputs. Use a <label class="gd-btn gd-btn-upload"
-   for="..."> next to a hidden <input type="file"> — clicking the label triggers
-   the picker. Replaces the previous absolute-overlay pattern which mis-positioned
-   the hidden input below the button. */
-.gd-btn-upload {
-  cursor: pointer;
+/* Visually hide an element while keeping it in the accessibility tree AND
+   leaving it interactable (no display:none, which Safari uses to suppress
+   the file picker on programmatic .click()). Pair with a real <button>
+   whose onclick does inputEl.click(). */
+.gd-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .gd-folder-filters {
