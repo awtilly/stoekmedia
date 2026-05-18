@@ -2936,15 +2936,11 @@ textarea.gd-input {
   flex-wrap: wrap;
 }
 
-.gd-file-input-wrapper {
-  position: relative;
-}
-
-.gd-file-input-wrapper input[type="file"] {
-  position: absolute;
-  opacity: 0;
-  width: 100%;
-  height: 100%;
+/* Label-for pattern for file inputs. Use a <label class="gd-btn gd-btn-upload"
+   for="..."> next to a hidden <input type="file"> — clicking the label triggers
+   the picker. Replaces the previous absolute-overlay pattern which mis-positioned
+   the hidden input below the button. */
+.gd-btn-upload {
   cursor: pointer;
 }
 

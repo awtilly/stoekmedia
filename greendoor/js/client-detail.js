@@ -1275,7 +1275,7 @@ function renderFiles() {
       <span class="gd-badge">${escapeHtml(folderName)}</span>
       <span class="gd-file-meta">${formatFileSize(f.fileSize)}</span>
       <span class="gd-file-meta">${formatDate(f.uploadedAt)}</span>
-      <button class="gd-btn gd-btn-sm gd-file-send-btn" onclick="event.stopPropagation(); sendSingleFile('${f.id}')">Send</button>
+      <button class="gd-btn gd-btn-sm gd-file-send-btn" onclick="event.stopPropagation(); sendSingleFile('${f.id}')" title="Email this file to the client">Email</button>
       <button class="gd-file-kebab" onclick="event.stopPropagation(); toggleFileRowMenu('${f.id}', event)" title="File options">&#8942;</button>
       <div id="file-menu-${f.id}" class="gd-file-menu gd-hidden">
         <button onclick="event.stopPropagation(); showFileMoveMenu('${f.id}', event)">Move to folder</button>
