@@ -154,11 +154,15 @@
         <h3>Place fields on your document</h3>
         <button class="gd-modal-close" onclick="closeBuilder()" aria-label="Close">&times;</button>
       </div>
-      <div class="gd-modal-body" style="padding: 0; flex: 1; overflow: hidden;">
+      <div class="gd-modal-body" style="padding: 0; flex: 1; overflow: hidden; display: flex; flex-direction: column;">
         <p class="gd-text-muted" style="padding: .75rem 1rem; margin: 0; border-bottom: 1px solid var(--gd-border, #e5e7eb); font-size: .9rem;">
-          Drag fields onto the PDF. Use clear names (e.g. "Buyer Name", "Property Address") so GreenDoor can auto-fill them. When done, click <strong>Save & Continue</strong>.
+          Drag fields onto the PDF. Use clear names (e.g. "Buyer Name", "Property Address") so GreenDoor can auto-fill them. When finished, click <strong>Done — set up auto-fill</strong> below.
         </p>
-        <div id="builder-mount" style="height: calc(100% - 3rem);"></div>
+        <div id="builder-mount" style="flex: 1; min-height: 0;"></div>
+      </div>
+      <div class="gd-modal-footer">
+        <button class="gd-btn" onclick="closeBuilder()">Cancel</button>
+        <button id="builder-done-btn" class="gd-btn gd-btn-primary" onclick="finishBuilder()" disabled>Done — set up auto-fill</button>
       </div>
     </div>
   </div>

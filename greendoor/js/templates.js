@@ -244,6 +244,8 @@ async function openBuilder({ templateName, documentUrls, templateId }) {
   builder.addEventListener("load", onBuilderLoad);
 
   mount.appendChild(builder);
+  const doneBtn = document.getElementById("builder-done-btn");
+  if (doneBtn) doneBtn.disabled = true;
   document.getElementById("builder-modal").classList.add("active");
 }
 
@@ -257,8 +259,11 @@ function onBuilderLoad(evt) {
   // For now we only care about save events.
 }
 
-async function onBuilderSave(evt) {
-  // CustomEvent.detail contains the template payload with `id` and `fields` (or `submitters[0].fields`).
+function onBuilderSave(evt) {
+  // DocuSeal autosaves on every change — fires the `save` event with the
+  // latest template payload. We just capture the latest state here; the
+  // downstream mapping flow runs only when the user explicitly clicks
+  // "Done — set up auto-fill" (finishBuilder).
   const detail = evt.detail || {};
   const docusealTemplateId = detail.id || detail.template_id || detail.templateId;
   const rawFields = Array.isArray(detail.fields)
@@ -278,6 +283,21 @@ async function onBuilderSave(evt) {
   }
 
   pendingBuilder = { docusealTemplateId, fields: fieldNames };
+
+  // Enable the Done button once we have a template ID (means DocuSeal has
+  // accepted at least one save). Fields are optional — a realtor can save
+  // a template with zero fields for blind sends.
+  const doneBtn = document.getElementById("builder-done-btn");
+  if (doneBtn && docusealTemplateId) doneBtn.disabled = false;
+}
+
+window.finishBuilder = async function () {
+  if (!pendingBuilder || !pendingBuilder.docusealTemplateId) {
+    showToast("Place at least one field before continuing, or hit Cancel.", "info");
+    return;
+  }
+
+  const fieldNames = pendingBuilder.fields || [];
   closeBuilder();
 
   if (!fieldNames.length) {
@@ -299,7 +319,7 @@ async function onBuilderSave(evt) {
   }
 
   renderMappingModal();
-}
+};
 
 /* ------------------------------------------------------------------ */
 /*  Mapping confirmation modal                                         */
