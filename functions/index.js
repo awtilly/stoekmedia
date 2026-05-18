@@ -18,6 +18,7 @@ const RESEND_API_KEY = defineSecret("RESEND_API_KEY");
 const DOCUSEAL_API_KEY = defineSecret("DOCUSEAL_API_KEY");
 const DOCUSEAL_WEBHOOK_SECRET = defineSecret("DOCUSEAL_WEBHOOK_SECRET");
 const DOCUSEAL_BASE_URL = defineSecret("DOCUSEAL_BASE_URL");
+const DOCUSEAL_ACCOUNT_EMAIL = defineSecret("DOCUSEAL_ACCOUNT_EMAIL");
 const GOOGLE_OAUTH_CLIENT_ID = defineSecret("GOOGLE_OAUTH_CLIENT_ID");
 const GOOGLE_OAUTH_CLIENT_SECRET = defineSecret("GOOGLE_OAUTH_CLIENT_SECRET");
 
@@ -1118,7 +1119,7 @@ function signHs256Jwt(payload, secret) {
 }
 
 exports.createDocuSealBuilderToken = onCall(
-  { region: "us-central1", secrets: [DOCUSEAL_API_KEY, DOCUSEAL_BASE_URL] },
+  { region: "us-central1", secrets: [DOCUSEAL_API_KEY, DOCUSEAL_BASE_URL, DOCUSEAL_ACCOUNT_EMAIL] },
   async (request) => {
     if (!request.auth) throw new HttpsError("unauthenticated", "You must be signed in.");
     const apiKey = DOCUSEAL_API_KEY.value();
@@ -1131,15 +1132,20 @@ exports.createDocuSealBuilderToken = onCall(
 
     const userSnap = await db.doc(`users/${uid}`).get();
     const userData = userSnap.exists ? userSnap.data() : {};
-    const userEmail = userData.email || request.auth.token.email;
-    if (!userEmail) {
-      throw new HttpsError("failed-precondition", "Your profile is missing an email address.");
+
+    // DocuSeal's builder JWT requires `user_email` to match a registered
+    // user on the DocuSeal account. We use the configured account-owner
+    // email rather than the GreenDoor login, since GreenDoor users are
+    // not auto-provisioned as DocuSeal users.
+    const accountEmail = DOCUSEAL_ACCOUNT_EMAIL.value();
+    if (!isLiveSecret(accountEmail)) {
+      throw new HttpsError("failed-precondition", "DOCUSEAL_ACCOUNT_EMAIL is not configured.");
     }
 
     const now = Math.floor(Date.now() / 1000);
     const payload = {
-      user_email: userEmail,
-      integration_email: userEmail,
+      user_email: accountEmail,
+      integration_email: accountEmail,
       name: templateName || userData.fullName || "Untitled Template",
       iat: now,
       exp: now + 60 * 60
