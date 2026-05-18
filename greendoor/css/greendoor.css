@@ -9030,7 +9030,48 @@ body.gd-light .gd-confirm-warning { background: #fffbeb; color: #92400e; }
   display: flex;
   flex-direction: column;
   gap: 12px;
-  margin-top: 18px;
+}
+
+/* Transcript is hidden until a conversation starts so the empty hero stays
+   centered and uncluttered. */
+.gd-dash-transcript:empty {
+  display: none;
+}
+
+/* ----- Active conversation state -----
+   Once Sage and the realtor have started exchanging messages we flip the
+   dashboard into a chat layout: greeting / subhead / chips collapse, the
+   transcript expands to fill the height, and the prompt anchors at the
+   bottom of the viewport — same shape as Claude. Selectors are scoped
+   with body.gd-light to win specificity against the page padding rules. */
+body.gd-light .gd-dash-content.gd-dash-active {
+  padding-top: 16px;
+  justify-content: stretch;
+}
+
+body.gd-light .gd-dash-content.gd-dash-active .gd-dash-hero {
+  flex: 1;
+  min-height: 0;
+  gap: 12px;
+}
+
+body.gd-light .gd-dash-content.gd-dash-active .gd-dash-greeting,
+body.gd-light .gd-dash-content.gd-dash-active .gd-dash-subhead,
+body.gd-light .gd-dash-content.gd-dash-active .gd-dash-chips {
+  display: none;
+}
+
+body.gd-light .gd-dash-content.gd-dash-active .gd-dash-transcript {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  justify-content: flex-end; /* newest at the bottom; older overflows up */
+  padding: 8px 2px 4px;
+  scroll-behavior: smooth;
+}
+
+body.gd-light .gd-dash-content.gd-dash-active .gd-dash-prompt-wrap {
+  flex-shrink: 0;
 }
 
 .gd-dash-msg {

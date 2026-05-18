@@ -277,6 +277,7 @@ window.submitDashPrompt = async function () {
   const question = (input.value || "").trim();
   if (!question) return;
 
+  activateConversation();
   appendTranscript("user", question);
   input.value = "";
   autoGrowTextarea();
@@ -608,6 +609,21 @@ const TOOL_EXECUTORS = {
 /* ------------------------------------------------------------------ */
 /*  Transcript rendering + streaming (typewriter)                      */
 /* ------------------------------------------------------------------ */
+
+// Flip the dashboard into chat layout: greeting/subhead/chips collapse,
+// transcript fills the height, prompt sticks to the bottom. Idempotent.
+function activateConversation() {
+  const content = document.querySelector(".gd-dash-content");
+  if (content && !content.classList.contains("gd-dash-active")) {
+    content.classList.add("gd-dash-active");
+    // Keep the prompt's focus state intact across the layout shift.
+    requestAnimationFrame(() => {
+      const input = document.getElementById("dash-prompt-input");
+      if (input && document.activeElement !== input) input.focus();
+    });
+  }
+}
+
 function appendTranscript(role, text, actions, stream, streamText) {
   const el = document.getElementById("dash-transcript");
   const msg = document.createElement("div");

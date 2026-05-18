@@ -73,9 +73,13 @@
   <div class="gd-page">
     <div class="gd-content gd-dash-content">
 
-      <div class="gd-dash-hero">
+      <div class="gd-dash-hero" id="dash-hero">
         <h1 class="gd-dash-greeting" id="dash-greeting">Hi.</h1>
-        <p class="gd-dash-subhead">What can Sage help you with today?</p>
+        <p class="gd-dash-subhead" id="dash-subhead">What can Sage help you with today?</p>
+
+        <div class="gd-dash-transcript" id="dash-transcript">
+          <!-- conversation messages injected by JS -->
+        </div>
 
         <form class="gd-dash-prompt-wrap" id="dash-prompt-form" autocomplete="off" onsubmit="return false;">
           <textarea
@@ -98,10 +102,6 @@
 
         <div class="gd-dash-chips" id="dash-chips">
           <!-- chips injected by JS -->
-        </div>
-
-        <div class="gd-dash-transcript" id="dash-transcript">
-          <!-- conversation messages injected by JS -->
         </div>
       </div>
 
