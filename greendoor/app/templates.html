@@ -117,11 +117,11 @@
   </div><!-- /gd-app-layout -->
 
   <!-- Upload Modal -->
-  <div id="upload-modal" class="gd-modal gd-hidden">
-    <div class="gd-modal-content" style="max-width: 480px;">
+  <div id="upload-modal" class="gd-modal-overlay">
+    <div class="gd-modal gd-modal-md">
       <div class="gd-modal-header">
-        <h2>Upload Template</h2>
-        <button class="gd-modal-close" onclick="closeUploadTemplate()">&times;</button>
+        <h3>Upload Template</h3>
+        <button class="gd-modal-close" onclick="closeUploadTemplate()" aria-label="Close">&times;</button>
       </div>
       <div class="gd-modal-body">
         <div class="gd-form-group">
@@ -148,11 +148,11 @@
   </div>
 
   <!-- Builder Modal (DocuSeal in-browser drag-drop field placement) -->
-  <div id="builder-modal" class="gd-modal gd-hidden">
-    <div class="gd-modal-content" style="max-width: 1100px; height: 90vh; display: flex; flex-direction: column;">
+  <div id="builder-modal" class="gd-modal-overlay">
+    <div class="gd-modal gd-modal-lg" style="max-width: 1100px; height: 90vh; display: flex; flex-direction: column;">
       <div class="gd-modal-header">
-        <h2>Place fields on your document</h2>
-        <button class="gd-modal-close" onclick="closeBuilder()">&times;</button>
+        <h3>Place fields on your document</h3>
+        <button class="gd-modal-close" onclick="closeBuilder()" aria-label="Close">&times;</button>
       </div>
       <div class="gd-modal-body" style="padding: 0; flex: 1; overflow: hidden;">
         <p class="gd-text-muted" style="padding: .75rem 1rem; margin: 0; border-bottom: 1px solid var(--gd-border, #e5e7eb); font-size: .9rem;">
@@ -164,11 +164,11 @@
   </div>
 
   <!-- Mapping Modal — confirm AI-suggested field → data source mapping -->
-  <div id="mapping-modal" class="gd-modal gd-hidden">
-    <div class="gd-modal-content" style="max-width: 640px;">
+  <div id="mapping-modal" class="gd-modal-overlay">
+    <div class="gd-modal gd-modal-md" style="max-width: 640px;">
       <div class="gd-modal-header">
-        <h2>Confirm auto-fill mapping</h2>
-        <button class="gd-modal-close" onclick="closeMappingModal()">&times;</button>
+        <h3>Confirm auto-fill mapping</h3>
+        <button class="gd-modal-close" onclick="closeMappingModal()" aria-label="Close">&times;</button>
       </div>
       <div class="gd-modal-body">
         <p class="gd-text-muted" style="margin-top:0;">

@@ -133,11 +133,11 @@ window.openUploadTemplate = function () {
   document.getElementById("upload-template-file").value = "";
   document.getElementById("upload-template-checklist").checked = false;
   document.getElementById("upload-status").textContent = "";
-  document.getElementById("upload-modal").classList.remove("gd-hidden");
+  document.getElementById("upload-modal").classList.add("active");
 };
 
 window.closeUploadTemplate = function () {
-  document.getElementById("upload-modal").classList.add("gd-hidden");
+  document.getElementById("upload-modal").classList.remove("active");
 };
 
 window.startUploadTemplate = async function () {
@@ -244,11 +244,11 @@ async function openBuilder({ templateName, documentUrls, templateId }) {
   builder.addEventListener("load", onBuilderLoad);
 
   mount.appendChild(builder);
-  document.getElementById("builder-modal").classList.remove("gd-hidden");
+  document.getElementById("builder-modal").classList.add("active");
 }
 
 window.closeBuilder = function () {
-  document.getElementById("builder-modal").classList.add("gd-hidden");
+  document.getElementById("builder-modal").classList.remove("active");
   document.getElementById("builder-mount").innerHTML = "";
 };
 
@@ -358,11 +358,11 @@ function renderMappingModal() {
     });
   });
 
-  document.getElementById("mapping-modal").classList.remove("gd-hidden");
+  document.getElementById("mapping-modal").classList.add("active");
 }
 
 window.closeMappingModal = function () {
-  document.getElementById("mapping-modal").classList.add("gd-hidden");
+  document.getElementById("mapping-modal").classList.remove("active");
 };
 
 window.saveTemplateFromMapping = async function () {
