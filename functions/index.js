@@ -1704,6 +1704,40 @@ exports.boldSignWebhook = onRequest({ region: "us-central1", secrets: [BOLDSIGN_
 /*  conversation history. Returns an AI-generated response.            */
 /* ------------------------------------------------------------------ */
 
+// Tools exposed to Sage on the dashboard "command bar" context. The realtor
+// asks Sage what they want and the model emits a `navigate` tool_use; the
+// dashboard frontend intercepts and routes the browser. Pre-fills the
+// destination page rather than auto-executing risky actions.
+const SAGE_DASHBOARD_TOOLS = [
+  {
+    name: "navigate",
+    description: "Open a page in the GreenDoor app. Use this whenever the realtor wants to view, see, open, find, look up, or go to something specific (a client, listing, the calendar, templates, settings). Prefer this over describing where things are.",
+    input_schema: {
+      type: "object",
+      properties: {
+        target: {
+          type: "string",
+          enum: ["client", "client_list", "listing", "listing_list", "calendar", "templates", "settings", "dashboard"],
+          description: "Which page. 'client' = a specific client's detail page (requires clientId). 'client_list' = the all-clients page (use for 'show me all my clients'). 'listing' = a specific listing (requires listingId). 'listing_list' = the all-listings page."
+        },
+        clientId: {
+          type: "string",
+          description: "Required when target=client. Use the exact id from the RECENT CLIENTS list in the system prompt. If the user names a client not in that list, set target=client_list instead."
+        },
+        listingId: {
+          type: "string",
+          description: "Required when target=listing. Use the exact id from the RECENT LISTINGS list."
+        },
+        tab: {
+          type: "string",
+          description: "Optional sub-tab on the destination page. For client target: 'overview' | 'compliance' | 'activity' | 'files' | 'matches'. Use 'compliance' when the user wants to send a document."
+        }
+      },
+      required: ["target"]
+    }
+  }
+];
+
 // Tools exposed to Sage on client_detail context. The model emits tool_use blocks
 // when it wants to suggest an action; the client renders these as approve-to-execute
 // buttons (replaces the regex action-detection that used to live in chatbot.js).
@@ -1819,34 +1853,47 @@ INSTRUCTIONS:
 4. Suggest the top 2-3 priority next actions the realtor should take
 5. Keep your response concise and actionable — this is a quick check-in, not a detailed report
 6. If the realtor asks follow-up questions, use this context to answer them accurately`;
-  } else if (context === "dashboard" && contextData) {
-    const cd = contextData;
-    const staleList = (cd.staleClients || []).length > 0
-      ? cd.staleClients.map(c => `- ${c.name}${c.daysSince != null ? ` (${c.daysSince} days)` : ' (never contacted)'}`).join('\n')
-      : '- None — all clients contacted recently.';
-    const showingsList = (cd.todayShowings || []).length > 0
-      ? cd.todayShowings.map(s => `- ${s.time} at ${s.address}`).join('\n')
-      : '- No showings today.';
-    systemPrompt = `You are a real estate assistant generating a daily briefing for GreenDoor CRM.
+  } else if (context === "dashboard") {
+    // Claude-style dashboard "command bar". Realtor types or speaks intent;
+    // Sage replies with a short text response and (where applicable) a
+    // navigate tool_use the frontend turns into a route change.
+    const cd = contextData || {};
+    const agentName = cd.agentFirstName || "there";
+    const today = cd.todayDate || new Date().toISOString().slice(0, 10);
 
-PORTFOLIO STATS:
-- Total clients: ${cd.totalClients || 0}
-- Active buyers: ${cd.activeBuyers || 0}
-- Active sellers: ${cd.activeSellers || 0}
-- Under contract: ${cd.underContract || 0}
+    const recentClients = Array.isArray(cd.recentClients) && cd.recentClients.length
+      ? cd.recentClients.map(c => `- ${c.id} → ${c.name}${c.status ? ` (${c.status})` : ""}`).join("\n")
+      : "- (none yet)";
+    const recentListings = Array.isArray(cd.recentListings) && cd.recentListings.length
+      ? cd.recentListings.map(l => `- ${l.id} → ${l.address}`).join("\n")
+      : "- (none yet)";
 
-CLIENTS NOT CONTACTED IN 14+ DAYS:
-${staleList}
+    systemPrompt = `You are Sage, the in-app assistant for GreenDoor (a real estate CRM). The realtor is on the dashboard and just typed or spoke a command. Your job is to (1) reply with a short conversational confirmation (1-2 sentences max), and (2) emit a navigate tool_use whenever they want to go somewhere or do something on another page.
 
-TODAY'S SHOWINGS:
-${showingsList}
+REALTOR: ${agentName}
+TODAY: ${today}
 
-INSTRUCTIONS:
-Give exactly 3 bullet points, one line each. Use the real data above.
-1) Clients needing follow-up (name them if any)
-2) Today's showings summary
-3) One specific priority action based on the data
-No headers, no intros, no sign-offs. Just the 3 bullets.`;
+RECENT CLIENTS (id → name):
+${recentClients}
+
+RECENT LISTINGS (id → address):
+${recentListings}
+
+ROUTING RULES:
+- "Show me [name]" / "Open [name]" / "Pull up [name]" → navigate target=client with their clientId from the list above. If the name doesn't match anyone in the list, route to target=client_list instead so they can search.
+- "Send [a doc] to [name]" → navigate target=client clientId=... tab=compliance (they'll send it from there — do NOT promise to send it yourself).
+- "My listings" / "Show listings" → target=listing_list.
+- "Show [address]" → target=listing with the matching listingId from above; if no match, target=listing_list.
+- "Calendar" / "Schedule" / "Appointments" / "Today's showings" → target=calendar.
+- "Templates" / "My templates" / "Forms" → target=templates.
+- "Settings" / "Profile" / "Connect Gmail" → target=settings.
+
+STYLE:
+- Always reply with text. Be warm but brief — one short sentence is usually enough. No bullet points, no headers.
+- When you emit a navigate tool_use, your text should say what you're doing, e.g. "Opening Sarah's profile." or "Taking you to your calendar."
+- If the request is ambiguous (e.g. multiple clients with the same first name), ask a one-sentence clarifying question and do NOT emit a navigate tool.
+- For general questions ("what should I do today?", "how do I add a listing?"), reply with a short helpful answer, no tool needed.
+- Never invent client or listing IDs. Only use IDs from the lists above.`;
   } else if (context === "client_detail" && clientId) {
     // Read client data for generic client-detail context
     const clientSnap = await db.doc(`clients/${clientId}`).get();
@@ -1887,6 +1934,10 @@ When the realtor asks you to draft an email, create a follow-up, schedule a show
   };
   if (context === "client_detail") {
     apiBody.tools = SAGE_CLIENT_DETAIL_TOOLS.map((t, i, arr) =>
+      i === arr.length - 1 ? { ...t, cache_control: { type: "ephemeral" } } : t
+    );
+  } else if (context === "dashboard") {
+    apiBody.tools = SAGE_DASHBOARD_TOOLS.map((t, i, arr) =>
       i === arr.length - 1 ? { ...t, cache_control: { type: "ephemeral" } } : t
     );
   }

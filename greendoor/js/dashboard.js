@@ -1,581 +1,337 @@
+/* ============================================================
+   GreenDoor CRM — Dashboard (Claude-style command bar)
+   ============================================================
+   The dashboard is now a single conversational entry point.
+   Realtor types or speaks intent → Sage replies with text and
+   (when applicable) emits a `navigate` tool_use that this
+   module turns into a route change.
+   ============================================================ */
+
 import { auth, db, functions, httpsCallable } from "./firebase-config.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import {
-  collection, query, where, orderBy, limit, getDocs, getCountFromServer, Timestamp,
-  addDoc, serverTimestamp
+  collection, query, where, orderBy, limit, getDocs
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-import { getCurrentUser, timeAgo, formatDate, formatDateTime, escapeHtml, showToast, safeToDate } from "./auth.js";
-import { startTour, checkAndResumeTour } from "./tour.js";
-import { calculateMatchScore } from "./match-engine.js";
+import { getCurrentUser, showToast, escapeHtml } from "./auth.js";
 
-const askAssistant = httpsCallable(functions, "askAssistant");
-const seedEmailTemplates = httpsCallable(functions, "seedEmailTemplates");
-const parseListingUrlFn = httpsCallable(functions, "parseListingUrl");
+const askAssistantFn = httpsCallable(functions, "askAssistant");
 
-let dashboardClients = [];
-let dlFeatureTags = [];
+let currentUser = null;
+let recentClients = [];   // [{ id, name, status }]
+let recentListings = [];  // [{ id, address }]
+let conversation = [];    // [{ role, content }] — passed back to Sage for follow-ups
 
-async function refreshStats(uid) {
-  try {
-    const [totalSnap, buyerSnap, sellerSnap, contractSnap] = await Promise.all([
-      getCountFromServer(query(collection(db, "clients"), where("realtorId", "==", uid))),
-      getCountFromServer(query(collection(db, "clients"), where("realtorId", "==", uid), where("status", "==", "active_buyer"))),
-      getCountFromServer(query(collection(db, "clients"), where("realtorId", "==", uid), where("status", "==", "active_seller"))),
-      getCountFromServer(query(collection(db, "clients"), where("realtorId", "==", uid), where("status", "==", "under_contract")))
-    ]);
-    document.getElementById("stat-total").textContent = totalSnap.data().count;
-    document.getElementById("stat-buyers").textContent = buyerSnap.data().count;
-    document.getElementById("stat-sellers").textContent = sellerSnap.data().count;
-    document.getElementById("stat-contracts").textContent = contractSnap.data().count;
-  } catch (e) {
-    console.error("Stats error:", e);
-  }
-}
-
-async function refreshActivityFeed(uid) {
-  try {
-    const actQ = query(
-      collection(db, "activities"),
-      where("realtorId", "==", uid),
-      orderBy("timestamp", "desc"),
-      limit(3)
-    );
-    const actSnap = await getDocs(actQ);
-    const feedEl = document.getElementById("activity-feed");
-    if (actSnap.empty) return;
-
-    // Single clients fetch, then build a name lookup.
-    const clientsSnap = await getDocs(query(collection(db, "clients"), where("realtorId", "==", uid)));
-    const nameById = {};
-    clientsSnap.forEach(d => { nameById[d.id] = d.data().fullName || "Unknown"; });
-
-    const icons = { email: "&#128231;", call: "&#128222;", note: "&#128221;", sms: "&#128172;", file_share: "&#128193;", showing: "&#127968;" };
-    let html = "";
-    actSnap.forEach(d => {
-      const a = d.data();
-      const icon = icons[a.type] || "&#128221;";
-      const clientName = nameById[a.clientId] || "Unknown";
-      html += `
-        <div class="gd-activity-item">
-          <div class="gd-activity-icon">${icon}</div>
-          <div class="gd-activity-body">
-            <div class="gd-activity-subject">
-              <a href="/greendoor/app/client-detail?id=${a.clientId}">${escapeHtml(clientName)}</a> — ${escapeHtml(a.subject) || "Activity"}
-            </div>
-            <div class="gd-activity-meta">${timeAgo(a.timestamp)}</div>
-          </div>
-        </div>`;
-    });
-    feedEl.innerHTML = html;
-  } catch (e) {
-    console.error("Activity feed error:", e);
-  }
-}
-
+/* ------------------------------------------------------------------ */
+/*  Boot                                                               */
+/* ------------------------------------------------------------------ */
 onAuthStateChanged(auth, async (user) => {
-  if (!user) return;
-
-  const profile = await getCurrentUser();
-  if (!profile) return;
-
-  document.getElementById("welcome-name").textContent = profile.fullName || "Agent";
-
-  const uid = user.uid;
-  await Promise.all([refreshStats(uid), refreshActivityFeed(uid)]);
-
-  // --- Upcoming Showings ---
-  try {
-    const now = Timestamp.now();
-    const clientCache = {};
-    const clientsSnap = await getDocs(query(collection(db, "clients"), where("realtorId", "==", uid)));
-    clientsSnap.forEach(d => { clientCache[d.id] = d.data().fullName || "Unknown"; });
-
-    const showQ = query(
-      collection(db, "showings"),
-      where("realtorId", "==", uid),
-      where("showingDate", ">=", now),
-      orderBy("showingDate", "asc"),
-      limit(5)
-    );
-    const showSnap = await getDocs(showQ);
-    const showEl = document.getElementById("showings-list");
-
-    const rows = [];
-    showSnap.forEach(d => {
-      const s = d.data();
-      if (s.status === "cancelled") return;
-      rows.push(`
-        <div class="gd-showing-item">
-          <span class="gd-showing-date">${formatDateTime(s.showingDate)}</span>
-          <span class="gd-showing-address">${escapeHtml(s.address) || "—"}</span>
-          <span class="gd-showing-client">${escapeHtml(clientCache[s.clientId]) || "—"}</span>
-        </div>`);
-    });
-    if (rows.length > 0) showEl.innerHTML = rows.join("");
-  } catch (e) {
-    console.error("Showings error:", e);
-  }
-
-  document.getElementById("dashboard-loading").classList.add("gd-hidden");
-  document.getElementById("dashboard-content").classList.remove("gd-hidden");
-
-  // Start interactive tour for new users, or resume if mid-tour
-  if (profile.showTour === true) {
-    setTimeout(() => startTour("dashboard"), 600);
-  } else {
-    setTimeout(() => checkAndResumeTour(), 600);
-  }
-
-  // Seed email templates once per user (function flips users/{uid}.templatesSeeded)
-  if (profile.templatesSeeded !== true) {
-    seedEmailTemplates().catch(() => {});
-  }
-
-  // Load AI briefing
-  loadBriefing();
-});
-
-/* ===== AI DAILY BRIEFING ===== */
-function formatBriefingHtml(text) {
-  let html = text
-    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
-    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-    .replace(/^\s*[-*]\s+(.+)$/gm, "<li>$1</li>")
-    .replace(/\n/g, "<br>");
-  html = html.replace(/((?:<li>.*<\/li><br>?)+)/g, "<ul>$1</ul>");
-  html = html.replace(/<ul><br>/g, "<ul>").replace(/<br><\/ul>/g, "</ul>");
-  html = html.replace(/<br><li>/g, "<li>");
-  return html;
-}
-
-async function loadBriefing() {
-  const contentEl = document.getElementById("ai-briefing-content");
-  const today = new Date().toISOString().slice(0, 10);
-  const cacheKey = "gd_briefing_" + today;
-
-  // Check sessionStorage cache
-  const cached = sessionStorage.getItem(cacheKey);
-  if (cached) {
-    contentEl.innerHTML = formatBriefingHtml(cached);
+  if (!user) {
+    window.location.href = "/greendoor/app/login";
     return;
   }
+  currentUser = await getCurrentUser();
+  renderGreeting();
+  renderChips();
+  autoGrowTextarea();
+  // Load recent clients/listings in the background so the prompt is usable immediately.
+  loadContextSnapshots(user.uid);
+});
 
-  contentEl.innerHTML = '<div class="gd-ai-briefing-loading"><div class="gd-spinner"></div><span>Generating your daily briefing...</span></div>';
+function renderGreeting() {
+  const h = new Date().getHours();
+  const greeting = h < 5 ? "Hi" : h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
+  const first = (currentUser?.fullName || "").split(/\s+/)[0] || "";
+  document.getElementById("dash-greeting").textContent = first ? `${greeting}, ${first}.` : `${greeting}.`;
+}
 
+async function loadContextSnapshots(uid) {
   try {
-    const user = auth.currentUser;
-    if (!user) return;
-    const uid = user.uid;
-
-    // Gather real CRM data for the briefing
-    const contextData = { staleClients: [], todayShowings: [], totalClients: 0, activeBuyers: 0, activeSellers: 0, underContract: 0 };
-
-    // Stale clients: not contacted in 14+ days
-    const fourteenDaysAgo = new Date();
-    fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
-    const clientsSnap = await getDocs(query(collection(db, "clients"), where("realtorId", "==", uid)));
-    contextData.totalClients = clientsSnap.size;
-    clientsSnap.forEach(d => {
-      const c = d.data();
-      if (c.status === "active_buyer") contextData.activeBuyers++;
-      if (c.status === "active_seller") contextData.activeSellers++;
-      if (c.status === "under_contract") contextData.underContract++;
-      const lastDate = safeToDate(c.lastActivityDate);
-      if (!lastDate || lastDate < fourteenDaysAgo) {
-        contextData.staleClients.push({ name: c.fullName || "Unknown", daysSince: lastDate ? Math.floor((Date.now() - lastDate.getTime()) / 86400000) : null });
-      }
-    });
-
-    // Today's showings (wrapped separately so a missing index doesn't block the briefing)
-    try {
-      const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
-      const showQ = query(
-        collection(db, "showings"),
+    const [cSnap, lSnap] = await Promise.all([
+      getDocs(query(
+        collection(db, "clients"),
         where("realtorId", "==", uid),
-        where("showingDate", ">=", Timestamp.fromDate(todayStart)),
-        orderBy("showingDate", "asc"),
-        limit(10)
-      );
-      const showSnap = await getDocs(showQ);
-      const todayEnd = new Date(); todayEnd.setHours(23, 59, 59, 999);
-      showSnap.forEach(d => {
-        const s = d.data();
-        if (s.status === "cancelled") return;
-        const dt = safeToDate(s.showingDate);
-        if (dt && dt <= todayEnd) {
-          contextData.todayShowings.push({ address: s.address || "TBD", time: dt.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) });
-        }
-      });
-    } catch (showErr) {
-      console.warn("Showings query failed (may need index):", showErr);
-    }
-
-    const result = await askAssistant({
-      question: "3 bullet points max, one line each. 1) Any clients not contacted in 14+ days? 2) Today's showings? 3) One priority action. No headers, no intros, no sign-offs. Just the 3 bullets.",
-      context: "dashboard",
-      contextData
+        orderBy("updatedAt", "desc"),
+        limit(20)
+      )),
+      getDocs(query(
+        collection(db, "listings"),
+        where("addedBy", "==", uid),
+        orderBy("updatedAt", "desc"),
+        limit(20)
+      ))
+    ]);
+    recentClients = cSnap.docs.map(d => {
+      const x = d.data();
+      return { id: d.id, name: x.fullName || "Unknown", status: x.status || null };
     });
-    const text = result.data.response;
-    sessionStorage.setItem(cacheKey, text);
-    contentEl.innerHTML = formatBriefingHtml(text);
+    recentListings = lSnap.docs.map(d => {
+      const x = d.data();
+      const a = x.address || {};
+      return { id: d.id, address: a.full || a.street || d.id };
+    });
   } catch (err) {
-    console.error("Briefing error:", err);
-    contentEl.innerHTML = '<div class="gd-ai-briefing-error">Could not load briefing. <button class="gd-btn gd-btn-sm" onclick="refreshBriefing()">Try Again</button></div>';
+    console.warn("Recent context load failed (may need index):", err.message);
   }
 }
 
-window.refreshBriefing = function () {
-  const today = new Date().toISOString().slice(0, 10);
-  sessionStorage.removeItem("gd_briefing_" + today);
-  loadBriefing();
-};
-
-/* ===== ADD LISTING MODAL (Dashboard) ===== */
-
-const DL_FEATURE_SUGGESTIONS = [
-  "Pool", "Garage", "Fireplace", "Hardwood Floors", "Open Floor Plan",
-  "Basement", "Deck", "Patio", "Fenced Yard", "Central Air",
-  "Updated Kitchen", "Stainless Appliances", "Granite Counters",
-  "Walk-in Closet", "Laundry Room", "Home Office", "Smart Home",
-  "Solar Panels", "Corner Lot", "Cul-de-sac", "New Roof"
+/* ------------------------------------------------------------------ */
+/*  Suggestion chips                                                   */
+/* ------------------------------------------------------------------ */
+const CHIPS = [
+  "Show today's calendar",
+  "Open my clients",
+  "Show my listings",
+  "Open Templates",
+  "What should I focus on today?"
 ];
 
-async function loadDashboardClients() {
-  const user = auth.currentUser;
-  if (!user) return;
-  try {
-    const snap = await getDocs(query(collection(db, "clients"), where("realtorId", "==", user.uid)));
-    dashboardClients = [];
-    snap.forEach(d => { dashboardClients.push({ id: d.id, ...d.data() }); });
-  } catch (e) {
-    console.error("Load clients error:", e);
-  }
-  renderDashboardClientCheckboxes();
-}
-
-function renderDashboardClientCheckboxes() {
-  const container = document.getElementById("dl-client-checkboxes");
-  if (!container) return;
-  if (dashboardClients.length === 0) {
-    container.innerHTML = '<span class="gd-muted">No clients found.</span>';
-    return;
-  }
-  container.innerHTML = dashboardClients.map(c =>
-    `<label style="display:flex;align-items:center;gap:0.5rem;padding:0.25rem 0;">
-      <input type="checkbox" class="dl-client-check" value="${c.id}">
-      <span>${escapeHtml(c.fullName || "Unnamed")} <small class="gd-muted">(${c.status || "lead"})</small></span>
-    </label>`
+function renderChips() {
+  const wrap = document.getElementById("dash-chips");
+  if (!wrap) return;
+  wrap.innerHTML = CHIPS.map(c =>
+    `<button type="button" class="gd-dash-chip" onclick="fillDashPrompt('${escapeAttr(c)}')">${escapeHtml(c)}</button>`
   ).join("");
 }
 
-function renderDlTags() {
-  const el = document.getElementById("dl-tag-list");
-  if (!el) return;
-  el.innerHTML = dlFeatureTags.map((tag, i) =>
-    `<span class="gd-tag">${escapeHtml(tag)}<button class="gd-tag-remove" onclick="removeDlTag(${i})">&times;</button></span>`
-  ).join("");
+function escapeAttr(s) {
+  return String(s).replace(/'/g, "\\'").replace(/"/g, "&quot;");
 }
 
-function renderDlTagSuggestions() {
-  const el = document.getElementById("dl-tag-suggestions");
-  if (!el) return;
-  const available = DL_FEATURE_SUGGESTIONS.filter(s => !dlFeatureTags.includes(s));
-  el.innerHTML = available.map(s =>
-    `<button class="gd-tag-suggestion" onclick="addDlTag('${s}')">${s}</button>`
-  ).join("");
-}
-
-window.addDlTag = function (tag) {
-  if (!dlFeatureTags.includes(tag)) {
-    dlFeatureTags.push(tag);
-    renderDlTags();
-    renderDlTagSuggestions();
-  }
+window.fillDashPrompt = function (text) {
+  const input = document.getElementById("dash-prompt-input");
+  input.value = text;
+  autoGrowTextarea();
+  input.focus();
 };
 
-window.removeDlTag = function (index) {
-  dlFeatureTags.splice(index, 1);
-  renderDlTags();
-  renderDlTagSuggestions();
-};
+/* ------------------------------------------------------------------ */
+/*  Textarea auto-grow + Enter-to-send                                 */
+/* ------------------------------------------------------------------ */
+function autoGrowTextarea() {
+  const input = document.getElementById("dash-prompt-input");
+  if (!input) return;
+  input.style.height = "auto";
+  input.style.height = Math.min(input.scrollHeight, 200) + "px";
+}
 
-// Wire tag input Enter key
 document.addEventListener("DOMContentLoaded", () => {
-  const tagInput = document.getElementById("dl-tag-input");
-  if (tagInput) {
-    tagInput.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") {
-        e.preventDefault();
-        const val = e.target.value.trim();
-        if (val && !dlFeatureTags.includes(val)) {
-          dlFeatureTags.push(val);
-          renderDlTags();
-          renderDlTagSuggestions();
-        }
-        e.target.value = "";
-      }
-    });
-  }
+  const input = document.getElementById("dash-prompt-input");
+  if (!input) return;
+  input.addEventListener("input", autoGrowTextarea);
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      submitDashPrompt();
+    }
+  });
 });
 
-window.openDashboardAddListing = function () {
-  // Clear form
-  ["dl-url", "dl-address", "dl-city", "dl-state", "dl-zip", "dl-county", "dl-neighborhood",
-   "dl-price", "dl-beds", "dl-baths", "dl-sqft", "dl-yearBuilt", "dl-lotSize",
-   "dl-garage", "dl-stories", "dl-mls", "dl-listingUrl", "dl-description", "dl-notes"].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.value = "";
-  });
-  const typeEl = document.getElementById("dl-type");
-  if (typeEl) typeEl.value = "";
-  const statusEl = document.getElementById("dl-status");
-  if (statusEl) statusEl.value = "active";
-  document.getElementById("dl-fetch-status").innerHTML = "";
-  document.getElementById("dl-fetch-btn").disabled = false;
-  document.getElementById("dl-fetch-btn").textContent = "Fetch";
-  const saveBtn = document.getElementById("dl-save-btn");
-  if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = "Save Listing"; }
-  dlFeatureTags = [];
-  renderDlTags();
-  renderDlTagSuggestions();
-  loadDashboardClients();
-  document.getElementById("dash-add-listing-modal").classList.add("active");
-};
+/* ------------------------------------------------------------------ */
+/*  Submit                                                             */
+/* ------------------------------------------------------------------ */
+window.submitDashPrompt = async function () {
+  const input = document.getElementById("dash-prompt-input");
+  const sendBtn = document.getElementById("dash-send-btn");
+  const question = (input.value || "").trim();
+  if (!question) return;
 
-window.closeDashboardAddListing = function () {
-  document.getElementById("dash-add-listing-modal").classList.remove("active");
-};
-
-window.fetchDashboardListingFromUrl = async function () {
-  const url = document.getElementById("dl-url").value.trim();
-  if (!url) { showToast("Enter a listing URL.", "error"); return; }
-
-  const btn = document.getElementById("dl-fetch-btn");
-  const statusEl = document.getElementById("dl-fetch-status");
-  btn.disabled = true;
-  btn.textContent = "Fetching...";
-  statusEl.innerHTML = '<div class="gd-spinner" style="display:inline-block;vertical-align:middle;margin-right:0.5rem;"></div> Extracting property details...';
-  statusEl.className = "gd-url-fetch-result gd-url-fetch-loading";
+  appendTranscript("user", question);
+  input.value = "";
+  autoGrowTextarea();
+  sendBtn.disabled = true;
+  showTyping();
 
   try {
-    const result = await parseListingUrlFn({ url });
-    const listing = result.data.listing;
+    const contextData = {
+      agentFirstName: (currentUser?.fullName || "").split(/\s+/)[0] || "",
+      todayDate: new Date().toISOString().slice(0, 10),
+      recentClients,
+      recentListings
+    };
+    const r = await askAssistantFn({
+      question,
+      context: "dashboard",
+      contextData,
+      history: conversation.slice(-6)
+    });
+    const { response, actions } = r.data || {};
+    removeTyping();
+    appendTranscript("assistant", response || "OK.", actions || []);
+    conversation.push({ role: "user", content: question });
+    conversation.push({ role: "assistant", content: response || "OK." });
 
-    if (listing.address) {
-      document.getElementById("dl-address").value = listing.address.street || listing.address.full || "";
-      document.getElementById("dl-city").value = listing.address.city || "";
-      document.getElementById("dl-state").value = listing.address.state || "";
-      document.getElementById("dl-zip").value = listing.address.zip || "";
-      document.getElementById("dl-county").value = listing.address.county || "";
-      document.getElementById("dl-neighborhood").value = listing.address.neighborhood || "";
-    }
-    if (listing.listingPrice) document.getElementById("dl-price").value = listing.listingPrice;
-    if (listing.bedrooms != null) document.getElementById("dl-beds").value = listing.bedrooms;
-    if (listing.bathrooms != null) document.getElementById("dl-baths").value = listing.bathrooms;
-    if (listing.squareFeet) document.getElementById("dl-sqft").value = listing.squareFeet;
-    if (listing.propertyType) document.getElementById("dl-type").value = listing.propertyType;
-    if (listing.yearBuilt) document.getElementById("dl-yearBuilt").value = listing.yearBuilt;
-    if (listing.lotSize) document.getElementById("dl-lotSize").value = listing.lotSize;
-    if (listing.garageSpaces) document.getElementById("dl-garage").value = listing.garageSpaces;
-    if (listing.stories) document.getElementById("dl-stories").value = listing.stories;
-    if (listing.mlsNumber) document.getElementById("dl-mls").value = listing.mlsNumber;
-    if (listing.status) document.getElementById("dl-status").value = listing.status;
-    if (listing.description) document.getElementById("dl-description").value = listing.description;
-    document.getElementById("dl-listingUrl").value = url;
-
-    if (listing.features && Array.isArray(listing.features)) {
-      dlFeatureTags = listing.features.slice(0, 30);
-      renderDlTags();
-      renderDlTagSuggestions();
-    }
-
-    statusEl.innerHTML = "&#10003; Property details extracted!";
-    statusEl.className = "gd-url-fetch-result gd-url-fetch-success";
+    // Auto-route on navigate
+    const nav = (actions || []).find(a => a.name === "navigate");
+    if (nav) executeNavigate(nav.input || {});
   } catch (err) {
-    console.error("Fetch listing error:", err);
-    statusEl.innerHTML = "&#10007; Failed to extract details. Enter manually below.";
-    statusEl.className = "gd-url-fetch-result gd-url-fetch-error";
+    console.error("askAssistant error:", err);
+    removeTyping();
+    appendTranscript("assistant", `Sage isn't reachable right now (${err.message}). Try again in a moment.`);
   } finally {
-    btn.disabled = false;
-    btn.textContent = "Fetch";
+    sendBtn.disabled = false;
   }
 };
 
-/* --- Add Client Modal (Dashboard) --- */
-window.openDashboardAddClient = function () {
-  document.getElementById("dash-add-client-modal").classList.add("active");
+/* ------------------------------------------------------------------ */
+/*  Navigation                                                         */
+/* ------------------------------------------------------------------ */
+const TARGET_ROUTES = {
+  dashboard: () => "/greendoor/app/dashboard",
+  client_list: () => "/greendoor/app/clients",
+  client: (i) => i.clientId
+    ? `/greendoor/app/client-detail?cid=${encodeURIComponent(i.clientId)}${i.tab ? `&tab=${encodeURIComponent(i.tab)}` : ""}`
+    : "/greendoor/app/clients",
+  listing_list: () => "/greendoor/app/listings",
+  listing: (i) => i.listingId
+    ? `/greendoor/app/listings?lid=${encodeURIComponent(i.listingId)}`
+    : "/greendoor/app/listings",
+  calendar: () => "/greendoor/app/calendar",
+  templates: () => "/greendoor/app/templates",
+  settings: () => "/greendoor/app/settings"
 };
 
-window.closeDashboardAddClient = function () {
-  document.getElementById("dash-add-client-modal").classList.remove("active");
-};
+function executeNavigate(input) {
+  const fn = TARGET_ROUTES[input.target];
+  if (!fn) {
+    showToast(`Sage tried to navigate to '${input.target}' but I don't know that page.`, "error");
+    return;
+  }
+  const url = fn(input);
+  // Brief delay so the user reads the confirmation text before the page changes.
+  setTimeout(() => { window.location.href = url; }, 600);
+}
 
-window.saveDashboardClient = async function () {
-  const fullName = document.getElementById("dash-add-fullName").value.trim();
-  const email = document.getElementById("dash-add-email").value.trim();
+/* ------------------------------------------------------------------ */
+/*  Transcript rendering                                               */
+/* ------------------------------------------------------------------ */
+function appendTranscript(role, text, actions) {
+  const el = document.getElementById("dash-transcript");
+  const msg = document.createElement("div");
+  msg.className = `gd-dash-msg gd-dash-msg-${role}`;
+  msg.innerHTML = formatMessageHtml(text || "");
 
-  if (!fullName || !email) {
-    showToast("Name and email are required.", "error");
+  if (Array.isArray(actions) && actions.length) {
+    const actionRow = document.createElement("div");
+    actionRow.className = "gd-dash-actions";
+    actions.forEach(a => {
+      if (a.name === "navigate") {
+        const btn = document.createElement("button");
+        btn.className = "gd-btn gd-btn-sm gd-btn-primary";
+        btn.textContent = labelForNavigate(a.input || {});
+        btn.onclick = () => executeNavigate(a.input || {});
+        actionRow.appendChild(btn);
+      }
+    });
+    if (actionRow.children.length) msg.appendChild(actionRow);
+  }
+
+  el.appendChild(msg);
+  el.scrollTop = el.scrollHeight;
+}
+
+function labelForNavigate(input) {
+  switch (input.target) {
+    case "client":
+      const c = recentClients.find(x => x.id === input.clientId);
+      return c ? `Open ${c.name}` : "Open client";
+    case "client_list": return "Open Clients";
+    case "listing":
+      const l = recentListings.find(x => x.id === input.listingId);
+      return l ? `Open ${l.address}` : "Open listing";
+    case "listing_list": return "Open Listings";
+    case "calendar": return "Open Calendar";
+    case "templates": return "Open Templates";
+    case "settings": return "Open Settings";
+    default: return "Open";
+  }
+}
+
+function formatMessageHtml(text) {
+  return escapeHtml(text)
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/\n/g, "<br>");
+}
+
+function showTyping() {
+  const el = document.getElementById("dash-transcript");
+  const t = document.createElement("div");
+  t.id = "dash-typing";
+  t.className = "gd-dash-msg gd-dash-msg-assistant gd-dash-typing";
+  t.innerHTML = '<span class="gd-dash-typing-dot"></span><span class="gd-dash-typing-dot"></span><span class="gd-dash-typing-dot"></span>';
+  el.appendChild(t);
+  el.scrollTop = el.scrollHeight;
+}
+
+function removeTyping() {
+  const t = document.getElementById("dash-typing");
+  if (t) t.remove();
+}
+
+/* ------------------------------------------------------------------ */
+/*  Voice input (parallel of chatbot.js, targets dashboard textarea)   */
+/* ------------------------------------------------------------------ */
+let dashRecognition = null;
+let dashListening = false;
+
+window.toggleDashVoice = function () {
+  const micBtn = document.getElementById("dash-mic-btn");
+  const input = document.getElementById("dash-prompt-input");
+
+  if (dashListening) {
+    if (dashRecognition) dashRecognition.stop();
     return;
   }
 
-  const user = auth.currentUser;
-  if (!user) return;
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    showToast("Voice input not supported in this browser.", "error");
+    return;
+  }
 
-  // Duplicate detection by email
-  try {
-    const dupeQ = query(collection(db, "clients"), where("realtorId", "==", user.uid), where("email", "==", email));
-    const dupeSnap = await getDocs(dupeQ);
-    if (!dupeSnap.empty) {
-      const existing = dupeSnap.docs[0].data();
-      const confirmed = confirm(`A client with email "${email}" already exists (${existing.fullName}). Add anyway?`);
-      if (!confirmed) return;
-    }
-  } catch (e) { /* proceed if check fails */ }
+  dashRecognition = new SpeechRecognition();
+  dashRecognition.lang = "en-US";
+  dashRecognition.interimResults = true;
+  dashRecognition.continuous = false;
+  dashRecognition.maxAlternatives = 1;
 
-  const data = {
-    realtorId: user.uid,
-    fullName,
-    email,
-    phone: document.getElementById("dash-add-phone").value.trim(),
-    status: document.getElementById("dash-add-status").value,
-    budgetMin: Number(document.getElementById("dash-add-budgetMin").value) || null,
-    budgetMax: Number(document.getElementById("dash-add-budgetMax").value) || null,
-    timeline: document.getElementById("dash-add-timeline").value,
-    source: document.getElementById("dash-add-source").value,
-    notes: document.getElementById("dash-add-notes").value.trim(),
-    preferredLocations: [],
-    propertyTypes: [],
-    bedsMin: null,
-    bedsMax: null,
-    bathsMin: null,
-    bathsMax: null,
-    sqftMin: null,
-    sqftMax: null,
-    mustHaveFeatures: [],
-    preApprovalStatus: "",
-    preApprovalAmount: null,
-    lastActivityDate: serverTimestamp(),
-    createdAt: serverTimestamp()
+  dashRecognition.onstart = () => {
+    dashListening = true;
+    micBtn.classList.add("listening");
+    input.placeholder = "Listening…";
   };
 
-  try {
-    const docRef = await addDoc(collection(db, "clients"), data);
+  dashRecognition.onresult = (e) => {
+    let transcript = "";
+    for (let i = 0; i < e.results.length; i++) transcript += e.results[i][0].transcript;
+    input.value = transcript;
+    autoGrowTextarea();
+    if (e.results[e.results.length - 1].isFinal) {
+      setTimeout(() => {
+        if (input.value.trim()) submitDashPrompt();
+      }, 400);
+    }
+  };
 
-    await addDoc(collection(db, "activities"), {
-      clientId: docRef.id,
-      realtorId: user.uid,
-      type: "note",
-      subject: "Client created",
-      body: "",
-      timestamp: serverTimestamp()
-    });
+  dashRecognition.onerror = (e) => {
+    console.error("Dash voice error:", e.error);
+    if (e.error !== "aborted" && e.error !== "no-speech") {
+      showToast("Couldn't hear you — try again.", "error");
+    }
+  };
 
-    showToast("Client added successfully!");
-    closeDashboardAddClient();
+  dashRecognition.onend = () => {
+    dashListening = false;
+    micBtn.classList.remove("listening");
+    input.placeholder = "Ask Sage anything, or say what you want to do…";
+  };
 
-    // Clear form
-    ["dash-add-fullName", "dash-add-email", "dash-add-phone", "dash-add-budgetMin", "dash-add-budgetMax", "dash-add-notes"].forEach(id => {
-      document.getElementById(id).value = "";
-    });
-    document.getElementById("dash-add-status").value = "lead";
-    document.getElementById("dash-add-timeline").value = "";
-    document.getElementById("dash-add-source").value = "";
-
-    await Promise.all([refreshStats(user.uid), refreshActivityFeed(user.uid)]);
-  } catch (e) {
-    console.error("Save client error:", e);
-    showToast("Could not save client. Check your connection and try again.", "error");
-  }
+  dashRecognition.start();
 };
 
-window.saveDashboardListing = async function () {
-  const user = auth.currentUser;
-  if (!user) return;
-
-  const addrFull = document.getElementById("dl-address").value.trim();
-  if (!addrFull) { showToast("Address is required.", "error"); return; }
-
-  const saveBtn = document.getElementById("dl-save-btn");
-  if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = "Saving..."; }
-
-  const price = Number(document.getElementById("dl-price").value) || null;
-  const sqft = Number(document.getElementById("dl-sqft").value) || null;
-
-  const address = {
-    full: [addrFull, document.getElementById("dl-city").value.trim(), document.getElementById("dl-state").value.trim(), document.getElementById("dl-zip").value.trim()].filter(Boolean).join(", "),
-    street: addrFull,
-    city: document.getElementById("dl-city").value.trim(),
-    state: document.getElementById("dl-state").value.trim(),
-    zip: document.getElementById("dl-zip").value.trim(),
-    county: document.getElementById("dl-county").value.trim(),
-    neighborhood: document.getElementById("dl-neighborhood").value.trim()
-  };
-
-  const data = {
-    address,
-    listingPrice: price,
-    bedrooms: Number(document.getElementById("dl-beds").value) || null,
-    bathrooms: Number(document.getElementById("dl-baths").value) || null,
-    squareFeet: sqft,
-    propertyType: document.getElementById("dl-type").value,
-    yearBuilt: Number(document.getElementById("dl-yearBuilt").value) || null,
-    lotSize: document.getElementById("dl-lotSize").value.trim(),
-    garageSpaces: Number(document.getElementById("dl-garage").value) || null,
-    stories: Number(document.getElementById("dl-stories").value) || null,
-    features: dlFeatureTags,
-    mlsNumber: document.getElementById("dl-mls").value.trim(),
-    status: document.getElementById("dl-status").value,
-    listingUrl: document.getElementById("dl-listingUrl").value.trim(),
-    description: document.getElementById("dl-description").value.trim(),
-    notes: document.getElementById("dl-notes").value.trim(),
-    photos: [],
-    addedBy: user.uid,
-    source: "manual",
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp()
-  };
-
-  if (price && sqft) {
-    data.pricePerSqft = Math.round(price / sqft);
-  }
-
-  try {
-    const docRef = await addDoc(collection(db, "listings"), data);
-
-    // Match to selected clients
-    const selectedClients = document.querySelectorAll(".dl-client-check:checked");
-    const listingForScore = { id: docRef.id, ...data };
-
-    for (const cb of selectedClients) {
-      const cid = cb.value;
-      const clientObj = dashboardClients.find(c => c.id === cid);
-      if (!clientObj) continue;
-
-      const result = calculateMatchScore(listingForScore, clientObj);
-      await addDoc(collection(db, "clientListingMatches"), {
-        listingId: docRef.id,
-        clientId: cid,
-        realtorId: user.uid,
-        matchScore: result.score,
-        matchBreakdown: result.breakdown,
-        dealBreakerHits: result.dealBreakerHits,
-        status: "interested",
-        clientRating: null,
-        clientFeedback: "",
-        realtorNotes: "",
-        matchedAt: serverTimestamp()
-      });
-    }
-
-    const matchCount = selectedClients.length;
-    showToast(matchCount > 0 ? `Listing added and matched to ${matchCount} client${matchCount > 1 ? "s" : ""}!` : "Listing added!");
-    closeDashboardAddListing();
-
-    await refreshActivityFeed(user.uid);
-  } catch (e) {
-    console.error("Save listing error:", e);
-    showToast("Could not save listing. Check your connection and try again.", "error");
-    if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = "Save Listing"; }
-  }
+/* ------------------------------------------------------------------ */
+/*  Logout (referenced from sidebar)                                   */
+/* ------------------------------------------------------------------ */
+window.handleLogout = async function () {
+  await auth.signOut();
+  window.location.href = "/greendoor/app/login";
 };

@@ -4,7 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Dashboard — GreenDoor</title>
-  <!-- PWA -->
   <link rel="manifest" href="/greendoor/app/manifest.json">
   <meta name="theme-color" content="#22c55e">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -72,318 +71,46 @@
 
   <div class="gd-app-layout">
   <div class="gd-page">
-    <div class="gd-content">
+    <div class="gd-content gd-dash-content">
 
-      <!-- Loading State -->
-      <div id="dashboard-loading" class="gd-loading">
-        <div class="gd-spinner gd-spinner-lg"></div>
-        <span class="gd-loading-text">Loading dashboard...</span>
+      <div class="gd-dash-hero">
+        <h1 class="gd-dash-greeting" id="dash-greeting">Hi.</h1>
+        <p class="gd-dash-subhead">What can Sage help you with today?</p>
+
+        <form class="gd-dash-prompt-wrap" id="dash-prompt-form" autocomplete="off" onsubmit="return false;">
+          <textarea
+            id="dash-prompt-input"
+            class="gd-dash-prompt-input"
+            placeholder="Ask Sage anything, or say what you want to do…"
+            rows="1"
+            autocomplete="off"
+            autocorrect="on"
+            spellcheck="true"></textarea>
+          <div class="gd-dash-prompt-actions">
+            <button type="button" id="dash-mic-btn" class="gd-dash-prompt-btn gd-dash-mic-btn" onclick="toggleDashVoice()" aria-label="Voice input" title="Speak to Sage">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+            </button>
+            <button type="submit" id="dash-send-btn" class="gd-dash-prompt-btn gd-dash-send-btn" onclick="submitDashPrompt()" aria-label="Send" title="Send">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+            </button>
+          </div>
+        </form>
+
+        <div class="gd-dash-chips" id="dash-chips">
+          <!-- chips injected by JS -->
+        </div>
+
+        <div class="gd-dash-transcript" id="dash-transcript">
+          <!-- conversation messages injected by JS -->
+        </div>
       </div>
 
-      <!-- Dashboard Content (hidden until loaded) -->
-      <div id="dashboard-content" class="gd-hidden">
-
-        <!-- Welcome + Quick Actions -->
-        <div class="gd-welcome gd-flex-between gd-flex-wrap gd-gap-sm">
-          <h1>Welcome back, <em id="welcome-name"></em></h1>
-          <div class="gd-quick-actions gd-mb-0">
-            <button class="gd-btn gd-btn-primary" onclick="openDashboardAddClient()">+ New Client</button>
-            <button class="gd-btn" onclick="openDashboardAddListing()">+ Add Listing</button>
-          </div>
-        </div>
-
-        <!-- AI Daily Briefing -->
-        <div id="ai-briefing" class="gd-card gd-ai-briefing-card">
-          <div class="gd-ai-briefing-header">
-            <div class="gd-ai-briefing-title"><span>&#10024;</span> Sage Daily Briefing</div>
-            <button class="gd-btn gd-btn-sm" onclick="refreshBriefing()">Refresh</button>
-          </div>
-          <div id="ai-briefing-content" class="gd-ai-briefing-content">
-            <div class="gd-ai-briefing-loading">
-              <div class="gd-spinner"></div>
-              <span>Sage is preparing your briefing...</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Stat Cards -->
-        <div class="gd-stats-row">
-          <div class="gd-stat-card">
-            <div class="gd-stat-number" id="stat-total">0</div>
-            <div class="gd-stat-label">Total Clients</div>
-          </div>
-          <div class="gd-stat-card">
-            <div class="gd-stat-number" id="stat-buyers">0</div>
-            <div class="gd-stat-label">Active Buyers</div>
-          </div>
-          <div class="gd-stat-card">
-            <div class="gd-stat-number" id="stat-sellers">0</div>
-            <div class="gd-stat-label">Active Sellers</div>
-          </div>
-          <div class="gd-stat-card">
-            <div class="gd-stat-number" id="stat-contracts">0</div>
-            <div class="gd-stat-label">Under Contract</div>
-          </div>
-        </div>
-
-        <!-- Two Column: Activity + Showings -->
-        <div class="gd-two-col">
-
-          <!-- Recent Activity -->
-          <div class="gd-card">
-            <h3>Recent Activity</h3>
-            <div id="activity-feed" class="gd-activity-feed">
-              <div class="gd-empty">
-                <div class="gd-empty-icon">&#128203;</div>
-                <div class="gd-empty-text">No recent activity</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Upcoming Showings -->
-          <div class="gd-card">
-            <h3>Upcoming Showings</h3>
-            <div id="showings-list" class="gd-showings-list">
-              <div class="gd-empty">
-                <div class="gd-empty-icon">&#127968;</div>
-                <div class="gd-empty-text">No upcoming showings</div>
-              </div>
-            </div>
-          </div>
-
-        </div>
-
-      </div>
     </div>
   </div>
   </div><!-- /gd-app-layout -->
 
-  <!-- Add Listing Modal -->
-  <div id="dash-add-listing-modal" class="gd-modal-overlay">
-    <div class="gd-modal gd-modal-lg">
-      <div class="gd-modal-header">
-        <h3>Add Listing</h3>
-        <button class="gd-modal-close" onclick="closeDashboardAddListing()" aria-label="Close">&times;</button>
-      </div>
-      <div class="gd-modal-body">
-
-        <!-- URL Fetch Section -->
-        <div class="gd-url-fetch-section">
-          <div class="gd-form-group gd-mb-0">
-            <label>Import from URL</label>
-            <div class="gd-flex gd-gap-sm">
-              <input type="url" id="dl-url" class="gd-input gd-flex-1" placeholder="Paste a Zillow, Realtor.com, or other listing URL...">
-              <button id="dl-fetch-btn" class="gd-btn gd-btn-primary" onclick="fetchDashboardListingFromUrl()">Fetch</button>
-            </div>
-          </div>
-          <div id="dl-fetch-status" class="gd-url-fetch-result"></div>
-        </div>
-
-        <div class="gd-or-divider"><span>OR enter manually</span></div>
-
-        <!-- Manual Form -->
-        <div class="gd-add-listing-form">
-          <div class="gd-form-section">
-            <div class="gd-form-section-title">Address</div>
-            <div class="gd-form-group">
-              <label for="dl-address">Street Address *</label>
-              <input type="text" id="dl-address" class="gd-input" placeholder="123 Main St">
-            </div>
-            <div class="gd-form-row">
-              <div class="gd-form-group"><label for="dl-city">City</label><input type="text" id="dl-city" class="gd-input"></div>
-              <div class="gd-form-group"><label for="dl-state">State</label><input type="text" id="dl-state" class="gd-input" maxlength="2" placeholder="MO"></div>
-              <div class="gd-form-group"><label for="dl-zip">ZIP</label><input type="text" id="dl-zip" class="gd-input" maxlength="10"></div>
-            </div>
-            <div class="gd-form-row">
-              <div class="gd-form-group"><label for="dl-county">County</label><input type="text" id="dl-county" class="gd-input"></div>
-              <div class="gd-form-group"><label for="dl-neighborhood">Neighborhood</label><input type="text" id="dl-neighborhood" class="gd-input"></div>
-            </div>
-          </div>
-
-          <div class="gd-form-section">
-            <div class="gd-form-section-title">Pricing</div>
-            <div class="gd-form-group">
-              <label for="dl-price">List Price ($)</label>
-              <input type="number" id="dl-price" class="gd-input">
-            </div>
-          </div>
-
-          <div class="gd-form-section">
-            <div class="gd-form-section-title">Details</div>
-            <div class="gd-form-row">
-              <div class="gd-form-group"><label for="dl-type">Property Type</label>
-                <select id="dl-type" class="gd-input">
-                  <option value="">Select...</option>
-                  <option value="Single Family">Single Family</option>
-                  <option value="Condo">Condo</option>
-                  <option value="Townhouse">Townhouse</option>
-                  <option value="Multi-Family">Multi-Family</option>
-                  <option value="Land">Land</option>
-                </select>
-              </div>
-              <div class="gd-form-group"><label for="dl-beds">Beds</label><input type="number" id="dl-beds" class="gd-input"></div>
-              <div class="gd-form-group"><label for="dl-baths">Baths</label><input type="number" id="dl-baths" class="gd-input" step="0.5"></div>
-            </div>
-            <div class="gd-form-row">
-              <div class="gd-form-group"><label for="dl-sqft">Sq Ft</label><input type="number" id="dl-sqft" class="gd-input"></div>
-              <div class="gd-form-group"><label for="dl-yearBuilt">Year Built</label><input type="number" id="dl-yearBuilt" class="gd-input"></div>
-              <div class="gd-form-group"><label for="dl-lotSize">Lot Size</label><input type="text" id="dl-lotSize" class="gd-input" placeholder="0.25 acres"></div>
-            </div>
-            <div class="gd-form-row">
-              <div class="gd-form-group"><label for="dl-garage">Garage Spaces</label><input type="number" id="dl-garage" class="gd-input"></div>
-              <div class="gd-form-group"><label for="dl-stories">Stories</label><input type="number" id="dl-stories" class="gd-input"></div>
-            </div>
-          </div>
-
-          <div class="gd-form-section">
-            <div class="gd-form-section-title">Features</div>
-            <div class="gd-form-group">
-              <div class="gd-tag-input-wrap">
-                <div id="dl-tag-list" class="gd-tag-list"></div>
-                <input type="text" id="dl-tag-input" class="gd-tag-field" placeholder="Type a feature and press Enter">
-              </div>
-              <div id="dl-tag-suggestions" class="gd-tag-suggestions"></div>
-            </div>
-          </div>
-
-          <div class="gd-form-section">
-            <div class="gd-form-section-title">Listing Info</div>
-            <div class="gd-form-row">
-              <div class="gd-form-group"><label for="dl-mls">MLS Number</label><input type="text" id="dl-mls" class="gd-input"></div>
-              <div class="gd-form-group"><label for="dl-status">Status</label>
-                <select id="dl-status" class="gd-input">
-                  <option value="active">Active</option>
-                  <option value="pending">Pending</option>
-                  <option value="sold">Sold</option>
-                  <option value="coming_soon">Coming Soon</option>
-                  <option value="withdrawn">Withdrawn</option>
-                </select>
-              </div>
-            </div>
-            <div class="gd-form-group">
-              <label for="dl-listingUrl">Listing URL</label>
-              <input type="url" id="dl-listingUrl" class="gd-input">
-            </div>
-            <div class="gd-form-group">
-              <label for="dl-description">Description</label>
-              <textarea id="dl-description" class="gd-input" rows="3"></textarea>
-            </div>
-          </div>
-
-          <div class="gd-form-section gd-border-0">
-            <div class="gd-form-section-title">Notes</div>
-            <div class="gd-form-group">
-              <textarea id="dl-notes" class="gd-input" rows="2" placeholder="Internal notes..."></textarea>
-            </div>
-          </div>
-
-          <!-- Match to Clients -->
-          <div class="gd-form-section gd-border-0">
-            <div class="gd-form-section-title">Match to Clients</div>
-            <div class="gd-form-group">
-              <label for="dl-client-select">Select clients to match this listing to</label>
-              <div id="dl-client-checkboxes" class="gd-client-checkbox-list" style="max-height:160px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius);padding:0.5rem;">
-                <span class="gd-muted">Loading clients...</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-      </div>
-      <div class="gd-modal-footer">
-        <button class="gd-btn" onclick="closeDashboardAddListing()">Cancel</button>
-        <button id="dl-save-btn" class="gd-btn gd-btn-primary" onclick="saveDashboardListing()">Save Listing</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Add Client Modal -->
-  <div id="dash-add-client-modal" class="gd-modal-overlay">
-    <div class="gd-modal">
-      <div class="gd-modal-header">
-        <h3>Add New Client</h3>
-        <button class="gd-modal-close" onclick="closeDashboardAddClient()" aria-label="Close">&times;</button>
-      </div>
-      <div class="gd-modal-body">
-        <div class="gd-form-row">
-          <div class="gd-form-group">
-            <label for="dash-add-fullName">Full Name *</label>
-            <input type="text" id="dash-add-fullName" class="gd-input" required>
-          </div>
-          <div class="gd-form-group">
-            <label for="dash-add-email">Email *</label>
-            <input type="email" id="dash-add-email" class="gd-input" required>
-          </div>
-        </div>
-        <div class="gd-form-row">
-          <div class="gd-form-group">
-            <label for="dash-add-phone">Phone</label>
-            <input type="tel" id="dash-add-phone" class="gd-input">
-          </div>
-          <div class="gd-form-group">
-            <label for="dash-add-status">Status</label>
-            <select id="dash-add-status" class="gd-input">
-              <option value="lead" selected>Lead</option>
-              <option value="active_buyer">Active Buyer</option>
-              <option value="active_seller">Active Seller</option>
-              <option value="under_contract">Under Contract</option>
-              <option value="closed">Closed</option>
-              <option value="inactive">Inactive</option>
-            </select>
-          </div>
-        </div>
-        <div class="gd-form-row">
-          <div class="gd-form-group">
-            <label for="dash-add-budgetMin">Budget Min</label>
-            <input type="number" id="dash-add-budgetMin" class="gd-input" placeholder="200000">
-          </div>
-          <div class="gd-form-group">
-            <label for="dash-add-budgetMax">Budget Max</label>
-            <input type="number" id="dash-add-budgetMax" class="gd-input" placeholder="500000">
-          </div>
-        </div>
-        <div class="gd-form-row">
-          <div class="gd-form-group">
-            <label for="dash-add-timeline">Timeline</label>
-            <select id="dash-add-timeline" class="gd-input">
-              <option value="">Select...</option>
-              <option value="Immediate">Immediate</option>
-              <option value="1-3 Months">1-3 Months</option>
-              <option value="3-6 Months">3-6 Months</option>
-              <option value="6-12 Months">6-12 Months</option>
-              <option value="Just Browsing">Just Browsing</option>
-            </select>
-          </div>
-          <div class="gd-form-group">
-            <label for="dash-add-source">Source</label>
-            <select id="dash-add-source" class="gd-input">
-              <option value="">Select...</option>
-              <option value="Referral">Referral</option>
-              <option value="Online Ad">Online Ad</option>
-              <option value="Open House">Open House</option>
-              <option value="Website">Website</option>
-              <option value="Social Media">Social Media</option>
-              <option value="Cold Call">Cold Call</option>
-              <option value="Other">Other</option>
-            </select>
-          </div>
-        </div>
-        <div class="gd-form-group">
-          <label for="dash-add-notes">Notes</label>
-          <textarea id="dash-add-notes" class="gd-input" rows="3" placeholder="Any initial notes..."></textarea>
-        </div>
-      </div>
-      <div class="gd-modal-footer">
-        <button class="gd-btn" onclick="closeDashboardAddClient()">Cancel</button>
-        <button class="gd-btn gd-btn-primary" onclick="saveDashboardClient()">Save Client</button>
-      </div>
-    </div>
-  </div>
-
   <script src="/assets/js/main.js"></script>
   <script type="module" src="/greendoor/js/auth.js"></script>
-  <script type="module" src="/greendoor/js/tour.js"></script>
-  <script type="module" src="/greendoor/js/match-engine.js"></script>
   <script type="module" src="/greendoor/js/dashboard.js"></script>
   <script type="module" src="/greendoor/js/bottom-tabs.js"></script>
   <script type="module" src="/greendoor/js/chatbot.js"></script>
