@@ -150,6 +150,26 @@ async function loadClient(uid) {
 
     document.getElementById("detail-loading").classList.add("gd-hidden");
     document.getElementById("detail-content").classList.remove("gd-hidden");
+
+    // Sage email draft prefill — dashboard's draft_email stashed subject+body
+    // in sessionStorage and routed here. Pop it, open the email modal, prefill.
+    try {
+      const draftKey = `sage_email_draft_${clientId}`;
+      const raw = sessionStorage.getItem(draftKey);
+      if (raw) {
+        sessionStorage.removeItem(draftKey);
+        const draft = JSON.parse(raw);
+        if (typeof window.openActivityModal === "function") {
+          window.openActivityModal("email");
+          setTimeout(() => {
+            const subEl = document.getElementById("act-subject");
+            const bodyEl = document.getElementById("act-body");
+            if (subEl && draft.subject) subEl.value = draft.subject;
+            if (bodyEl && draft.body) bodyEl.value = draft.body;
+          }, 100);
+        }
+      }
+    } catch (_) { /* non-fatal */ }
   } catch (e) {
     console.error("Load client error:", e);
     showToast("Failed to load client.", "error");

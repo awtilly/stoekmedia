@@ -10,15 +10,19 @@
 import { auth, db, functions, httpsCallable } from "./firebase-config.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import {
-  collection, query, where, orderBy, limit, getDocs, Timestamp
+  collection, query, where, orderBy, limit, getDocs, addDoc, doc, updateDoc,
+  Timestamp, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { getCurrentUser, showToast, escapeHtml, safeToDate } from "./auth.js";
 
 const askAssistantFn = httpsCallable(functions, "askAssistant");
+const parseListingUrlFn = httpsCallable(functions, "parseListingUrl");
+const sendComplianceDocFn = httpsCallable(functions, "sendComplianceDocV2");
 
 let currentUser = null;
-let recentClients = [];   // [{ id, name, status, lastContactDays }]
+let recentClients = [];   // [{ id, name, status, email, phone, lastContactDays }]
 let recentListings = [];  // [{ id, address }]
+let templates = [];       // [{ id, name, category }]
 let todayShowings = [];   // [{ time, address }]
 let conversation = [];    // [{ role, content }] — passed back to Sage for follow-ups
 let briefingShown = false;
@@ -54,7 +58,7 @@ async function loadContextSnapshots(uid) {
   const endOfToday = new Date(); endOfToday.setHours(23, 59, 59, 999);
 
   try {
-    const [cSnap, lSnap, sSnap] = await Promise.all([
+    const [cSnap, lSnap, tSnap, sSnap] = await Promise.all([
       getDocs(query(
         collection(db, "clients"),
         where("realtorId", "==", uid),
@@ -67,6 +71,10 @@ async function loadContextSnapshots(uid) {
         orderBy("updatedAt", "desc"),
         limit(20)
       )),
+      getDocs(query(
+        collection(db, "documentTemplates"),
+        where("ownerId", "==", uid)
+      )).catch(() => null), // No realtor templates yet is fine
       getDocs(query(
         collection(db, "showings"),
         where("realtorId", "==", uid),
@@ -86,6 +94,8 @@ async function loadContextSnapshots(uid) {
         id: d.id,
         name: x.fullName || "Unknown",
         status: x.status || null,
+        email: x.email || null,
+        phone: x.phone || null,
         lastContactDays
       };
     });
@@ -95,6 +105,13 @@ async function loadContextSnapshots(uid) {
       const a = x.address || {};
       return { id: d.id, address: a.full || a.street || d.id };
     });
+
+    if (tSnap) {
+      templates = tSnap.docs.map(d => {
+        const x = d.data();
+        return { id: d.id, name: x.name || "Untitled", category: x.category || "" };
+      });
+    }
 
     if (sSnap) {
       todayShowings = sSnap.docs
@@ -271,7 +288,8 @@ window.submitDashPrompt = async function () {
       agentFirstName: (currentUser?.fullName || "").split(/\s+/)[0] || "",
       todayDate: new Date().toISOString().slice(0, 10),
       recentClients,
-      recentListings
+      recentListings,
+      templates
     };
     const r = await askAssistantFn({
       question,
@@ -330,6 +348,264 @@ function executeNavigate(input) {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Tool executors — confirm-before-execute action handlers           */
+/* ------------------------------------------------------------------ */
+
+function clientName(clientId) {
+  const c = recentClients.find(x => x.id === clientId);
+  return c ? c.name : "client";
+}
+function clientEmail(clientId) {
+  const c = recentClients.find(x => x.id === clientId);
+  return c?.email || null;
+}
+function listingAddress(listingId) {
+  const l = recentListings.find(x => x.id === listingId);
+  return l ? l.address : "listing";
+}
+function templateName(templateId) {
+  const t = templates.find(x => x.id === templateId);
+  return t ? t.name : "document";
+}
+
+function previewRow(label, value) {
+  if (value == null || value === "") return "";
+  return `<div class="gd-dash-card-row"><span class="gd-dash-card-label">${escapeHtml(label)}</span><span class="gd-dash-card-value">${escapeHtml(String(value))}</span></div>`;
+}
+
+const STATUS_LABELS = {
+  lead: "Lead", active_buyer: "Active Buyer", active_seller: "Active Seller",
+  under_contract: "Under Contract", closed: "Closed", inactive: "Inactive"
+};
+
+const TOOL_EXECUTORS = {
+  create_client: {
+    title: "New Client",
+    icon: "&#128100;", // person
+    confirmLabel: "Create Client",
+    preview: (input) => `
+      ${previewRow("Name", input.fullName)}
+      ${previewRow("Email", input.email)}
+      ${previewRow("Phone", input.phone)}
+      ${previewRow("Status", STATUS_LABELS[input.status] || "Lead")}
+      ${previewRow("Type", input.transactionType ? input.transactionType.replace("_", " & ") : "")}
+      ${previewRow("Notes", input.notes)}
+    `,
+    execute: async (input) => {
+      const uid = auth.currentUser.uid;
+      const data = {
+        realtorId: uid,
+        fullName: input.fullName,
+        email: input.email || "",
+        phone: input.phone || "",
+        status: input.status || "lead",
+        transactionType: input.transactionType || "",
+        notes: input.notes || "",
+        source: "Sage",
+        budgetMin: null, budgetMax: null, timeline: "",
+        preferredLocations: [], propertyTypes: [],
+        bedsMin: null, bedsMax: null, bathsMin: null, bathsMax: null,
+        sqftMin: null, sqftMax: null, mustHaveFeatures: [],
+        preApprovalStatus: "", preApprovalAmount: null,
+        lastActivityDate: serverTimestamp(),
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      };
+      const ref = await addDoc(collection(db, "clients"), data);
+      await addDoc(collection(db, "activities"), {
+        clientId: ref.id, realtorId: uid, type: "note",
+        subject: "Client added via Sage", body: "",
+        timestamp: serverTimestamp()
+      });
+      return {
+        message: `Added **${input.fullName}**.`,
+        followUp: { label: `Open ${input.fullName}'s profile`, action: () => executeNavigate({ target: "client", clientId: ref.id }) }
+      };
+    }
+  },
+
+  create_followup: {
+    title: "Follow-up reminder",
+    icon: "&#9745;", // ballot box w/ check
+    confirmLabel: "Create Follow-Up",
+    preview: (input) => {
+      const due = new Date(); due.setDate(due.getDate() + (input.days_from_now || 0));
+      return `
+        ${previewRow("Title", input.title)}
+        ${previewRow("Due", due.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }))}
+        ${input.clientId ? previewRow("Client", clientName(input.clientId)) : ""}
+        ${previewRow("Notes", input.notes)}
+      `;
+    },
+    execute: async (input) => {
+      const uid = auth.currentUser.uid;
+      const due = new Date(); due.setDate(due.getDate() + (input.days_from_now || 0));
+      await addDoc(collection(db, "followUps"), {
+        realtorId: uid,
+        clientId: input.clientId || null,
+        title: input.title,
+        dueDate: Timestamp.fromDate(due),
+        priority: "medium",
+        status: "pending",
+        notes: input.notes || "",
+        sourceType: "sage",
+        createdAt: serverTimestamp()
+      });
+      return { message: `Reminder set for **${due.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}**.` };
+    }
+  },
+
+  schedule_event: {
+    title: "Schedule",
+    icon: "&#128197;", // calendar
+    confirmLabel: "Add to Calendar",
+    preview: (input) => `
+      ${previewRow("Title", input.title)}
+      ${previewRow("When", `${input.date} ${input.time}`)}
+      ${input.clientId ? previewRow("Client", clientName(input.clientId)) : ""}
+      ${previewRow("Address", input.address)}
+      ${previewRow("Notes", input.notes)}
+    `,
+    execute: async (input) => {
+      const uid = auth.currentUser.uid;
+      const dt = new Date(`${input.date}T${input.time || "09:00"}:00`);
+      if (isNaN(dt.getTime())) throw new Error("Couldn't parse the date/time. Try again.");
+      const data = {
+        realtorId: uid,
+        clientId: input.clientId || null,
+        address: input.address || input.title,
+        showingDate: Timestamp.fromDate(dt),
+        durationMinutes: 30,
+        status: "scheduled",
+        notes: input.notes || "",
+        listingPrice: null, mlsNumber: "",
+        createdAt: serverTimestamp(),
+        clientRating: null, clientFeedback: "",
+        disclosuresSent: false, followUpId: null
+      };
+      await addDoc(collection(db, "showings"), data);
+      return {
+        message: `Scheduled **${input.title}** on ${dt.toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}.`,
+        followUp: { label: "Open calendar", action: () => executeNavigate({ target: "calendar" }) }
+      };
+    }
+  },
+
+  send_compliance_doc: {
+    title: "Send document",
+    icon: "&#128196;", // page
+    confirmLabel: "Send for Signature",
+    preview: (input) => `
+      ${previewRow("Document", templateName(input.templateId))}
+      ${previewRow("Recipient", `${clientName(input.clientId)}${clientEmail(input.clientId) ? ` <${clientEmail(input.clientId)}>` : ""}`)}
+      ${input.listingId ? previewRow("Property", listingAddress(input.listingId)) : ""}
+    `,
+    execute: async (input) => {
+      try {
+        await sendComplianceDocFn({
+          templateId: input.templateId,
+          clientId: input.clientId,
+          listingId: input.listingId || null
+        });
+        return {
+          message: `Sent **${templateName(input.templateId)}** to ${clientName(input.clientId)}.`,
+          followUp: { label: "Open client", action: () => executeNavigate({ target: "client", clientId: input.clientId, tab: "compliance" }) }
+        };
+      } catch (err) {
+        // V2 not configured → route to compliance tab where the legacy fallback path lives.
+        if (err.code === "failed-precondition" || (err.message || "").includes("DocuSeal")) {
+          showToast("Routing you to the compliance tab to complete the send.", "info");
+          executeNavigate({ target: "client", clientId: input.clientId, tab: "compliance" });
+          return { message: "Opening the compliance tab to complete the send." };
+        }
+        throw err;
+      }
+    }
+  },
+
+  draft_email: {
+    title: "Email draft",
+    icon: "&#9993;", // envelope
+    confirmLabel: "Open in client to send",
+    preview: (input) => `
+      ${previewRow("To", `${clientName(input.clientId)}${clientEmail(input.clientId) ? ` <${clientEmail(input.clientId)}>` : ""}`)}
+      ${previewRow("Subject", input.subject)}
+      <div class="gd-dash-card-body">${escapeHtml(input.body || "").replace(/\n/g, "<br>")}</div>
+    `,
+    execute: async (input) => {
+      // Stash the draft in sessionStorage; client-detail.js can read & prefill the email modal.
+      const draft = { subject: input.subject, body: input.body, ts: Date.now() };
+      try { sessionStorage.setItem(`sage_email_draft_${input.clientId}`, JSON.stringify(draft)); } catch (_) {}
+      executeNavigate({ target: "client", clientId: input.clientId, tab: "activity" });
+      return { message: "Opening the client — your draft will appear in the email composer." };
+    }
+  },
+
+  add_listing: {
+    title: "New Listing",
+    icon: "&#127968;", // house
+    confirmLabel: "Add Listing",
+    preview: (input) => {
+      if (input.source_url) {
+        return `
+          ${previewRow("Source", input.source_url)}
+          <div class="gd-dash-card-body gd-text-muted">We'll fetch the details on confirm.</div>
+        `;
+      }
+      return `
+        ${previewRow("Address", input.address)}
+        ${previewRow("Price", input.price ? `$${Number(input.price).toLocaleString()}` : "")}
+        ${previewRow("Beds / Baths", input.beds || input.baths ? `${input.beds || "?"} / ${input.baths || "?"}` : "")}
+        ${previewRow("Sq ft", input.sqft)}
+        ${previewRow("Notes", input.notes)}
+      `;
+    },
+    execute: async (input) => {
+      const uid = auth.currentUser.uid;
+      let data;
+      if (input.source_url) {
+        const r = await parseListingUrlFn({ url: input.source_url });
+        const parsed = r.data || {};
+        data = {
+          address: parsed.address || { full: "", street: "", city: "", state: "", zip: "" },
+          listingPrice: parsed.price || null,
+          beds: parsed.beds || null,
+          baths: parsed.baths || null,
+          squareFeet: parsed.sqft || null,
+          yearBuilt: parsed.yearBuilt || null,
+          propertyType: parsed.propertyType || "",
+          description: parsed.description || "",
+          mlsNumber: parsed.mlsNumber || "",
+          sourceUrl: input.source_url,
+          notes: input.notes || ""
+        };
+      } else {
+        data = {
+          address: { full: input.address || "", street: input.address || "", city: "", state: "", zip: "" },
+          listingPrice: input.price || null,
+          beds: input.beds || null,
+          baths: input.baths || null,
+          squareFeet: input.sqft || null,
+          notes: input.notes || ""
+        };
+      }
+      data.addedBy = uid;
+      data.source = "sage";
+      data.status = "active";
+      data.createdAt = serverTimestamp();
+      data.updatedAt = serverTimestamp();
+      data.photos = [];
+      const ref = await addDoc(collection(db, "listings"), data);
+      const label = data.address?.full || data.address?.street || "your new listing";
+      return {
+        message: `Added **${label}**.`,
+        followUp: { label: "Open listing", action: () => executeNavigate({ target: "listing", listingId: ref.id }) }
+      };
+    }
+  }
+};
+
+/* ------------------------------------------------------------------ */
 /*  Transcript rendering + streaming (typewriter)                      */
 /* ------------------------------------------------------------------ */
 function appendTranscript(role, text, actions, stream, streamText) {
@@ -346,20 +622,21 @@ function appendTranscript(role, text, actions, stream, streamText) {
   const finalText = stream ? (streamText || "") : (text || "");
 
   const renderActions = () => {
-    if (Array.isArray(actions) && actions.length) {
-      const actionRow = document.createElement("div");
-      actionRow.className = "gd-dash-actions";
-      actions.forEach(a => {
-        if (a.name === "navigate") {
-          const btn = document.createElement("button");
-          btn.className = "gd-btn gd-btn-sm gd-btn-primary";
-          btn.textContent = labelForNavigate(a.input || {});
-          btn.onclick = () => executeNavigate(a.input || {});
-          actionRow.appendChild(btn);
-        }
-      });
-      if (actionRow.children.length) msg.appendChild(actionRow);
-    }
+    if (!Array.isArray(actions) || !actions.length) return;
+    actions.forEach(a => {
+      if (a.name === "navigate") {
+        const row = document.createElement("div");
+        row.className = "gd-dash-actions";
+        const btn = document.createElement("button");
+        btn.className = "gd-btn gd-btn-sm gd-btn-primary";
+        btn.textContent = labelForNavigate(a.input || {});
+        btn.onclick = () => executeNavigate(a.input || {});
+        row.appendChild(btn);
+        msg.appendChild(row);
+      } else if (TOOL_EXECUTORS[a.name]) {
+        msg.appendChild(renderConfirmCard(a.name, a.input || {}));
+      }
+    });
   };
 
   if (stream && role === "assistant") {
@@ -368,6 +645,68 @@ function appendTranscript(role, text, actions, stream, streamText) {
     textWrap.innerHTML = formatMessageHtml(finalText);
     renderActions();
   }
+}
+
+// Render an inline confirm-before-execute action card. Replaces itself
+// with a status row once the user clicks Confirm (or Cancel).
+function renderConfirmCard(toolName, input) {
+  const def = TOOL_EXECUTORS[toolName];
+  const card = document.createElement("div");
+  card.className = "gd-dash-card";
+
+  const header = `
+    <div class="gd-dash-card-header">
+      <span class="gd-dash-card-icon">${def.icon}</span>
+      <span class="gd-dash-card-title">${escapeHtml(def.title)}</span>
+    </div>
+    <div class="gd-dash-card-rows">${def.preview(input)}</div>
+  `;
+
+  card.innerHTML = `
+    ${header}
+    <div class="gd-dash-card-footer">
+      <button class="gd-btn gd-btn-sm gd-dash-card-cancel">Cancel</button>
+      <button class="gd-btn gd-btn-sm gd-btn-primary gd-dash-card-confirm">${escapeHtml(def.confirmLabel)}</button>
+    </div>
+  `;
+
+  const cancelBtn = card.querySelector(".gd-dash-card-cancel");
+  const confirmBtn = card.querySelector(".gd-dash-card-confirm");
+
+  cancelBtn.onclick = () => {
+    card.innerHTML = `<div class="gd-dash-card-status gd-text-muted">Cancelled.</div>`;
+  };
+
+  confirmBtn.onclick = async () => {
+    confirmBtn.disabled = true;
+    cancelBtn.disabled = true;
+    confirmBtn.textContent = "Working…";
+    try {
+      const result = await def.execute(input);
+      const followUpHtml = result?.followUp
+        ? `<button class="gd-btn gd-btn-sm gd-dash-card-followup">${escapeHtml(result.followUp.label)}</button>`
+        : "";
+      card.innerHTML = `
+        <div class="gd-dash-card-status gd-dash-card-status-ok">
+          <span class="gd-dash-card-check">&#10003;</span>
+          <span>${formatMessageHtml(result?.message || "Done.")}</span>
+        </div>
+        ${followUpHtml ? `<div class="gd-dash-card-footer">${followUpHtml}</div>` : ""}
+      `;
+      if (result?.followUp) {
+        card.querySelector(".gd-dash-card-followup").onclick = result.followUp.action;
+      }
+    } catch (err) {
+      console.error(`${toolName} execute error:`, err);
+      card.innerHTML = `
+        <div class="gd-dash-card-status gd-dash-card-status-err">
+          <span>Couldn't complete: ${escapeHtml(err.message || "unknown error")}</span>
+        </div>
+      `;
+    }
+  };
+
+  return card;
 }
 
 // Typewriter — paints text char-by-char with adaptive speed. We render into

@@ -1711,29 +1711,125 @@ exports.boldSignWebhook = onRequest({ region: "us-central1", secrets: [BOLDSIGN_
 const SAGE_DASHBOARD_TOOLS = [
   {
     name: "navigate",
-    description: "Open a page in the GreenDoor app. Use this whenever the realtor wants to view, see, open, find, look up, or go to something specific (a client, listing, the calendar, templates, settings). Prefer this over describing where things are.",
+    description: "Open a page in the GreenDoor app. Use this when the realtor wants to view, see, open, find, look up, or go to something specific (a client, listing, the calendar, templates, settings). DO NOT use this for actions like adding clients, sending docs, or scheduling — use the action-specific tool instead.",
     input_schema: {
       type: "object",
       properties: {
         target: {
           type: "string",
           enum: ["client", "client_list", "listing", "listing_list", "calendar", "templates", "settings", "dashboard"],
-          description: "Which page. 'client' = a specific client's detail page (requires clientId). 'client_list' = the all-clients page (use for 'show me all my clients'). 'listing' = a specific listing (requires listingId). 'listing_list' = the all-listings page."
+          description: "Which page. 'client' = a specific client's detail page (requires clientId). 'client_list' = the all-clients page. 'listing' = a specific listing (requires listingId). 'listing_list' = the all-listings page."
         },
         clientId: {
           type: "string",
-          description: "Required when target=client. Use the exact id from the RECENT CLIENTS list in the system prompt. If the user names a client not in that list, set target=client_list instead."
+          description: "Required when target=client. Use the exact id from RECENT CLIENTS. If the named client isn't in the list, use target=client_list instead."
         },
         listingId: {
           type: "string",
-          description: "Required when target=listing. Use the exact id from the RECENT LISTINGS list."
+          description: "Required when target=listing. Use the exact id from RECENT LISTINGS."
         },
         tab: {
           type: "string",
-          description: "Optional sub-tab on the destination page. For client target: 'overview' | 'compliance' | 'activity' | 'files' | 'matches'. Use 'compliance' when the user wants to send a document."
+          description: "Optional sub-tab. For client target: 'overview' | 'compliance' | 'activity' | 'files' | 'matches'."
         }
       },
       required: ["target"]
+    }
+  },
+  {
+    name: "create_client",
+    description: "Propose creating a new client. The realtor MUST confirm before the client is created. Use whenever the realtor says 'add a new client', 'create a client', 'add [name] as a buyer/seller', etc.",
+    input_schema: {
+      type: "object",
+      properties: {
+        fullName: { type: "string", description: "Client's full name. Required." },
+        email: { type: "string", description: "Email address if mentioned." },
+        phone: { type: "string", description: "Phone number if mentioned." },
+        status: {
+          type: "string",
+          enum: ["lead", "active_buyer", "active_seller", "under_contract", "closed", "inactive"],
+          description: "Pipeline status. Default 'lead' unless the user implied buyer/seller/under-contract."
+        },
+        transactionType: {
+          type: "string",
+          enum: ["buyer", "seller", "buyer_and_seller"],
+          description: "If the realtor said buyer, seller, or both."
+        },
+        notes: { type: "string", description: "Free-form notes from the user request." }
+      },
+      required: ["fullName"]
+    }
+  },
+  {
+    name: "create_followup",
+    description: "Propose a follow-up reminder. The realtor MUST confirm. Use when they say 'remind me', 'follow up with', 'check in on'.",
+    input_schema: {
+      type: "object",
+      properties: {
+        title: { type: "string", description: "Short title for the task, under 80 chars." },
+        days_from_now: { type: "integer", description: "Days from today the reminder is due (e.g. 'in 3 days' → 3, 'next week' → 7, 'tomorrow' → 1)." },
+        clientId: { type: "string", description: "Optional clientId from RECENT CLIENTS if the follow-up is about a specific client." },
+        notes: { type: "string", description: "Optional context for what to do." }
+      },
+      required: ["title", "days_from_now"]
+    }
+  },
+  {
+    name: "schedule_event",
+    description: "Propose scheduling a showing or calendar event. The realtor MUST confirm. Use when they say 'book a showing', 'schedule a meeting', 'put X on the calendar'.",
+    input_schema: {
+      type: "object",
+      properties: {
+        title: { type: "string", description: "Short title for the event, e.g. 'Showing — 123 Maple St' or 'Listing presentation'." },
+        date: { type: "string", description: "Date in YYYY-MM-DD. Resolve relative dates (tomorrow → today+1) using TODAY from the system prompt." },
+        time: { type: "string", description: "Time in 24h HH:MM format." },
+        address: { type: "string", description: "Property address if mentioned." },
+        clientId: { type: "string", description: "Optional clientId from RECENT CLIENTS if the event is about a specific client." },
+        notes: { type: "string", description: "Optional notes." }
+      },
+      required: ["title", "date", "time"]
+    }
+  },
+  {
+    name: "send_compliance_doc",
+    description: "Propose sending a document for signature to a client. The realtor MUST confirm. Use when they say 'send buyer rep to X', 'email disclosures to Y', 'send the contract to Z'. Only use clientId values that appear in RECENT CLIENTS and templateId values that appear in YOUR TEMPLATES.",
+    input_schema: {
+      type: "object",
+      properties: {
+        clientId: { type: "string", description: "Required. Exact id from RECENT CLIENTS." },
+        templateId: { type: "string", description: "Required. Exact id from YOUR TEMPLATES list." },
+        listingId: { type: "string", description: "Optional listingId from RECENT LISTINGS if the doc is tied to a specific property." }
+      },
+      required: ["clientId", "templateId"]
+    }
+  },
+  {
+    name: "draft_email",
+    description: "Compose an email TO a specific client. The realtor MUST confirm before sending. Use when they say 'email X about Y', 'send Sarah a note saying Z'. Always reference a clientId from RECENT CLIENTS — never invent.",
+    input_schema: {
+      type: "object",
+      properties: {
+        clientId: { type: "string", description: "Required. Exact id from RECENT CLIENTS." },
+        subject: { type: "string", description: "Email subject line." },
+        body: { type: "string", description: "Email body. Address the client by their first name. Sign off with the realtor's first name." }
+      },
+      required: ["clientId", "subject", "body"]
+    }
+  },
+  {
+    name: "add_listing",
+    description: "Propose adding a new listing. The realtor MUST confirm. Use when they say 'add a listing', 'I have a new listing', 'parse this URL: ...'. If they provide a URL, set source_url; we'll fetch the details on confirm.",
+    input_schema: {
+      type: "object",
+      properties: {
+        source_url: { type: "string", description: "Listing URL (Zillow, Realtor.com, etc.). When provided, other fields can be omitted — we'll parse on confirm." },
+        address: { type: "string", description: "Property address if no URL." },
+        price: { type: "integer", description: "List price in dollars." },
+        beds: { type: "integer" },
+        baths: { type: "number" },
+        sqft: { type: "integer" },
+        notes: { type: "string", description: "Any other detail mentioned." }
+      }
     }
   }
 ];
@@ -1862,38 +1958,55 @@ INSTRUCTIONS:
     const today = cd.todayDate || new Date().toISOString().slice(0, 10);
 
     const recentClients = Array.isArray(cd.recentClients) && cd.recentClients.length
-      ? cd.recentClients.map(c => `- ${c.id} → ${c.name}${c.status ? ` (${c.status})` : ""}`).join("\n")
+      ? cd.recentClients.map(c => `- ${c.id} → ${c.name}${c.status ? ` (${c.status})` : ""}${c.email ? ` <${c.email}>` : ""}`).join("\n")
       : "- (none yet)";
     const recentListings = Array.isArray(cd.recentListings) && cd.recentListings.length
       ? cd.recentListings.map(l => `- ${l.id} → ${l.address}`).join("\n")
       : "- (none yet)";
+    const templates = Array.isArray(cd.templates) && cd.templates.length
+      ? cd.templates.map(t => `- ${t.id} → ${t.name}${t.category ? ` (${t.category})` : ""}`).join("\n")
+      : "- (none uploaded yet)";
 
-    systemPrompt = `You are Sage, the in-app assistant for GreenDoor (a real estate CRM). The realtor is on the dashboard and just typed or spoke a command. Your job is to (1) reply with a short conversational confirmation (1-2 sentences max), and (2) emit a navigate tool_use whenever they want to go somewhere or do something on another page.
+    systemPrompt = `You are Sage, the in-app assistant for GreenDoor (a real estate CRM). The realtor is on the dashboard and just typed or spoke a command. Your job is to (1) reply with a short conversational confirmation, and (2) emit the most appropriate tool_use block so the frontend can execute or route.
 
 REALTOR: ${agentName}
 TODAY: ${today}
 
-RECENT CLIENTS (id → name):
+RECENT CLIENTS (id → name [status] <email>):
 ${recentClients}
 
 RECENT LISTINGS (id → address):
 ${recentListings}
 
-ROUTING RULES:
-- "Show me [name]" / "Open [name]" / "Pull up [name]" → navigate target=client with their clientId from the list above. If the name doesn't match anyone in the list, route to target=client_list instead so they can search.
-- "Send [a doc] to [name]" → navigate target=client clientId=... tab=compliance (they'll send it from there — do NOT promise to send it yourself).
-- "My listings" / "Show listings" → target=listing_list.
-- "Show [address]" → target=listing with the matching listingId from above; if no match, target=listing_list.
-- "Calendar" / "Schedule" / "Appointments" / "Today's showings" → target=calendar.
-- "Templates" / "My templates" / "Forms" → target=templates.
-- "Settings" / "Profile" / "Connect Gmail" → target=settings.
+YOUR TEMPLATES (id → name):
+${templates}
+
+TOOL SELECTION RULES:
+
+NAVIGATION (use \`navigate\`):
+- "Show me [name]" / "Open [name]" / "Pull up [name]" → target=client with their clientId. If name doesn't match anyone in RECENT CLIENTS, target=client_list.
+- "Show me [address]" → target=listing with matching listingId, else target=listing_list.
+- "My calendar" / "Today's showings" → target=calendar.
+- "My templates" / "Forms" → target=templates.
+- "Settings" → target=settings.
+
+ACTIONS (use the specific tool, do NOT navigate):
+- "Add [name] as [a buyer / a seller / a new client]" → \`create_client\` with fullName + status + transactionType + any email/phone they mentioned.
+- "Remind me to follow up with [name] in [N days/next week]" → \`create_followup\` with title, days_from_now, clientId.
+- "Book a showing for [client] at [address] tomorrow at 2pm" → \`schedule_event\` with title, date (resolve "tomorrow" using TODAY above), time (HH:MM), clientId, address.
+- "Send [doc name] to [client]" → \`send_compliance_doc\` with clientId + templateId. Match the doc name to a template in YOUR TEMPLATES. If no clear match, ask which template.
+- "Email [client] [the message]" / "Draft an email to [client] saying [X]" → \`draft_email\` with clientId, subject, body. Write a complete, polite email. Address by first name.
+- "Add a listing [URL]" or "Parse this URL" → \`add_listing\` with source_url. If they gave specs instead, fill address/price/beds/baths/sqft.
 
 STYLE:
-- Always reply with text. Be warm but brief — one short sentence is usually enough. No bullet points, no headers.
-- When you emit a navigate tool_use, your text should say what you're doing, e.g. "Opening Sarah's profile." or "Taking you to your calendar."
-- If the request is ambiguous (e.g. multiple clients with the same first name), ask a one-sentence clarifying question and do NOT emit a navigate tool.
-- For general questions ("what should I do today?", "how do I add a listing?"), reply with a short helpful answer, no tool needed.
-- Never invent client or listing IDs. Only use IDs from the lists above.`;
+- Always reply with one short conversational sentence. Examples:
+  - For navigation: "Opening Sarah's profile."
+  - For an action: "Here's a draft email for Sarah — confirm to send."
+  - For ambiguity: ONE-sentence clarifying question, NO tool.
+- NEVER claim to have done something. The frontend shows a Confirm card; the action only runs after the realtor clicks Confirm.
+- NEVER invent IDs. Only use ids from the lists above.
+- When multiple matches exist (two Sarahs), pick the most-recent one and mention it: "I'll use Sarah Smith from your recent clients."
+- For general questions ("what should I do today?", "how do I…?"), reply briefly with no tool.`;
   } else if (context === "client_detail" && clientId) {
     // Read client data for generic client-detail context
     const clientSnap = await db.doc(`clients/${clientId}`).get();

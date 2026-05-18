@@ -9153,3 +9153,125 @@ body.gd-light .gd-confirm-warning { background: #fffbeb; color: #92400e; }
   from { opacity: 0; transform: translateY(4px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+/* Dashboard confirm-before-execute cards (Sage proposes an action) */
+.gd-dash-card {
+  margin-top: 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #f8fafc;
+  overflow: hidden;
+  animation: gdDashMsgIn 0.25s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+.gd-dash-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid #e5e7eb;
+  background: #ffffff;
+}
+
+.gd-dash-card-icon {
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.gd-dash-card-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #0f172a;
+  letter-spacing: -0.005em;
+}
+
+.gd-dash-card-rows {
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.gd-dash-card-row {
+  display: flex;
+  gap: 12px;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  align-items: flex-start;
+}
+
+.gd-dash-card-label {
+  flex: 0 0 90px;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.gd-dash-card-value {
+  flex: 1;
+  color: #0f172a;
+  word-break: break-word;
+}
+
+.gd-dash-card-body {
+  margin-top: 6px;
+  padding: 10px 12px;
+  background: #ffffff;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  font-size: 0.85rem;
+  color: #334155;
+  white-space: pre-wrap;
+  line-height: 1.5;
+}
+
+.gd-dash-card-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 10px 14px;
+  border-top: 1px solid #e5e7eb;
+  background: #ffffff;
+}
+
+.gd-dash-card-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+  font-size: 0.88rem;
+  font-weight: 500;
+}
+
+.gd-dash-card-status-ok {
+  color: #15803d;
+  background: #f0fdf4;
+}
+
+.gd-dash-card-status-err {
+  color: #b91c1c;
+  background: #fef2f2;
+}
+
+.gd-dash-card-check {
+  display: inline-flex;
+  width: 20px;
+  height: 20px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #22c55e;
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.gd-dash-card-status .gd-text-muted {
+  color: #64748b;
+}
+
+@media (max-width: 640px) {
+  .gd-dash-card-label {
+    flex: 0 0 78px;
+  }
+}
