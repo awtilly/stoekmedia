@@ -125,6 +125,19 @@
                   <p class="gd-text-muted gd-text-muted-sm gd-mb-0">Automatically appended to all outgoing emails.</p>
                   <textarea id="set-emailSignature" class="gd-input gd-signature-textarea" rows="5" placeholder="Best regards,&#10;Your Name&#10;Company Name&#10;(555) 123-4567"></textarea>
                 </div>
+                <div class="gd-form-group">
+                  <label>Signature Image (optional)</label>
+                  <p class="gd-text-muted gd-text-muted-sm gd-mb-0">A logo or photo appended after your signature text. Recommended: 240&times;80px PNG or JPG, under 200 KB.</p>
+                  <div class="gd-signature-image-row">
+                    <img id="set-signatureImage-preview" class="gd-signature-image-preview" alt="" style="display:none;">
+                    <span id="set-signatureImage-empty" class="gd-text-muted gd-text-muted-sm">No image uploaded</span>
+                    <div class="gd-signature-image-actions">
+                      <label class="gd-btn gd-btn-sm gd-btn-outline" for="set-signatureImage-input">Upload</label>
+                      <input type="file" id="set-signatureImage-input" accept="image/png,image/jpeg,image/gif" style="display:none;" onchange="uploadSignatureImage(this.files[0])">
+                      <button type="button" id="set-signatureImage-remove" class="gd-btn gd-btn-sm gd-btn-danger-outline" style="display:none;" onclick="removeSignatureImage()">Remove</button>
+                    </div>
+                  </div>
+                </div>
                 <button class="gd-btn gd-btn-primary" onclick="saveProfile()">Save Profile</button>
               </div>
             </div>

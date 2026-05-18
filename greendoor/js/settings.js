@@ -40,6 +40,7 @@ onAuthStateChanged(auth, async (user) => {
     document.getElementById("set-phone").value = profile.phone || "";
     document.getElementById("set-company").value = profile.company || "";
     document.getElementById("set-emailSignature").value = profile.emailSignature || "";
+    renderSignatureImage(profile.emailSignatureImageUrl || "");
 
     // Load templates and sequences — don't block page if they fail
     const results = await Promise.allSettled([
@@ -80,6 +81,76 @@ window.saveProfile = async function () {
   } catch (e) {
     console.error("Save profile error:", e);
     showToast("Failed to save profile.", "error");
+  }
+};
+
+/* ===== SIGNATURE IMAGE ===== */
+function renderSignatureImage(url) {
+  const preview = document.getElementById("set-signatureImage-preview");
+  const empty = document.getElementById("set-signatureImage-empty");
+  const removeBtn = document.getElementById("set-signatureImage-remove");
+  if (!preview) return;
+  if (url) {
+    preview.src = url;
+    preview.style.display = "";
+    empty.style.display = "none";
+    removeBtn.style.display = "";
+  } else {
+    preview.src = "";
+    preview.style.display = "none";
+    empty.style.display = "";
+    removeBtn.style.display = "none";
+  }
+}
+
+window.uploadSignatureImage = async function (file) {
+  const user = auth.currentUser;
+  if (!user || !file) return;
+  if (file.size > 200 * 1024) {
+    showToast("Image too large — keep it under 200 KB.", "error");
+    return;
+  }
+  if (!/^image\/(png|jpe?g|gif)$/i.test(file.type)) {
+    showToast("Only PNG, JPG, or GIF images are allowed.", "error");
+    return;
+  }
+  try {
+    const ext = (file.name.match(/\.([a-z0-9]+)$/i) || [, "png"])[1].toLowerCase();
+    const path = `users/${user.uid}/signature/image.${ext}`;
+    const storageRef = ref(storage, path);
+    await uploadBytesResumable(storageRef, file);
+    const url = await getDownloadURL(storageRef);
+    await setDoc(doc(db, "users", user.uid), {
+      emailSignatureImageUrl: url,
+      emailSignatureImagePath: path
+    }, { merge: true });
+    renderSignatureImage(url);
+    showToast("Signature image uploaded.");
+  } catch (err) {
+    console.error("Signature upload error:", err);
+    showToast("Failed to upload image.", "error");
+  }
+};
+
+window.removeSignatureImage = async function () {
+  const user = auth.currentUser;
+  if (!user) return;
+  if (!confirm("Remove your signature image?")) return;
+  try {
+    const profile = await getCurrentUser();
+    const path = profile?.emailSignatureImagePath;
+    if (path) {
+      await deleteObject(ref(storage, path)).catch(() => {});
+    }
+    await setDoc(doc(db, "users", user.uid), {
+      emailSignatureImageUrl: null,
+      emailSignatureImagePath: null
+    }, { merge: true });
+    renderSignatureImage("");
+    showToast("Signature image removed.");
+  } catch (err) {
+    console.error("Signature remove error:", err);
+    showToast("Failed to remove image.", "error");
   }
 };
 

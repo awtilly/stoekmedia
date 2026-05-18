@@ -3,7 +3,7 @@ const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { onDocumentCreated } = require("firebase-functions/v2/firestore");
 const { defineSecret } = require("firebase-functions/params");
 const { initializeApp } = require("firebase-admin/app");
-const { getFirestore } = require("firebase-admin/firestore");
+const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { getStorage } = require("firebase-admin/storage");
 const { getAuth } = require("firebase-admin/auth");
 const crypto = require("crypto");
@@ -1474,28 +1474,43 @@ exports.docusealWebhook = onRequest(
 
       await Promise.all(writes);
 
-      // Auto-complete matching checklist items (mirrors boldSignWebhook CHKL-06).
-      // Runs for both compliance docs (templateId match) and ad-hoc envelopes
-      // (envelope-linked checklist item via linkedEnvelopeId).
+      // Auto-complete matching checklist items.
+      // - Compliance docs match by templateId
+      // - Ad-hoc envelopes match by linkedEnvelopeId on the checklist item
       try {
-        if (isCompliance) {
-          const checklistQuery = await db.collection(`clients/${clientId}/closingChecklist`)
-            .where("linkedTemplateId", "==", templateId)
+        const queries = [];
+        if (isCompliance && templateId) {
+          queries.push(
+            db.collection(`clients/${clientId}/closingChecklist`)
+              .where("linkedTemplateId", "==", templateId)
+              .where("completed", "==", false)
+              .get()
+          );
+        }
+        queries.push(
+          db.collection(`clients/${clientId}/closingChecklist`)
+            .where("linkedEnvelopeId", "==", submissionId)
             .where("completed", "==", false)
-            .get();
-          if (!checklistQuery.empty) {
-            const checklistBatch = db.batch();
-            checklistQuery.docs.forEach(checkDoc => {
-              checklistBatch.update(checkDoc.ref, {
-                completed: true,
-                autoCompleted: true,
-                autoCompletedAt: FieldValue.serverTimestamp(),
-                completedAt: FieldValue.serverTimestamp()
-              });
+            .get()
+        );
+        const snaps = await Promise.all(queries);
+        const seen = new Set();
+        const checklistBatch = db.batch();
+        let anyToUpdate = false;
+        for (const snap of snaps) {
+          for (const checkDoc of snap.docs) {
+            if (seen.has(checkDoc.id)) continue;
+            seen.add(checkDoc.id);
+            anyToUpdate = true;
+            checklistBatch.update(checkDoc.ref, {
+              completed: true,
+              autoCompleted: true,
+              autoCompletedAt: FieldValue.serverTimestamp(),
+              completedAt: FieldValue.serverTimestamp()
             });
-            await checklistBatch.commit();
           }
         }
+        if (anyToUpdate) await checklistBatch.commit();
       } catch (checklistErr) {
         console.error("docusealWebhook: Checklist auto-complete error:", checklistErr);
       }
@@ -1661,24 +1676,43 @@ exports.boldSignWebhook = onRequest({ region: "us-central1", secrets: [BOLDSIGN_
     ]);
 
     // Step 8b -- Auto-complete matching checklist items (CHKL-06)
+    // Matches by templateId (compliance docs) OR linkedEnvelopeId (ad-hoc).
     try {
-      const checklistQuery = await db.collection(`clients/${clientId}/closingChecklist`)
-        .where("linkedTemplateId", "==", templateId)
-        .where("completed", "==", false)
-        .get();
-
-      if (!checklistQuery.empty) {
-        const checklistBatch = db.batch();
-        checklistQuery.docs.forEach(checkDoc => {
+      const queries = [];
+      if (templateId) {
+        queries.push(
+          db.collection(`clients/${clientId}/closingChecklist`)
+            .where("linkedTemplateId", "==", templateId)
+            .where("completed", "==", false)
+            .get()
+        );
+      }
+      queries.push(
+        db.collection(`clients/${clientId}/closingChecklist`)
+          .where("linkedEnvelopeId", "==", documentId)
+          .where("completed", "==", false)
+          .get()
+      );
+      const snaps = await Promise.all(queries);
+      const seen = new Set();
+      const checklistBatch = db.batch();
+      let count = 0;
+      for (const snap of snaps) {
+        for (const checkDoc of snap.docs) {
+          if (seen.has(checkDoc.id)) continue;
+          seen.add(checkDoc.id);
+          count++;
           checklistBatch.update(checkDoc.ref, {
             completed: true,
             autoCompleted: true,
             autoCompletedAt: FieldValue.serverTimestamp(),
             completedAt: FieldValue.serverTimestamp()
           });
-        });
+        }
+      }
+      if (count > 0) {
         await checklistBatch.commit();
-        console.log(`boldSignWebhook: Auto-completed ${checklistQuery.docs.length} checklist item(s) for template ${templateId}`);
+        console.log(`boldSignWebhook: Auto-completed ${count} checklist item(s) for documentId ${documentId}`);
       }
     } catch (checklistErr) {
       // Non-fatal: log but don't fail the webhook for checklist errors
@@ -2840,19 +2874,37 @@ exports.sendEmail = onCall(
   const fromName = userData.fullName || "GreenDoor CRM";
   const replyTo = userData.email || null;
 
+  // Append the user's signature (text + optional image) to the body, unless
+  // it's already there. Body arrives as HTML (frontend converts \n to <br>).
+  const signatureText = (userData.emailSignature || "").trim();
+  const signatureImageUrl = userData.emailSignatureImageUrl || "";
+  let composedBody = body;
+  if (signatureText || signatureImageUrl) {
+    const sigSnippet =
+      (signatureText ? signatureText.replace(/\n/g, "<br>") : "") +
+      (signatureImageUrl ? `${signatureText ? "<br>" : ""}<img src="${signatureImageUrl}" alt="" style="max-width:240px;display:block;margin-top:8px;border:0;">` : "");
+    // De-dupe: if the textarea body already contains the signature text or the
+    // image URL, don't append again (realtors may paste their own copy).
+    const alreadyHasText = signatureText && body.includes(signatureText.split(/\n/)[0]);
+    const alreadyHasImage = signatureImageUrl && body.includes(signatureImageUrl);
+    if (!alreadyHasText && !alreadyHasImage) {
+      composedBody = `${body}<br><br>${sigSnippet}`;
+    }
+  }
+
   // Prefer Gmail OAuth (true From: agent's address, DMARC-aligned).
   // Fall back to sendViaEmail (Resend "via" pattern → SendGrid).
   let provider = "resend";
   let sentViaGmail = false;
   try {
-    sentViaGmail = await sendViaGmail({ uid, to, toName, subject, body, fromName, replyTo });
+    sentViaGmail = await sendViaGmail({ uid, to, toName, subject, body: composedBody, fromName, replyTo });
   } catch (err) {
     console.warn(`sendEmail: Gmail send failed for uid=${uid}, falling back to sendViaEmail —`, err.message);
   }
   if (sentViaGmail) {
     provider = "gmail";
   } else {
-    await sendViaEmail({ to, toName, subject, body, fromEmail: null, fromName, replyTo });
+    await sendViaEmail({ to, toName, subject, body: composedBody, fromEmail: null, fromName, replyTo });
   }
 
   // Log activity
@@ -2987,6 +3039,134 @@ exports.checkSignatureStatus = onCall({ region: "us-central1", secrets: [BOLDSIG
 
   return { status };
 });
+
+/* ================================================================
+   revokeEnvelope
+   ----------------------------------------------------------------
+   Revokes an in-flight e-signature envelope at the upstream provider
+   (DocuSeal or BoldSign) so the signer's email link stops working,
+   then marks the local envelope record as 'cancelled'. The frontend
+   delete handler calls this BEFORE deleting the local doc so a
+   pre-empted cancel doesn't leave the signer with a working link.
+   ================================================================ */
+exports.revokeEnvelope = onCall(
+  { region: "us-central1", secrets: [BOLDSIGN_API_KEY, DOCUSEAL_API_KEY, DOCUSEAL_BASE_URL] },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "You must be signed in.");
+    const { documentId } = request.data || {};
+    if (!documentId) throw new HttpsError("invalid-argument", "documentId is required.");
+
+    const envSnap = await db.collection("envelopes").doc(documentId).get();
+    if (!envSnap.exists) {
+      // Nothing to revoke upstream; let the frontend delete cleanly.
+      return { revoked: false, reason: "no-local-record" };
+    }
+    const env = envSnap.data();
+    if (env.realtorId !== request.auth.uid) {
+      throw new HttpsError("permission-denied", "Not your envelope.");
+    }
+    if (env.status === "completed" || env.status === "signed") {
+      // Already complete — nothing to revoke.
+      return { revoked: false, reason: "already-complete" };
+    }
+
+    const provider = env.provider || "boldsign";
+    let revoked = false;
+
+    if (provider === "docuseal") {
+      const apiKey = DOCUSEAL_API_KEY.value();
+      const baseUrl = DOCUSEAL_BASE_URL.value() || "https://api.docuseal.com";
+      if (!isLiveSecret(apiKey)) throw new HttpsError("failed-precondition", "DocuSeal not configured.");
+      const submissionId = env.submissionId || documentId;
+      const resp = await fetch(`${baseUrl}/submissions/${encodeURIComponent(submissionId)}`, {
+        method: "DELETE",
+        headers: { "X-Auth-Token": apiKey }
+      });
+      // 200/204 = revoked; 404 = already gone; both acceptable.
+      if (!resp.ok && resp.status !== 404) {
+        const text = await resp.text();
+        throw new HttpsError("internal", `DocuSeal revoke failed (${resp.status}): ${text}`);
+      }
+      revoked = true;
+    } else {
+      const apiKey = BOLDSIGN_API_KEY.value();
+      if (!apiKey) throw new HttpsError("failed-precondition", "BOLDSIGN_API_KEY is not configured.");
+      const resp = await fetch(`https://api.boldsign.com/v1/document/revoke?documentId=${encodeURIComponent(documentId)}`, {
+        method: "POST",
+        headers: { "X-API-KEY": apiKey, "Content-Type": "application/json" },
+        body: JSON.stringify({ message: "Cancelled by sender" })
+      });
+      if (!resp.ok && resp.status !== 404) {
+        const text = await resp.text();
+        throw new HttpsError("internal", `BoldSign revoke failed (${resp.status}): ${text}`);
+      }
+      revoked = true;
+    }
+
+    await envSnap.ref.update({
+      status: "cancelled",
+      cancelledAt: FieldValue.serverTimestamp()
+    }).catch(() => {});
+    return { revoked };
+  }
+);
+
+/* ================================================================
+   resendEnvelope
+   ----------------------------------------------------------------
+   Sends a fresh "please sign" reminder email to all outstanding
+   signers. DocuSeal sends through POST /submissions/{id}/email;
+   BoldSign through POST /v1/document/remind.
+   ================================================================ */
+exports.resendEnvelope = onCall(
+  { region: "us-central1", secrets: [BOLDSIGN_API_KEY, DOCUSEAL_API_KEY, DOCUSEAL_BASE_URL] },
+  async (request) => {
+    if (!request.auth) throw new HttpsError("unauthenticated", "You must be signed in.");
+    const { documentId } = request.data || {};
+    if (!documentId) throw new HttpsError("invalid-argument", "documentId is required.");
+
+    const envSnap = await db.collection("envelopes").doc(documentId).get();
+    if (!envSnap.exists) throw new HttpsError("not-found", "Envelope not found.");
+    const env = envSnap.data();
+    if (env.realtorId !== request.auth.uid) throw new HttpsError("permission-denied", "Not your envelope.");
+    if (env.status === "completed" || env.status === "signed") {
+      throw new HttpsError("failed-precondition", "Envelope already complete — nothing to resend.");
+    }
+
+    const provider = env.provider || "boldsign";
+    if (provider === "docuseal") {
+      const apiKey = DOCUSEAL_API_KEY.value();
+      const baseUrl = DOCUSEAL_BASE_URL.value() || "https://api.docuseal.com";
+      if (!isLiveSecret(apiKey)) throw new HttpsError("failed-precondition", "DocuSeal not configured.");
+      const submissionId = env.submissionId || documentId;
+      const resp = await fetch(`${baseUrl}/submissions/${encodeURIComponent(submissionId)}/email`, {
+        method: "POST",
+        headers: { "X-Auth-Token": apiKey, "Content-Type": "application/json" }
+      });
+      if (!resp.ok) {
+        const text = await resp.text();
+        throw new HttpsError("internal", `DocuSeal resend failed (${resp.status}): ${text}`);
+      }
+    } else {
+      const apiKey = BOLDSIGN_API_KEY.value();
+      if (!apiKey) throw new HttpsError("failed-precondition", "BOLDSIGN_API_KEY is not configured.");
+      const resp = await fetch(`https://api.boldsign.com/v1/document/remind?documentId=${encodeURIComponent(documentId)}`, {
+        method: "POST",
+        headers: { "X-API-KEY": apiKey, "Content-Type": "application/json" },
+        body: JSON.stringify({ message: "Friendly reminder — please sign when you have a moment." })
+      });
+      if (!resp.ok) {
+        const text = await resp.text();
+        throw new HttpsError("internal", `BoldSign resend failed (${resp.status}): ${text}`);
+      }
+    }
+
+    await envSnap.ref.update({
+      lastRemindedAt: FieldValue.serverTimestamp()
+    }).catch(() => {});
+    return { resent: true };
+  }
+);
 
 /* ================================================================
    createEmbeddedSignatureRequest
@@ -4094,7 +4274,7 @@ exports.calendarFeed = onRequest({ region: "us-central1" }, async (req, res) => 
   // Load events
   const eventsSnap = await db.collection("events").where("realtorId", "==", uid).get();
   const showingsSnap = await db.collection("showings").where("realtorId", "==", uid).get();
-  const followUpsSnap = await db.collection("followUps").where("realtorId", "==", uid).where("status", "==", "outstanding").get();
+  const followUpsSnap = await db.collection("followUps").where("realtorId", "==", uid).where("status", "==", "pending").get();
 
   // Build iCal
   const lines = [

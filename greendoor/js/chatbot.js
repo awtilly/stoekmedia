@@ -194,11 +194,9 @@ const TOOL_RENDERERS = {
       window.openActivityModal("call");
       setTimeout(() => {
         const bodyEl = document.getElementById("act-body");
-        if (bodyEl && input.summary) {
-          bodyEl.value = input.duration_minutes
-            ? `(${input.duration_minutes} min) ${input.summary}`
-            : input.summary;
-        }
+        const durationEl = document.getElementById("act-duration");
+        if (bodyEl && input.summary) bodyEl.value = input.summary;
+        if (durationEl && input.duration_minutes) durationEl.value = input.duration_minutes;
       }, 100);
     }
   }),

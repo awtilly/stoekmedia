@@ -77,7 +77,21 @@ function withV2Fallback(v2Name, v1Name) {
 }
 
 const sendEmailFn = httpsCallable(functions, "sendEmail");
+const checkSignatureStatusV2Fn = httpsCallable(functions, "checkSignatureStatusV2");
+const checkSignatureStatusV1Fn = httpsCallable(functions, "checkSignatureStatus");
+// Kept for embed-modal polling where we don't yet know the provider — the
+// V2→V1 fallback there is benign because the embed flow is always BoldSign.
 const checkSignatureStatusFn = withV2Fallback("checkSignatureStatusV2", "checkSignatureStatus");
+
+// Look up an envelope's provider and call the matching status checker.
+// Solves the "DocuSeal returns 404 internal for a BoldSign id, fallback
+// predicate misses, V1 never runs" bug from the action audit.
+async function checkSignatureStatusForEnvelope(documentId) {
+  const envSnap = await getDoc(doc(db, "envelopes", documentId));
+  const provider = envSnap.exists() ? (envSnap.data().provider || "boldsign") : "boldsign";
+  const fn = provider === "docuseal" ? checkSignatureStatusV2Fn : checkSignatureStatusV1Fn;
+  return fn({ documentId });
+}
 // Ad-hoc per-send drag-drop builder. DocuSeal's analog (the <docuseal-builder>
 // web component) is wired into the new Templates page rather than per-send,
 // so this call stays on BoldSign until that flow is retired.
@@ -86,6 +100,8 @@ const shareDocumentFn = httpsCallable(functions, "shareDocument");
 const parseListingUrlFn = httpsCallable(functions, "parseListingUrl");
 const sendComplianceDocFn = withV2Fallback("sendComplianceDocV2", "sendComplianceDoc");
 const sendBulkComplianceDocsFn = withV2Fallback("sendBulkComplianceDocsV2", "sendBulkComplianceDocs");
+const revokeEnvelopeFn = httpsCallable(functions, "revokeEnvelope");
+const resendEnvelopeFn = httpsCallable(functions, "resendEnvelope");
 const cleanupClientStorageFn = httpsCallable(functions, "cleanupClientStorage");
 
 /* --- Auth gate --- */
@@ -638,8 +654,12 @@ async function loadEmailTemplates(uid) {
 
 function replaceMergeTags(text) {
   if (!text) return text;
+  const clientFirstName = (clientData?.fullName || "").split(/\s+/)[0] || "";
   return text
     .replace(/\{\{clientName\}\}/g, clientData?.fullName || "")
+    .replace(/\{\{clientFirstName\}\}/g, clientFirstName)
+    .replace(/\{\{clientEmail\}\}/g, clientData?.email || "")
+    .replace(/\{\{clientPhone\}\}/g, clientData?.phone || "")
     .replace(/\{\{realtorName\}\}/g, realtorProfile?.fullName || "")
     .replace(/\{\{realtorPhone\}\}/g, realtorProfile?.phone || "")
     .replace(/\{\{realtorEmail\}\}/g, realtorProfile?.email || "")
@@ -1852,7 +1872,8 @@ async function loadEnvelopes(uid) {
         <span class="gd-badge-esig" style="background: ${statusColors[e.status] || "#6b7280"}">${statusLabel(e.status)}</span>
         <span class="gd-file-meta">${e.status === "draft" ? "Draft" : formatDate(e.sentAt)}</span>
         <button class="gd-btn gd-btn-sm" onclick="checkEnvelopeStatus('${e.documentId}')">Check Status</button>
-        <button class="gd-btn gd-btn-sm gd-btn-danger" onclick="deleteEnvelope('${e.documentId}')" title="Delete">&times;</button>
+        ${e.status !== "completed" && e.status !== "signed" ? `<button class="gd-btn gd-btn-sm" onclick="resendEnvelope('${e.documentId}')" title="Resend reminder email">Resend</button>` : ""}
+        <button class="gd-btn gd-btn-sm gd-btn-danger" onclick="deleteEnvelope('${e.documentId}')" title="Cancel">&times;</button>
       </div>`;
     }).join("");
   } catch (e) {
@@ -1863,7 +1884,7 @@ async function loadEnvelopes(uid) {
 window.checkEnvelopeStatus = async function (documentId) {
   try {
     showToast("Checking status...");
-    const result = await checkSignatureStatusFn({ documentId });
+    const result = await checkSignatureStatusForEnvelope(documentId);
     showToast("Status: " + statusLabel(result.data.status));
     const user = auth.currentUser;
     if (user) {
@@ -1875,18 +1896,38 @@ window.checkEnvelopeStatus = async function (documentId) {
   }
 };
 
+window.resendEnvelope = async function (documentId) {
+  try {
+    showToast("Sending reminder…");
+    await resendEnvelopeFn({ documentId });
+    showToast("Reminder sent to signer.");
+  } catch (err) {
+    console.error("Resend envelope error:", err);
+    showToast(err.message || "Couldn't send reminder.", "error");
+  }
+};
+
 window.deleteEnvelope = async function (documentId) {
-  if (!confirm("Delete this signature request? This cannot be undone.")) return;
+  if (!confirm("Cancel this signature request? The signer's email link will stop working.")) return;
   const user = auth.currentUser;
   if (!user) return;
 
   try {
+    // Revoke upstream FIRST so the signer can't sign a cancelled envelope.
+    // revokeEnvelope returns gracefully if the envelope is already complete
+    // or has no upstream record, so we still proceed to delete locally.
+    try {
+      await revokeEnvelopeFn({ documentId });
+    } catch (revokeErr) {
+      console.warn("Upstream revoke failed (deleting local record anyway):", revokeErr);
+      showToast("Couldn't reach the e-signature provider — deleting local record only.", "info");
+    }
     await deleteDoc(doc(db, "envelopes", documentId));
-    showToast("Signature request deleted.");
+    showToast("Signature request cancelled.");
     await loadEnvelopes(user.uid);
   } catch (err) {
     console.error("Delete envelope error:", err);
-    showToast("Failed to delete.", "error");
+    showToast("Failed to cancel.", "error");
   }
 };
 

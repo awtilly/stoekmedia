@@ -654,6 +654,8 @@ export async function recalculateDeadlines(db, clientId, closingDate) {
   snap.forEach(docSnap => {
     const data = docSnap.data();
     if (data.deadlineOffsetDays == null) return;
+    // Don't trample a deadline the realtor explicitly overrode.
+    if (data.customDeadline) return;
 
     let deadline = null;
     if (closingDate) {
@@ -844,17 +846,29 @@ export function renderChecklist() {
 function renderChecklistItem(item) {
   const isCompleted = item.completed && !item.notApplicable;
   const isNA = item.notApplicable;
-  const isOverdue = !item.completed && !item.notApplicable && item.deadline && isDateOverdue(item.deadline);
+  // customDeadline (Firestore Timestamp) overrides the computed deadline when present.
+  const effectiveDeadline = item.customDeadline || item.deadline;
+  const isOverdue = !item.completed && !item.notApplicable && effectiveDeadline && isDateOverdue(effectiveDeadline);
 
   const classes = ["gd-checklist-item"];
   if (isCompleted) classes.push("completed");
   if (isNA) classes.push("na");
 
-  // Deadline display
+  // Deadline display — click to edit
   let deadlineHtml = "";
-  if (item.deadline && !isNA) {
+  if (!isNA) {
     const deadlineClass = isOverdue ? "gd-checklist-deadline overdue" : "gd-checklist-deadline";
-    deadlineHtml = `<span class="${deadlineClass}">Due: ${formatDate(item.deadline)}</span>`;
+    const customBadge = item.customDeadline ? ' <span class="gd-checklist-deadline-custom" title="Custom deadline">●</span>' : "";
+    const dateStr = effectiveDeadline ? formatDate(effectiveDeadline) : "Set deadline";
+    const inputVal = effectiveDeadline ? toIsoDateInput(effectiveDeadline) : "";
+    deadlineHtml = `
+      <button type="button" class="${deadlineClass}" onclick="window.editChecklistDeadline('${item.id}', this)" title="Click to set a custom deadline">
+        ${effectiveDeadline ? `Due: ${dateStr}` : dateStr}${customBadge}
+      </button>
+      <input type="date" class="gd-checklist-deadline-input" id="deadline-${item.id}" value="${inputVal}" style="display:none;"
+        onchange="window.saveChecklistDeadline('${item.id}', this.value)"
+        onblur="this.style.display='none'">
+    `;
   }
 
   // Badges
@@ -976,6 +990,43 @@ window.saveChecklistNotes = async function(itemId, value) {
     console.error("Save checklist notes error:", err);
   }
 };
+
+// Click handler on the deadline pill: swap to the hidden date input + focus it.
+window.editChecklistDeadline = function(itemId, buttonEl) {
+  const input = document.getElementById(`deadline-${itemId}`);
+  if (!input) return;
+  buttonEl.style.display = "none";
+  input.style.display = "";
+  input.focus();
+  if (typeof input.showPicker === "function") input.showPicker();
+};
+
+// Persist a custom deadline. Empty value clears the override and falls back
+// to the computed deadline on next recalculation.
+window.saveChecklistDeadline = async function(itemId, value) {
+  if (!currentClientId) return;
+  try {
+    const docRef = doc(db, "clients", currentClientId, "closingChecklist", itemId);
+    if (value) {
+      // Stored as a JS Date — Firestore converts to Timestamp automatically.
+      await updateDoc(docRef, { customDeadline: new Date(value + "T00:00:00") });
+    } else {
+      // deleteField is imported from firestore SDK; fall back to setting null.
+      await updateDoc(docRef, { customDeadline: null });
+    }
+  } catch (err) {
+    console.error("Save checklist deadline error:", err);
+  }
+};
+
+function toIsoDateInput(val) {
+  const d = toJSDate(val);
+  if (!d) return "";
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
 
 /**
  * Toggles a seeded checklist item between N/A and active.
@@ -1120,9 +1171,11 @@ export function buildChecklistContext() {
 
   const done = items.filter(i => i.completed);
   const outstanding = items.filter(i => !i.completed);
+  const effDeadline = (i) => i.customDeadline || i.deadline;
   const overdue = outstanding.filter(i => {
-    if (!i.deadline) return false;
-    const d = typeof i.deadline.toDate === "function" ? i.deadline.toDate() : new Date(i.deadline);
+    const dl = effDeadline(i);
+    if (!dl) return false;
+    const d = typeof dl.toDate === "function" ? dl.toDate() : new Date(dl);
     return d < new Date();
   });
 
@@ -1143,12 +1196,15 @@ export function buildChecklistContext() {
       category: CATEGORY_LABELS[i.category] || i.category,
       autoCompleted: i.autoCompleted || false
     })),
-    outstandingItems: outstanding.map(i => ({
-      task: i.task,
-      category: CATEGORY_LABELS[i.category] || i.category,
-      deadline: i.deadline ? formatDate(i.deadline) : null,
-      overdue: i.deadline && (typeof i.deadline.toDate === "function" ? i.deadline.toDate() : new Date(i.deadline)) < new Date()
-    })),
+    outstandingItems: outstanding.map(i => {
+      const dl = effDeadline(i);
+      return {
+        task: i.task,
+        category: CATEGORY_LABELS[i.category] || i.category,
+        deadline: dl ? formatDate(dl) : null,
+        overdue: dl && (typeof dl.toDate === "function" ? dl.toDate() : new Date(dl)) < new Date()
+      };
+    }),
     overdueCount: overdue.length,
     todayDate: new Date().toLocaleDateString("en-US")
   };

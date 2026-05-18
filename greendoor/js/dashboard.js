@@ -549,14 +549,20 @@ const TOOL_EXECUTORS = {
       const uid = auth.currentUser.uid;
       const dt = new Date(`${input.date}T${input.time || "09:00"}:00`);
       if (isNaN(dt.getTime())) throw new Error("Couldn't parse the date/time. Try again.");
+      const durationMinutes = 30;
+      const endDt = new Date(dt.getTime() + durationMinutes * 60_000);
       const data = {
         realtorId: uid,
         clientId: input.clientId || null,
         address: input.address || input.title,
         showingDate: Timestamp.fromDate(dt),
-        durationMinutes: 30,
+        endDate: Timestamp.fromDate(endDt),
+        durationMinutes,
         status: "scheduled",
-        notes: input.notes || "",
+        // Field is named realtorNotes everywhere it's read (client-detail.js
+        // renderShowingCard, calendar.js); writing 'notes' here was silently
+        // dropped from the UI.
+        realtorNotes: input.notes || "",
         listingPrice: null, mlsNumber: "",
         createdAt: serverTimestamp(),
         clientRating: null, clientFeedback: "",
