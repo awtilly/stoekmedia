@@ -77,7 +77,6 @@ function withV2Fallback(v2Name, v1Name) {
 }
 
 const sendEmailFn = httpsCallable(functions, "sendEmail");
-const sendForSignatureFn = withV2Fallback("sendForSignatureV2", "sendForSignature");
 const checkSignatureStatusFn = withV2Fallback("checkSignatureStatusV2", "checkSignatureStatus");
 // Ad-hoc per-send drag-drop builder. DocuSeal's analog (the <docuseal-builder>
 // web component) is wired into the new Templates page rather than per-send,
@@ -87,7 +86,6 @@ const shareDocumentFn = httpsCallable(functions, "shareDocument");
 const parseListingUrlFn = httpsCallable(functions, "parseListingUrl");
 const sendComplianceDocFn = withV2Fallback("sendComplianceDocV2", "sendComplianceDoc");
 const sendBulkComplianceDocsFn = withV2Fallback("sendBulkComplianceDocsV2", "sendBulkComplianceDocs");
-const createSenderIdentityFn = httpsCallable(functions, "createSenderIdentity");
 const cleanupClientStorageFn = httpsCallable(functions, "cleanupClientStorage");
 
 /* --- Auth gate --- */
@@ -471,6 +469,16 @@ window.addEventListener("load", () => requestAnimationFrame(updateTabIndicator))
 window.addEventListener("resize", updateTabIndicator);
 document.fonts?.ready?.then(updateTabIndicator);
 
+// Honor ?tab=<name> on arrival (e.g., from Sage "Open Sarah's profile, files tab").
+// Click the matching tab button so all its side-effects (indicator move, lazy
+// checklist init, etc.) run identically to a manual click.
+(function applyInitialTabParam() {
+  const wanted = params.get("tab");
+  if (!wanted) return;
+  const btn = document.querySelector(`.gd-tab[data-tab="${CSS.escape(wanted)}"]`);
+  if (btn) btn.click();
+})();
+
 /* ===== ACTIVITY TAB ===== */
 async function loadActivities(uid) {
   try {
@@ -544,7 +552,7 @@ window.saveActivity = async function () {
   const subject = document.getElementById("act-subject").value.trim();
   if (!subject) { showToast("Subject is required.", "error"); return; }
 
-  // If email type, send via SendGrid
+  // Email type goes through the sendEmail callable (Gmail OAuth → Resend "via" fallback).
   if (currentActivityType === "email") {
     const to = document.getElementById("act-to").value.trim();
     if (!to) { showToast("Recipient email is required.", "error"); return; }
@@ -2881,14 +2889,6 @@ document.addEventListener("ai-email-draft", (e) => {
   openActivityModal("email");
   document.getElementById("act-subject").value = subject;
   document.getElementById("act-body").value = body;
-});
-
-// Listen for AI actions that should refresh client data
-document.addEventListener("ai-actions-performed", async () => {
-  const user = auth.currentUser;
-  if (user) {
-    await loadClient(user.uid);
-  }
 });
 
 /* ===== ADD LISTING FROM CLIENT DETAIL ===== */

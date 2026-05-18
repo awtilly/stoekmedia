@@ -41,12 +41,6 @@ onAuthStateChanged(auth, async (user) => {
     document.getElementById("set-company").value = profile.company || "";
     document.getElementById("set-emailSignature").value = profile.emailSignature || "";
 
-    // Show diagnostics button for admins
-    if (profile.role === "admin") {
-      const diagEl = document.getElementById("boldsign-diagnostics");
-      if (diagEl) diagEl.style.display = "";
-    }
-
     // Load templates and sequences — don't block page if they fail
     const results = await Promise.allSettled([
       loadTemplates(user.uid),
@@ -222,39 +216,6 @@ document.getElementById("tpl-file-input").addEventListener("change", async (e) =
   await loadTemplates(user.uid);
   e.target.value = "";
 });
-
-/* ===== BOLDSIGN DIAGNOSTICS ===== */
-
-window.runBoldSignTest = async function () {
-  const btn = document.getElementById("btn-run-diagnostics");
-  const resultsEl = document.getElementById("diagnostics-results");
-  btn.disabled = true;
-  btn.textContent = "Running...";
-  resultsEl.style.display = "block";
-  resultsEl.innerHTML = '<div class="gd-spinner gd-spinner-sm"></div> Running 7 tests...';
-
-  try {
-    const stressTest = httpsCallable(functions, "stressTestBoldSign");
-    const { data } = await stressTest();
-
-    let html = `<div class="gd-diag-summary">${data.summary}</div>`;
-    html += data.results.map(r =>
-      `<div class="gd-diag-row">` +
-        `<span class="gd-diag-badge ${r.passed ? "gd-diag-pass" : "gd-diag-fail"}">${r.passed ? "PASS" : "FAIL"}</span>` +
-        `<span class="gd-diag-name">${r.test}</span>` +
-        `<span class="gd-diag-detail">${r.details}</span>` +
-      `</div>`
-    ).join("");
-
-    resultsEl.innerHTML = html;
-  } catch (e) {
-    console.error("Stress test error:", e);
-    resultsEl.innerHTML = `<div class="gd-diag-row"><span class="gd-diag-badge gd-diag-fail">ERROR</span> ${escapeHtml(e.message)}</div>`;
-  } finally {
-    btn.disabled = false;
-    btn.textContent = "Run Diagnostics";
-  }
-};
 
 /* ===== EMAIL SENDER STATUS ===== */
 

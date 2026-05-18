@@ -4,14 +4,14 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Email Automation for Real Estate Agents — GreenDoor CRM | Stoek Media</title>
-  <meta name="description" content="GreenDoor CRM email automation: send emails from client pages, 5 built-in templates, merge tags for personalization, SendGrid sender verification, auto-appended signatures, and full activity logging.">
-  <meta name="keywords" content="real estate email automation, follow-up emails realtor, email templates real estate CRM, SendGrid real estate, GreenDoor CRM email">
+  <meta name="description" content="GreenDoor CRM email automation: send emails from client pages, 5 built-in templates, merge tags for personalization, Gmail send-on-behalf, auto-appended signatures, and full activity logging.">
+  <meta name="keywords" content="real estate email automation, follow-up emails realtor, email templates real estate CRM, Gmail OAuth real estate, GreenDoor CRM email">
   <link rel="canonical" href="https://stoekmedia.com/greendoor/features/email-automation.html">
 
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Stoek Media">
   <meta property="og:title" content="Email Automation for Real Estate Agents — GreenDoor CRM">
-  <meta property="og:description" content="Send personalized emails from your CRM with 5 built-in templates, merge tags, auto-appended signatures, and SendGrid sender verification.">
+  <meta property="og:description" content="Send personalized emails from your CRM with 5 built-in templates, merge tags, auto-appended signatures, and Gmail send-on-behalf.">
   <meta property="og:url" content="https://stoekmedia.com/greendoor/features/email-automation.html">
   <meta property="og:image" content="https://stoekmedia.com/assets/images/greendoor-og.png">
   <meta property="og:image:width" content="1200">
@@ -19,7 +19,7 @@
 
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Email Automation for Real Estate Agents — GreenDoor CRM">
-  <meta name="twitter:description" content="Send personalized emails from your CRM with 5 built-in templates, merge tags, auto-appended signatures, and SendGrid sender verification.">
+  <meta name="twitter:description" content="Send personalized emails from your CRM with 5 built-in templates, merge tags, auto-appended signatures, and Gmail send-on-behalf.">
   <meta name="twitter:image" content="https://stoekmedia.com/assets/images/greendoor-og.png">
 
   <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large">
@@ -155,7 +155,7 @@
     <div class="container">
       <span class="section-label reveal" style="color: #22c55e;">Email Automation</span>
       <h1 class="reveal" style="font-family: var(--font-display); font-size: clamp(2.5rem, 5vw, 4.5rem); font-weight: 500; line-height: 1.1; max-width: 800px;">Automated Email Follow-Ups for <em style="color: #22c55e;">Real Estate</em></h1>
-      <p class="hero-sub reveal" style="max-width: 640px;">Send personalized emails from a client's detail page using built-in templates and merge tags. Emails go from your own address via SendGrid sender verification, with your signature auto-appended and every email logged in the client's activity feed.</p>
+      <p class="hero-sub reveal" style="max-width: 640px;">Send personalized emails from a client's detail page using built-in templates and merge tags. Connect your Gmail once and emails go out from your own address, with your signature auto-appended and every email logged in the client's activity feed.</p>
       <div class="hero-cta reveal" style="margin-top: var(--space-lg);">
         <a href="/greendoor/" class="btn btn-primary btn-arrow" style="background: #22c55e; border-color: #22c55e;">Try GreenDoor</a>
         <a href="#templates" class="btn btn-arrow">See the Templates</a>
@@ -221,22 +221,21 @@
     </div>
   </section>
 
-  <!-- Section 3: SendGrid & Sender Verification -->
+  <!-- Section 3: Sender identity + deliverability -->
   <section class="section-pad-lg" style="background: var(--color-bg-elevated);">
     <div class="container">
       <div class="feature-detail-grid">
         <div class="reveal">
-          <span class="section-label" style="color: #22c55e;">Sender Verification</span>
+          <span class="section-label" style="color: #22c55e;">Send From Your Own Gmail</span>
           <h3>Emails Come from Your Own Address</h3>
-          <p>GreenDoor uses SendGrid for email delivery, but your clients never see SendGrid's name or a generic "noreply" address. Through SendGrid's sender verification process, you verify your own email address so every email sent from GreenDoor appears to come directly from you.</p>
-          <p>When a client gets an email, it shows your name and your email address in the "From" field. When they reply, the reply goes to your email inbox. The experience is seamless &mdash; clients have no idea the email was sent from a CRM, and you maintain a professional, personal touch.</p>
-          <p>Setting up sender verification takes about two minutes during onboarding. GreenDoor walks you through the process step by step.</p>
+          <p>Connect your Gmail account once from Settings and GreenDoor sends every email directly through your inbox using Google's official send-on-behalf API. Clients see your name and your email address in the "From" field; replies land in your inbox; the message even shows up in your Gmail Sent folder.</p>
+          <p>If you'd rather not connect Gmail, GreenDoor sends from a shared verified sender as <em>You via GreenDoor</em> with replies routed back to your address. Either way, clients always have a real way to reply to you directly.</p>
         </div>
         <div class="reveal">
           <span class="section-label" style="color: #22c55e;">Deliverability</span>
           <h3>Professional Email Delivery That Reaches the Inbox</h3>
-          <p>Emails sent through GreenDoor use SendGrid's infrastructure, which means high deliverability rates and proper authentication (SPF, DKIM). Your emails are far less likely to land in spam compared to sending from a personal email account with attachments.</p>
-          <p>SendGrid handles the technical details &mdash; bounce management, unsubscribe compliance, and delivery optimization &mdash; so you just write the email and click send. GreenDoor takes care of making sure it actually gets delivered.</p>
+          <p>Whether sent through your Gmail or the shared sender, every message ships with proper authentication (SPF, DKIM, DMARC alignment), so it lands in the inbox &mdash; not in spam. No DNS configuration on your end, no copy-pasted unsubscribe footers.</p>
+          <p>Bounces, unsubscribe handling, and delivery optimization happen automatically. You just write the email and click send.</p>
         </div>
       </div>
     </div>

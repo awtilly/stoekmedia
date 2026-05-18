@@ -88,6 +88,13 @@ function injectBottomTabs() {
   const aiTab = nav.querySelector(".gd-tab-ai");
   if (aiTab) {
     aiTab.addEventListener("click", () => {
+      // On the dashboard, focus the inline Sage prompt instead of the legacy
+      // floating panel (which isn't injected there — see chatbot.js).
+      const dashInput = document.getElementById("dash-prompt-input");
+      if (dashInput) {
+        dashInput.focus();
+        return;
+      }
       if (typeof window.toggleAiPanel === "function") {
         window.toggleAiPanel();
       }

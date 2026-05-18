@@ -406,22 +406,28 @@ async function persistTemplate() {
       .map(m => ({ docusealFieldName: m.fieldName, source: m.source }));
 
     const docRef = doc(db, "documentTemplates", pendingUpload.templateId);
-    await setDoc(docRef, {
+    // merge:true so editing an existing template doesn't clobber createdAt and
+    // any sibling metadata (description, state, transactionTypes, required)
+    // the realtor may have set after the initial upload.
+    const payload = {
       ownerId: currentUser.uid,
       visibility: "private",
       name: pendingUpload.name,
-      description: "",
       category: "uploaded",
       docusealTemplateId: String(pendingBuilder.docusealTemplateId || ""),
       mergeFields,
       checklistEnabled: !!pendingUpload.checklist,
       sourcePdfPath: pendingUpload.storagePath,
-      state: null,
-      transactionTypes: [],
-      required: false,
-      createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
-    });
+    };
+    if (!pendingUpload.isEdit) {
+      payload.description = "";
+      payload.state = null;
+      payload.transactionTypes = [];
+      payload.required = false;
+      payload.createdAt = serverTimestamp();
+    }
+    await setDoc(docRef, payload, { merge: true });
 
     showToast("Template saved", "success");
     closeMappingModal();
@@ -446,7 +452,8 @@ window.editTemplate = async function (templateId) {
     name: t.name,
     storagePath: t.sourcePdfPath || null,
     downloadUrl: null,
-    checklist: !!t.checklistEnabled
+    checklist: !!t.checklistEnabled,
+    isEdit: true
   };
   // Re-open builder loaded with the existing template id so realtor can adjust fields.
   await openBuilder({

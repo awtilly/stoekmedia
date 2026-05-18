@@ -17,7 +17,27 @@ import { getCurrentUser, showToast, escapeHtml, safeToDate } from "./auth.js";
 
 const askAssistantFn = httpsCallable(functions, "askAssistant");
 const parseListingUrlFn = httpsCallable(functions, "parseListingUrl");
-const sendComplianceDocFn = httpsCallable(functions, "sendComplianceDocV2");
+
+// Same V2→V1 fallback shim used in client-detail.js. DocuSeal V2 is the
+// primary path; BoldSign V1 is the silent fallback while DocuSeal secrets
+// are still __pending__ in Secret Manager.
+function withV2Fallback(v2Name, v1Name) {
+  const v2 = httpsCallable(functions, v2Name);
+  const v1 = httpsCallable(functions, v1Name);
+  return async (data) => {
+    try {
+      return await v2(data);
+    } catch (err) {
+      const code = err?.code || "";
+      const msg = err?.message || "";
+      if (code.includes("failed-precondition") && /DocuSeal/i.test(msg)) {
+        return await v1(data);
+      }
+      throw err;
+    }
+  };
+}
+const sendComplianceDocFn = withV2Fallback("sendComplianceDocV2", "sendComplianceDoc");
 
 let currentUser = null;
 let recentClients = [];   // [{ id, name, status, email, phone, lastContactDays }]
@@ -328,7 +348,7 @@ const TARGET_ROUTES = {
   dashboard: () => "/greendoor/app/dashboard",
   client_list: () => "/greendoor/app/clients",
   client: (i) => i.clientId
-    ? `/greendoor/app/client-detail?cid=${encodeURIComponent(i.clientId)}${i.tab ? `&tab=${encodeURIComponent(i.tab)}` : ""}`
+    ? `/greendoor/app/client-detail?id=${encodeURIComponent(i.clientId)}${i.tab ? `&tab=${encodeURIComponent(i.tab)}` : ""}`
     : "/greendoor/app/clients",
   listing_list: () => "/greendoor/app/listings",
   listing: (i) => i.listingId
@@ -447,7 +467,7 @@ const TOOL_EXECUTORS = {
       ${previewRow("Email", input.email)}
       ${previewRow("Phone", input.phone)}
       ${previewRow("Status", STATUS_LABELS[input.status] || "Lead")}
-      ${previewRow("Type", input.transactionType ? input.transactionType.replace("_", " & ") : "")}
+      ${previewRow("Type", input.transactionType ? (TRANSACTION_TYPE_LABELS[input.transactionType] || input.transactionType) : "")}
       ${previewRow("Notes", input.notes)}
     `,
     execute: async (input) => {
@@ -568,14 +588,17 @@ const TOOL_EXECUTORS = {
         });
         return {
           message: `Sent **${templateName(input.templateId)}** to ${clientName(input.clientId)}.`,
-          followUp: { label: "Open client", action: () => executeNavigate({ target: "client", clientId: input.clientId, tab: "compliance" }) }
+          followUp: { label: "Open client", action: () => executeNavigate({ target: "client", clientId: input.clientId, tab: "files" }) }
         };
       } catch (err) {
-        // V2 not configured → route to compliance tab where the legacy fallback path lives.
-        if (err.code === "failed-precondition" || (err.message || "").includes("DocuSeal")) {
-          showToast("Routing you to the compliance tab to complete the send.", "info");
-          executeNavigate({ target: "client", clientId: input.clientId, tab: "compliance" });
-          return { message: "Opening the compliance tab to complete the send." };
+        const code = err?.code || "";
+        const msg = err?.message || "";
+        // V1 fallback didn't help — open the files tab so the realtor can use
+        // the legacy per-send drag-drop or pick a different template.
+        if (code.includes("failed-precondition") || /DocuSeal|BoldSign/i.test(msg)) {
+          showToast("Sage couldn't send automatically — opening the Files tab so you can finish manually.", "info");
+          executeNavigate({ target: "client", clientId: input.clientId, tab: "files" });
+          return { message: "Opening the Files tab to complete the send." };
         }
         throw err;
       }
@@ -692,16 +715,20 @@ const TOOL_EXECUTORS = {
     },
     execute: async (input) => {
       const uid = auth.currentUser.uid;
+      if (!input.source_url && !input.address) {
+        throw new Error("Need either a listing URL or an address to create a listing.");
+      }
       let data;
       if (input.source_url) {
         const r = await parseListingUrlFn({ url: input.source_url });
-        const parsed = r.data || {};
+        // parseListingUrl Cloud Function returns { listing: {...} } — not a flat shape.
+        const parsed = (r.data && r.data.listing) || {};
         data = {
           address: parsed.address || { full: "", street: "", city: "", state: "", zip: "" },
-          listingPrice: parsed.price || null,
-          beds: parsed.beds || null,
-          baths: parsed.baths || null,
-          squareFeet: parsed.sqft || null,
+          listingPrice: parsed.listingPrice || null,
+          bedrooms: parsed.bedrooms || null,
+          bathrooms: parsed.bathrooms || null,
+          squareFeet: parsed.squareFeet || null,
           yearBuilt: parsed.yearBuilt || null,
           propertyType: parsed.propertyType || "",
           description: parsed.description || "",
@@ -713,8 +740,8 @@ const TOOL_EXECUTORS = {
         data = {
           address: { full: input.address || "", street: input.address || "", city: "", state: "", zip: "" },
           listingPrice: input.price || null,
-          beds: input.beds || null,
-          baths: input.baths || null,
+          bedrooms: input.beds || null,
+          bathrooms: input.baths || null,
           squareFeet: input.sqft || null,
           notes: input.notes || ""
         };

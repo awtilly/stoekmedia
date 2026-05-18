@@ -1730,7 +1730,8 @@ const SAGE_DASHBOARD_TOOLS = [
         },
         tab: {
           type: "string",
-          description: "Optional sub-tab. For client target: 'overview' | 'compliance' | 'activity' | 'files' | 'matches'."
+          enum: ["overview", "activity", "showings", "files", "properties", "checklist"],
+          description: "Optional sub-tab. Only valid when target=client. 'properties' is the saved matches; 'files' contains the compliance/signing sub-panel; 'checklist' is the closing checklist."
         }
       },
       required: ["target"]
@@ -1818,18 +1819,22 @@ const SAGE_DASHBOARD_TOOLS = [
   },
   {
     name: "add_listing",
-    description: "Propose adding a new listing. The realtor MUST confirm. Use when they say 'add a listing', 'I have a new listing', 'parse this URL: ...'. If they provide a URL, set source_url; we'll fetch the details on confirm.",
+    description: "Propose adding a new listing. The realtor MUST confirm. Use when they say 'add a listing', 'I have a new listing', 'parse this URL: ...'. ALWAYS include either source_url OR address (a listing with neither is meaningless). If they provide a URL, prefer source_url; we'll fetch the details on confirm.",
     input_schema: {
       type: "object",
       properties: {
         source_url: { type: "string", description: "Listing URL (Zillow, Realtor.com, etc.). When provided, other fields can be omitted — we'll parse on confirm." },
-        address: { type: "string", description: "Property address if no URL." },
+        address: { type: "string", description: "Property address. Required if no source_url." },
         price: { type: "integer", description: "List price in dollars." },
         beds: { type: "integer" },
         baths: { type: "number" },
         sqft: { type: "integer" },
         notes: { type: "string", description: "Any other detail mentioned." }
-      }
+      },
+      anyOf: [
+        { required: ["source_url"] },
+        { required: ["address"] }
+      ]
     }
   },
   {

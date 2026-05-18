@@ -17,6 +17,7 @@ function detectPage() {
   if (path.includes("clients")) return "clients";
   if (path.includes("calendar")) return "calendar";
   if (path.includes("listings")) return "listings";
+  if (path.includes("templates")) return "templates";
   if (path.includes("settings")) return "settings";
   if (path.includes("admin")) return "admin";
   if (path.includes("faq")) return "faq";
@@ -59,6 +60,10 @@ const QUICK_ACTIONS = {
   "listings": [
     "Match listings to my buyers",
     "What's new on the market?"
+  ],
+  "templates": [
+    "How do template auto-fills work?",
+    "What fields can Sage map?"
   ],
   "settings": [
     "How do I set up templates?",
@@ -167,13 +172,16 @@ const TOOL_RENDERERS = {
       if (typeof window.openShowingModal !== "function") return;
       window.openShowingModal();
       setTimeout(() => {
-        const addrEl = document.getElementById("showing-address");
-        const dateEl = document.getElementById("showing-date");
-        const timeEl = document.getElementById("showing-time");
-        const notesEl = document.getElementById("showing-notes");
+        const addrEl = document.getElementById("show-address");
+        const dateEl = document.getElementById("show-date");
+        const notesEl = document.getElementById("show-notes");
         if (addrEl && input.address) addrEl.value = input.address;
-        if (dateEl && input.date) dateEl.value = input.date;
-        if (timeEl && input.time) timeEl.value = input.time;
+        // The modal uses a single datetime-local input. Combine date + time
+        // into "YYYY-MM-DDTHH:MM"; default time to 09:00 when only a date was given.
+        if (dateEl && input.date) {
+          const time = input.time && /^\d{1,2}:\d{2}$/.test(input.time) ? input.time : "09:00";
+          dateEl.value = `${input.date}T${time}`;
+        }
         if (notesEl && input.notes) notesEl.value = input.notes;
       }, 100);
     }
@@ -320,11 +328,6 @@ window.sendAiMessage = async function () {
     // Append to session history
     chatHistory.push({ role: "user", content: question });
     chatHistory.push({ role: "assistant", content: response });
-
-    // If the AI performed actions on client-detail, notify page to refresh
-    if (result.data.actionsPerformed && result.data.actionsPerformed.length > 0 && page === "client-detail") {
-      document.dispatchEvent(new CustomEvent("ai-actions-performed"));
-    }
   } catch (err) {
     removeTypingIndicator();
     const msg = err.message || "Something went wrong. Please try again.";
@@ -473,8 +476,15 @@ function initMobileKeyboardFix() {
 }
 
 /* ---------- auto-init on auth ---------- */
+// Skip injecting the floating Sage panel on the dashboard — the dashboard IS
+// now a full-page Sage command bar, so a second floating UI would be a
+// duplicate (the mobile bottom-tabs Sage button also points at this panel).
+function shouldSkipChatbotInjection() {
+  return /\/greendoor\/app\/dashboard(\/|$|\?)/.test(window.location.pathname + window.location.search);
+}
+
 onAuthStateChanged(auth, (user) => {
-  if (user && !document.getElementById("ai-panel")) {
+  if (user && !document.getElementById("ai-panel") && !shouldSkipChatbotInjection()) {
     const page = detectPage();
     injectChatHTML(page);
     initMobileKeyboardFix();

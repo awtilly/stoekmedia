@@ -54,6 +54,13 @@ onAuthStateChanged(auth, async (user) => {
 
   document.getElementById("listings-loading").classList.add("gd-hidden");
   document.getElementById("listings-content").classList.remove("gd-hidden");
+
+  // Auto-open a specific listing when arriving from a Sage "Open listing"
+  // follow-up: /greendoor/app/listings?lid=<id>
+  const lid = new URLSearchParams(window.location.search).get("lid");
+  if (lid && typeof window.openListingDetail === "function") {
+    window.openListingDetail(lid);
+  }
 });
 
 /* ===== LOAD DATA ===== */
