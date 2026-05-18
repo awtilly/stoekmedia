@@ -487,7 +487,11 @@ body.gd-light .gd-modal-footer {
    Tab strip is sticky under the page header. Active tab is indicated by a
    single absolutely-positioned underline element that slides between tabs
    (animated via transform); per-tab border-bottom is intentionally not used
-   so the slide animation works. */
+   so the slide animation works.
+
+   Note: we intentionally do NOT apply mask-image to .gd-tabs — that would
+   clip the strip's white background too, letting page content bleed through
+   the faded right edge while sticky. */
 body.gd-light .gd-tabs {
   position: sticky;
   top: var(--gd-topbar-height);
@@ -501,9 +505,6 @@ body.gd-light .gd-tabs {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
-  /* Right-edge fade hints at horizontal overflow on mobile. */
-  -webkit-mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 24px), transparent 100%);
-  mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 24px), transparent 100%);
 }
 
 body.gd-light .gd-tabs::-webkit-scrollbar { display: none; }
@@ -1179,8 +1180,8 @@ body.gd-light .gd-modal-lg { max-width: 800px; }
     padding: 10px 12px;
     gap: 6px;
   }
-  /* Bleed the tab strip to viewport edges so the right-fade and horizontal
-     scroll feel natural on phones. */
+  /* Bleed the tab strip to viewport edges so horizontal scroll feels
+     natural on phones. */
   body.gd-light .gd-tabs {
     margin-left: -16px;
     margin-right: -16px;
