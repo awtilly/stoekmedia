@@ -2048,17 +2048,19 @@ const espn = {
         if (!comp) continue;
         const notes = comp.notes || [];
         const note = notes[0]?.headline || '';
-        let region = '';
-        if (note.includes('South')) region = 'South';
-        else if (note.includes('East')) region = 'East';
-        else if (note.includes('Midwest')) region = 'Midwest';
-        else if (note.includes('West')) region = 'West';
-        if (!region) continue;
+        // STRICT: must be an NCAA Championship game, not a conference tournament.
+        // Old loose `note.includes('East')` matched "Big East Tournament", "Big West",
+        // "Southland", "Mountain West", etc. and injected phantom bracket teams.
+        if (!note.includes('NCAA') || !note.includes('Championship')) continue;
+        const regionMatch = note.match(/(South|East|Midwest|West) Region/);
+        if (!regionMatch) continue; // skips Final Four / National Championship (no region in headline)
+        const region = regionMatch[1];
         for (const c of (comp.competitors || [])) {
           const team = c.team || {};
           const seed = c.curatedRank?.current;
           if (!seed || seed > 16) continue;
           const name = team.shortDisplayName || team.displayName || team.name || '';
+          if (!name) continue;
           const key = `${name}_${seed}_${region}`;
           if (!allTeams[key]) {
             allTeams[key] = { name, seed, region, logo: team.logo || '', abbr: team.abbreviation || '', espnId: team.id || '', color: team.color || '', record: c.records?.[0]?.summary || '' };
@@ -3570,6 +3572,12 @@ async function parseBulkImport(){
 /* ── ESPN Import ── */
 async function importFromESPN(){
   if(!await requireAdmin()) return;
+  // Year sanity: if S.year is stale (last tournament's year), offer to bump
+  const thisYear = new Date().getFullYear();
+  if(S.year < thisYear){
+    const bump = await appConfirm(`Your tournament year is ${S.year}. Update to ${thisYear} before importing?`, { title: 'Update Tournament Year', confirmLabel: 'Update' });
+    if(bump){ S.year = thisYear; saveState(); }
+  }
   if(S.teams.length > 0 && !await appConfirm('This will replace all current teams. Continue?', { title: 'Replace Teams', confirmLabel: 'Replace' })) return;
 
   const btn = document.getElementById('espn-import-btn');
@@ -3580,10 +3588,23 @@ async function importFromESPN(){
   try {
     const teams = await espn.fetchTournamentTeams();
     if(teams.length === 0){
-      // Tournament bracket not yet available - try to import current year's ranking-based teams
       showToast('Tournament bracket not available yet. Try after Selection Sunday.');
       if(btn){ btn.textContent = origText; btn.disabled = false; }
       return;
+    }
+
+    // Sanity check: 4 regions × 16 slots = 64 bracket slots. With play-ins, total team
+    // entries should be 64-68. Anything outside that means ESPN data is partial/stale.
+    const slotCount = new Set(teams.map(t => `${t.seed}_${t.region}`)).size;
+    const regionCounts = teams.reduce((acc, t) => { acc[t.region] = (acc[t.region]||0)+1; return acc; }, {});
+    const incomplete = slotCount < 64 || Object.values(regionCounts).some(n => n < 16) || REGIONS.some(r => !regionCounts[r]);
+    if(incomplete){
+      const detail = REGIONS.map(r => `${r}: ${regionCounts[r] || 0}/16`).join(', ');
+      const proceed = await appConfirm(`ESPN returned an incomplete bracket (${slotCount}/64 slots).\n\n${detail}\n\nImport partial data anyway? (Manual fixup will be needed in Settings.)`, { title: 'Incomplete Bracket', danger: true, confirmLabel: 'Import Anyway' });
+      if(!proceed){
+        if(btn){ btn.textContent = origText; btn.disabled = false; }
+        return;
+      }
     }
 
     S.teams = teams.map(t => ({

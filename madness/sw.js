@@ -46,7 +46,7 @@ self.addEventListener('notificationclick', (event) => {
 });
 
 /* ── Service Worker Cache ── */
-const CACHE_NAME = 'mm-draft-v7';
+const CACHE_NAME = 'mm-draft-v8';
 const PRECACHE_URLS = [
   './',
   './index.html',
