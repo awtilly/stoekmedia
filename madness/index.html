@@ -2920,31 +2920,33 @@ function connectToRoom(code){
   const gen = ++_roomGeneration;
   unsubRoom = db.collection("rooms").doc(code).onSnapshot(doc => {
     if(gen !== _roomGeneration) return; // stale listener
-    if(!doc.exists){
-      saveState();
-      return;
-    }
-    const data = doc.data();
-    if(data && data.state){
-      _isRemoteUpdate = true;
-      const local = {};
-      for(const k of VIEW_LOCAL) local[k] = S[k];
-      const remote = JSON.parse(data.state);
-      Object.assign(S, remote, local);
-      // Reconstruct Firestore Timestamp from serialized JSON
-      if(S.ds && S.ds.pickDeadline && typeof S.ds.pickDeadline === 'object' && S.ds.pickDeadline.seconds){
-        S.ds.pickDeadline = new firebase.firestore.Timestamp(S.ds.pickDeadline.seconds, S.ds.pickDeadline.nanoseconds || 0);
-      }
-      localStorage.setItem("mm4", JSON.stringify(S));
-      render();
-      updateAppBadge();
-      if ('Notification' in window && Notification.permission === 'granted') initFCM().catch(() => {});
-      _isRemoteUpdate = false;
-    }
+    // A pick transaction is currently writing — drop this snapshot.
+    // Our transaction commit will deliver its own snapshot with the post-pick state shortly.
+    if(_pickInFlight) return;
+    _applyRoomSnapshot(doc);
   }, err => {
     console.warn("Firestore listen error:", err);
     showToast("Connection error \u2014 working offline");
   });
+}
+
+function _applyRoomSnapshot(doc){
+  if(!doc.exists){ saveState(); return; }
+  const data = doc.data();
+  if(!data || !data.state) return;
+  _isRemoteUpdate = true;
+  const local = {};
+  for(const k of VIEW_LOCAL) local[k] = S[k];
+  const remote = JSON.parse(data.state);
+  Object.assign(S, remote, local);
+  if(S.ds && S.ds.pickDeadline && typeof S.ds.pickDeadline === 'object' && S.ds.pickDeadline.seconds){
+    S.ds.pickDeadline = new firebase.firestore.Timestamp(S.ds.pickDeadline.seconds, S.ds.pickDeadline.nanoseconds || 0);
+  }
+  localStorage.setItem("mm4", JSON.stringify(S));
+  render();
+  updateAppBadge();
+  if('Notification' in window && Notification.permission === 'granted') initFCM().catch(() => {});
+  _isRemoteUpdate = false;
 }
 
 function getRecentRooms(){
@@ -3122,6 +3124,7 @@ async function advanceTeam(region, gameIdx, teamId){
   if(!await requireAdmin()) return;
   const b = S.bracket[region];
   const oldWinner = b[gameIdx];
+  if(oldWinner === teamId) return; // no-op, skip Firestore write
   b[gameIdx] = teamId;
   if(oldWinner && oldWinner !== teamId){
     for(let gi = gameIdx+1; gi < 15; gi++){
@@ -3156,6 +3159,7 @@ async function advanceTeam(region, gameIdx, teamId){
     }
   }
   syncGames();
+  saveState();
   render();
 }
 
@@ -3173,12 +3177,14 @@ function clearDownstream(region, changedGame){
 
 async function advanceFF(ffIdx, teamId){
   if(!await requireAdmin()) return;
+  if(S.bracket.ff[ffIdx] === teamId) return;
   S.bracket.ff[ffIdx] = teamId;
   if(ffIdx < 2){
     const cw = S.bracket.ff[2];
     if(cw && cw !== S.bracket.ff[0] && cw !== S.bracket.ff[1]) S.bracket.ff[2] = null;
   }
   syncGames();
+  saveState();
   render();
 }
 
@@ -3208,15 +3214,18 @@ async function clearBracketGame(region, gameIdx, event){
   clearDownstream(region, gameIdx);
   cascadeFF();
   syncGames();
+  saveState();
   render();
 }
 
 async function clearFFGame(ffIdx, event){
   if(event) event.preventDefault();
   if(!await requireAdmin()) return;
+  if(S.bracket.ff[ffIdx] == null && (ffIdx >= 2 || S.bracket.ff[2] == null)) return;
   S.bracket.ff[ffIdx] = null;
   if(ffIdx < 2){ S.bracket.ff[2] = null; }
   syncGames();
+  saveState();
   render();
 }
 
@@ -3489,6 +3498,7 @@ async function addPlayer(){
   if(!pin || !/^\d{4}$/.test(pin.trim())){ showToast('PIN must be 4 digits'); return; }
   const pinHash = await hashPin(pin.trim());
   S.players.push({id: generateId(), name: n, teamIds: [], pinHash});
+  saveState();
   render();
   setTimeout(() => document.getElementById("pn")?.focus(), 0);
 }
@@ -3496,6 +3506,7 @@ async function addPlayer(){
 async function removePlayer(id){
   if(!await requireAdmin()) return;
   S.players = S.players.filter(p => p.id !== id);
+  saveState();
   render();
 }
 
@@ -3504,6 +3515,7 @@ async function movePlayer(i, d){
   const s = i + d;
   if(s < 0 || s >= S.players.length) return;
   [S.players[i], S.players[s]] = [S.players[s], S.players[i]];
+  saveState();
   render();
 }
 
@@ -3521,6 +3533,7 @@ async function addTeam(){
   const n = document.getElementById("tn").value.trim();
   if(!n) return;
   S.teams.push({id: generateId(), name: n, seed: Number(document.getElementById("ts").value), region: document.getElementById("tr").value});
+  saveState();
   render();
   setTimeout(() => document.getElementById("tn")?.focus(), 0);
 }
@@ -3528,6 +3541,7 @@ async function addTeam(){
 async function deleteTeam(id){
   if(!await requireAdmin()) return;
   S.teams = S.teams.filter(t => t.id !== id);
+  saveState();
   render();
 }
 
@@ -3549,6 +3563,7 @@ async function parseBulkImport(){
     }
   }
   if(skipped > 0) showToast(`${skipped} line(s) skipped (invalid seed, region, or duplicate)`);
+  saveState();
   render();
 }
 
@@ -3585,6 +3600,7 @@ async function importFromESPN(){
     }));
 
     showToast(`Imported ${S.teams.length} teams from ESPN!`);
+    saveState();
     render();
   } catch(e) {
     console.error('ESPN import failed:', e);
@@ -3623,6 +3639,7 @@ async function refreshTeamData(){
     }
     await autoResolvePlayIns();
     showToast('Team data refreshed!');
+    saveState();
     render();
   } catch(e) {
     showToast('Refresh failed.');
@@ -3847,21 +3864,78 @@ async function startDraft(){
   };
   S.players.forEach(p => p.teamIds = []);
   if(duration > 0) startDraftClock();
+  saveState();
   render();
 }
 
+// Transactional pick: atomic read-modify-write on Firestore.
+// Eliminates the "two clients pick at once" race that broke the live draft last year.
+// Server-state is the source of truth; local S updates via the snapshot listener.
+let _pickInFlight = false;
 async function pickTeam(tid){
+  if(_pickInFlight) return; // ignore re-entrant taps while a pick is settling
   const myId = getMyPlayerId();
+  // No-room (solo/offline) mode: simple local mutation
+  if(!roomId){
+    return _pickTeamLocal(tid, myId);
+  }
+  _pickInFlight = true;
+  try {
+    await db.runTransaction(async (tx) => {
+      const ref = db.collection("rooms").doc(roomId);
+      const snap = await tx.get(ref);
+      if(!snap.exists) throw { code: 'no-room', msg: 'Room not found' };
+      const remote = JSON.parse(snap.data().state || '{}');
+      const ds = remote.ds || {};
+      if(ds.complete) throw { code: 'complete', msg: 'Draft already complete' };
+      if(!ds.started) throw { code: 'not-started', msg: 'Draft has not started' };
+      if(!adminUnlocked && myId !== ds.order[ds.cp]){
+        throw { code: 'not-turn', msg: "It's not your turn anymore" };
+      }
+      const taken = (remote.players || []).flatMap(p => p.teamIds || []);
+      if(taken.includes(tid)){
+        throw { code: 'taken', msg: 'That team was just picked — choose another' };
+      }
+      const pl = (remote.players || []).find(p => p.id === ds.order[ds.cp]);
+      if(!pl) throw { code: 'no-player', msg: 'Drafting player not found' };
+      pl.teamIds = pl.teamIds || [];
+      pl.teamIds.push(tid);
+      ds.cp++;
+      if(ds.cp >= ds.order.length){
+        ds.complete = true;
+        ds.pickDeadline = null;
+      } else if(ds.timerDuration && ds.timerDuration > 0){
+        ds.pickDeadline = firebase.firestore.Timestamp.fromDate(new Date(Date.now() + ds.timerDuration * 1000));
+        ds.timerPaused = false;
+        ds.pausedRemaining = null;
+      }
+      remote.ds = ds;
+      tx.update(ref, {
+        state: JSON.stringify(remote),
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    });
+    _beeped = false;
+    updateAppBadge();
+  } catch(err){
+    if(err && err.msg) showToast(err.msg);
+    else { console.warn('Pick transaction failed:', err); showToast('Pick failed — try again'); }
+  } finally {
+    _pickInFlight = false;
+  }
+}
+
+function _pickTeamLocal(tid, myId){
   const ds = S.ds;
   if(ds.complete) return;
   _beeped = false;
-  // Turn enforcement: only the current drafter can pick (admin override preserved)
-  if(!adminUnlocked && myId !== ds.order[ds.cp]){
-    showToast("It's not your turn!");
-    return;
-  }
+  if(!adminUnlocked && myId !== ds.order[ds.cp]){ showToast("It's not your turn!"); return; }
+  const taken = S.players.flatMap(p => p.teamIds || []);
+  if(taken.includes(tid)){ showToast('Team already picked'); return; }
   const pl = S.players.find(p => p.id === ds.order[ds.cp]);
-  if(pl) pl.teamIds.push(tid);
+  if(!pl) return;
+  pl.teamIds = pl.teamIds || [];
+  pl.teamIds.push(tid);
   ds.cp++;
   if(ds.cp >= ds.order.length){
     ds.complete = true;
@@ -3872,12 +3946,42 @@ async function pickTeam(tid){
     ds.timerPaused = false;
     ds.pausedRemaining = null;
   }
+  saveState();
   render();
   updateAppBadge();
 }
 
 async function undoDraft(){
   if(!await requireAdmin()) return;
+  // Multiplayer: do it transactionally so concurrent picks can't sneak past
+  if(roomId){
+    try {
+      await db.runTransaction(async (tx) => {
+        const ref = db.collection("rooms").doc(roomId);
+        const snap = await tx.get(ref);
+        if(!snap.exists) return;
+        const remote = JSON.parse(snap.data().state || '{}');
+        const ds = remote.ds || {};
+        if(!ds.order || ds.cp === 0) return;
+        ds.cp--;
+        ds.complete = false;
+        const pl = (remote.players || []).find(p => p.id === ds.order[ds.cp]);
+        if(pl && pl.teamIds && pl.teamIds.length){ pl.teamIds.pop(); }
+        if(ds.timerDuration && ds.timerDuration > 0){
+          ds.pickDeadline = firebase.firestore.Timestamp.fromDate(new Date(Date.now() + ds.timerDuration * 1000));
+          ds.timerPaused = false;
+          ds.pausedRemaining = null;
+        }
+        remote.ds = ds;
+        tx.update(ref, {
+          state: JSON.stringify(remote),
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+      });
+      _beeped = false;
+    } catch(err){ console.warn('Undo failed:', err); showToast('Undo failed — try again'); }
+    return;
+  }
   const ds = S.ds;
   if(ds.cp === 0) return;
   _beeped = false;
@@ -3885,12 +3989,12 @@ async function undoDraft(){
   ds.complete = false;
   const pl = S.players.find(p => p.id === ds.order[ds.cp]);
   if(pl) pl.teamIds.pop();
-  // Reset timer for the restored pick
   if(ds.timerDuration && ds.timerDuration > 0){
     ds.pickDeadline = firebase.firestore.Timestamp.fromDate(new Date(Date.now() + ds.timerDuration * 1000));
     ds.timerPaused = false;
     ds.pausedRemaining = null;
   }
+  saveState();
   render();
 }
 
@@ -3900,6 +4004,7 @@ async function resetDraft(){
   stopDraftClock();
   S.ds = {order:[], cp:0, started:false, complete:false};
   S.players.forEach(p => p.teamIds = []);
+  saveState();
   render();
 }
 
@@ -4006,16 +4111,59 @@ function updateDraftClock(){
   }
 }
 
-function autoPickHighestSeed(){
+async function autoPickHighestSeed(){
   _beeped = false;
+  const myId = getMyPlayerId();
+  // Transactional path for multiplayer: computes highest-available against server state
+  if(roomId){
+    let pickedName = '';
+    try {
+      await db.runTransaction(async (tx) => {
+        const ref = db.collection("rooms").doc(roomId);
+        const snap = await tx.get(ref);
+        if(!snap.exists) return;
+        const remote = JSON.parse(snap.data().state || '{}');
+        const ds = remote.ds || {};
+        if(ds.complete || !ds.started) return;
+        // Only the active drafter (or admin) drives the auto-pick to avoid duplicate fires
+        if(!adminUnlocked && myId !== ds.order[ds.cp]) return;
+        const taken = new Set((remote.players || []).flatMap(p => p.teamIds || []));
+        const available = (remote.teams || []).filter(t => !taken.has(t.id)).sort((a,b) => a.seed - b.seed);
+        if(available.length === 0) return;
+        const chosen = available[0];
+        const pl = (remote.players || []).find(p => p.id === ds.order[ds.cp]);
+        if(!pl) return;
+        pl.teamIds = pl.teamIds || [];
+        pl.teamIds.push(chosen.id);
+        ds.cp++;
+        if(ds.cp >= ds.order.length){
+          ds.complete = true;
+          ds.pickDeadline = null;
+        } else if(ds.timerDuration && ds.timerDuration > 0){
+          ds.pickDeadline = firebase.firestore.Timestamp.fromDate(new Date(Date.now() + ds.timerDuration * 1000));
+          ds.timerPaused = false;
+        }
+        remote.ds = ds;
+        tx.update(ref, {
+          state: JSON.stringify(remote),
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        pickedName = chosen.name || 'Unknown';
+      });
+      if(pickedName) showToast('Auto-picked: ' + pickedName);
+      updateAppBadge();
+    } catch(err){ console.warn('Auto-pick failed:', err); }
+    return;
+  }
+  // Local-only fallback
   const ds = S.ds;
   if(ds.complete) return;
-  const all = S.players.flatMap(p => p.teamIds);
+  const all = S.players.flatMap(p => p.teamIds || []);
   const available = S.teams.filter(t => !all.includes(t.id)).sort((a,b) => a.seed - b.seed);
   if(available.length === 0) return;
   const tid = available[0].id;
   const pl = S.players.find(p => p.id === ds.order[ds.cp]);
-  if(pl) pl.teamIds.push(tid);
+  if(pl){ pl.teamIds = pl.teamIds || []; pl.teamIds.push(tid); }
   ds.cp++;
   if(ds.cp >= ds.order.length){
     ds.complete = true;
@@ -4025,6 +4173,7 @@ function autoPickHighestSeed(){
     ds.timerPaused = false;
   }
   showToast('Auto-picked: ' + (S.teams.find(t => t.id === tid)?.name || 'Unknown'));
+  saveState();
   render();
   updateAppBadge();
 }
@@ -4310,6 +4459,7 @@ function renderSettings(c){
 async function changeYear(v){
   if(!await requireAdmin()) return;
   S.year = Number(v) || new Date().getFullYear();
+  saveState();
   render();
 }
 
@@ -4317,18 +4467,21 @@ async function clearAllTeams(){
   if(!await requireAdmin()) return;
   if(!await appConfirm('Clear all teams?', { title: 'Clear Teams', danger: true, confirmLabel: 'Clear All' })) return;
   S.teams = [];
+  saveState();
   render();
 }
 
 async function changeScoring(r, v){
   if(!await requireAdmin()) return;
   S.rp[r] = Number(v) || 0;
+  saveState();
   render();
 }
 
 async function toggleUpsetBonus(){
   if(!await requireAdmin()) return;
   S.ub = !S.ub;
+  saveState();
   render();
 }
 
@@ -4336,6 +4489,7 @@ async function setPreset(k){
   if(!await requireAdmin()) return;
   const pr = {doubling:{1:1,2:2,3:4,4:8,5:16,6:32}, linear:{1:1,2:2,3:3,4:4,5:5,6:6}, backLoaded:{1:1,2:2,3:4,4:8,5:20,6:40}, flat:{1:1,2:1,3:1,4:1,5:1,6:1}};
   S.rp = {...pr[k]};
+  saveState();
   render();
 }
 
