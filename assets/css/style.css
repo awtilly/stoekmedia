@@ -1,23 +1,23 @@
 /* ============================================
    STOEK MEDIA — Global Styles
-   Dark cinematic aesthetic with red accent
+   Dark editorial aesthetic with vermillion accent
    ============================================ */
 
 @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Outfit:wght@300;400;500;600;700&display=swap');
 
 /* --- CSS Variables --- */
 :root {
-  --color-bg: #1a1a2e;
-  --color-bg-elevated: #22223a;
-  --color-bg-card: #2a2a44;
-  --color-surface: #33334d;
-  --color-border: rgba(255, 255, 255, 0.1);
-  --color-text-primary: #f5f0e8;
-  --color-text-secondary: rgba(245, 240, 232, 0.6);
-  --color-text-muted: rgba(245, 240, 232, 0.35);
-  --color-accent: #c4443a;
-  --color-accent-hover: #d95248;
-  --color-accent-dim: rgba(196, 68, 58, 0.15);
+  --color-bg: #15151f;
+  --color-bg-elevated: #1c1c28;
+  --color-bg-card: #232333;
+  --color-surface: #2c2c40;
+  --color-border: rgba(255, 255, 255, 0.09);
+  --color-text-primary: #f4f1ea;
+  --color-text-secondary: rgba(244, 241, 234, 0.64);
+  --color-text-muted: rgba(244, 241, 234, 0.40);
+  --color-accent: #e0533f;
+  --color-accent-hover: #f0664f;
+  --color-accent-dim: rgba(224, 83, 63, 0.14);
   --color-white: #ffffff;
 
   --font-display: 'Playfair Display', Georgia, serif;
@@ -129,7 +129,7 @@ img {
 }
 
 .nav.scrolled {
-  background: rgba(26, 26, 46, 0.92);
+  background: rgba(21, 21, 31, 0.92);
   backdrop-filter: blur(20px);
   border-bottom: 1px solid var(--color-border);
 }
@@ -283,8 +283,8 @@ img {
   position: absolute;
   inset: 0;
   z-index: 0;
-  background: radial-gradient(ellipse at 30% 50%, rgba(196, 68, 58, 0.08) 0%, transparent 60%),
-              radial-gradient(ellipse at 70% 80%, rgba(196, 68, 58, 0.05) 0%, transparent 50%);
+  background: radial-gradient(ellipse at 30% 50%, rgba(224, 83, 63, 0.08) 0%, transparent 60%),
+              radial-gradient(ellipse at 70% 80%, rgba(224, 83, 63, 0.05) 0%, transparent 50%);
 }
 
 .hero-content {
@@ -465,7 +465,7 @@ img {
 }
 
 .service-card:hover {
-  border-color: rgba(196, 68, 58, 0.3);
+  border-color: rgba(224, 83, 63, 0.3);
   transform: translateY(-4px);
 }
 
@@ -539,7 +539,7 @@ img {
 }
 
 .work-card:hover {
-  border-color: rgba(196, 68, 58, 0.3);
+  border-color: rgba(224, 83, 63, 0.3);
   transform: translateY(-3px);
 }
 
@@ -890,7 +890,7 @@ body::before {
 }
 
 .product-card:hover {
-  border-color: rgba(196, 68, 58, 0.3);
+  border-color: rgba(224, 83, 63, 0.3);
   transform: translateY(-4px);
 }
 
@@ -981,7 +981,7 @@ body::before {
 }
 
 .feature-card:hover {
-  border-color: rgba(196, 68, 58, 0.3);
+  border-color: rgba(224, 83, 63, 0.3);
   transform: translateY(-4px);
 }
 
@@ -1141,10 +1141,178 @@ body::before {
   margin-top: var(--space-lg);
 }
 
+/* ============================================
+   REFRESH 2026 — section headings, 2-up divisions,
+   featured project card, GreenDoor brand tile,
+   About-page venture cards
+   ============================================ */
+
+/* Shared section heading (replaces repeated inline-styled h2s) */
+.section-heading {
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 4vw, 3.2rem);
+  font-weight: 500;
+  line-height: 1.15;
+  margin-bottom: var(--space-lg);
+}
+
+.section-heading em {
+  font-family: var(--font-display);
+  font-style: italic;
+  color: var(--color-accent);
+}
+
+/* Divisions: two cards should fill the row, not sit in a 3-col grid */
+.services-grid--two {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+/* Featured project card (homepage Work) */
+.work-featured {
+  display: grid;
+  grid-template-columns: 1fr 1.1fr;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-card);
+  overflow: hidden;
+  transition: border-color 0.4s ease, transform 0.4s ease;
+}
+
+.work-featured:hover {
+  border-color: rgba(224, 83, 63, 0.32);
+  transform: translateY(-3px);
+}
+
+.work-featured-visual {
+  min-height: 340px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.work-featured-body {
+  padding: var(--space-lg);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.work-featured-body h3 {
+  font-family: var(--font-display);
+  font-size: clamp(1.6rem, 3vw, 2.1rem);
+  font-weight: 500;
+  line-height: 1.2;
+  margin: 0.4rem 0 var(--space-sm);
+}
+
+.work-featured-body p {
+  color: var(--color-text-secondary);
+  font-size: 0.98rem;
+  line-height: 1.8;
+}
+
+.work-featured .view-link {
+  margin-top: var(--space-md);
+}
+
+/* GreenDoor brand tile (replaces the emoji placeholder) */
+.gd-tile {
+  background:
+    radial-gradient(ellipse at 28% 22%, rgba(34, 197, 94, 0.20) 0%, transparent 60%),
+    linear-gradient(155deg, #1a2b1f 0%, #15151f 70%);
+}
+
+.gd-tile-mark {
+  font-family: var(--font-body);
+  font-size: clamp(1.8rem, 3vw, 2.4rem);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: var(--color-text-primary);
+}
+
+.gd-tile-mark .gd-green {
+  color: #22c55e;
+}
+
+.gd-tile-sub {
+  font-family: var(--font-body);
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+/* About-page venture cards (classes were referenced but never defined) */
+.work-info {
+  padding: var(--space-md);
+}
+
+.work-tags {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: var(--space-sm);
+}
+
+.work-tag {
+  font-family: var(--font-body);
+  font-size: 0.62rem;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  padding: 0.28rem 0.6rem;
+  border: 1px solid var(--color-border);
+}
+
+.work-info h3 {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 500;
+  line-height: 1.25;
+  margin-bottom: var(--space-sm);
+}
+
+.work-info p {
+  color: var(--color-text-secondary);
+  font-size: 0.92rem;
+  line-height: 1.75;
+}
+
+.work-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--font-body);
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+  margin-top: var(--space-md);
+  transition: gap 0.3s ease;
+}
+
+.work-card:hover .work-link {
+  gap: 0.8rem;
+}
+
 /* --- Responsive --- */
 @media (max-width: 1024px) {
   .services-grid {
     grid-template-columns: 1fr;
+  }
+
+  .work-featured {
+    grid-template-columns: 1fr;
+  }
+
+  .work-featured-visual {
+    min-height: 240px;
   }
 
   .value-grid,
@@ -1184,7 +1352,7 @@ body::before {
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(26, 26, 46, 0.98);
+    background: rgba(21, 21, 31, 0.98);
     backdrop-filter: blur(20px);
     flex-direction: column;
     align-items: center;
