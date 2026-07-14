@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<title>Momentum</title>
+<link rel="manifest" href="./manifest.webmanifest">
+<meta name="theme-color" content="#1A3C2A">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Momentum">
+<link rel="apple-touch-icon" href="./apple-touch-icon.png">
+<style>
+  :root{
+    --green:#1A3C2A;--green-d:#122b1e;--green-soft:#e7ede3;
+    --ink:#1c1c1c;--muted:#7b7565;--line:#e5decb;--bg:#FAF6EE;--card:#fffdf6;
+    --amber:#a8863f;--amber-soft:#f3ead4;--red:#a33d2c;--blue:#33506b;--blue-soft:#e9eef3;
+    --brass:#C4A96A;
+    --serif:"Didot","Playfair Display","Georgia",serif;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:var(--bg);color:var(--ink);line-height:1.4;padding-bottom:88px;
+    padding-top:env(safe-area-inset-top);}
+  .top{background:linear-gradient(135deg,var(--green),var(--green-d));color:#fff;
+    padding:calc(env(safe-area-inset-top) + 16px) 18px 16px;text-align:center;
+    border-bottom:2px solid var(--brass)}
+  .top h1{margin:0;font-size:19px;letter-spacing:.28em;font-weight:400;font-family:var(--serif);text-transform:uppercase}
+  .top .goal{margin-top:4px;font-size:13px;opacity:.85;color:var(--brass)}
+  .top .left{margin-top:2px;font-size:12px;opacity:.65}
+  .counsel{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--brass);
+    border-radius:10px;padding:14px 16px;margin-bottom:14px}
+  .counsel .lbl{font-size:10.5px;text-transform:uppercase;letter-spacing:.18em;color:var(--amber);font-weight:700;margin-bottom:6px}
+  .counsel .q{font-family:var(--serif);font-style:italic;font-size:16.5px;line-height:1.45;color:var(--green-d)}
+  .counsel .who{font-size:12px;color:var(--muted);margin-top:6px}
+  .wrap{max-width:560px;margin:0 auto;padding:14px}
+  .panel{display:none}.panel.active{display:block}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:14px;
+    box-shadow:0 2px 10px rgba(26,60,42,.05)}
+  .ring-wrap{display:flex;align-items:center;gap:16px}
+  .ring{position:relative;width:120px;height:120px;flex:none}
+  .ring svg{transform:rotate(-90deg)}
+  .ring .num{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+  .ring .num b{font-size:34px;line-height:1;color:var(--green-d);font-family:var(--serif)}
+  .ring .num span{font-size:11px;color:var(--muted);margin-top:2px}
+  .stat-mini{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}
+  .pill{background:var(--green-soft);color:var(--green-d);font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px}
+  .pill.amber{background:var(--amber-soft);color:var(--amber)}
+  .pill.blue{background:var(--blue-soft);color:var(--blue)}
+  h2.section{font-size:11.5px;text-transform:uppercase;letter-spacing:.14em;color:var(--amber);margin:0 0 10px;font-weight:700}
+  .bigbtn{width:100%;border:none;border-radius:14px;padding:18px;font-size:17px;font-weight:700;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;gap:10px;transition:.15s}
+  .bigbtn.todo{background:var(--green);color:#fff}
+  .bigbtn.todo:active{background:var(--green-d)}
+  .bigbtn.did{background:var(--green-soft);color:var(--green-d);border:2px solid var(--green)}
+  .sub{font-size:13px;color:var(--muted);margin:8px 2px 0;text-align:center}
+  .strip{display:flex;gap:6px;justify-content:space-between;margin-top:14px}
+  .day{flex:1;text-align:center;cursor:pointer}
+  .day .dot{height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:15px;
+    border:2px solid var(--line);background:#fff;color:var(--muted)}
+  .day.clean .dot{background:var(--green);border-color:var(--green);color:#fff}
+  .day.today .dot{box-shadow:0 0 0 2px var(--amber)}
+  .day .lbl{font-size:10px;color:var(--muted);margin-top:3px}
+  .urge{display:flex;align-items:center;justify-content:space-between;margin-top:14px;
+    background:var(--amber-soft);border-radius:12px;padding:12px 14px}
+  .urge .t{font-size:13px;color:var(--amber);font-weight:600}
+  .urge button{background:var(--amber);color:#fff;border:none;border-radius:10px;padding:9px 14px;font-weight:700;cursor:pointer}
+  .reward{border:1px solid var(--line);border-radius:13px;padding:13px;margin-bottom:10px;display:flex;gap:12px;align-items:center}
+  .reward.locked{opacity:.55}
+  .reward.claimed{background:var(--green-soft);border-color:#cfe6d8}
+  .reward .tier{width:46px;height:46px;border-radius:12px;background:var(--green-soft);color:var(--green-d);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;flex:none;font-weight:800}
+  .reward .tier small{font-size:9px;font-weight:700;color:var(--muted)}
+  .reward .body{flex:1;min-width:0}
+  .reward .nm{font-weight:700;font-size:15px}
+  .reward .meta{font-size:12px;color:var(--muted);margin-top:2px}
+  .reward .meta b{color:var(--blue)}
+  .reward button{background:var(--green);color:#fff;border:none;border-radius:10px;padding:9px 12px;font-weight:700;cursor:pointer;font-size:13px;flex:none}
+  .reward button:disabled{background:var(--line);color:var(--muted);cursor:not-allowed}
+  .safebox{background:var(--green-soft);border:1px solid #cfe6d8;border-radius:12px;padding:13px 14px;font-size:13px;margin-bottom:14px}
+  .safebox b{color:var(--green-d)}
+  .field{display:flex;flex-direction:column;gap:5px;margin-bottom:12px}
+  .field label{font-size:12px;color:var(--muted);font-weight:600}
+  input{font-family:inherit;font-size:16px;padding:11px;border:1px solid var(--line);border-radius:11px;background:#fff;width:100%}
+  input:focus{outline:none;border-color:var(--green)}
+  .actbtn{background:var(--green);color:#fff;border:none;border-radius:11px;padding:12px;font-weight:700;font-size:15px;width:100%;cursor:pointer}
+  .ghost{background:#fff;border:1px solid var(--line);color:var(--muted);border-radius:11px;padding:11px;font-weight:600;width:100%;cursor:pointer}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .muted{color:var(--muted);font-size:13px}
+  .fundbal{font-size:30px;font-weight:800;color:var(--blue)}
+  nav{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--line);
+    display:flex;justify-content:space-around;padding:8px 6px calc(env(safe-area-inset-bottom) + 8px);z-index:10}
+  nav button{background:none;border:none;color:var(--muted);font-size:12px;font-weight:700;
+    letter-spacing:.08em;text-transform:uppercase;cursor:pointer;padding:12px 10px}
+  nav button.active{color:var(--green);border-top:2px solid var(--brass);margin-top:-9px;padding-top:19px}
+  .rep{display:flex;align-items:center;gap:12px;padding:11px 2px;border-bottom:1px solid var(--line);cursor:pointer}
+  .rep:last-child{border-bottom:none}
+  .rep .chk{width:30px;height:30px;border-radius:9px;border:2px solid var(--line);background:#fff;flex:none;
+    display:flex;align-items:center;justify-content:center;color:#fff;font-size:16px;font-weight:800}
+  .rep.done .chk{background:var(--green);border-color:var(--green)}
+  .rep.due .chk{border-color:var(--amber)}
+  .rep .body{flex:1;min-width:0}
+  .rep .nm{font-weight:700;font-size:15px}
+  .rep.done .nm{color:var(--green-d)}
+  .rep .meta{font-size:12px;color:var(--muted);margin-top:1px}
+  .rep .tag{font-size:11px;font-weight:700;color:var(--muted);flex:none}
+  .rep.done .tag{color:var(--green-d)}
+  .rep.due .tag{color:var(--amber)}
+  .warn2{background:var(--amber-soft);border-radius:10px;padding:9px 12px;font-size:12.5px;color:var(--amber);
+    font-weight:600;margin-top:10px}
+  .hist{font-size:13px}
+  .hist .h{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line)}
+  .hist .h:last-child{border:none}
+</style>
+</head>
+<body>
+<div class="top">
+  <h1>Momentum</h1>
+  <div class="goal">Spot-free nails by Dec 31, 2026</div>
+  <div class="left" id="days-left"></div>
+</div>
+
+<div class="wrap">
+
+  <!-- TODAY -->
+  <div class="panel active" id="tab-today">
+    <div class="counsel">
+      <div class="lbl">Daily counsel</div>
+      <div class="q" id="pio-quote"></div>
+      <div class="who">— St. Pio of Pietrelcina</div>
+    </div>
+
+    <div class="card">
+      <h2 class="section">Groundwork — today's reps</h2>
+      <div id="gw-list"></div>
+      <div id="gw-warn"></div>
+      <div class="sub">Missing once is a data point. Missing twice is a decision.</div>
+    </div>
+
+    <div class="card">
+      <h2 class="section">Nails — clean streak</h2>
+      <div class="ring-wrap">
+        <div class="ring">
+          <svg width="120" height="120">
+            <circle cx="60" cy="60" r="52" fill="none" stroke="#e3eae5" stroke-width="12"/>
+            <circle id="ring-prog" cx="60" cy="60" r="52" fill="none" stroke="#2f7d4f" stroke-width="12" stroke-linecap="round"/>
+          </svg>
+          <div class="num"><b id="nail-streak">0</b><span>day streak</span></div>
+        </div>
+        <div>
+          <div class="stat-mini">
+            <span class="pill" id="nail-best">best 0</span>
+            <span class="pill amber" id="nail-total">0 clean days</span>
+          </div>
+          <div class="muted" id="next-reward" style="margin-top:10px"></div>
+        </div>
+      </div>
+      <button class="bigbtn todo" id="btn-nail" style="margin-top:16px">Mark today clean ✓</button>
+      <div class="sub">Bite today and the streak resets — that’s the point. Honesty beats the habit.</div>
+      <div class="strip" id="nail-strip"></div>
+      <div class="urge">
+        <div class="t">Felt the urge? Beat it instead of biting.</div>
+        <button id="btn-urge">Beat one</button>
+      </div>
+      <div class="sub" id="urge-line"></div>
+    </div>
+
+    <div class="card">
+      <h2 class="section">Workouts</h2>
+      <div class="ring-wrap">
+        <div class="ring">
+          <svg width="120" height="120">
+            <circle cx="60" cy="60" r="52" fill="none" stroke="#e3eae5" stroke-width="12"/>
+            <circle id="ring-wk" cx="60" cy="60" r="52" fill="none" stroke="#2d5d7c" stroke-width="12" stroke-linecap="round"/>
+          </svg>
+          <div class="num"><b id="wk-count" style="color:#2d5d7c">0</b><span id="wk-goal-lbl">of 3 this week</span></div>
+        </div>
+        <div>
+          <div class="stat-mini">
+            <span class="pill blue" id="wk-total">0 total</span>
+            <span class="pill" id="wk-streak">0 wk streak</span>
+          </div>
+          <div class="muted" id="next-wk-reward" style="margin-top:10px"></div>
+        </div>
+      </div>
+      <button class="bigbtn todo" id="btn-workout" style="margin-top:16px">Log a workout ✓</button>
+      <div class="sub">Even 10 minutes counts. Showing up is the rep.</div>
+    </div>
+  </div>
+
+  <!-- REWARDS -->
+  <div class="panel" id="tab-rewards">
+    <div class="safebox">
+      <b>Two locks, so it stays safe:</b> a reward unlocks when you hit the streak <i>and</i> the Reward Fund has the cash.
+      Fund it from money you <i>didn’t</i> spend (Fund tab) — so rewards never cost you extra and your savings keep growing.
+    </div>
+    <h2 class="section">Nail streak ladder</h2>
+    <div id="nail-rewards"></div>
+    <h2 class="section" style="margin-top:18px">Workout ladder</h2>
+    <div id="wk-rewards"></div>
+  </div>
+
+  <!-- FUND -->
+  <div class="panel" id="tab-fund">
+    <div class="card" style="text-align:center">
+      <h2 class="section">Reward Fund</h2>
+      <div class="fundbal" id="fund-bal">$0</div>
+      <div class="muted" id="cap-left"></div>
+    </div>
+    <div class="card">
+      <h2 class="section">Add found money (the safe way)</h2>
+      <p class="muted" style="margin-top:0">What you stayed <b>under</b> your weekly fun-money target goes here. Rewards paid for by spending you avoided.</p>
+      <div class="row2">
+        <div class="field"><label>Weekly target $</label><input type="number" id="wk-target" inputmode="decimal"></div>
+        <div class="field"><label>Spent this week $</label><input type="number" id="wk-actual" inputmode="decimal" placeholder="e.g. 95"></div>
+      </div>
+      <button class="actbtn" id="add-found">Add what I saved</button>
+      <div class="muted" id="found-prev" style="margin-top:8px;text-align:center"></div>
+    </div>
+    <div class="card">
+      <h2 class="section">Add manually (optional)</h2>
+      <div class="row2">
+        <div class="field"><label>Amount $</label><input type="number" id="man-amt" inputmode="decimal"></div>
+        <div class="field"><label>Monthly cap $</label><input type="number" id="cap-set" inputmode="decimal"></div>
+      </div>
+      <button class="ghost" id="add-man">Add to fund</button>
+    </div>
+  </div>
+
+  <!-- MORE -->
+  <div class="panel" id="tab-more">
+    <div class="card">
+      <h2 class="section">Settings</h2>
+      <div class="field"><label>Workouts per week goal</label><input type="number" id="set-wkgoal" inputmode="numeric"></div>
+      <button class="actbtn" id="save-settings">Save</button>
+    </div>
+    <div class="card">
+      <h2 class="section">Recent activity</h2>
+      <div class="hist" id="hist"></div>
+    </div>
+    <div class="card">
+      <h2 class="section">Reminders (the honest setup)</h2>
+      <p class="muted" style="margin-top:0">This app is hosted on a static site, so it can't wake your phone up by itself.
+      The reliable fix takes 2 minutes in the iPhone <b>Clock/Reminders</b> apps:</p>
+      <div class="hist">
+        <div class="h"><span>Daily alarm, before your usual wake</span><span class="muted">"Rosary, then train"</span></div>
+        <div class="h"><span>Reminder, Mondays 7am</span><span class="muted">"Flight day: photo + 100 words"</span></div>
+        <div class="h"><span>Reminder, Thursdays 5pm</span><span class="muted">"Call one person — not a text"</span></div>
+        <div class="h"><span>Reminder, 1st Sunday monthly</span><span class="muted">"Owner's review — 30 min"</span></div>
+      </div>
+      <p class="muted" style="margin-bottom:0">The alarm gets you to the app; the app keeps the score.</p>
+    </div>
+    <div class="card">
+      <h2 class="section">Backup</h2>
+      <p class="muted" style="margin-top:0">Data lives on this device. Export now and then so you never lose your streak.</p>
+      <button class="ghost" id="export" style="margin-bottom:8px">Export backup</button>
+      <button class="ghost" id="import-b" style="margin-bottom:8px">Import backup</button>
+      <input type="file" id="import-f" accept="application/json" style="display:none">
+      <button class="ghost" id="reset" style="color:var(--red)">Reset everything</button>
+    </div>
+    <p class="muted" style="text-align:center">Add to Home Screen for the full app experience.</p>
+  </div>
+</div>
+
+<nav>
+  <button data-tab="today" class="active">Today</button>
+  <button data-tab="rewards">Rewards</button>
+  <button data-tab="fund">Fund</button>
+  <button data-tab="more">More</button>
+</nav>
+
+<script>
+const KEY='momentum2';
+const GOAL='2026-12-31';
+const PIO=[
+"Pray, hope, and don't worry. Worry is useless. God is merciful and will hear your prayer.",
+"My past, O Lord, to Your mercy; my present, to Your love; my future, to Your providence.",
+"The rosary is the weapon for these times.",
+"Prayer is the best weapon we have; it is the key to God's heart.",
+"Do not spend your energies on things that generate worry, anxiety and anguish. Only one thing is necessary: lift up your spirit and love God.",
+"In the spiritual life, he who does not advance goes backwards.",
+"You must speak to Jesus not only with your lips but with your heart.",
+"Have patience and persevere in the holy exercise of meditation.",
+"Joy, with peace, is the sister of charity. Serve the Lord with laughter.",
+"Walk with simplicity in the way of the Lord, and do not torment your spirit.",
+"He who begins to love must be ready to suffer.",
+"Fear nothing. Jesus is more powerful than all hell.",
+"Time spent in honor of God and for the salvation of souls is never badly spent.",
+"Always humble yourself lovingly before God and man, because God speaks to those who are truly humble of heart.",
+"The life of a Christian is nothing but a perpetual struggle against self.",
+"Whoever does not meditate acts like someone who never looks in the mirror.",
+"Humility and purity are the wings which carry us to God and make us almost divine.",
+"A thousand years of enjoying human glory is not worth even an hour spent sweetly communing with Jesus in the Blessed Sacrament.",
+"Our Lord loves you and loves you tenderly; and if He does not let you feel the sweetness of His love, it is to make you more humble.",
+"Do not be daunted by the cross. The surest test of love consists in suffering for the loved one.",
+"Stay with me, Lord, for it is necessary to have You present so that I do not forget You.",
+"Some souls are destined to fly, and yet content themselves with crawling.",
+"The best consolation comes from prayer.",
+"Don't let a day go by without praying a little.",
+];
+function dayOfYear(){const n=new Date();return Math.floor((n-new Date(n.getFullYear(),0,0))/864e5);}
+const ymd=(d)=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+const today=()=>ymd(new Date());
+const addDays=(s,n)=>{const d=new Date(s+'T00:00:00');d.setDate(d.getDate()+n);return ymd(d);};
+
+function defaults(){return{
+  nails:{},          // {'YYYY-MM-DD':true}
+  workouts:{},       // {'YYYY-MM-DD':count}
+  urges:{},          // {'YYYY-MM-DD':count}
+  gw:{rosary:{},craft:{},calls:{},review:{}},  // Groundwork reps {'YYYY-MM-DD':true}
+  fund:{contrib:[],claimed:[]},   // claimed: [{date,name,dollars}]
+  settings:{wkGoal:3,weeklyTarget:150,monthlyCap:100},
+  nailRewards:[
+    {id:'n3',thr:3,name:'Specialty coffee, guilt-free',$:7},
+    {id:'n7',thr:7,name:'Sleeve of TP5x',$:13},
+    {id:'n14',thr:14,name:'Dinner out, no guilt',$:40},
+    {id:'n30',thr:30,name:'Bottle of Fortaleza Reposado',$:60},
+    {id:'n60',thr:60,name:'Round at a course on your list',$:120},
+    {id:'n90',thr:90,name:'New rangefinder (down payment)',$:200},
+    {id:'n180',thr:180,name:'$500 toward the Ireland golf trip',$:500},
+  ],
+  wkRewards:[
+    {id:'w12',thr:12,name:'Lifting gloves / new bands',$:25},
+    {id:'w25',thr:25,name:'New golf polo / quarter-zip',$:60},
+    {id:'w50',thr:50,name:'Golf shoes',$:150},
+    {id:'w100',thr:100,name:'Driver or club fitting',$:300},
+  ],
+};}
+
+let s=load();
+function migrate(x){ if(!x.gw)x.gw={rosary:{},craft:{},calls:{},review:{}}; for(const k of ['rosary','craft','calls','review'])if(!x.gw[k])x.gw[k]={}; return x; }
+function load(){try{const x=JSON.parse(localStorage.getItem(KEY));return x&&x.nails!==undefined?migrate(x):defaults();}catch(e){return defaults();}}
+function save(){localStorage.setItem(KEY,JSON.stringify(s));render();}
+
+// ---- derived ----
+function nailStreak(){
+  let n=0,d=today();
+  if(!s.nails[d])d=addDays(d,-1);
+  while(s.nails[d]){n++;d=addDays(d,-1);}
+  return n;
+}
+function nailBest(){
+  const days=Object.keys(s.nails).filter(k=>s.nails[k]).sort();
+  let best=0,cur=0,prev=null;
+  for(const k of days){ if(prev&&addDays(prev,1)===k)cur++; else cur=1; best=Math.max(best,cur); prev=k; }
+  return best;
+}
+const nailTotal=()=>Object.values(s.nails).filter(Boolean).length;
+const workoutTotal=()=>Object.values(s.workouts).reduce((a,b)=>a+b,0);
+function isoWeekKey(dt){const d=new Date(Date.UTC(dt.getFullYear(),dt.getMonth(),dt.getDate()));const day=d.getUTCDay()||7;d.setUTCDate(d.getUTCDate()+4-day);const y=new Date(Date.UTC(d.getUTCFullYear(),0,1));return d.getUTCFullYear()+'-'+Math.ceil((((d-y)/864e5)+1)/7);}
+function workoutsThisWeek(){const wk=isoWeekKey(new Date());return Object.keys(s.workouts).filter(k=>isoWeekKey(new Date(k+'T00:00:00'))===wk).reduce((a,k)=>a+s.workouts[k],0);}
+function weekStreak(){ // consecutive weeks (incl this) meeting goal
+  let n=0; const goal=s.settings.wkGoal; let ref=new Date();
+  for(let i=0;i<104;i++){
+    const wk=isoWeekKey(ref);
+    const c=Object.keys(s.workouts).filter(k=>isoWeekKey(new Date(k+'T00:00:00'))===wk).reduce((a,k)=>a+s.workouts[k],0);
+    if(c>=goal)n++; else { if(i===0){ref.setDate(ref.getDate()-7);continue;} break; } // allow current week not-yet-done
+    ref.setDate(ref.getDate()-7);
+  }
+  return n;
+}
+const fundBal=()=>s.fund.contrib.reduce((a,b)=>a+b.amount,0)-s.fund.claimed.reduce((a,b)=>a+b.dollars,0);
+function redeemedThisMonth(){const m=today().slice(0,7);return s.fund.claimed.filter(c=>c.date.slice(0,7)===m).reduce((a,b)=>a+b.dollars,0);}
+const capLeft=()=>Math.max(0,s.settings.monthlyCap-redeemedThisMonth());
+const daysLeft=()=>Math.max(0,Math.round((new Date(GOAL+'T00:00:00')-new Date(today()+'T00:00:00'))/864e5));
+const claimed=(id)=>s.fund.claimed.some(c=>c.id===id);
+
+// ---- groundwork derived ----
+function gwStreak(map){ let n=0,d=today(); if(!map[d])d=addDays(d,-1); while(map[d]){n++;d=addDays(d,-1);} return n; }
+function doneThisWeek(map){ const wk=isoWeekKey(new Date()); return Object.keys(map).some(k=>isoWeekKey(new Date(k+'T00:00:00'))===wk); }
+function doneThisMonth(map){ const m=today().slice(0,7); return Object.keys(map).some(k=>k.slice(0,7)===m); }
+function firstSunday(){ const d=new Date(); d.setDate(1); while(d.getDay()!==0)d.setDate(d.getDate()+1); return ymd(d); }
+function trainedToday(){ return (s.workouts[today()]||0)>0; }
+
+// ---- actions ----
+function toggleNail(date){ if(s.nails[date])delete s.nails[date]; else s.nails[date]=true; save(); }
+function toggleGw(k){ const d=today(); if(s.gw[k][d])delete s.gw[k][d]; else s.gw[k][d]=true; save(); }
+function toggleTrain(){ const d=today(); if(trainedToday()){ if(s.workouts[d]>1)s.workouts[d]--; else delete s.workouts[d]; } else { s.workouts[d]=(s.workouts[d]||0)+1; } save(); }
+function logWorkout(){ const d=today(); s.workouts[d]=(s.workouts[d]||0)+1; save(); }
+function beatUrge(){ const d=today(); s.urges[d]=(s.urges[d]||0)+1; save(); }
+function addFound(){
+  const t=parseFloat(document.getElementById('wk-target').value)||0;
+  const a=parseFloat(document.getElementById('wk-actual').value);
+  s.settings.weeklyTarget=t;
+  if(isNaN(a)){alert('Enter what you spent this week.');return;}
+  const f=Math.max(0,t-a);
+  if(f<=0){alert('Hit or over target — nothing extra saved this week. That’s ok.');save();return;}
+  s.fund.contrib.push({date:today(),amount:f,note:'Found money'});
+  document.getElementById('wk-actual').value=''; save();
+  alert('Added $'+f.toFixed(2)+' from money you didn’t spend.');
+}
+function addManual(){const a=parseFloat(document.getElementById('man-amt').value);if(isNaN(a)||a<=0){alert('Enter an amount.');return;}s.fund.contrib.push({date:today(),amount:a,note:'Manual'});document.getElementById('man-amt').value='';save();}
+function claim(list,id){
+  const r=s[list].find(x=>x.id===id); const metric=(list==='nailRewards')?nailStreak():workoutTotal();
+  if(metric<r.thr){alert('Not unlocked yet.');return;}
+  if(fundBal()<r.$){alert('Fund needs $'+r.$+'. Add found money first (Fund tab).');return;}
+  if(r.$>capLeft()){alert('Over this month’s cap ($'+capLeft().toFixed(0)+' left). Resets next month.');return;}
+  if(!confirm('Claim "'+r.name+'" for $'+r.$+'? You earned it — go enjoy it.'))return;
+  s.fund.claimed.push({id:r.id,date:today(),name:r.name,dollars:r.$}); save();
+}
+
+// ---- render ----
+const C=2*Math.PI*52;
+function setRing(el,frac){el.style.strokeDasharray=C;el.style.strokeDashoffset=C*(1-Math.min(1,frac));}
+
+function gwRow(cls,onclick,nm,meta,tag){
+  return `<div class="rep ${cls}" onclick="${onclick}"><div class="chk">${cls.includes('done')?'✓':''}</div>
+    <div class="body"><div class="nm">${nm}</div><div class="meta">${meta}</div></div><div class="tag">${tag}</div></div>`;
+}
+function renderGw(){
+  document.getElementById('pio-quote').textContent='“'+PIO[dayOfYear()%PIO.length]+'”';
+  const t=today(), y=addDays(t,-1);
+  const rows=[];
+  // Daily: rosary
+  const rDone=!!s.gw.rosary[t], rStreak=gwStreak(s.gw.rosary);
+  rows.push(gwRow(rDone?'done':'', "toggleGw('rosary')", 'Pray — one decade','Before the phone. About five minutes.', rDone?(rStreak+'-day streak'):'daily'));
+  // Daily: train (synced with workout log)
+  const tDone=trainedToday();
+  rows.push(gwRow(tDone?'done':'', 'toggleTrain()', 'Train — 30 min minimum','Hotel gym and bodyweight count.', tDone?'done':'daily'));
+  // Weekly: craft rep
+  const cDone=doneThisWeek(s.gw.craft);
+  const late=(new Date().getDay()>=5); // Fri+ and not done → due
+  rows.push(gwRow(cDone?'done':(late?'due':''), "toggleGw('craft')", 'Craft rep — photo + 100 words','Bourdain register. Gate or flight.', cDone?'done':(late?'due':'weekly')));
+  // Weekly: call
+  const kDone=doneThisWeek(s.gw.calls);
+  rows.push(gwRow(kDone?'done':(late?'due':''), "toggleGw('calls')", 'Call one person','A real call, not a text.', kDone?'done':(late?'due':'weekly')));
+  // Monthly: owner's review (due from first Sunday)
+  const vDone=doneThisMonth(s.gw.review), fs=firstSunday();
+  const vDue=!vDone && t>=fs;
+  rows.push(gwRow(vDone?'done':(vDue?'due':''), "toggleGw('review')", "Owner's review — 30 min",'What did I build? What do I own more of?', vDone?'done':(vDue?'due':fs.slice(5).replace('-','/'))));
+  document.getElementById('gw-list').innerHTML=rows.join('');
+  // never-miss-twice warnings
+  let warn='';
+  if(!s.gw.rosary[t]&&!s.gw.rosary[y]&&Object.keys(s.gw.rosary).length)warn='Rosary missed yesterday — don’t make it two.';
+  else if(!trainedToday()&&!(s.workouts[y]>0)&&Object.keys(s.workouts).length)warn='No training yesterday — never miss twice.';
+  document.getElementById('gw-warn').innerHTML=warn?`<div class="warn2">${warn}</div>`:'';
+}
+
+function render(){
+  renderGw();
+  document.getElementById('days-left').textContent=daysLeft()+' days left in the year';
+  const st=nailStreak();
+  document.getElementById('nail-streak').textContent=st;
+  document.getElementById('nail-best').textContent='best '+nailBest();
+  document.getElementById('nail-total').textContent=nailTotal()+' clean days';
+  // ring fills toward next reward threshold
+  const nextN=s.nailRewards.find(r=>st<r.thr);
+  const prevThr=(()=>{let p=0;for(const r of s.nailRewards){if(st>=r.thr)p=r.thr;}return p;})();
+  setRing(document.getElementById('ring-prog'), nextN?((st-prevThr)/(nextN.thr-prevThr)):1);
+  document.getElementById('next-reward').innerHTML=nextN?('Next: <b>'+esc(nextN.name)+'</b> at '+nextN.thr+' days ('+(nextN.thr-st)+' to go)'):'Every nail reward unlocked.';
+
+  // nail strip — last 7 days
+  let strip='';
+  for(let i=6;i>=0;i--){const d=addDays(today(),-i);const dt=new Date(d+'T00:00:00');
+    const lbl=['Su','Mo','Tu','We','Th','Fr','Sa'][dt.getDay()];
+    strip+=`<div class="day ${s.nails[d]?'clean':''} ${i===0?'today':''}" onclick="toggleNail('${d}')"><div class="dot">${s.nails[d]?'✓':''}</div><div class="lbl">${lbl}</div></div>`;}
+  document.getElementById('nail-strip').innerHTML=strip;
+  document.getElementById('btn-nail').className='bigbtn '+(s.nails[today()]?'did':'todo');
+  document.getElementById('btn-nail').textContent=s.nails[today()]?'Clean today ✓ (tap to undo)':'Mark today clean ✓';
+  const u=s.urges[today()]||0;
+  document.getElementById('urge-line').textContent=u?(u+' urge'+(u>1?'s':'')+' beaten today'):'';
+
+  // workouts
+  const wc=workoutsThisWeek();
+  document.getElementById('wk-count').textContent=wc;
+  document.getElementById('wk-goal-lbl').textContent='of '+s.settings.wkGoal+' this week';
+  setRing(document.getElementById('ring-wk'), wc/s.settings.wkGoal);
+  document.getElementById('wk-total').textContent=workoutTotal()+' total';
+  document.getElementById('wk-streak').textContent=weekStreak()+' wk streak';
+  const nextW=s.wkRewards.find(r=>workoutTotal()<r.thr);
+  document.getElementById('next-wk-reward').innerHTML=nextW?('Next: <b>'+esc(nextW.name)+'</b> at '+nextW.thr+' ('+(nextW.thr-workoutTotal())+' to go)'):'All workout rewards unlocked.';
+
+  // rewards
+  document.getElementById('nail-rewards').innerHTML=s.nailRewards.map(r=>rewardCard('nailRewards',r,nailStreak(),'day streak')).join('');
+  document.getElementById('wk-rewards').innerHTML=s.wkRewards.map(r=>rewardCard('wkRewards',r,workoutTotal(),'workouts')).join('');
+
+  // fund
+  document.getElementById('fund-bal').textContent='$'+fundBal().toFixed(0);
+  document.getElementById('cap-left').textContent='$'+capLeft().toFixed(0)+' of $'+s.settings.monthlyCap+' monthly cap left';
+  document.getElementById('wk-target').value=s.settings.weeklyTarget;
+  document.getElementById('cap-set').value=s.settings.monthlyCap;
+  document.getElementById('set-wkgoal').value=s.settings.wkGoal;
+
+  // history
+  const items=[
+    ...Object.keys(s.gw.rosary).map(d=>({d,t:'Rosary',v:''})),
+    ...Object.keys(s.gw.craft).map(d=>({d,t:'Craft rep',v:''})),
+    ...Object.keys(s.gw.calls).map(d=>({d,t:'Call made',v:''})),
+    ...Object.keys(s.gw.review).map(d=>({d,t:'Owner\'s review',v:''})),
+    ...Object.keys(s.nails).map(d=>({d,t:'Nails clean',v:''})),
+    ...Object.keys(s.workouts).map(d=>({d,t:'Workout ×'+s.workouts[d],v:''})),
+    ...s.fund.contrib.map(c=>({d:c.date,t:c.note,v:'+$'+c.amount.toFixed(0)})),
+    ...s.fund.claimed.map(c=>({d:c.date,t:'Reward: '+c.name,v:'-$'+c.dollars})),
+  ].sort((a,b)=>b.d<a.d?-1:1).slice(0,40);
+  document.getElementById('hist').innerHTML=items.map(i=>`<div class="h"><span>${i.d} · ${esc(i.t)}</span><span class="muted">${i.v}</span></div>`).join('')||'<div class="muted">Nothing yet.</div>';
+}
+
+function rewardCard(list,r,metric,unit){
+  const done=claimed(r.id), unlocked=metric>=r.thr, canPay=fundBal()>=r.$ && r.$<=capLeft();
+  let btn;
+  if(done)btn='<button disabled>Claimed ✓</button>';
+  else if(!unlocked)btn=`<button disabled>${r.thr-metric} ${unit} to go</button>`;
+  else if(!canPay)btn='<button disabled>Fund $'+r.$+'</button>';
+  else btn=`<button onclick="claim('${list}','${r.id}')">Claim</button>`;
+  return `<div class="reward ${done?'claimed':(unlocked?'':'locked')}">
+    <div class="tier">${r.thr}<small>${unit==='day streak'?'days':'wkts'}</small></div>
+    <div class="body"><div class="nm">${esc(r.name)}</div><div class="meta">unlock at ${r.thr} ${unit} · <b>$${r.$}</b> from fund</div></div>
+    ${btn}</div>`;
+}
+function esc(x){return String(x).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+
+// nav
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('nav button').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');document.getElementById('tab-'+b.dataset.tab).classList.add('active');
+  window.scrollTo(0,0);
+});
+document.getElementById('btn-nail').onclick=()=>toggleNail(today());
+document.getElementById('btn-workout').onclick=logWorkout;
+document.getElementById('btn-urge').onclick=beatUrge;
+document.getElementById('add-found').onclick=addFound;
+document.getElementById('add-man').onclick=addManual;
+document.getElementById('wk-actual').addEventListener('input',()=>{
+  const t=parseFloat(document.getElementById('wk-target').value)||0,a=parseFloat(document.getElementById('wk-actual').value);
+  document.getElementById('found-prev').textContent=isNaN(a)?'':(t-a>0?('→ $'+(t-a).toFixed(2)+' will go to your fund'):'→ nothing extra saved');
+});
+document.getElementById('save-settings').onclick=()=>{s.settings.wkGoal=parseInt(document.getElementById('set-wkgoal').value)||3;save();alert('Saved.');};
+document.getElementById('cap-set').addEventListener('change',()=>{s.settings.monthlyCap=parseFloat(document.getElementById('cap-set').value)||0;save();});
+document.getElementById('export').onclick=()=>{const b=new Blob([JSON.stringify(s,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='momentum-'+today()+'.json';a.click();};
+document.getElementById('import-b').onclick=()=>document.getElementById('import-f').click();
+document.getElementById('import-f').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(d.nails===undefined)throw 0;s=migrate(d);save();alert('Imported.');}catch(x){alert('Bad file.');}};r.readAsText(f);};
+document.getElementById('reset').onclick=()=>{if(confirm('Erase everything and start over?')){s=defaults();save();}};
+
+render();
+if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));}
+</script>
+</body>
+</html>
