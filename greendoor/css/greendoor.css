@@ -9333,3 +9333,13 @@ body.gd-light .gd-dash-content.gd-dash-active .gd-dash-prompt-wrap {
     flex: 0 0 78px;
   }
 }
+
+
+/* ---- iOS safe areas (native app + notched phones) ----
+   viewport-fit=cover lets content extend under the status bar and home
+   indicator; these pad the fixed chrome back out of those zones. */
+.gd-topbar { padding-top: env(safe-area-inset-top, 0px); }
+.gd-sidebar { padding-top: env(safe-area-inset-top, 0px); }
+.gd-ai-panel { padding-top: env(safe-area-inset-top, 0px); }
+.gd-bottom-tabs { padding-bottom: env(safe-area-inset-bottom, 0px); }
+body { padding-bottom: env(safe-area-inset-bottom, 0px); }

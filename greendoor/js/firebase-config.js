@@ -28,7 +28,10 @@ export const auth = IS_NATIVE
 /* Offline cache: client lists, listings and the calendar render instantly from
    IndexedDB and sync when the connection returns. Multi-tab safe. */
 export const db = initializeFirestore(app, {
-  localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+  localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+  /* WKWebView's streaming transport breaks Firestore's WebChannel — listeners
+     silently die and retry forever. Long polling is the reliable path there. */
+  ...(IS_NATIVE ? { experimentalForceLongPolling: true } : {})
 });
 export const storage = getStorage(app);
 export const functions = getFunctions(app, "us-central1");
