@@ -626,7 +626,7 @@ function renderDetailMatches(listing) {
         <span>${m.score}%</span>
       </div>
       <div class="gd-match-info">
-        <a href="/greendoor/app/client-detail?id=${m.client.id}" class="gd-match-name">${escapeHtml(m.client.fullName) || "Unknown"}</a>
+        <a href="client-detail.html?id=${m.client.id}" class="gd-match-name">${escapeHtml(m.client.fullName) || "Unknown"}</a>
         <span class="gd-text-muted">${matchScoreLabel(m.score)}</span>
         ${m.dealBreakerHits.length > 0 ? `<span class="gd-match-dealbreaker">Deal breaker: ${escapeHtml(m.dealBreakerHits.join(", "))}</span>` : ""}
       </div>

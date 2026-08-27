@@ -174,13 +174,13 @@ submitBtn.addEventListener("click", async () => {
     // Let auth.js's onAuthStateChanged run first so it can route to onboarding/dashboard.
     setTimeout(() => {
       if (window.location.pathname.includes("/set-password")) {
-        window.location.href = "/greendoor/app/dashboard";
+        window.location.href = "dashboard.html";
       }
     }, 1200);
   } catch (err) {
     showState("success");
     setTimeout(() => {
-      window.location.href = "/greendoor/app/login";
+      window.location.href = "login.html";
     }, 1500);
   }
 });

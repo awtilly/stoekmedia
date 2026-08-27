@@ -20,7 +20,7 @@ onAuthStateChanged(auth, async (user) => {
   const isLoginPage = path.includes("/app/login");
   const isOnboardingPage = path.includes("/app/onboarding");
   const isSetPasswordPage = path.includes("/app/set-password");
-  const isCrmPage = path.includes("/greendoor/app/");
+  const isCrmPage = /\/app\//.test(path);
 
   if (user) {
     try {
@@ -32,17 +32,17 @@ onAuthStateChanged(auth, async (user) => {
         // Onboarding redirect: strict === false so existing users (without field) are unaffected
         if (cachedProfile.onboardingComplete === false) {
           if (!isOnboardingPage) {
-            window.location.href = "/greendoor/app/onboarding";
+            window.location.href = "onboarding.html";
             return;
           }
         } else if (isLoginPage) {
-          window.location.href = "/greendoor/app/dashboard";
+          window.location.href = "dashboard.html";
           return;
         }
 
         renderNavUser(cachedProfile);
       } else if (isLoginPage) {
-        window.location.href = "/greendoor/app/dashboard";
+        window.location.href = "dashboard.html";
         return;
       }
     } catch (e) {
@@ -51,7 +51,7 @@ onAuthStateChanged(auth, async (user) => {
   } else {
     cachedProfile = null;
     if (isCrmPage && !isLoginPage && !isSetPasswordPage) {
-      window.location.href = "/greendoor/app/login";
+      window.location.href = "login.html";
       return;
     }
   }
@@ -135,7 +135,7 @@ window.handleForgotPassword = async function () {
 /* --- Logout handler --- */
 window.handleLogout = async function () {
   await signOut(auth);
-  window.location.href = "/greendoor/app/login";
+  window.location.href = "login.html";
 };
 
 /* --- Get current user profile (cached) --- */
@@ -268,8 +268,8 @@ function isStandalone() {
 }
 
 // Service worker registration
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/greendoor/app/sw.js', { scope: '/greendoor/app/' })
+if ('serviceWorker' in navigator && !window.Capacitor?.isNativePlatform?.()) {
+  navigator.serviceWorker.register('sw.js')
     .then(reg => {
       // If a worker is already waiting on load, surface the banner immediately.
       if (reg.waiting && navigator.serviceWorker.controller) {
@@ -322,7 +322,7 @@ function showInstallBanner() {
   banner.id = 'gd-install-banner';
   banner.className = 'gd-install-banner';
   banner.innerHTML = `
-    <img class="gd-install-banner-icon" src="/greendoor/app/icons/icon-192.png" alt="GreenDoor">
+    <img class="gd-install-banner-icon" src="icons/icon-192.png" alt="GreenDoor">
     <div class="gd-install-banner-text">
       Install GreenDoor CRM
       <small>${isIOS ? 'Tap Share, then scroll down and tap "Add to Home Screen"' : 'Add to your home screen for quick access'}</small>

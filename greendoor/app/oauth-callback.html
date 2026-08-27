@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Connecting your account — GreenDoor</title>
-  <link rel="stylesheet" href="/assets/css/style.css">
-  <link rel="stylesheet" href="/greendoor/css/greendoor.css">
+  <link rel="stylesheet" href="../../assets/css/style.css">
+  <link rel="stylesheet" href="../css/greendoor.css">
   <style>
     body { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 1rem; }
     .oauth-card { max-width: 28rem; width: 100%; padding: 2rem; text-align: center; }
@@ -23,7 +23,7 @@
   </div>
 
   <script type="module">
-    import { auth, functions, httpsCallable } from "/greendoor/js/firebase-config.js";
+    import { auth, functions, httpsCallable } from "../js/firebase-config.js";
     import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
     const params = new URLSearchParams(window.location.search);
@@ -32,7 +32,7 @@
     const titleEl = document.getElementById("oauth-title");
     const detailEl = document.getElementById("oauth-detail");
     const cardEl = document.getElementById("oauth-card");
-    const returnTo = sessionStorage.getItem("oauthReturnTo") || "/greendoor/app/settings";
+    const returnTo = sessionStorage.getItem("oauthReturnTo") || "settings.html";
 
     function showError(message, recoverable = true) {
       cardEl.innerHTML = `
@@ -40,7 +40,7 @@
         <h2>Could not connect Gmail</h2>
         <p class="gd-text-muted-sm">${message}</p>
         <div class="oauth-actions">
-          ${recoverable ? '<a class="gd-btn gd-btn-primary" href="/greendoor/app/settings">Back to settings</a>' : ''}
+          ${recoverable ? '<a class="gd-btn gd-btn-primary" href="settings.html">Back to settings</a>' : ''}
         </div>`;
     }
 

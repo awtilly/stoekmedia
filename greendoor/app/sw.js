@@ -46,7 +46,7 @@ self.addEventListener('notificationclick', (event) => {
 });
 
 /* ── Service Worker Cache ── */
-const CACHE_NAME = 'greendoor-v3';
+const CACHE_NAME = 'greendoor-v4';
 const PRECACHE_URLS = [
   '/greendoor/app/dashboard',
   '/greendoor/app/login',
@@ -54,6 +54,12 @@ const PRECACHE_URLS = [
   '/greendoor/app/calendar',
   '/greendoor/app/settings',
   '/greendoor/app/listings',
+  '/greendoor/app/dashboard.html',
+  '/greendoor/app/login.html',
+  '/greendoor/app/clients.html',
+  '/greendoor/app/calendar.html',
+  '/greendoor/app/settings.html',
+  '/greendoor/app/listings.html',
   '/greendoor/css/greendoor.css',
   '/assets/css/style.css',
   '/greendoor/app/icons/icon-192.png',

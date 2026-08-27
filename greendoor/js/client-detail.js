@@ -46,7 +46,7 @@ let complianceUnsubscribe = null;
 let pendingSendTemplateId = null;
 
 if (!clientId) {
-  window.location.href = "/greendoor/app/clients";
+  window.location.href = "clients.html";
 }
 
 /* --- Cloud Functions --- */
@@ -74,7 +74,7 @@ async function loadClient(uid) {
   try {
     const snap = await getDoc(doc(db, "clients", clientId));
     if (!snap.exists() || snap.data().realtorId !== uid) {
-      window.location.href = "/greendoor/app/clients";
+      window.location.href = "clients.html";
       return;
     }
     clientData = { id: snap.id, ...snap.data() };
@@ -362,7 +362,7 @@ window.deleteClient = async function () {
     });
 
     showToast("Client deleted.");
-    window.location.href = "/greendoor/app/clients";
+    window.location.href = "clients.html";
   } catch (e) {
     console.error("Delete error:", e);
     showToast("Failed to delete client.", "error");

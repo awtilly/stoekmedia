@@ -234,7 +234,7 @@ window.finishOnboarding = async function () {
       termsAcceptedAt: serverTimestamp()
     }, { merge: true });
 
-    window.location.href = "/greendoor/app/dashboard";
+    window.location.href = "dashboard.html";
   } catch (err) {
     console.error("Onboarding save error:", err);
     showToast("Failed to save profile. Please try again.", "error");

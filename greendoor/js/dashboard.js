@@ -33,7 +33,7 @@ let briefingShown = false;
 /* ------------------------------------------------------------------ */
 onAuthStateChanged(auth, async (user) => {
   if (!user) {
-    window.location.href = "/greendoor/app/login";
+    window.location.href = "login.html";
     return;
   }
   currentUser = await getCurrentUser();
@@ -326,18 +326,18 @@ window.submitDashPrompt = async function () {
 /*  Navigation                                                         */
 /* ------------------------------------------------------------------ */
 const TARGET_ROUTES = {
-  dashboard: () => "/greendoor/app/dashboard",
-  client_list: () => "/greendoor/app/clients",
+  dashboard: () => "dashboard.html",
+  client_list: () => "clients.html",
   client: (i) => i.clientId
-    ? `/greendoor/app/client-detail?id=${encodeURIComponent(i.clientId)}${i.tab ? `&tab=${encodeURIComponent(i.tab)}` : ""}`
-    : "/greendoor/app/clients",
-  listing_list: () => "/greendoor/app/listings",
+    ? `client-detail.html?id=${encodeURIComponent(i.clientId)}${i.tab ? `&tab=${encodeURIComponent(i.tab)}` : ""}`
+    : "clients.html",
+  listing_list: () => "listings.html",
   listing: (i) => i.listingId
-    ? `/greendoor/app/listings?lid=${encodeURIComponent(i.listingId)}`
-    : "/greendoor/app/listings",
-  calendar: () => "/greendoor/app/calendar",
-  templates: () => "/greendoor/app/templates",
-  settings: () => "/greendoor/app/settings"
+    ? `listings.html?lid=${encodeURIComponent(i.listingId)}`
+    : "listings.html",
+  calendar: () => "calendar.html",
+  templates: () => "templates.html",
+  settings: () => "settings.html"
 };
 
 function executeNavigate(input) {
@@ -998,5 +998,5 @@ window.toggleDashVoice = function () {
 /* ------------------------------------------------------------------ */
 window.handleLogout = async function () {
   await auth.signOut();
-  window.location.href = "/greendoor/app/login";
+  window.location.href = "login.html";
 };

@@ -25,7 +25,7 @@ onAuthStateChanged(auth, async (user) => {
 
   const profile = await getCurrentUser();
   if (!profile || profile.role !== "admin") {
-    window.location.href = "/greendoor/app/dashboard";
+    window.location.href = "dashboard.html";
     return;
   }
 

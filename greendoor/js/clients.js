@@ -57,7 +57,7 @@ function renderClients(clients) {
 
   tbody.innerHTML = clients.map(c => `
     <tr>
-      <td><a href="/greendoor/app/client-detail?id=${c.id}">${escapeHtml(c.fullName) || "—"}</a></td>
+      <td><a href="client-detail.html?id=${c.id}">${escapeHtml(c.fullName) || "—"}</a></td>
       <td><span class="gd-badge gd-badge-${c.status || "lead"}">${statusLabel(c.status || "lead")}</span></td>
       <td class="gd-hide-mobile">${c.budgetMin || c.budgetMax ? formatCurrency(c.budgetMin) + " — " + formatCurrency(c.budgetMax) : "—"}</td>
       <td class="gd-hide-mobile">${c.preferredLocations && c.preferredLocations.length ? c.preferredLocations[0] : "—"}</td>

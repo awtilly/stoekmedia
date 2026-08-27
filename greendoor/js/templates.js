@@ -35,7 +35,7 @@ const DOCUSEAL_BUILDER_SCRIPT = "https://cdn.docuseal.com/js/builder.js";
 /* ------------------------------------------------------------------ */
 onAuthStateChanged(auth, async (user) => {
   if (!user) {
-    window.location.href = "/greendoor/app/login";
+    window.location.href = "login.html";
     return;
   }
   currentUser = await getCurrentUser();
@@ -486,5 +486,5 @@ window.deleteTemplate = async function (templateId) {
 
 window.handleLogout = async function () {
   await auth.signOut();
-  window.location.href = "/greendoor/app/login";
+  window.location.href = "login.html";
 };

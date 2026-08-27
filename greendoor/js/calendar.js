@@ -329,7 +329,7 @@ window.showPopover = function (eventId, anchorEl) {
   let actions = "";
   if (ev.type !== "showingtime") {
     if (ev.clientId) {
-      actions += `<a href="/greendoor/app/client-detail?id=${ev.clientId}" class="gd-btn gd-btn-sm gd-btn-primary">View Client</a>`;
+      actions += `<a href="client-detail.html?id=${ev.clientId}" class="gd-btn gd-btn-sm gd-btn-primary">View Client</a>`;
     }
     if (ev.type === "event") {
       actions += `<button class="gd-btn gd-btn-sm" onclick="editEvent('${ev.id}')">Edit</button>`;

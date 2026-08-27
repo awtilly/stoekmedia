@@ -27,10 +27,10 @@ const TOUR_STEPS = {
 };
 
 const PAGE_URLS = {
-  dashboard: "/greendoor/app/dashboard",
-  clients: "/greendoor/app/clients",
-  calendar: "/greendoor/app/calendar",
-  settings: "/greendoor/app/settings"
+  dashboard: "dashboard.html",
+  clients: "clients.html",
+  calendar: "calendar.html",
+  settings: "settings.html"
 };
 
 const TOTAL_STEPS = TOUR_PAGES.reduce((sum, p) => sum + TOUR_STEPS[p].length, 0);

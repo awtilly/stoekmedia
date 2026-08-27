@@ -478,7 +478,7 @@ function initMobileKeyboardFix() {
 // now a full-page Sage command bar, so a second floating UI would be a
 // duplicate (the mobile bottom-tabs Sage button also points at this panel).
 function shouldSkipChatbotInjection() {
-  return /\/greendoor\/app\/dashboard(\/|$|\?)/.test(window.location.pathname + window.location.search);
+  return /\/app\/dashboard(\.html)?(\/|$|\?)/.test(window.location.pathname + window.location.search);
 }
 
 onAuthStateChanged(auth, (user) => {
