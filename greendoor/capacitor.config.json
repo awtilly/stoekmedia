@@ -1,0 +1,9 @@
+{
+  "appId": "com.stoekmedia.greendoor",
+  "appName": "GreenDoor CRM",
+  "webDir": "www",
+  "backgroundColor": "#f8f9fa",
+  "ios": {
+    "contentInset": "automatic"
+  }
+}

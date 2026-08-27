@@ -314,6 +314,7 @@ function showUpdateBanner(waitingWorker) {
 let deferredInstallPrompt = null;
 
 function showInstallBanner() {
+  if (window.Capacitor?.isNativePlatform?.()) return;  // already installed
   if (isStandalone()) return;
   if (document.getElementById('gd-install-banner')) return;
 
