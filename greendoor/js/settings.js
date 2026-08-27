@@ -1,12 +1,12 @@
 import { auth, db, storage, functions, httpsCallable } from "./firebase-config.js";
-import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+import { onAuthStateChanged } from "./vendor/firebase.js";
 import {
   doc, getDoc, setDoc, addDoc, updateDoc, deleteDoc, getDocs,
   collection, query, where, orderBy, serverTimestamp
-} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+} from "./vendor/firebase.js";
 import {
   ref, uploadBytesResumable, getDownloadURL, deleteObject
-} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
+} from "./vendor/firebase.js";
 import { getCurrentUser, showToast, formatFileSize, escapeHtml, formatDateTime } from "./auth.js";
 import { checkAndResumeTour } from "./tour.js";
 

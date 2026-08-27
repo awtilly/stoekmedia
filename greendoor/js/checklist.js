@@ -21,7 +21,7 @@ import { db, auth } from "./firebase-config.js";
 import {
   writeBatch, doc, collection, getDocs, serverTimestamp,
   updateDoc, addDoc, deleteDoc, onSnapshot, query, where
-} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+} from "./vendor/firebase.js";
 import { showToast, escapeHtml, formatDate } from "./auth.js";
 
 /* ------------------------------------------------------------------ */

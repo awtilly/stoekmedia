@@ -6,14 +6,14 @@
    ============================================================ */
 
 import { auth, db, storage, functions, httpsCallable } from "./firebase-config.js";
-import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+import { onAuthStateChanged } from "./vendor/firebase.js";
 import {
   collection, query, where, getDocs, doc, setDoc, deleteDoc,
   serverTimestamp
-} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+} from "./vendor/firebase.js";
 import {
   ref as storageRef, uploadBytes, getDownloadURL, deleteObject
-} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
+} from "./vendor/firebase.js";
 import { getCurrentUser, showToast, escapeHtml } from "./auth.js";
 
 const createDocuSealBuilderTokenFn = httpsCallable(functions, "createDocuSealBuilderToken");

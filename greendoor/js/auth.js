@@ -4,13 +4,13 @@ import {
   signInWithEmailAndPassword,
   sendPasswordResetEmail,
   signOut
-} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+} from "./vendor/firebase.js";
 import {
   doc,
   getDoc,
   updateDoc,
   serverTimestamp
-} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+} from "./vendor/firebase.js";
 
 let cachedProfile = null;
 

@@ -1,10 +1,10 @@
 import { auth, db, functions, httpsCallable } from "./firebase-config.js";
-import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+import { onAuthStateChanged } from "./vendor/firebase.js";
 import {
   collection, query, where, getDocs, getDoc, getCountFromServer,
   doc, updateDoc, setDoc, addDoc, orderBy, limit, startAfter,
   Timestamp
-} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+} from "./vendor/firebase.js";
 import { getCurrentUser, formatDate, showToast, escapeHtml, safeToDate } from "./auth.js";
 
 /* ================================================================

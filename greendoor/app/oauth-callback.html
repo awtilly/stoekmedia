@@ -24,7 +24,7 @@
 
   <script type="module">
     import { auth, functions, httpsCallable } from "../js/firebase-config.js";
-    import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+    import { onAuthStateChanged } from "../js/vendor/firebase.js";
 
     const params = new URLSearchParams(window.location.search);
     const code = params.get("code");

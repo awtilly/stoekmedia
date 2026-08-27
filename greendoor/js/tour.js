@@ -1,5 +1,5 @@
 import { auth, db } from "./firebase-config.js";
-import { doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { doc, updateDoc } from "./vendor/firebase.js";
 
 const TOUR_PAGES = ["dashboard", "clients", "calendar", "settings"];
 

@@ -1,8 +1,8 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getAuth } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-import { getFirestore } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-import { getStorage } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
-import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-functions.js";
+import { initializeApp } from "./vendor/firebase.js";
+import { getAuth } from "./vendor/firebase.js";
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "./vendor/firebase.js";
+import { getStorage } from "./vendor/firebase.js";
+import { getFunctions, httpsCallable } from "./vendor/firebase.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDEPiHPEURzn_gtiTaR-rbCGg06JYUSlQY",
@@ -15,7 +15,11 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
-export const db = getFirestore(app);
+/* Offline cache: client lists, listings and the calendar render instantly from
+   IndexedDB and sync when the connection returns. Multi-tab safe. */
+export const db = initializeFirestore(app, {
+  localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+});
 export const storage = getStorage(app);
 export const functions = getFunctions(app, "us-central1");
 export { httpsCallable };

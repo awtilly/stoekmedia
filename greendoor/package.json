@@ -1,0 +1,12 @@
+{
+  "name": "greendoor",
+  "private": true,
+  "scripts": {
+    "vendor": "esbuild vendor-src/firebase.js --bundle --format=esm --minify --outfile=js/vendor/firebase.js",
+    "build": "npm run vendor && ./build-www.sh"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2",
+    "firebase": "12.18.0"
+  }
+}

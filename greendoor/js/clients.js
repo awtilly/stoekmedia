@@ -1,8 +1,8 @@
 import { auth, db, functions, httpsCallable } from "./firebase-config.js";
-import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+import { onAuthStateChanged } from "./vendor/firebase.js";
 import {
   collection, query, where, orderBy, getDocs, addDoc, serverTimestamp
-} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+} from "./vendor/firebase.js";
 import { getCurrentUser, formatCurrency, timeAgo, statusLabel, showToast, escapeHtml } from "./auth.js";
 import { checkAndResumeTour } from "./tour.js";
 

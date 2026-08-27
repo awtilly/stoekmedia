@@ -4,7 +4,7 @@
  * Detects page context and sets appropriate quick actions.
  */
 import { auth, functions, httpsCallable } from "./firebase-config.js";
-import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+import { onAuthStateChanged } from "./vendor/firebase.js";
 import { showToast } from "./auth.js";
 
 const askAssistant = httpsCallable(functions, "askAssistant");
