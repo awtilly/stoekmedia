@@ -127,7 +127,13 @@ window.handleForgotPassword = async function () {
     errorEl.style.display = "block";
     setTimeout(() => { errorEl.style.color = ""; }, 5000);
   } catch (err) {
-    errorEl.textContent = "Could not send reset email. Check the address.";
+    const code = err && err.code || "";
+    errorEl.textContent =
+      code.includes("too-many-requests") ? "Too many attempts. Wait a few minutes and try again." :
+      code.includes("user-not-found")    ? "No account with that email. GreenDoor logins are invite-based." :
+      code.includes("invalid-email")     ? "That does not look like an email address." :
+      code.includes("network")           ? "No connection. Try again when you are back online." :
+      "Could not send reset email (" + (code || "unknown error") + ").";
     errorEl.style.display = "block";
   }
 };
