@@ -991,18 +991,18 @@ body.gd-light .gd-modal-lg { max-width: 800px; }
 /* --- Bottom Tab Bar (Mobile) --- */
 .gd-bottom-tabs {
   position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 56px;
-  padding-bottom: env(safe-area-inset-bottom, 0px);
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 10px);
+  left: 12px;
+  right: 12px;
+  height: 62px;
   background: #ffffff;
-  border-top: 1px solid #e5e7eb;
+  border: 1px solid #e5e7eb;
+  border-radius: 24px;
   display: flex;
   align-items: center;
   justify-content: space-around;
   z-index: 1800;
-  box-shadow: 0 -1px 8px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.10);
 }
 
 .gd-tab-item {
@@ -1116,7 +1116,7 @@ body.gd-light .gd-modal-lg { max-width: 800px; }
   }
 
   body.gd-light .gd-content {
-    padding: 20px 16px calc(72px + env(safe-area-inset-bottom, 0px));
+    padding: 20px 16px calc(96px + env(safe-area-inset-bottom, 0px));
     margin: 0 auto;
   }
 
@@ -1236,7 +1236,7 @@ body.gd-light .gd-modal-lg { max-width: 800px; }
 /* --- Small Phone (480px) --- */
 @media (max-width: 480px) {
   body.gd-light .gd-content {
-    padding: 16px 12px calc(72px + env(safe-area-inset-bottom, 0px));
+    padding: 16px 12px calc(96px + env(safe-area-inset-bottom, 0px));
   }
 
   .gd-topbar {
@@ -9347,3 +9347,6 @@ body.gd-light .gd-dash-content.gd-dash-active .gd-dash-prompt-wrap {
   padding-top: env(safe-area-inset-top, 0px);
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
+
+/* Native app: breathing room between the status bar and the topbar row */
+html.gd-native .gd-topbar { padding-top: calc(env(safe-area-inset-top, 0px) + 10px); }

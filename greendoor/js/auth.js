@@ -12,6 +12,8 @@ import {
   serverTimestamp
 } from "./vendor/firebase.js";
 
+if (window.Capacitor?.isNativePlatform?.()) document.documentElement.classList.add("gd-native");
+
 let cachedProfile = null;
 
 /* --- Auth state listener (runs on every CRM page) --- */
