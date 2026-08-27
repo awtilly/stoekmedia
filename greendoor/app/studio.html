@@ -31,7 +31,9 @@ header #home{background:none;border:0;padding:4px 6px;margin-left:-6px;display:f
 header #home:hover{background:rgba(255,255,255,.10)}
 header #home img{height:30px;flex:0 0 auto}
 header #home .t{font-family:var(--fd);font-size:16px;flex:0 0 auto}
-header #home[aria-pressed=true]{background:rgba(255,255,255,.16)}
+/* No pressed state. aria-pressed stays for screen readers, but tinting the
+   button for as long as the dashboard is open reads as a stuck hover -- the
+   dashboard being on screen is the indicator. */
 .tabs{display:flex;gap:3px;overflow-x:auto;scrollbar-width:none;flex:1;justify-content:flex-end}
 .tabs::-webkit-scrollbar{display:none}
 .tab{background:rgba(255,255,255,.09);color:#fff;border:0;padding:8px 13px;font:600 10px/1 var(--fb);
