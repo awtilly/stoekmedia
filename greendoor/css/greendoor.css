@@ -9340,7 +9340,11 @@ body.gd-light .gd-dash-content.gd-dash-active .gd-dash-prompt-wrap {
    Capacitor WebView is not display-mode:standalone, so the PWA-gated rules
    above never fire there. */
 .gd-ai-panel { padding-top: env(safe-area-inset-top, 0px); }
-.gd-topbar { padding-top: env(safe-area-inset-top, 0px); }
+.gd-topbar {
+  /* border-box: the bar must grow by the inset or the padding eats its height */
+  padding-top: env(safe-area-inset-top, 0px);
+  height: calc(var(--gd-topbar-height) + env(safe-area-inset-top, 0px));
+}
 .gd-sidebar { padding-top: env(safe-area-inset-top, 0px); }
 .gd-login-page,
 .gd-onboarding-page {
@@ -9349,4 +9353,11 @@ body.gd-light .gd-dash-content.gd-dash-active .gd-dash-prompt-wrap {
 }
 
 /* Native app: breathing room between the status bar and the topbar row */
-html.gd-native .gd-topbar { padding-top: calc(env(safe-area-inset-top, 0px) + 10px); }
+html.gd-native .gd-topbar {
+  padding-top: calc(env(safe-area-inset-top, 0px) + 10px);
+  height: calc(var(--gd-topbar-height) + env(safe-area-inset-top, 0px) + 10px);
+}
+/* Mobile: the bottom tabs name the page — the topbar keeps only the menu button */
+@media (max-width: 768px) {
+  .gd-topbar-title { display: none; }
+}
