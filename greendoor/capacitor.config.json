@@ -3,7 +3,5 @@
   "appName": "GreenDoor CRM",
   "webDir": "www",
   "backgroundColor": "#f8f9fa",
-  "ios": {
-    "contentInset": "automatic"
-  }
+  "ios": {}
 }

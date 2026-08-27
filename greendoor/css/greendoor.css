@@ -9335,11 +9335,15 @@ body.gd-light .gd-dash-content.gd-dash-active .gd-dash-prompt-wrap {
 }
 
 
-/* ---- iOS safe areas (native app + notched phones) ----
-   viewport-fit=cover lets content extend under the status bar and home
-   indicator; these pad the fixed chrome back out of those zones. */
+/* ---- iOS safe areas ----
+   Unconditional: env() resolves to 0 outside notched/native contexts, and the
+   Capacitor WebView is not display-mode:standalone, so the PWA-gated rules
+   above never fire there. */
+.gd-ai-panel { padding-top: env(safe-area-inset-top, 0px); }
 .gd-topbar { padding-top: env(safe-area-inset-top, 0px); }
 .gd-sidebar { padding-top: env(safe-area-inset-top, 0px); }
-.gd-ai-panel { padding-top: env(safe-area-inset-top, 0px); }
-.gd-bottom-tabs { padding-bottom: env(safe-area-inset-bottom, 0px); }
-body { padding-bottom: env(safe-area-inset-bottom, 0px); }
+.gd-login-page,
+.gd-onboarding-page {
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}

@@ -69,7 +69,7 @@ function injectBottomTabs() {
     if (tab.isCenter) {
       return `
         <button class="gd-tab-item gd-tab-ai" aria-label="Ask Sage">
-          <span class="gd-tab-ai-circle">&#10024;</span>
+          <span class="gd-tab-ai-circle"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l1.8 6.2L20 10l-6.2 1.8L12 18l-1.8-6.2L4 10l6.2-1.8Z"/><path d="M19 14.5l.9 3.1 3.1.9-3.1.9-.9 3.1-.9-3.1-3.1-.9 3.1-.9Z" opacity=".85"/></svg></span>
           <span class="gd-tab-label">Sage</span>
         </button>`;
     }
