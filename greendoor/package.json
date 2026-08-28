@@ -6,6 +6,7 @@
     "build": "npm run vendor && ./build-www.sh"
   },
   "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
     "esbuild": "0.28.2",
     "firebase": "12.18.0"
   },
