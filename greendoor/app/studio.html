@@ -26,9 +26,9 @@ button,input,select,textarea{font-family:inherit}
 
 /* ---------- header ---------- */
 header{background:#fff;color:var(--ink);padding:calc(env(safe-area-inset-top,0px) + 8px) 14px 8px;display:flex;
-     align-items:center;gap:12px;flex:0 0 auto}
-header .ttl{flex:1;text-align:center;font:700 14px/1 var(--fb);letter-spacing:.02em;color:var(--ink);
-     margin-right:-70px;pointer-events:none}
+     align-items:center;justify-content:space-between;gap:12px;flex:0 0 auto;position:relative}
+header .ttl{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);font:700 14px/1 var(--fb);
+     letter-spacing:.02em;color:var(--ink);pointer-events:none}
 .tabstrip{background:#fff;border-bottom:1px solid #E5E7EB;padding:2px 12px 10px;flex:0 0 auto}
 /* No pressed state. aria-pressed stays for screen readers, but tinting the
    button for as long as the dashboard is open reads as a stuck hover -- the
