@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
 <meta name="theme-color" content="#ffffff">
 <title>Studio — GreenDoor</title>
@@ -25,8 +25,11 @@ body{font-family:var(--fb);background:#F3F4F6;color:var(--ink);display:flex;flex
 button,input,select,textarea{font-family:inherit}
 
 /* ---------- header ---------- */
-header{background:#fff;color:var(--ink);padding:8px 14px;display:flex;align-items:center;gap:12px;flex:0 0 auto;
-     border-bottom:1px solid #E5E7EB}
+header{background:#fff;color:var(--ink);padding:calc(env(safe-area-inset-top,0px) + 8px) 14px 8px;display:flex;
+     align-items:center;gap:12px;flex:0 0 auto}
+header .ttl{flex:1;text-align:center;font:700 14px/1 var(--fb);letter-spacing:.02em;color:var(--ink);
+     margin-right:-70px;pointer-events:none}
+.tabstrip{background:#fff;border-bottom:1px solid #E5E7EB;padding:2px 12px 10px;flex:0 0 auto}
 /* No pressed state. aria-pressed stays for screen readers, but tinting the
    button for as long as the dashboard is open reads as a stuck hover -- the
    dashboard being on screen is the indicator. */
@@ -92,16 +95,17 @@ aside{width:var(--panelw);flex:0 0 var(--panelw);background:#fff;border-right:1p
       text-transform:uppercase;color:var(--ink-soft);cursor:pointer;border-bottom:2px solid transparent}
 .ptab[aria-selected=true]{color:var(--ink);border-bottom-color:var(--brass)}
 .pbody{flex:1;overflow-y:auto;padding:15px}
-.pfoot{flex:0 0 auto;border-top:1px solid var(--stone);padding:9px 12px;display:flex;gap:6px;flex-wrap:wrap;background:#FBFAF7}
+.pfoot{flex:0 0 auto;border-top:1px solid #E5E7EB;padding:9px 12px calc(9px + env(safe-area-inset-bottom,0px));display:flex;gap:8px;background:#fff}
 
 /* ---------- stage ---------- */
-.stage{flex:1;overflow:auto;display:flex;flex-direction:column;align-items:center;gap:14px;padding:18px;min-width:0}
+.stage{flex:1;overflow:auto;display:flex;flex-direction:column;align-items:center;gap:14px;padding:14px 14px 20px;min-width:0;background:#EDEFF2}
 .stagebar{display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:center;max-width:100%}
-.chip{background:#fff;border:1px solid var(--stone);padding:7px 12px;font:600 9.5px/1 var(--fb);
-      letter-spacing:.11em;text-transform:uppercase;cursor:pointer;border-radius:2px;color:var(--ink-soft);white-space:nowrap}
+.chip{background:#fff;border:1px solid #E5E7EB;padding:8px 14px;font:600 9.5px/1 var(--fb);
+      letter-spacing:.11em;text-transform:uppercase;cursor:pointer;border-radius:99px;color:var(--ink-soft);white-space:nowrap}
 .chip[aria-selected=true]{background:var(--ink);color:#fff;border-color:var(--ink)}
-.btn{background:var(--brass);color:#fff;border:0;padding:9px 15px;font:600 9.5px/1 var(--fb);
-     letter-spacing:.13em;text-transform:uppercase;cursor:pointer;border-radius:2px;white-space:nowrap}
+.btn{background:var(--brass);color:#fff;border:0;padding:10px 16px;font:600 9.5px/1 var(--fb);
+     letter-spacing:.13em;text-transform:uppercase;cursor:pointer;border-radius:8px;white-space:nowrap}
+.btn.grow{flex:1}
 .btn.ghost{background:#fff;color:var(--ink);border:1px solid var(--ink)}
 .btn.sm{padding:7px 11px;font-size:9px}
 .btn:disabled{opacity:.5;cursor:wait}
@@ -112,7 +116,7 @@ aside{width:var(--panelw);flex:0 0 var(--panelw);background:#fff;border-right:1p
 .grp:first-child>h4{margin-top:0}
 label{display:block;margin-bottom:9px}
 label>span{display:block;font:600 9px/1.4 var(--fb);letter-spacing:.09em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:4px}
-input[type=text],select,textarea{width:100%;padding:8px 9px;border:1px solid var(--stone);border-radius:2px;
+input[type=text],select,textarea{width:100%;padding:9px 11px;border:1px solid #E5E7EB;border-radius:8px;
      font:400 13px/1.35 var(--fb);color:var(--ink);background:#fff}
 textarea{resize:vertical;min-height:62px}
 input:focus,select:focus,textarea:focus,button:focus-visible{outline:2px solid var(--sage);outline-offset:-1px}
@@ -136,7 +140,7 @@ input:focus,select:focus,textarea:focus,button:focus-visible{outline:2px solid v
 .imp .hint{margin-top:7px}
 
 /* storage / import notice */
-#notice{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);max-width:min(560px,92vw);
+#notice{position:fixed;left:50%;bottom:calc(76px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);max-width:min(560px,92vw);
   background:var(--ink);color:#fff;padding:11px 16px;border-radius:3px;font-size:12px;line-height:1.5;
   box-shadow:0 6px 24px rgba(0,0,0,.28);z-index:60;display:none}
 
@@ -162,7 +166,9 @@ input[type=color]{width:100%;height:32px;padding:2px;border:1px solid var(--ston
 .popmenu.up{top:auto;bottom:calc(100% + 4px)}
 .popmenu button{background:none;border:0;text-align:left;padding:10px 12px;font:500 12px/1.2 var(--fb);
   color:var(--ink);cursor:pointer;border-radius:6px;white-space:nowrap}
+.popmenu[hidden]{display:none}
 .popmenu button:hover{background:#F1F5F9}
+.popmenu hr{border:0;border-top:1px solid #F0F0EE;margin:4px 0}
 /* listing picker */
 #gdpickwrap{position:fixed;inset:0;background:rgba(15,23,17,.45);z-index:120;display:flex;
   align-items:flex-end;justify-content:center}
@@ -252,27 +258,35 @@ body.export .art{box-shadow:none;margin:0}
   .ptabs{position:sticky;top:0;background:#fff;z-index:5}
   .pbody{flex:none;overflow:visible;max-height:none}
   .pfoot{position:sticky;bottom:0;z-index:5}
-  header{flex-wrap:wrap;gap:8px;position:sticky;top:0;z-index:20}
-  .tabs{justify-content:flex-start;width:100%;order:3}
-  .chip,.btn{padding:9px 12px}
+  header{position:sticky;top:0;z-index:21}
+  .tabstrip{position:sticky;top:calc(env(safe-area-inset-top,0px) + 38px);z-index:20}
+  input[type=text],select,textarea{font-size:16px}
+  .chip{padding:9px 13px}
 }
 #crm{color:var(--brass);padding:8px 10px 8px 0;font:700 11px/1 var(--fb);letter-spacing:.1em;
      text-transform:uppercase;text-decoration:none;flex:0 0 auto;white-space:nowrap}
 #crm:hover{color:var(--brass-deep)}
 .doorglyph{width:34px;height:52px;background:var(--gdb);border-radius:4px 4px 0 0;opacity:.45;position:relative}
 .doorglyph::after{content:'';position:absolute;right:5px;top:24px;width:4px;height:4px;border-radius:50%;background:#fff}
-/* iOS safe areas: page starts below the status bar; sticky chrome respects it */
-body{padding-top:env(safe-area-inset-top,0px)}
-@media (max-width:860px){
-  header{top:env(safe-area-inset-top,0px)}
-  .pfoot{bottom:env(safe-area-inset-bottom,0px)}
-}
+
 </style>
 
 <header>
   <a href="dashboard.html" id="crm" title="Back to GreenDoor">&#8249; GreenDoor</a>
-  <div class="tabs" id="tabs"></div>
+  <span class="ttl">Studio</span>
+  <div class="menuwrap">
+    <button class="btn ghost sm" id="morebtn" aria-label="More">&#8943;</button>
+    <div class="popmenu" id="moremenu" hidden>
+      <button id="dl">Download PNG</button>
+      <button id="dlall">Download all sizes</button>
+      <button id="pr">Print / PDF</button>
+      <hr>
+      <button id="imp">Restore backup</button>
+      <button id="rs">Reset design</button>
+    </div>
+  </div>
 </header>
+<div class="tabstrip"><div class="tabs" id="tabs"></div></div>
 <section id="dash" hidden>
   <div class="dhead">
     <div>
@@ -298,29 +312,14 @@ body{padding-top:env(safe-area-inset-top,0px)}
     <div class="ptabs" id="ptabs"></div>
     <div class="pbody" id="panel"></div>
     <div class="pfoot">
-      <button class="btn sm" id="save">Save</button>
       <button class="btn ghost sm" id="open">Projects</button>
-      <div class="menuwrap">
-        <button class="btn ghost sm" id="pfmore" aria-label="More">&#8943;</button>
-        <div class="popmenu up" id="pfmenu" hidden>
-          <button id="imp">Restore backup</button>
-          <button id="rs">Reset design</button>
-        </div>
-      </div>
+      <button class="btn ghost sm" id="save">Save</button>
+      <button class="btn sm grow" id="share">Publish</button>
     </div>
   </aside>
   <div class="stage">
     <div class="stagebar">
-      <div class="tabs" id="sizes" style="gap:4px;flex:1 1 100%;justify-content:flex-start"></div>
-      <button class="btn" id="share">Share</button>
-      <button class="btn ghost" id="dl">Download PNG</button>
-      <div class="menuwrap">
-        <button class="btn ghost" id="morebtn" aria-label="More">&#8943;</button>
-        <div class="popmenu" id="moremenu" hidden>
-          <button id="dlall">Download all sizes</button>
-          <button id="pr">Print / PDF</button>
-        </div>
-      </div>
+      <div class="tabs" id="sizes" style="gap:6px;flex:1 1 100%;justify-content:flex-start"></div>
     </div>
     <div class="wrap" id="wrap"><div class="art" id="art"></div></div>
   </div>
@@ -1675,7 +1674,7 @@ $('#ptabs').onclick = e=>{ const b=e.target.closest('[data-p]'); if(!b) return;
 function bindMenu(btn, menu){
   $(btn).onclick = e => { e.stopPropagation(); const m=$(menu); m.hidden=!m.hidden; };
 }
-bindMenu('#morebtn','#moremenu'); bindMenu('#pfmore','#pfmenu');
+bindMenu('#morebtn','#moremenu');
 addEventListener('click', e => {
   if(!e.target.closest('.menuwrap')) document.querySelectorAll('.popmenu').forEach(m=>m.hidden=true);
 });
