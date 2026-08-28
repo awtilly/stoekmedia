@@ -409,11 +409,14 @@ function normalize(v){
 let S = (()=>{ try{ return normalize(JSON.parse(localStorage.getItem('ae-studio'))); }catch(e){ return clone(DEFAULTS); } })();
 /* ---------- GreenDoor handoff ----------
    The CRM stashes the signed-in agent's details and, when "Create marketing
-   in Studio" is pressed, the listing itself. Both are picked up here. */
-(function(){
+   in Studio" is pressed, the listing itself. Deferred to a task so every
+   const below (GD_STATUS_BACK etc.) is initialized before we touch it. */
+setTimeout(function(){
+  let applied=false;
   try{
     const prof = JSON.parse(sessionStorage.getItem('gd-profile')||'null');
     if(prof && prof.fullName && S.agentName===DEFAULTS.agentName && prof.fullName!==DEFAULTS.agentName){
+      applied=true;
       S.agentName = prof.fullName;
       const ph = String(prof.phone||'').replace(/\D/g,'');
       if(ph.length===10) S.phone = '('+ph.slice(0,3)+') '+ph.slice(3,6)+'-'+ph.slice(6);
@@ -424,13 +427,19 @@ let S = (()=>{ try{ return normalize(JSON.parse(localStorage.getItem('ae-studio'
     const raw = sessionStorage.getItem('gd-studio-listing');
     if(raw){
       sessionStorage.removeItem('gd-studio-listing');
-      Object.assign(S, fromGreenDoorListing(JSON.parse(raw)));
+      const gd = JSON.parse(raw);
+      Object.assign(S, fromGreenDoorListing(gd));
       S.photos=[null,null,null,null]; S.focal=clone(DEFAULTS.focal);
       try{ localStorage.removeItem('ae-current'); }catch(e){}
+      applied=true;
       save();
+      if((gd.photos||[]).length) setTimeout(async()=>{
+        try{ S.photos=await pullListingPhotos(gd.photos); save(); buildPanel(); draw(); }catch(e){}
+      }, 0);
     }
-  }catch(e){}
-})();
+    if(applied){ save(); buildPanel(); draw(); }
+  }catch(e){ console.error('GreenDoor handoff:', e); }
+}, 0);
 
 /* ---------- helpers ---------- */
 const esc = s => String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -1286,9 +1295,10 @@ $('#pr').onclick = async ()=>{
 /* ---------- import from the realtor's saved GreenDoor listings ---------- */
 async function pullListingPhotos(urls){
   const out=[null,null,null,null];
-  const list=(urls||[]).filter(u=>/^https?:/.test(String(u))).slice(0,4);
-  await Promise.all(list.map((u,i)=>fetch(u).then(r=>r.blob()).then(b=>downscale(b))
-    .then(d=>{ out[i]=d; }).catch(()=>{})));
+  const list=(urls||[]).filter(u=>/^(https?:|data:image)/.test(String(u))).slice(0,4);
+  await Promise.all(list.map((u,i)=>/^data:/.test(u)
+    ? Promise.resolve().then(()=>{ out[i]=u; })
+    : fetch(u).then(r=>r.blob()).then(b=>downscale(b)).then(d=>{ out[i]=d; }).catch(()=>{})));
   return out;
 }
 async function openGdPicker(){
