@@ -383,8 +383,34 @@ window.sendWithContext = async function (question, contextType, contextData) {
 let recognition = null;
 let isListening = false;
 
+const NativeSpeechAI = window.Capacitor?.isNativePlatform?.() ? window.Capacitor.Plugins?.Speech : null;
+
+async function nativeVoiceInput(micBtn) {
+  const input = document.getElementById("ai-input");
+  if (isListening) { try { await NativeSpeechAI.stop(); } catch (e) {} return; }
+  try {
+    const perm = await NativeSpeechAI.requestPermission();
+    if (!perm.granted) { showToast("Microphone access is off. Enable it in iOS Settings.", "error"); return; }
+    isListening = true;
+    micBtn.classList.add("listening");
+    await NativeSpeechAI.removeAllListeners();
+    NativeSpeechAI.addListener("partial", (d) => { if (input) input.value = d.text || ""; });
+    NativeSpeechAI.addListener("end", () => {
+      isListening = false;
+      micBtn.classList.remove("listening");
+    });
+    await NativeSpeechAI.start();
+  } catch (e) {
+    isListening = false;
+    micBtn.classList.remove("listening");
+    showToast("Voice input could not start.", "error");
+  }
+}
+
 window.toggleVoiceInput = function () {
   const micBtn = document.getElementById("ai-mic-btn");
+
+  if (NativeSpeechAI) { nativeVoiceInput(micBtn); return; }
 
   if (isListening) {
     if (recognition) recognition.stop();

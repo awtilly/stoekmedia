@@ -938,9 +938,37 @@ function removeTyping() {
 let dashRecognition = null;
 let dashListening = false;
 
+const NativeSpeech = window.Capacitor?.isNativePlatform?.() ? window.Capacitor.Plugins?.Speech : null;
+
+async function nativeDashVoice(micBtn, input) {
+  if (dashListening) { try { await NativeSpeech.stop(); } catch (e) {} return; }
+  try {
+    const perm = await NativeSpeech.requestPermission();
+    if (!perm.granted) { showToast("Microphone access is off. Enable it in iOS Settings.", "error"); return; }
+    dashListening = true;
+    micBtn.classList.add("listening");
+    input.placeholder = "Listening…";
+    await NativeSpeech.removeAllListeners();
+    NativeSpeech.addListener("partial", (d) => { input.value = d.text || ""; autoGrowTextarea(); });
+    NativeSpeech.addListener("end", () => {
+      dashListening = false;
+      micBtn.classList.remove("listening");
+      input.placeholder = "Ask Sage anything, or say what you want to do…";
+      if (input.value.trim()) setTimeout(() => submitDashPrompt(), 300);
+    });
+    await NativeSpeech.start();
+  } catch (e) {
+    dashListening = false;
+    micBtn.classList.remove("listening");
+    showToast("Voice input could not start.", "error");
+  }
+}
+
 window.toggleDashVoice = function () {
   const micBtn = document.getElementById("dash-mic-btn");
   const input = document.getElementById("dash-prompt-input");
+
+  if (NativeSpeech) { nativeDashVoice(micBtn, input); return; }
 
   if (dashListening) {
     if (dashRecognition) dashRecognition.stop();

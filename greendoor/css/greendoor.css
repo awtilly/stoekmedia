@@ -3861,7 +3861,7 @@ body.gd-light .gd-breadcrumb-current {
   background: #ffffff;
   border-left: 1px solid #e5e7eb;
   box-shadow: -4px 0 24px rgba(0, 0, 0, 0.08);
-  z-index: 1900;
+  z-index: 1950;
   display: flex;
   flex-direction: column;
   transition: right 0.3s ease;
@@ -8418,13 +8418,17 @@ body.gd-light .gd-confirm-warning { background: #fffbeb; color: #92400e; }
 
 /* --- 768px: Tablets & small screens --- */
 @media (max-width: 768px) {
-  /* Modals — full-screen on mobile */
+  /* Modals — bottom sheets on mobile. Height must leave the status bar
+     visible: taller-than-viewport content + flex-end clips the sheet's top. */
   .gd-modal {
     max-width: 100%;
-    max-height: 100vh;
-    max-height: 100dvh;
+    max-height: calc(100dvh - env(safe-area-inset-top, 0px) - 28px);
     border-radius: var(--gd-radius-lg) var(--gd-radius-lg) 0 0;
-    margin: 0;
+    margin: 0 !important;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .gd-modal-overlay {
+    padding: 0;
   }
 
   .gd-modal-lg {
