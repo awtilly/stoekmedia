@@ -586,6 +586,7 @@ window.openListingDetail = function (id) {
       ${listing.lotSize ? `<div class="gd-detail-spec"><span class="num">${listing.lotSize}</span><span class="lbl">Lot</span></div>` : ""}
       ${listing.garageSpaces ? `<div class="gd-detail-spec"><span class="num">${listing.garageSpaces}</span><span class="lbl">Garage</span></div>` : ""}
     </div>
+    <button class="gd-btn gd-btn-primary" style="width:100%;margin:12px 0 4px" onclick="sendToStudio('${listing.id}')">Create marketing in Studio</button>
     ${listing.propertyType ? `<div class="gd-detail-field"><strong>Type:</strong> ${escapeHtml(listing.propertyType)}</div>` : ""}
     ${listing.features?.length ? `<div class="gd-detail-field"><strong>Features:</strong> ${listing.features.map(f => `<span class="gd-tag">${escapeHtml(f)}</span>`).join(" ")}</div>` : ""}
     ${listing.schoolDistrict ? `<div class="gd-detail-field"><strong>School:</strong> ${escapeHtml(listing.schoolDistrict)}${listing.schoolRating ? ` (${listing.schoolRating}/10)` : ""}</div>` : ""}
@@ -886,3 +887,12 @@ async function importBookmarkedPropertiesOnce(uid) {
     console.error("Import bookmarked properties error:", e);
   }
 }
+
+
+/* Hand a listing to the Studio: it reads gd-studio-listing on boot. */
+window.sendToStudio = (id) => {
+  const l = allListings.find(x => x.id === id);
+  if (!l) return;
+  try { sessionStorage.setItem("gd-studio-listing", JSON.stringify(l)); } catch (e) {}
+  window.location.href = "studio.html";
+};

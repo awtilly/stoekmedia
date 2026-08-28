@@ -29,6 +29,9 @@ onAuthStateChanged(auth, async (user) => {
       const userDoc = await getDoc(doc(db, "users", user.uid));
       if (userDoc.exists()) {
         cachedProfile = { uid: user.uid, ...userDoc.data() };
+        try { sessionStorage.setItem("gd-profile", JSON.stringify({
+          fullName: cachedProfile.fullName || "", phone: cachedProfile.phone || "",
+          email: cachedProfile.email || "", company: cachedProfile.company || "" })); } catch (e) {}
         updateDoc(doc(db, "users", user.uid), { lastLogin: serverTimestamp() }).catch(() => {});
 
         // Onboarding redirect: strict === false so existing users (without field) are unaffected
@@ -157,6 +160,9 @@ export async function getCurrentUser() {
         const userDoc = await getDoc(doc(db, "users", user.uid));
         if (userDoc.exists()) {
           cachedProfile = { uid: user.uid, ...userDoc.data() };
+        try { sessionStorage.setItem("gd-profile", JSON.stringify({
+          fullName: cachedProfile.fullName || "", phone: cachedProfile.phone || "",
+          email: cachedProfile.email || "", company: cachedProfile.company || "" })); } catch (e) {}
           resolve(cachedProfile);
         } else {
           resolve({ uid: user.uid, email: user.email, role: "realtor" });
