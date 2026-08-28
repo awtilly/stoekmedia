@@ -85,6 +85,21 @@ function injectBottomTabs() {
 
   document.body.appendChild(nav);
 
+  // Top chrome replacement: status-bar scrim + floating menu chip
+  if (!document.getElementById("gd-top-scrim")) {
+    const scrim = document.createElement("div");
+    scrim.id = "gd-top-scrim";
+    document.body.appendChild(scrim);
+  }
+  if (!document.getElementById("gd-menu-chip") && document.getElementById("gd-sidebar")) {
+    const chip = document.createElement("button");
+    chip.id = "gd-menu-chip";
+    chip.setAttribute("aria-label", "Menu");
+    chip.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>';
+    chip.addEventListener("click", () => document.getElementById("gd-sidebar").classList.toggle("open"));
+    document.body.appendChild(chip);
+  }
+
   const aiTab = nav.querySelector(".gd-tab-ai");
   if (aiTab) {
     aiTab.addEventListener("click", () => {

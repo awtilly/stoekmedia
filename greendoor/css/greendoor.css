@@ -9361,3 +9361,38 @@ html.gd-native .gd-topbar {
 @media (max-width: 768px) {
   .gd-topbar-title { display: none; }
 }
+
+/* ---- Mobile: no top bar; floating menu chip + status-bar scrim ---- */
+@media (max-width: 768px) {
+  .gd-topbar { display: none; }
+  body.gd-light .gd-content { padding-top: calc(env(safe-area-inset-top, 0px) + 14px); }
+  .gd-page { padding-top: 0; }
+}
+#gd-top-scrim {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: env(safe-area-inset-top, 0px);
+  background: rgba(248, 249, 250, 0.72);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  z-index: 1900;
+  pointer-events: none;
+}
+#gd-menu-chip {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 10px);
+  right: 14px;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.10);
+  color: #475569;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 1901;
+}
+#gd-menu-chip:active { transform: scale(0.94); }
