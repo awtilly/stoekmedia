@@ -738,3 +738,36 @@ window.generateCalendarFeed = async function () {
     section.innerHTML = '<p class="gd-text-muted-sm" style="color:var(--gd-red);">Failed to generate feed URL. Please try again.</p>';
   }
 };
+
+
+/* ------------------------------------------------------------------ */
+/*  Account deletion (App Store 5.1.1(v))                              */
+/* ------------------------------------------------------------------ */
+window.openDeleteAccountModal = () => {
+  document.getElementById("delete-confirm-input").value = "";
+  document.getElementById("delete-account-modal").classList.add("active");
+};
+window.closeDeleteAccountModal = () => {
+  document.getElementById("delete-account-modal").classList.remove("active");
+};
+window.confirmDeleteAccount = async () => {
+  const typed = document.getElementById("delete-confirm-input").value.trim().toUpperCase();
+  if (typed !== "DELETE") {
+    showToast('Type DELETE to confirm.', "error");
+    return;
+  }
+  const btn = document.getElementById("delete-account-go");
+  btn.disabled = true;
+  btn.textContent = "Deleting\u2026";
+  try {
+    const deleteAccount = httpsCallable(functions, "deleteAccount");
+    await deleteAccount();
+    try { await auth.signOut(); } catch (e) {}
+    window.location.href = "login.html";
+  } catch (err) {
+    console.error("deleteAccount:", err);
+    showToast("Could not delete the account: " + (err.message || "unknown error"), "error");
+    btn.disabled = false;
+    btn.textContent = "Delete everything";
+  }
+};

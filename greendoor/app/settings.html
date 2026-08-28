@@ -144,6 +144,13 @@
                 </div>
                 <button class="gd-btn gd-btn-primary" onclick="saveProfile()">Save Profile</button>
               </div>
+
+              <div class="gd-card" style="border-color:#FCA5A5;margin-top:24px">
+                <h3 style="color:#B91C1C">Delete account</h3>
+                <p class="gd-text-muted" style="margin:6px 0 14px">Permanently removes your account and
+                everything in it &mdash; clients, listings, calendar, templates, and files. This cannot be undone.</p>
+                <button class="gd-btn" style="background:#DC2626;color:#fff" onclick="openDeleteAccountModal()">Delete my account&hellip;</button>
+              </div>
             </div>
 
             <!-- Documents Panel -->
@@ -310,5 +317,25 @@
   <script type="module" src="../js/tour.js"></script>
   <script type="module" src="../js/bottom-tabs.js"></script>
   <script type="module" src="../js/chatbot.js"></script>
+  <!-- Delete account confirmation -->
+  <div id="delete-account-modal" class="gd-modal-overlay">
+    <div class="gd-modal">
+      <div class="gd-modal-header">
+        <h3 style="color:#B91C1C">Delete your account?</h3>
+        <button class="gd-modal-close" onclick="closeDeleteAccountModal()" aria-label="Close">&times;</button>
+      </div>
+      <div class="gd-modal-body">
+        <p>This permanently deletes your GreenDoor account and <strong>all of your data</strong>:
+        clients, listings, showings, follow-ups, calendar events, templates, documents, and uploaded files.
+        There is no undo and no recovery.</p>
+        <label class="gd-label" for="delete-confirm-input" style="margin-top:12px">Type <strong>DELETE</strong> to confirm</label>
+        <input type="text" id="delete-confirm-input" class="gd-input" autocomplete="off" autocapitalize="characters" placeholder="DELETE">
+      </div>
+      <div class="gd-modal-footer">
+        <button class="gd-btn" onclick="closeDeleteAccountModal()">Cancel</button>
+        <button class="gd-btn" id="delete-account-go" style="background:#DC2626;color:#fff" onclick="confirmDeleteAccount()">Delete everything</button>
+      </div>
+    </div>
+  </div>
 </body>
 </html>

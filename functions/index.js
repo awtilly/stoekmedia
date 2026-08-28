@@ -2995,3 +2995,52 @@ exports.sendSMS = onCall(
     }
   }
 );
+
+/* ============================================================
+   Account deletion (App Store Guideline 5.1.1(v))
+   Deletes every document the user owns across all collections,
+   their storage files, their user record, and the auth account.
+   ============================================================ */
+exports.deleteAccount = onCall(async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "You must be signed in.");
+  const uid = request.auth.uid;
+  const db = getFirestore();
+
+  const COLLECTIONS = [
+    "clients", "listings", "showings", "followUps", "events", "activities",
+    "bookmarkedProperties", "clientListingMatches", "envelopes",
+    "emailTemplates", "documentTemplates", "templateFiles", "files", "folders",
+    "followUpSequences", "sequenceEnrollments", "searchHistory",
+  ];
+  const OWNER_FIELDS = ["realtorId", "addedBy", "ownerId", "createdBy"];
+
+  let deleted = 0;
+  for (const col of COLLECTIONS) {
+    for (const field of OWNER_FIELDS) {
+      // Loop until the query drains — batches of 400.
+      for (;;) {
+        const snap = await db.collection(col).where(field, "==", uid).limit(400).get();
+        if (snap.empty) break;
+        const batch = db.batch();
+        snap.docs.forEach((d) => batch.delete(d.ref));
+        await batch.commit();
+        deleted += snap.size;
+      }
+    }
+  }
+
+  // User record incl. any subcollections
+  await db.recursiveDelete(db.collection("users").doc(uid));
+
+  // Uploaded files
+  try {
+    await getStorage().bucket().deleteFiles({ prefix: `files/${uid}/` });
+  } catch (e) {
+    console.error("storage cleanup:", e.message);
+  }
+
+  // Auth account last — after this the client session is dead.
+  await getAuth().deleteUser(uid);
+  console.log(`deleteAccount: uid=${uid} docs=${deleted}`);
+  return { ok: true, deleted };
+});
