@@ -39,12 +39,21 @@ service cloud.firestore {
                     && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
                          'fullName', 'phone', 'company', 'emailSignature',
                          'showTour', 'onboardingComplete', 'onboardingCompletedAt',
-                         'termsAcceptedAt', 'lastLogin'
+                         'termsAcceptedAt', 'lastLogin', 'fcmTokens'
                        ]);
 
       // Admins can do anything
       allow create, delete: if isAuthenticated() && isAdmin();
       allow update: if isAuthenticated() && isAdmin();
+
+      // Push/in-app notifications: written by Cloud Functions only (admin SDK
+      // bypasses rules); the owner may read, mark read, and dismiss.
+      match /notifications/{notificationId} {
+        allow read, delete: if isAuthenticated() && request.auth.uid == userId;
+        allow update: if isAuthenticated() && request.auth.uid == userId
+                      && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
+        allow create: if false;
+      }
     }
 
     match /clients/{clientId} {

@@ -46,6 +46,10 @@ onAuthStateChanged(auth, async (user) => {
         }
 
         renderNavUser(cachedProfile);
+
+        if (window.Capacitor?.isNativePlatform?.()) {
+          import("./push.js").then((m) => m.initPush(user.uid)).catch(() => {});
+        }
       } else if (isLoginPage) {
         window.location.href = "dashboard.html";
         return;

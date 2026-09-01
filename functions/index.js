@@ -3,7 +3,8 @@ const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { onDocumentCreated } = require("firebase-functions/v2/firestore");
 const { defineSecret } = require("firebase-functions/params");
 const { initializeApp } = require("firebase-admin/app");
-const { getFirestore, FieldValue } = require("firebase-admin/firestore");
+const { getFirestore, FieldValue, FieldPath } = require("firebase-admin/firestore");
+const { getMessaging } = require("firebase-admin/messaging");
 const { getStorage } = require("firebase-admin/storage");
 const { getAuth } = require("firebase-admin/auth");
 const crypto = require("crypto");
@@ -853,6 +854,24 @@ exports.docusealWebhook = onRequest(
 
       await Promise.all(writes);
 
+      // Notify the realtor (push + in-app) that the document came back signed.
+      if (realtorId) {
+        try {
+          const clientSnap = await db.doc(`clients/${clientId}`).get();
+          const clientName = clientSnap.exists ? clientSnap.data().fullName : null;
+          await db.collection(`users/${realtorId}/notifications`).add({
+            type: "document_signed",
+            title: "Document signed",
+            body: clientName ? `${clientName} signed "${title}".` : `"${title}" was signed.`,
+            url: `client-detail.html?id=${clientId}`,
+            read: false,
+            createdAt: FieldValue.serverTimestamp()
+          });
+        } catch (notifyErr) {
+          console.warn("docusealWebhook: notification enqueue failed:", notifyErr.message);
+        }
+      }
+
       // Auto-complete matching checklist items.
       // - Compliance docs match by templateId
       // - Ad-hoc envelopes match by linkedEnvelopeId on the checklist item
@@ -898,6 +917,46 @@ exports.docusealWebhook = onRequest(
     } catch (err) {
       console.error("docusealWebhook error:", err);
       return res.status(200).send("OK");
+    }
+  }
+);
+
+/* Push delivery pipeline: any function can enqueue a doc under
+   users/{uid}/notifications and this trigger fans it out to every device
+   token on the user doc, pruning tokens FCM reports as dead. The doc also
+   doubles as the in-app notification record (`read` flag, client-visible). */
+exports.sendPushOnNotification = onDocumentCreated(
+  { region: "us-central1", document: "users/{uid}/notifications/{notificationId}" },
+  async (event) => {
+    const snap = event.data;
+    if (!snap) return;
+    const n = snap.data() || {};
+    const uid = event.params.uid;
+
+    const userSnap = await db.doc(`users/${uid}`).get();
+    const tokens = Object.keys((userSnap.exists && userSnap.data().fcmTokens) || {});
+    if (!tokens.length) return;
+
+    const resp = await getMessaging().sendEachForMulticast({
+      tokens,
+      notification: { title: n.title || "GreenDoor", body: n.body || "" },
+      data: { url: n.url || "", type: n.type || "" },
+      apns: { payload: { aps: { sound: "default" } } }
+    });
+
+    const deadCodes = [
+      "messaging/registration-token-not-registered",
+      "messaging/invalid-registration-token",
+      "messaging/invalid-argument"
+    ];
+    const updateArgs = [];
+    resp.responses.forEach((r, i) => {
+      if (r.error && deadCodes.includes(r.error.code)) {
+        updateArgs.push(new FieldPath("fcmTokens", tokens[i]), FieldValue.delete());
+      }
+    });
+    if (updateArgs.length) {
+      await db.doc(`users/${uid}`).update(...updateArgs).catch(() => {});
     }
   }
 );
