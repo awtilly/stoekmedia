@@ -68,6 +68,8 @@
 	<true/>
 	<key>FirebaseAppDelegateProxyEnabled</key>
 	<false/>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>GreenDoor uses the microphone so you can speak to Sage instead of typing.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
