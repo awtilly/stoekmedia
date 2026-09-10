@@ -411,3 +411,26 @@ window.addEventListener('appinstalled', () => {
 if (/iPad|iPhone|iPod/.test(navigator.userAgent) && !isStandalone() && !localStorage.getItem('gd-install-dismissed')) {
   setTimeout(showInstallBanner, 6000);
 }
+
+/* iOS keyboard avoidance. A fixed-position modal doesn't shrink when the
+   keyboard opens, so a field near the bottom (Notes, Save) can end up hidden
+   behind it. Publish the keyboard height as --gd-kb so the modal CSS can make
+   room, and pull the focused control back into view. */
+(function () {
+  const vv = window.visualViewport;
+  if (!vv) return;
+  let timer;
+  const update = () => {
+    const kb = Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop));
+    document.documentElement.style.setProperty("--gd-kb", kb + "px");
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      const a = document.activeElement;
+      if (kb > 0 && a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) && a.closest(".gd-modal")) {
+        a.scrollIntoView({ block: "center", behavior: "smooth" });
+      }
+    }, 80);
+  };
+  vv.addEventListener("resize", update);
+  vv.addEventListener("scroll", update);
+})();

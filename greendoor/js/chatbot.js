@@ -440,6 +440,9 @@ window.toggleVoiceInput = function () {
     input.placeholder = "Listening...";
   };
 
+  // Some recognizers (the iOS Simulator's for one) keep emitting "final"
+  // results after the first — send exactly once per listening session.
+  let voiceSent = false;
   recognition.onresult = (e) => {
     let transcript = "";
     for (let i = 0; i < e.results.length; i++) {
@@ -447,7 +450,9 @@ window.toggleVoiceInput = function () {
     }
     input.value = transcript;
 
-    if (e.results[e.results.length - 1].isFinal) {
+    if (e.results[e.results.length - 1].isFinal && !voiceSent) {
+      voiceSent = true;
+      try { recognition.stop(); } catch (_) {}
       setTimeout(() => {
         if (input.value.trim()) {
           window.sendAiMessage();

@@ -1005,6 +1005,7 @@ async function nativeDashVoice(micBtn, input) {
   } catch (e) {
     dashListening = false;
     micBtn.classList.remove("listening");
+    input.placeholder = "Ask Sage anything, or say what you want to do…";
     showToast("Voice input could not start.", "error");
   }
 }
@@ -1038,12 +1039,17 @@ window.toggleDashVoice = function () {
     input.placeholder = "Listening…";
   };
 
+  // Send exactly once per listening session — some recognizers keep
+  // emitting "final" results (the iOS Simulator's does).
+  let voiceSent = false;
   dashRecognition.onresult = (e) => {
     let transcript = "";
     for (let i = 0; i < e.results.length; i++) transcript += e.results[i][0].transcript;
     input.value = transcript;
     autoGrowTextarea();
-    if (e.results[e.results.length - 1].isFinal) {
+    if (e.results[e.results.length - 1].isFinal && !voiceSent) {
+      voiceSent = true;
+      try { dashRecognition.stop(); } catch (_) {}
       setTimeout(() => {
         if (input.value.trim()) submitDashPrompt();
       }, 400);

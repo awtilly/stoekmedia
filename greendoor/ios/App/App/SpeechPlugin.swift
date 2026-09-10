@@ -26,6 +26,11 @@ public class SpeechPlugin: CAPPlugin {
     }
 
     @objc func start(_ call: CAPPluginCall) {
+#if targetEnvironment(simulator)
+        // AVAudioEngine's input node aborts with an AudioToolbox RPC timeout in
+        // the Simulator (uncatchable SIGABRT). Real devices are unaffected.
+        call.reject("Voice input isn't available in the Simulator."); return
+#else
         stopInternal()
         let session = AVAudioSession.sharedInstance()
         do {
@@ -55,6 +60,7 @@ public class SpeechPlugin: CAPPlugin {
             if error != nil { self?.finish() }
         }
         call.resolve()
+#endif
     }
 
     @objc func stop(_ call: CAPPluginCall) {

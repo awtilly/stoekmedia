@@ -760,7 +760,7 @@ textarea {
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
   .gd-modal-overlay {
-    padding-bottom: env(safe-area-inset-bottom, 0px);
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + var(--gd-kb, 0px));
   }
 }
 
@@ -2561,6 +2561,8 @@ textarea.gd-input {
   align-items: center;
   justify-content: center;
   padding: var(--space-md);
+  /* --gd-kb = on-screen keyboard height (set by js/auth.js) */
+  padding-bottom: calc(var(--space-md) + var(--gd-kb, 0px));
 }
 
 .gd-modal-overlay.active {
@@ -2575,7 +2577,7 @@ textarea.gd-input {
   width: 100%;
   max-width: 560px;
   max-height: 90vh;
-  max-height: 90dvh;
+  max-height: calc(100dvh - var(--gd-kb, 0px) - 2 * var(--space-md));
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;

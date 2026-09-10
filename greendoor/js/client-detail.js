@@ -388,7 +388,7 @@ function updateTabIndicator() {
 }
 
 function setTabCount(name, value) {
-  const el = document.querySelector(`.gd-tab-count[data-count="${name}"]`);
+  const el = document.querySelector(`.gd-tab-count[data-tab-count="${name}"]`);
   if (!el) return;
   if (value == null || value === "" || value === 0 || (typeof value === "number" && Number.isNaN(value))) {
     el.hidden = true;
