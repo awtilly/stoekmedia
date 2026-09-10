@@ -925,6 +925,8 @@ exports.docusealWebhook = onRequest(
    users/{uid}/notifications and this trigger fans it out to every device
    token on the user doc, pruning tokens FCM reports as dead. The doc also
    doubles as the in-app notification record (`read` flag, client-visible). */
+exports.sendReminders = require("./reminders").sendReminders;
+
 exports.sendPushOnNotification = onDocumentCreated(
   { region: "us-central1", document: "users/{uid}/notifications/{notificationId}" },
   async (event) => {
@@ -960,6 +962,248 @@ exports.sendPushOnNotification = onDocumentCreated(
     }
   }
 );
+
+/* ------------------------------------------------------------------ */
+/*  Sage tool definitions (restored; dropped by the BoldSign cleanup)   */
+/* ------------------------------------------------------------------ */
+const SAGE_DASHBOARD_TOOLS = [
+  {
+    name: "navigate",
+    description: "Open a page in the GreenDoor app. Use this when the realtor wants to view, see, open, find, look up, or go to something specific (a client, listing, the calendar, settings). DO NOT use this for actions like adding clients, sending docs, or scheduling — use the action-specific tool instead.",
+    input_schema: {
+      type: "object",
+      properties: {
+        target: {
+          type: "string",
+          enum: ["client", "client_list", "listing", "listing_list", "calendar", "settings", "dashboard"],
+          description: "Which page. 'client' = a specific client's detail page (requires clientId). 'client_list' = the all-clients page. 'listing' = a specific listing (requires listingId). 'listing_list' = the all-listings page."
+        },
+        clientId: {
+          type: "string",
+          description: "Required when target=client. Use the exact id from RECENT CLIENTS. If the named client isn't in the list, use target=client_list instead."
+        },
+        listingId: {
+          type: "string",
+          description: "Required when target=listing. Use the exact id from RECENT LISTINGS."
+        },
+        tab: {
+          type: "string",
+          enum: ["overview", "activity", "showings", "files", "properties", "checklist"],
+          description: "Optional sub-tab. Only valid when target=client. 'properties' is the saved matches; 'files' contains the compliance/signing sub-panel; 'checklist' is the closing checklist."
+        }
+      },
+      required: ["target"]
+    }
+  },
+  {
+    name: "create_client",
+    description: "Propose creating a new client. The realtor MUST confirm before the client is created. Use whenever the realtor says 'add a new client', 'create a client', 'add [name] as a buyer/seller', etc.",
+    input_schema: {
+      type: "object",
+      properties: {
+        fullName: { type: "string", description: "Client's full name. Required." },
+        email: { type: "string", description: "Email address if mentioned." },
+        phone: { type: "string", description: "Phone number if mentioned." },
+        status: {
+          type: "string",
+          enum: ["lead", "active_buyer", "active_seller", "under_contract", "closed", "inactive"],
+          description: "Pipeline status. Default 'lead' unless the user implied buyer/seller/under-contract."
+        },
+        transactionType: {
+          type: "string",
+          enum: ["SFH - Buyer", "SFH - Seller", "Condo - Buyer", "Condo - Seller", "Multi-Family - Buyer", "Multi-Family - Seller", "Land - Buyer", "Land - Seller"],
+          description: "Property type + side. Default to 'SFH - Buyer' for a buyer and 'SFH - Seller' for a seller unless they said condo, multi-family, or land."
+        },
+        notes: { type: "string", description: "Free-form notes from the user request." }
+      },
+      required: ["fullName"]
+    }
+  },
+  {
+    name: "create_followup",
+    description: "Propose a follow-up reminder. The realtor MUST confirm. Use when they say 'remind me', 'follow up with', 'check in on'.",
+    input_schema: {
+      type: "object",
+      properties: {
+        title: { type: "string", description: "Short title for the task, under 80 chars." },
+        days_from_now: { type: "integer", description: "Days from today the reminder is due (e.g. 'in 3 days' → 3, 'next week' → 7, 'tomorrow' → 1)." },
+        clientId: { type: "string", description: "Optional clientId from RECENT CLIENTS if the follow-up is about a specific client." },
+        notes: { type: "string", description: "Optional context for what to do." }
+      },
+      required: ["title", "days_from_now"]
+    }
+  },
+  {
+    name: "schedule_event",
+    description: "Propose scheduling a showing or calendar event. The realtor MUST confirm. Use when they say 'book a showing', 'schedule a meeting', 'put X on the calendar'.",
+    input_schema: {
+      type: "object",
+      properties: {
+        title: { type: "string", description: "Short title for the event, e.g. 'Showing — 123 Maple St' or 'Listing presentation'." },
+        date: { type: "string", description: "Date in YYYY-MM-DD. Resolve relative dates (tomorrow → today+1) using TODAY from the system prompt." },
+        time: { type: "string", description: "Time in 24h HH:MM format." },
+        address: { type: "string", description: "Property address if mentioned." },
+        clientId: { type: "string", description: "Optional clientId from RECENT CLIENTS if the event is about a specific client." },
+        notes: { type: "string", description: "Optional notes." }
+      },
+      required: ["title", "date", "time"]
+    }
+  },
+  {
+    name: "draft_email",
+    description: "Compose an email TO a specific client. The realtor MUST confirm before sending. Use when they say 'email X about Y', 'send Sarah a note saying Z'. Always reference a clientId from RECENT CLIENTS — never invent.",
+    input_schema: {
+      type: "object",
+      properties: {
+        clientId: { type: "string", description: "Required. Exact id from RECENT CLIENTS." },
+        subject: { type: "string", description: "Email subject line." },
+        body: { type: "string", description: "Email body. Address the client by their first name. Sign off with the realtor's first name." }
+      },
+      required: ["clientId", "subject", "body"]
+    }
+  },
+  {
+    name: "add_listing",
+    description: "Propose adding a new listing. The realtor MUST confirm. Use when they say 'add a listing', 'I have a new listing', 'parse this URL: ...'. ALWAYS include either source_url OR address (a listing with neither is meaningless). If they provide a URL, prefer source_url; we'll fetch the details on confirm.",
+    input_schema: {
+      type: "object",
+      properties: {
+        source_url: { type: "string", description: "Listing URL (Zillow, Realtor.com, etc.). When provided, other fields can be omitted — we'll parse on confirm." },
+        address: { type: "string", description: "Property address. Required if no source_url." },
+        price: { type: "integer", description: "List price in dollars." },
+        beds: { type: "integer" },
+        baths: { type: "number" },
+        sqft: { type: "integer" },
+        notes: { type: "string", description: "Any other detail mentioned." }
+      }
+      // Anthropic rejects anyOf/oneOf at the top level of input_schema; the
+      // "source_url OR address" requirement lives in the description instead.
+    }
+  },
+  {
+    name: "update_client",
+    description: "Propose updating or adding information on an existing client's profile. The realtor MUST confirm before the change is saved. Use whenever the realtor says 'update Sarah's email', 'set John's budget to 400-500k', 'Sarah wants 3+ beds', 'Sarah is pre-approved for $500k', 'change John's status to under contract', 'Sarah's looking in Brentwood and Glendale', etc. Only include the fields the realtor actually mentioned — leave the rest out. For list fields (preferredLocations / propertyTypes / mustHaveFeatures / dealBreakers) send the COMPLETE new list as the realtor described it; this replaces the existing list. ClientId MUST come from RECENT CLIENTS — never invent.",
+    input_schema: {
+      type: "object",
+      properties: {
+        clientId: { type: "string", description: "Required. Exact id from RECENT CLIENTS." },
+        fullName: { type: "string" },
+        email: { type: "string" },
+        phone: { type: "string" },
+        status: {
+          type: "string",
+          enum: ["lead", "active_buyer", "active_seller", "under_contract", "closed", "inactive"]
+        },
+        transactionType: {
+          type: "string",
+          enum: ["SFH - Buyer", "SFH - Seller", "Condo - Buyer", "Condo - Seller", "Multi-Family - Buyer", "Multi-Family - Seller", "Land - Buyer", "Land - Seller"]
+        },
+        source: { type: "string", description: "Lead source, e.g. Zillow, referral, open house." },
+        timeline: { type: "string", description: "Free-text timeline, e.g. '3 months', 'ASAP', 'spring 2027'." },
+        budgetMin: { type: "integer", description: "Lower bound of budget in dollars." },
+        budgetMax: { type: "integer", description: "Upper bound of budget in dollars." },
+        bedsMin: { type: "integer" },
+        bedsMax: { type: "integer" },
+        bathsMin: { type: "number" },
+        bathsMax: { type: "number" },
+        sqftMin: { type: "integer" },
+        sqftMax: { type: "integer" },
+        preferredLocations: {
+          type: "array",
+          items: { type: "string" },
+          description: "Full replacement list of preferred neighborhoods / cities."
+        },
+        propertyTypes: {
+          type: "array",
+          items: { type: "string" },
+          description: "Full replacement list, e.g. ['single_family', 'condo']."
+        },
+        mustHaveFeatures: {
+          type: "array",
+          items: { type: "string" },
+          description: "Full replacement list of must-haves."
+        },
+        dealBreakers: {
+          type: "array",
+          items: { type: "string" },
+          description: "Full replacement list of deal-breakers."
+        },
+        preApprovalStatus: {
+          type: "string",
+          description: "Free-text, e.g. 'approved', 'pending', 'denied', 'not yet started'."
+        },
+        preApprovalAmount: { type: "integer", description: "Pre-approval amount in dollars." },
+        notes: { type: "string", description: "Free-form notes — overwrites the existing notes field." },
+        closingDate: { type: "string", description: "Closing date in YYYY-MM-DD." }
+      },
+      required: ["clientId"]
+    }
+  }
+];
+const SAGE_CLIENT_DETAIL_TOOLS = [
+  {
+    name: "draft_email",
+    description: "Compose an email for the realtor to send to this client. Use when the user asks you to write, draft, or send an email.",
+    input_schema: {
+      type: "object",
+      properties: {
+        subject: { type: "string", description: "Email subject line" },
+        body: { type: "string", description: "Email body. Address the client by name. Include a signoff with the realtor's name placeholder as {{agent_name}} if unknown." }
+      },
+      required: ["subject", "body"]
+    }
+  },
+  {
+    name: "create_followup",
+    description: "Create a follow-up reminder task for this client. Use when the user asks to remember to check in, follow up, or set a reminder.",
+    input_schema: {
+      type: "object",
+      properties: {
+        title: { type: "string", description: "Short title for the follow-up task, under 80 chars" },
+        days_from_now: { type: "integer", description: "Number of days from today to set the due date" },
+        notes: { type: "string", description: "Optional context for what to do at follow-up time" }
+      },
+      required: ["title", "days_from_now"]
+    }
+  },
+  {
+    name: "schedule_showing",
+    description: "Schedule a property showing for this client. Use when the user asks to schedule, book, or arrange a showing.",
+    input_schema: {
+      type: "object",
+      properties: {
+        address: { type: "string", description: "Property address, if mentioned" },
+        date: { type: "string", description: "Date in YYYY-MM-DD format if mentioned" },
+        time: { type: "string", description: "Time in HH:MM 24h format if mentioned" },
+        notes: { type: "string", description: "Optional notes about the showing" }
+      }
+    }
+  },
+  {
+    name: "log_call",
+    description: "Log a phone call activity for this client. Use when the user asks to record, log, or note a call they had.",
+    input_schema: {
+      type: "object",
+      properties: {
+        summary: { type: "string", description: "Brief summary of what was discussed on the call" },
+        duration_minutes: { type: "integer", description: "Call duration in minutes if known" }
+      },
+      required: ["summary"]
+    }
+  },
+  {
+    name: "save_note",
+    description: "Save a note to this client's record. Use when the user asks to save a summary, save a note, or capture observations.",
+    input_schema: {
+      type: "object",
+      properties: {
+        title: { type: "string", description: "Short title for the note" },
+        body: { type: "string", description: "Full note body" }
+      },
+      required: ["title", "body"]
+    }
+  }
+];
 
 exports.askAssistant = onCall({ region: "us-central1", secrets: [ANTHROPIC_API_KEY, VOYAGE_API_KEY] }, async (request) => {
   if (!request.auth) {
@@ -1046,14 +1290,13 @@ NAVIGATION (use \`navigate\`):
 - "Show me [name]" / "Open [name]" / "Pull up [name]" → target=client with their clientId. If name doesn't match anyone in RECENT CLIENTS, target=client_list.
 - "Show me [address]" → target=listing with matching listingId, else target=listing_list.
 - "My calendar" / "Today's showings" → target=calendar.
-- "My templates" / "Forms" → target=templates.
 - "Settings" → target=settings.
 
 ACTIONS (use the specific tool, do NOT navigate):
-- "Add [name] as [a buyer / a seller / a new client]" → \`create_client\` with fullName + status + transactionType + any email/phone they mentioned.
+- "Add [name] as [a buyer / a seller / a new client]" → \`create_client\` with fullName + status + transactionType (e.g. "SFH - Buyer") + any email/phone they mentioned.
+- "Log a call with [name]" / "I just talked to [name]" / "Note on [name]: X" → these are logged from the client's Activity tab; reply with one sentence saying so and emit \`navigate\` (target=client, tab=activity) for that client.
 - "Remind me to follow up with [name] in [N days/next week]" → \`create_followup\` with title, days_from_now, clientId.
 - "Book a showing for [client] at [address] tomorrow at 2pm" → \`schedule_event\` with title, date (resolve "tomorrow" using TODAY above), time (HH:MM), clientId, address.
-- "Send [doc name] to [client]" → \`send_compliance_doc\` with clientId + templateId. Match the doc name to a template in YOUR TEMPLATES. If no clear match, ask which template.
 - "Email [client] [the message]" / "Draft an email to [client] saying [X]" → \`draft_email\` with clientId, subject, body. Write a complete, polite email. Address by first name.
 - "Add a listing [URL]" or "Parse this URL" → \`add_listing\` with source_url. If they gave specs instead, fill address/price/beds/baths/sqft.
 - "Update [client]'s [field]" / "Set [client]'s [field] to X" / "[Client] is pre-approved for $X" / "[Client] wants 3+ beds" / "Change [client]'s status to Y" / "[Client]'s phone is X" → \`update_client\` with clientId and ONLY the fields the realtor mentioned. For list fields, send the complete new list. Match by name to RECENT CLIENTS; if no match, ask which client.

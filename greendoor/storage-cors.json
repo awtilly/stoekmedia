@@ -1,0 +1,13 @@
+[
+  {
+    "origin": [
+      "https://stoekmedia.com",
+      "capacitor://localhost",
+      "http://localhost",
+      "https://localhost"
+    ],
+    "method": ["GET"],
+    "responseHeader": ["Content-Type"],
+    "maxAgeSeconds": 3600
+  }
+]

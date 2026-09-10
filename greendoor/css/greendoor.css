@@ -573,6 +573,10 @@ body.gd-light .gd-tab.active .gd-tab-ico { opacity: 1; }
   line-height: 1;
 }
 
+.gd-tab-count[hidden] {
+  display: none;
+}
+
 body.gd-light .gd-tab.active .gd-tab-count {
   color: #15803d;
   background: #dcfce7;
@@ -5120,6 +5124,10 @@ body.gd-light .gd-breadcrumb-current {
   font-size: 0.85rem;
 }
 
+.gd-file-action-bar:not(.active) {
+  display: none;
+}
+
 .gd-file-action-bar.active {
   bottom: 24px;
 }
@@ -9407,3 +9415,50 @@ html.gd-native .gd-topbar {
   z-index: 1901;
 }
 #gd-menu-chip:active { transform: scale(0.94); }
+
+/* Beta scope: features hidden for the first realtor beta. Remove the class to re-enable. */
+.gd-beta-hidden { display: none !important; }
+
+/* Phone bridge — Call / Text / Email row on the client header */
+.gd-contact-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  margin: var(--space-sm) 0 var(--space-md);
+}
+.gd-contact-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  text-decoration: none;
+}
+.gd-contact-btn.gd-contact-off {
+  opacity: 0.4;
+  pointer-events: none;
+}
+.gd-contact-log-sub {
+  margin: 0 0 var(--space-md);
+  color: var(--color-text-muted, #64748b);
+  font-size: 0.95rem;
+}
+@media (max-width: 768px) {
+  .gd-contact-row .gd-contact-btn {
+    flex: 1 1 0;
+    justify-content: center;
+    min-height: 44px;
+  }
+}
+
+/* Install banner must not cover the floating tab bar or the Sage panel
+   (web only; suppressed in the native shell). */
+.gd-install-banner {
+  z-index: 1900;
+}
+@media (max-width: 768px) {
+  .gd-install-banner {
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 82px);
+    left: 12px;
+    right: 12px;
+    border-radius: 14px;
+  }
+}

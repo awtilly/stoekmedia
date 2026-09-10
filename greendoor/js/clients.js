@@ -138,7 +138,8 @@ window.saveClient = async function () {
     preApprovalStatus: "",
     preApprovalAmount: null,
     lastActivityDate: serverTimestamp(),
-    createdAt: serverTimestamp()
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
   };
 
   try {

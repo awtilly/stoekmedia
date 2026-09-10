@@ -85,6 +85,7 @@ async function loadClient(uid) {
     const badge = document.getElementById("client-badge");
     badge.textContent = statusLabel(clientData.status);
     badge.className = `gd-badge gd-badge-${clientData.status || "lead"}`;
+    renderContactRow();
 
     const [actCount, fileCount] = await Promise.all([
       getCountFromServer(query(collection(db, "activities"), where("clientId", "==", clientId), where("realtorId", "==", uid))),
@@ -292,12 +293,13 @@ window.saveOverview = async function () {
   };
 
   try {
-    await updateDoc(doc(db, "clients", clientId), data);
+    await updateDoc(doc(db, "clients", clientId), { ...data, updatedAt: serverTimestamp() });
     clientData = { ...clientData, ...data };
     document.getElementById("client-name").textContent = data.fullName;
     const badge = document.getElementById("client-badge");
     badge.textContent = statusLabel(data.status);
     badge.className = `gd-badge gd-badge-${data.status}`;
+    renderContactRow();
     showToast("Client updated!");
   } catch (e) {
     console.error("Save error:", e);
@@ -387,7 +389,7 @@ function updateTabIndicator() {
 function setTabCount(name, value) {
   const el = document.querySelector(`.gd-tab-count[data-count="${name}"]`);
   if (!el) return;
-  if (value == null || value === "" || value === 0) {
+  if (value == null || value === "" || value === 0 || (typeof value === "number" && Number.isNaN(value))) {
     el.hidden = true;
     el.textContent = "";
   } else {
@@ -2850,14 +2852,22 @@ window.saveAndMatchListing = async function () {
  */
 async function loadComplianceTemplates(uid) {
   try {
-    const templatesSnap = await getDocs(
-      query(collection(db, "documentTemplates"), orderBy("sortOrder"))
-    );
+    // Two scoped queries: the rules only let non-admins read seeded forms and
+    // their own private templates, and Firestore rejects an unfiltered
+    // collection read it can't prove is allowed. Sorted client-side.
+    const [seededSnap, mineSnap] = await Promise.all([
+      getDocs(query(collection(db, "documentTemplates"), where("visibility", "==", "seeded"))),
+      getDocs(query(collection(db, "documentTemplates"), where("ownerId", "==", uid)))
+    ]);
 
+    const seen = new Set();
     const allTemplates = [];
-    templatesSnap.forEach(d => {
+    [...seededSnap.docs, ...mineSnap.docs].forEach(d => {
+      if (seen.has(d.id)) return;
+      seen.add(d.id);
       allTemplates.push({ id: d.id, ...d.data() });
     });
+    allTemplates.sort((a, b) => (a.sortOrder ?? 9999) - (b.sortOrder ?? 9999));
 
     // Realtor's own uploaded templates ("My Templates") — always shown,
     // not filtered by transaction type. They live in the same collection
@@ -2895,6 +2905,10 @@ async function loadComplianceTemplates(uid) {
  * headers. Each row shows: checkbox, name, category badge, required asterisk,
  * status badge, and Send button.
  */
+/* Beta: compliance forms are a tracking list only. E-sign sending (DocuSeal)
+   is turned off until the realtor's actual forms are mapped as templates. */
+const COMPLIANCE_ESIGN_ENABLED = false;
+
 function renderComplianceList() {
   const listEl = document.getElementById("compliance-list");
   const bannerEl = document.getElementById("compliance-no-txn-banner");
@@ -2908,7 +2922,7 @@ function renderComplianceList() {
     toolbarEl.classList.add("gd-hidden");
   } else {
     bannerEl.classList.add("gd-hidden");
-    toolbarEl.classList.remove("gd-hidden");
+    if (COMPLIANCE_ESIGN_ENABLED) toolbarEl.classList.remove("gd-hidden");
   }
 
   if (complianceTemplates.length === 0) {
@@ -2935,7 +2949,7 @@ function renderComplianceList() {
       const isSent = status !== COMPLIANCE_STATUSES.NOT_SENT;
       // Uploaded templates don't depend on transaction type — always sendable.
       const rowDisabled = noTxnType && !cat.ignoresTxnType;
-      const showSendButton = !rowDisabled && !isSent;
+      const showSendButton = COMPLIANCE_ESIGN_ENABLED && !rowDisabled && !isSent;
 
       html += `<div class="gd-compliance-row ${rowDisabled ? 'gd-disabled' : ''}">
         <input type="checkbox" class="gd-compliance-check" data-template-id="${escapeHtml(template.id)}"
@@ -3410,3 +3424,132 @@ window.cancelEnrollment = async function (enrollmentId) {
   }
 };
 
+/* ------------------------------------------------------------------ */
+/*  Phone bridge                                                        */
+/*                                                                      */
+/*  Realtors call and text from their own number and email from their   */
+/*  brokerage account. GreenDoor doesn't try to be that channel; it     */
+/*  opens the native app via tel:/sms:/mailto: and, when the realtor    */
+/*  comes back, offers a one-tap activity log so "days since contact"   */
+/*  and the Activity timeline stay true.                                */
+/* ------------------------------------------------------------------ */
+const CONTACT_LOG_KEY = "gd-pending-contact";
+const CONTACT_LOG_MAX_AGE_MS = 3 * 60 * 60 * 1000; // prompt if they return within 3h
+let contactLogPending = null;
+
+function renderContactRow() {
+  const phone = (clientData?.phone || "").replace(/[^\d+]/g, "");
+  const email = (clientData?.email || "").trim();
+  const set = (id, ok, title) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.classList.toggle("gd-contact-off", !ok);
+    el.setAttribute("aria-disabled", ok ? "false" : "true");
+    el.title = ok ? title : "Not on file";
+  };
+  set("contact-call", !!phone, phone);
+  set("contact-text", !!phone, phone);
+  set("contact-email", !!email, email);
+}
+
+window.contactClient = function (kind) {
+  if (!clientData) return false;
+  const phone = (clientData.phone || "").replace(/[^\d+]/g, "");
+  const email = (clientData.email || "").trim();
+  let href = null;
+  if (kind === "call" && phone) href = `tel:${phone}`;
+  else if (kind === "text" && phone) href = `sms:${phone}`;
+  else if (kind === "email" && email) {
+    const first = (clientData.fullName || "").split(/\s+/)[0] || "";
+    href = `mailto:${email}?subject=${encodeURIComponent(first ? `Following up, ${first}` : "Following up")}`;
+  }
+  if (!href) {
+    showToast(kind === "email" ? "No email on file for this client." : "No phone number on file for this client.", "error");
+    return false;
+  }
+  const pending = { kind, clientId, at: Date.now() };
+  try { sessionStorage.setItem(CONTACT_LOG_KEY, JSON.stringify(pending)); } catch (_) {}
+  contactLogPending = pending;
+  window.location.href = href;
+  // Desktop browsers may not leave the page at all (no dialer / mail handler),
+  // so fall back to prompting after a beat. Mobile returns via visibilitychange.
+  setTimeout(() => { if (document.visibilityState === "visible") maybePromptContactLog(); }, 2500);
+  return false;
+};
+
+function readPendingContact() {
+  if (contactLogPending) return contactLogPending;
+  try {
+    const raw = sessionStorage.getItem(CONTACT_LOG_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch (_) { return null; }
+}
+
+function clearPendingContact() {
+  contactLogPending = null;
+  try { sessionStorage.removeItem(CONTACT_LOG_KEY); } catch (_) {}
+}
+
+function maybePromptContactLog() {
+  const p = readPendingContact();
+  if (!p || p.clientId !== clientId) return;
+  if (Date.now() - p.at > CONTACT_LOG_MAX_AGE_MS) { clearPendingContact(); return; }
+  clearPendingContact();
+  const name = clientData?.fullName || "this client";
+  const first = name.split(/\s+/)[0];
+  const verb = p.kind === "call" ? "call" : p.kind === "text" ? "text" : "email";
+  document.getElementById("contact-log-title").textContent = `Log this ${verb}?`;
+  document.getElementById("contact-log-sub").textContent =
+    p.kind === "call" ? `Add a call with ${first} to the timeline.` :
+    p.kind === "text" ? `Add a text to ${first} to the timeline.` :
+    `Add an email to ${first} to the timeline.`;
+  document.getElementById("contact-log-note").value = "";
+  document.getElementById("contact-log-modal").dataset.kind = p.kind;
+  document.getElementById("contact-log-modal").classList.add("active");
+}
+
+window.closeContactLog = function () {
+  document.getElementById("contact-log-modal").classList.remove("active");
+};
+
+window.saveContactLog = async function () {
+  const user = auth.currentUser;
+  if (!user || !clientData) return;
+  const modal = document.getElementById("contact-log-modal");
+  const kind = modal.dataset.kind || "call";
+  const note = document.getElementById("contact-log-note").value.trim();
+  const first = (clientData.fullName || "Client").split(/\s+/)[0];
+  const type = kind === "call" ? "call" : kind === "text" ? "sms" : "email";
+  const subject = kind === "call" ? `Called ${first}` : kind === "text" ? `Texted ${first}` : `Emailed ${first}`;
+  const btn = document.getElementById("contact-log-save");
+  btn.disabled = true;
+  try {
+    await addDoc(collection(db, "activities"), {
+      clientId,
+      realtorId: user.uid,
+      type,
+      subject,
+      body: note,
+      source: "phone_bridge",
+      timestamp: serverTimestamp()
+    });
+    await updateDoc(doc(db, "clients", clientId), { lastActivityDate: serverTimestamp(), updatedAt: serverTimestamp() });
+    closeContactLog();
+    showToast("Logged.");
+    await loadActivities(user.uid);
+    const c = await getCountFromServer(query(collection(db, "activities"), where("clientId", "==", clientId), where("realtorId", "==", user.uid)));
+    document.getElementById("qs-activities").textContent = c.data().count;
+    document.getElementById("qs-days").textContent = "0";
+    if (typeof updateTabCounts === "function") updateTabCounts();
+  } catch (e) {
+    console.error("contact log error:", e);
+    showToast("Couldn't save that. Try again.", "error");
+  } finally {
+    btn.disabled = false;
+  }
+};
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") setTimeout(maybePromptContactLog, 400);
+});
+window.addEventListener("pageshow", () => setTimeout(maybePromptContactLog, 800));

@@ -31,6 +31,7 @@ service cloud.firestore {
           || request.resource.data.source == resource.data.source;
     }
 
+
     match /users/{userId} {
       allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
 
@@ -39,7 +40,9 @@ service cloud.firestore {
                     && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
                          'fullName', 'phone', 'company', 'emailSignature',
                          'showTour', 'onboardingComplete', 'onboardingCompletedAt',
-                         'termsAcceptedAt', 'lastLogin', 'fcmTokens'
+                         'termsAcceptedAt', 'lastLogin', 'fcmTokens',
+                         'showingTimeFeedUrl', 'showingTimeLastSyncedAt', 'showingTimeSyncCount',
+                         'showingTimeSyncError', 'timezone'
                        ]);
 
       // Admins can do anything
@@ -140,7 +143,10 @@ service cloud.firestore {
     }
 
     match /folders/{folderId} {
-      allow read: if isAuthenticated() && (isOwner(resource.data.realtorId) || isAdmin());
+      // Folders use deterministic ids and the client does getDoc-then-setDoc;
+      // a get on a not-yet-existing doc must not throw on resource.data.
+      allow get: if isAuthenticated() && (resource == null || isOwner(resource.data.realtorId) || isAdmin());
+      allow list: if isAuthenticated() && (isOwner(resource.data.realtorId) || isAdmin());
       allow create: if isAuthenticated() && incomingRealtorIdMatchesAuth();
       allow update: if isAuthenticated() && (isOwner(resource.data.realtorId) || isAdmin()) && realtorIdUnchanged();
       allow delete: if isAuthenticated() && (isOwner(resource.data.realtorId) || isAdmin());

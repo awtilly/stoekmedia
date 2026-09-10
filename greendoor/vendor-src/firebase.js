@@ -7,7 +7,7 @@ export {
   sendPasswordResetEmail, confirmPasswordReset, verifyPasswordResetCode
 } from 'firebase/auth';
 export {
-  getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
+  getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager, persistentSingleTabManager, memoryLocalCache,
   collection, doc, getDoc, getDocs, addDoc, setDoc, updateDoc, deleteDoc,
   query, where, orderBy, limit, startAfter, onSnapshot,
   getCountFromServer, writeBatch, serverTimestamp, Timestamp
@@ -17,3 +17,4 @@ export {
   getDownloadURL, deleteObject, listAll
 } from 'firebase/storage';
 export { getFunctions, httpsCallable } from 'firebase/functions';
+export { setLogLevel } from 'firebase/firestore';

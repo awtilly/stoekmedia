@@ -406,7 +406,18 @@ function normalize(v){
   if(!['stack','overlay','split'].includes(s.layout)) s.layout=DEFAULTS.layout;
   return s;
 }
-let S = (()=>{ try{ return normalize(JSON.parse(localStorage.getItem('ae-studio'))); }catch(e){ return clone(DEFAULTS); } })();
+/* One-time migration: storage keys used to carry a previous realtor's initials
+   (ae-). Copy anything saved under the old keys to the gd- keys when the new
+   ones are still empty, so existing designs survive the rename. */
+(function(){
+  try{
+    [['ae-studio','gd-studio'],['ae-projects','gd-projects'],['ae-current','gd-current']].forEach(([o,n])=>{
+      const v=localStorage.getItem(o);
+      if(v!==null && localStorage.getItem(n)===null) localStorage.setItem(n,v);
+    });
+  }catch(e){}
+})();
+let S = (()=>{ try{ return normalize(JSON.parse(localStorage.getItem('gd-studio'))); }catch(e){ return clone(DEFAULTS); } })();
 /* ---------- GreenDoor handoff ----------
    The CRM stashes the signed-in agent's details and, when "Create marketing
    in Studio" is pressed, the listing itself. Deferred to a task so every
@@ -430,7 +441,7 @@ setTimeout(function(){
       const gd = JSON.parse(raw);
       Object.assign(S, fromGreenDoorListing(gd));
       S.photos=[null,null,null,null]; S.focal=clone(DEFAULTS.focal);
-      try{ localStorage.removeItem('ae-current'); }catch(e){}
+      try{ localStorage.removeItem('gd-current'); }catch(e){}
       applied=true;
       save();
       if((gd.photos||[]).length) setTimeout(async()=>{
@@ -999,10 +1010,10 @@ function notice(msg){
   clearTimeout(notice._t); notice._t=setTimeout(()=>{ n.style.display='none'; }, 9000);
 }
 function save(){
-  try{ localStorage.setItem('ae-studio', JSON.stringify(S)); return true; }
+  try{ localStorage.setItem('gd-studio', JSON.stringify(S)); return true; }
   catch(e){
     try{
-      localStorage.setItem('ae-studio', JSON.stringify(Object.assign({},S,{photos:[null,null,null,null]})));
+      localStorage.setItem('gd-studio', JSON.stringify(Object.assign({},S,{photos:[null,null,null,null]})));
       if(!_warned){ _warned=true;
         notice('These photos are too big for the browser to remember. Your design is saved; the photos are not. Use Backup to keep everything.'); }
     }catch(e2){
@@ -1214,16 +1225,28 @@ function fit(){
 }
 
 /* ---------- export ----------
-   Two delivery paths. Opened from a file on her computer, a normal download
-   link works. Opened from a shared link, the page has to ask the viewer to
-   save, so we use the downloads capability when it is there. */
+   Two delivery paths. In the iOS app a download link does nothing inside the
+   web view, so the file is written to the app's cache folder and handed to the
+   system share sheet (Save Image / Files / Messages / anywhere). On the web a
+   normal download link works. Plugins are reached the same way js/push.js
+   does: window.Capacitor.Plugins.<Name>, no bundler. */
 const sleep = ms => new Promise(r=>setTimeout(r,ms));
-let _dl;
-async function downloader(){
-  if(_dl!==undefined) return _dl;
-  try{ _dl = (typeof claude!=='undefined' && claude && claude.use) ? await claude.use('downloads') : null; }
-  catch(e){ _dl=null; }
-  return _dl;
+const isNative = () => !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+const nativePlugin = name => (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins[name]) || null;
+/* Native: write the data URL's payload to Directory.Cache ('CACHE') and share
+   the resulting file URI. Resolves 'saved', 'declined' (sheet dismissed), or
+   null when the plugins are not present so the caller can fall back. */
+async function shareNative(filename, dataUrl, title){
+  const fs=nativePlugin('Filesystem'), sh=nativePlugin('Share');
+  if(!fs || !sh) return null;
+  const data=String(dataUrl).split(',')[1]||'';
+  const {uri}=await fs.writeFile({path:'studio/'+filename, data, directory:'CACHE', recursive:true});
+  try{ await sh.share({title:title||'GreenDoor Studio', files:[uri]}); return 'saved'; }
+  catch(err){
+    const m=String((err && err.message)||'').toLowerCase();
+    if(m.includes('cancel') || m.includes('abort')) return 'declined';
+    throw err;
+  }
 }
 function dataUrlToBlob(u){
   const [head,b64]=u.split(',');
@@ -1233,25 +1256,16 @@ function dataUrlToBlob(u){
   return new Blob([arr],{type:mime});
 }
 async function deliver(filename, dataUrl){
-  const d=await downloader();
-  if(d){
-    for(let attempt=0; attempt<2; attempt++){
-      try{ await d.save({filename, data:dataUrlToBlob(dataUrl)}); return 'saved'; }
-      catch(err){
-        const c=err && err.code;
-        if(c==='declined') return 'declined';
-        if(c==='rate_limited'){ await sleep(1600); continue; }
-        if(c==='too_large'){ alert('That image is too large to save. Try turning the text size down, or use a smaller size.'); return 'failed'; }
-        break;
-      }
-    }
+  if(isNative()){
+    const r=await shareNative(filename, dataUrl);
+    if(r) return r;
   }
   const a=document.createElement('a'); a.download=filename; a.href=dataUrl; a.click();
   return 'saved';
 }
 function fileName(size){
   const base=(cur==='listing'||cur==='openhouse') ? (S.addr||'listing') : T_REG[cur].label;
-  return `ae-${String(base).toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')}-${size}.png`;
+  return `gd-${String(base).toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')}-${size}.png`;
 }
 async function exportPng(size){
   const prev=curSize;
@@ -1281,14 +1295,18 @@ $('#dlall').onclick = async e=>{
   }catch(err){ alert('Export failed: '+err.message); }
   b.disabled=false; b.textContent=t;
 };
-$('#pr').onclick = async ()=>{
-  if(await downloader()){
-    alert('Printing works best from the copy saved on your computer.\n\n'
-        + 'From here, use Download PNG instead — on Flyer and Postcard it saves at print resolution, '
-        + 'and any print shop can work from that.');
+$('#pr').onclick = async e=>{
+  if(!SZ[curSize].pdf) alert('Tip: Flyer and Postcard are the print sizes. This will still print, but pick one of those for a proper page.');
+  if(isNative()){
+    /* No print dialog inside the app: hand over the print-resolution PNG instead. */
+    const b=e.target, t=b.textContent; b.disabled=true; b.textContent='Rendering…';
+    try{
+      const r=await exportPng(curSize);
+      if(r==='saved') notice('Saved at print resolution — send it to Files, AirPrint, or a print shop from the share sheet.');
+    }catch(err){ alert('Export failed: '+err.message); }
+    b.disabled=false; b.textContent=t;
     return;
   }
-  if(!SZ[curSize].pdf) alert('Tip: Flyer and Postcard are the print sizes. This will still print, but pick one of those for a proper page.');
   window.print();
 };
 
@@ -1331,7 +1349,7 @@ async function openGdPicker(){
     Object.assign(S, fromGreenDoorListing(l));
     S.photos=await pullListingPhotos(l.photos);
     S.focal=clone(DEFAULTS.focal);
-    try{ localStorage.removeItem('ae-current'); }catch(e2){}
+    try{ localStorage.removeItem('gd-current'); }catch(e2){}
     save(); buildPanel(); draw();
     const got=S.photos.filter(Boolean).length;
     notice(`Imported ${(l.address||{}).street||'listing'}${got?` with ${got} photo${got===1?'':'s'}`:''}. Check it before you post.`);
@@ -1350,7 +1368,7 @@ async function openGdPicker(){
    prompt-based Save; it is migrated on first read and left readable by
    older copies of the file through the same shape in Backup.
    ============================================================ */
-const PKEY='ae-projects';
+const PKEY='gd-projects';
 const uid = () => 'p_' + Date.now().toString(36) + Math.random().toString(36).slice(2,7);
 
 function readStore(){
@@ -1378,7 +1396,7 @@ function writeStore(store){
   catch(e){ notice('Browser storage is full — that project was not saved. Use Backup, then delete a project you no longer need.'); return false; }
 }
 const projects = () => readStore().items;
-const CKEY='ae-current';
+const CKEY='gd-current';
 /* Which record the editor is on. Persisted, or a reload would make the next
    Save a second copy of the same house instead of an update. */
 let curProject = (()=>{ try{ const id=localStorage.getItem(CKEY);
@@ -1639,12 +1657,11 @@ $('#dgrid').onkeydown = e=>{
   if(card){ e.preventDefault(); openProject(card.dataset.id); }
 };
 addEventListener('keydown', e=>{ if(e.key==='Escape' && !$('#dash').hidden) showDash(false); });
-$('#exp').onclick = ()=>{
-  const blob=new Blob([JSON.stringify({studio:2, state:S, projects:readStore()},null,2)],{type:'application/json'});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a'); a.href=url;
-  a.download='greendoor-studio-backup.json'; a.click();
-  setTimeout(()=>URL.revokeObjectURL(url), 4000);
+$('#exp').onclick = async ()=>{
+  const json=JSON.stringify({studio:2, state:S, projects:readStore()},null,2);
+  const b64=btoa(unescape(encodeURIComponent(json)));
+  try{ await deliver('greendoor-studio-backup.json', 'data:application/json;base64,'+b64); }
+  catch(err){ alert('Backup failed: '+err.message); }
 };
 $('#imp').onclick = ()=>{
   const inp=document.createElement('input'); inp.type='file'; inp.accept='application/json,.json';
@@ -1696,12 +1713,17 @@ $('#share').onclick = async e => {
     const sz=SZ[curSize];
     const url=await htmlToImage.toPng($('#art'), {pixelRatio:sz.pr||1, width:sz.w, height:sz.h,
       style:{transform:'none'}, cacheBust:true});
-    const file=new File([dataUrlToBlob(url)], fileName(curSize), {type:'image/png'});
-    if(navigator.canShare && navigator.canShare({files:[file]})){
-      await navigator.share({files:[file], title:'GreenDoor Studio'});
+    const name=fileName(curSize);
+    if(isNative() && await shareNative(name, url, 'GreenDoor Studio')){
+      /* handled by the native share sheet */
     } else {
-      await deliver(fileName(curSize), url);
-      notice('Sharing is not available here — the image was downloaded instead.');
+      const file=new File([dataUrlToBlob(url)], name, {type:'image/png'});
+      if(navigator.canShare && navigator.canShare({files:[file]})){
+        await navigator.share({files:[file], title:'GreenDoor Studio'});
+      } else {
+        await deliver(name, url);
+        notice('Sharing is not available here — the image was downloaded instead.');
+      }
     }
   }catch(err){ if(err && err.name!=='AbortError') alert('Share failed: '+err.message); }
   b.disabled=false; b.textContent=t;

@@ -1,6 +1,6 @@
 import { initializeApp } from "./vendor/firebase.js";
 import { getAuth, initializeAuth, indexedDBLocalPersistence } from "./vendor/firebase.js";
-import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "./vendor/firebase.js";
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, memoryLocalCache } from "./vendor/firebase.js";
 import { getStorage } from "./vendor/firebase.js";
 import { getFunctions, httpsCallable } from "./vendor/firebase.js";
 
@@ -27,11 +27,21 @@ export const auth = IS_NATIVE
   : getAuth(app);
 /* Offline cache: client lists, listings and the calendar render instantly from
    IndexedDB and sync when the connection returns. Multi-tab safe. */
+/* WebKit's streaming transport breaks Firestore's WebChannel — listeners
+   silently die and retry forever. That's every WKWebView (native shell) AND
+   Safari itself; the SDK's auto-detection doesn't catch it, so long polling
+   is forced on the whole engine family. Chrome/Firefox keep the default. */
+const IS_WEBKIT = IS_NATIVE || /^((?!chrome|android|crios|fxios).)*safari/i.test(navigator.userAgent);
+/* NO IndexedDB persistence in the native shell: WKWebView's indexedDB.open()
+   can hang forever (seen on iOS 18.7 — SDK stalls at "SimpleDb Opening
+   database" and every query spins behind it, diag'd 2026-09-07). The app only
+   does one-shot reads, so a memory cache costs little; browsers keep the
+   persistent multi-tab cache. */
 export const db = initializeFirestore(app, {
-  localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
-  /* WKWebView's streaming transport breaks Firestore's WebChannel — listeners
-     silently die and retry forever. Long polling is the reliable path there. */
-  ...(IS_NATIVE ? { experimentalForceLongPolling: true } : {})
+  localCache: IS_NATIVE
+    ? memoryLocalCache()
+    : persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+  ...(IS_WEBKIT ? { experimentalForceLongPolling: true } : {})
 });
 export const storage = getStorage(app);
 export const functions = getFunctions(app, "us-central1");

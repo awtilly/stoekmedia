@@ -60,11 +60,12 @@ async function loadContextSnapshots(uid) {
 
   try {
     const [cSnap, lSnap, tSnap, sSnap] = await Promise.all([
+      // No orderBy: manually-added clients never had updatedAt, and Firestore
+      // drops docs missing the orderBy field. Sort client-side instead.
       getDocs(query(
         collection(db, "clients"),
         where("realtorId", "==", uid),
-        orderBy("updatedAt", "desc"),
-        limit(20)
+        limit(200)
       )),
       getDocs(query(
         collection(db, "listings"),
@@ -87,7 +88,8 @@ async function loadContextSnapshots(uid) {
 
     recentClients = cSnap.docs.map(d => {
       const x = d.data();
-      const lastContact = safeToDate(x.lastContactAt) || safeToDate(x.updatedAt);
+      // lastActivityDate is what note/call/email/showing logging stamps.
+      const lastContact = safeToDate(x.lastActivityDate) || safeToDate(x.lastContactAt) || safeToDate(x.updatedAt) || safeToDate(x.createdAt);
       const lastContactDays = lastContact
         ? Math.floor((now - lastContact.getTime()) / 86400000)
         : null;
@@ -97,9 +99,10 @@ async function loadContextSnapshots(uid) {
         status: x.status || null,
         email: x.email || null,
         phone: x.phone || null,
-        lastContactDays
+        lastContactDays,
+        _sort: lastContact ? lastContact.getTime() : 0
       };
-    });
+    }).sort((a, b) => b._sort - a._sort).slice(0, 20);
 
     recentListings = lSnap.docs.map(d => {
       const x = d.data();
@@ -175,7 +178,7 @@ function maybeShowBriefing() {
 const STATIC_CHIPS = [
   "Open my clients",
   "Show my listings",
-  "Open Templates"
+  "What's on my calendar today?"
 ];
 
 function buildChips() {
@@ -380,8 +383,10 @@ const STATUS_LABELS = {
   under_contract: "Under Contract", closed: "Closed", inactive: "Inactive"
 };
 
+// Sage now emits the same vocabulary as the Overview select ("SFH - Buyer"), so
+// labels pass through; legacy values from older Sage sessions still map.
 const TRANSACTION_TYPE_LABELS = {
-  buyer: "Buyer", seller: "Seller", buyer_and_seller: "Buyer & Seller"
+  buyer: "SFH - Buyer", seller: "SFH - Seller", buyer_and_seller: "Buyer & Seller"
 };
 
 // Pretty-print client field updates for the confirm-card preview.

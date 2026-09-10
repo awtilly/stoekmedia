@@ -21,6 +21,15 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
        Functions sender expects. */
     func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
         Messaging.messaging().apnsToken = deviceToken
+        /* FCM's didReceiveRegistrationToken usually fires at launch, before the
+           WebView exists — the plugin drops events with no JS listener. APNs
+           registration only completes after JS calls register(), so re-posting
+           the token here guarantees a listener is attached to receive it. */
+        Messaging.messaging().token { token, _ in
+            if let token = token {
+                NotificationCenter.default.post(name: .capacitorDidRegisterForRemoteNotifications, object: token)
+            }
+        }
     }
 
     func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {

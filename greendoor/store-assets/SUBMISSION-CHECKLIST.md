@@ -99,6 +99,8 @@ Firebase Analytics is disabled in this app, no ads, no tracking SDKs — so
   client signs a document.
   ```
 - ⚠️ Do NOT delete the uitest account — it is the App Review demo login.
+- The uitest account is a plain **realtor** (demoted from admin 2026-09-10) so
+  reviewers and testers never see the Admin panel or other users' data.
 
 ## Step 6 — Archive and upload the build (Xcode)
 
@@ -116,7 +118,9 @@ First archive may prompt for the Apple ID login in Xcode → Settings → Accoun
 ## Step 7 — TestFlight (Alison = tester #1)
 
 1. TestFlight tab → the processed build → complete "Test Information"
-   (what to test: "Log in, browse clients/listings, try Sage, sign a document")
+   (what to test: "Log in, add a client, tap Call/Text/Email on a client and
+   log it, ask Sage to set a follow-up, add a listing, make a flyer in Studio
+   and share it, subscribe to the calendar feed in Settings → Integrations")
 2. Internal testing is only for your own ASC users; for Alison use
    **External Testing** → create group "Beta" → add her email → add the build
    - External TestFlight needs a quick Beta App Review (usually < 1 day)
@@ -135,3 +139,19 @@ First archive may prompt for the Apple ID login in Xcode → Settings → Accoun
 ---
 
 *Generated 2026-09-01 · branch `app-store-capacitor`*
+
+---
+
+## Beta scope (round one, 2026-09-10)
+
+Hidden via the `gd-beta-hidden` CSS class (remove the class to re-enable):
+Templates page, Settings → E-Signatures / Email / Sequences, Start Sequence
+button, listing detail Activity / Market tabs, the e-signature FAQ entry.
+Compliance forms render as a tracking list only (`COMPLIANCE_ESIGN_ENABLED`
+in `js/client-detail.js`). Sage's `send_compliance_doc` tool and the
+Templates navigation target are removed from `functions/index.js`.
+
+New in this round: Call / Text / Email buttons on the client header with a
+one-tap "log this?" prompt on return; push reminders for follow-ups due today
+(8am local) and showings one hour out (`functions/reminders.js`, every 15 min);
+Studio share/export via the native share sheet; Storage CORS for listing photos.
