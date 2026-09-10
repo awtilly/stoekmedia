@@ -32,10 +32,23 @@ export async function initPush(uid) {
     }
   });
 
-  let perm = await push.checkPermissions();
-  if (perm.receive === "prompt") perm = await push.requestPermissions();
-  if (perm.receive !== "granted") return;
+  const finish = async () => {
+    await push.register();
+    push.removeAllDeliveredNotifications().catch(() => {});
+  };
 
-  await push.register();
-  push.removeAllDeliveredNotifications().catch(() => {});
+  /* Don't ask on first launch — the realtor hasn't seen why yet. The prompt is
+     triggered by window.gdRequestPush() the first time they create something a
+     reminder would be sent for (follow-up, showing, event). Once granted, later
+     launches register silently. */
+  window.gdRequestPush = async () => {
+    try {
+      let p = await push.checkPermissions();
+      if (p.receive === "prompt") p = await push.requestPermissions();
+      if (p.receive === "granted") await finish();
+    } catch (e) { console.warn("push: request failed", e); }
+  };
+
+  const perm = await push.checkPermissions();
+  if (perm.receive === "granted") await finish();
 }

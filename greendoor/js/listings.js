@@ -10,6 +10,7 @@ import {
 import { getCurrentUser, showToast, formatCurrency, formatDate, statusLabel, escapeHtml, sanitizeUrl, safeToDate } from "./auth.js";
 import { calculateMatchScore, matchScoreColor, matchScoreLabel } from "./match-engine.js";
 import { initAddressAutocomplete } from "./address-autocomplete.js";
+import { icon } from "./icons.js";
 
 let allListings = [];
 let filteredListings = [];
@@ -177,7 +178,7 @@ function renderListings() {
 function renderGrid() {
   const el = document.getElementById("listings-grid");
   if (filteredListings.length === 0) {
-    el.innerHTML = `<div class="gd-empty" style="grid-column:1/-1;"><div class="gd-empty-icon">&#127968;</div><div class="gd-empty-text">No listings match your filters</div></div>`;
+    el.innerHTML = `<div class="gd-empty" style="grid-column:1/-1;"><div class="gd-empty-icon">${icon("home", 44)}</div><div class="gd-empty-text">No listings match your filters</div></div>`;
     return;
   }
 
@@ -190,7 +191,7 @@ function renderGrid() {
     return `
       <div class="gd-listing-card" onclick="openListingDetail('${l.id}')">
         <div class="gd-listing-photo" ${photo ? `style="background-image:url('${encodeURI(photo)}')"` : ""}>
-          ${!photo ? '<span class="gd-listing-no-photo">&#127968;</span>' : ""}
+          ${!photo ? '<span class="gd-listing-no-photo">${icon("home", 36)}</span>' : ""}
           <span class="gd-listing-status-badge gd-lst-${escapeHtml(l.status || "active")}">${statusLabelListing(l.status)}</span>
           ${qm ? `<span class="gd-match-badge-float" style="background:${escapeHtml(qm.color)}">${qm.score}%</span>` : ""}
         </div>

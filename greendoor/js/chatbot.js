@@ -6,6 +6,7 @@
 import { auth, functions, httpsCallable } from "./firebase-config.js";
 import { onAuthStateChanged } from "./vendor/firebase.js";
 import { showToast } from "./auth.js";
+import { icon } from "./icons.js";
 
 const askAssistant = httpsCallable(functions, "askAssistant");
 
@@ -91,7 +92,7 @@ function injectChatHTML(page) {
   fab.onclick = () => window.toggleAiPanel();
   fab.title = "Ask Sage";
   fab.setAttribute("aria-label", "Open Sage");
-  fab.innerHTML = "&#10024;";
+  fab.innerHTML = icon("sparkle", 22);
   document.body.appendChild(fab);
 
   const panel = document.createElement("div");
@@ -99,15 +100,17 @@ function injectChatHTML(page) {
   panel.className = "gd-ai-panel";
   panel.innerHTML = `
     <div class="gd-ai-panel-header">
-      <div class="gd-ai-panel-title"><span>&#10024;</span> Sage</div>
+      <div class="gd-ai-panel-title"><span>${icon("sparkle", 18)}</span> Sage</div>
       <button class="gd-ai-panel-close" onclick="toggleAiPanel()" aria-label="Close AI panel">&times;</button>
     </div>
     <div class="gd-ai-quick-actions">${quickBtns}</div>
-    <div id="ai-messages" class="gd-ai-messages"></div>
+    <div id="ai-messages" class="gd-ai-messages">
+      <div class="gd-ai-msg gd-ai-msg-ai gd-ai-intro">Hi, I'm Sage. Ask me anything about ${/client-detail/.test(location.pathname) ? "this client" : "your clients, listings, or calendar"}, or tap a suggestion above. I can draft emails, set follow-ups, and schedule showings for you to confirm.</div>
+    </div>
     <div class="gd-ai-input-area">
-      <button id="ai-mic-btn" class="gd-ai-mic" onclick="toggleVoiceInput()" aria-label="Voice input" title="Speak to Sage">&#127908;</button>
+      <button id="ai-mic-btn" class="gd-ai-mic" onclick="toggleVoiceInput()" aria-label="Voice input" title="Speak to Sage">${icon("mic", 18)}</button>
       <input type="text" id="ai-input" class="gd-ai-input" placeholder="Ask Sage anything..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendAiMessage();}">
-      <button id="ai-send-btn" class="gd-ai-send" onclick="sendAiMessage()" aria-label="Send message">&#10148;</button>
+      <button id="ai-send-btn" class="gd-ai-send" onclick="sendAiMessage()" aria-label="Send message">${icon("send", 18)}</button>
     </div>`;
   document.body.appendChild(panel);
 }
@@ -133,7 +136,7 @@ function formatAiResponse(text) {
 const TOOL_RENDERERS = {
   draft_email: (input) => ({
     label: "Send This Email",
-    icon: "&#9993;",
+    icon: icon("mail", 16),
     handler: () => {
       if (typeof window.openActivityModal !== "function") return;
       window.openActivityModal("email");
@@ -147,7 +150,7 @@ const TOOL_RENDERERS = {
   }),
   create_followup: (input) => ({
     label: "Create Follow-Up",
-    icon: "&#9745;",
+    icon: icon("checkbox", 16),
     handler: () => {
       if (typeof window.openFollowUpModal !== "function") return;
       window.openFollowUpModal();
@@ -167,7 +170,7 @@ const TOOL_RENDERERS = {
   }),
   schedule_showing: (input) => ({
     label: "Schedule Showing",
-    icon: "&#127968;",
+    icon: icon("home", 16),
     handler: () => {
       if (typeof window.openShowingModal !== "function") return;
       window.openShowingModal();
@@ -188,7 +191,7 @@ const TOOL_RENDERERS = {
   }),
   log_call: (input) => ({
     label: "Log Call",
-    icon: "&#128222;",
+    icon: icon("phone", 16),
     handler: () => {
       if (typeof window.openActivityModal !== "function") return;
       window.openActivityModal("call");
@@ -202,7 +205,7 @@ const TOOL_RENDERERS = {
   }),
   save_note: (input) => ({
     label: "Save as Note",
-    icon: "&#128221;",
+    icon: icon("note", 16),
     handler: () => {
       if (typeof window.openActivityModal !== "function") return;
       window.openActivityModal("note");
@@ -285,7 +288,7 @@ function removeTypingIndicator() {
 
 /* ---------- toggle panel ---------- */
 window.toggleAiPanel = function () {
-  document.getElementById("ai-panel").classList.toggle("open");
+  document.getElementById("ai-panel")?.classList.toggle("open");
 };
 
 /* ---------- quick action ---------- */

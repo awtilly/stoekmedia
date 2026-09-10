@@ -16,8 +16,29 @@ if (window.Capacitor?.isNativePlatform?.()) document.documentElement.classList.a
 
 let cachedProfile = null;
 
+/* --- Watchdog: if Auth never reports a state, don't leave the realtor on a
+   spinner forever. Offer a retry (reload) and a way back to login. --- */
+let authResolved = false;
+const AUTH_WATCHDOG_MS = 9000;
+setTimeout(() => {
+  if (authResolved || !/\/app\//.test(window.location.pathname)) return;
+  if (document.getElementById("gd-auth-stuck")) return;
+  const el = document.createElement("div");
+  el.id = "gd-auth-stuck";
+  el.className = "gd-auth-stuck";
+  el.innerHTML = `
+    <div class="gd-auth-stuck-text">Still connecting… this is taking longer than usual.</div>
+    <div class="gd-auth-stuck-actions">
+      <button type="button" class="gd-btn gd-btn-primary gd-btn-sm" onclick="location.reload()">Retry</button>
+      <button type="button" class="gd-btn gd-btn-sm" onclick="location.href='login.html'">Log in again</button>
+    </div>`;
+  document.body.appendChild(el);
+}, AUTH_WATCHDOG_MS);
+
 /* --- Auth state listener (runs on every CRM page) --- */
 onAuthStateChanged(auth, async (user) => {
+  authResolved = true;
+  document.getElementById("gd-auth-stuck")?.remove();
   const path = window.location.pathname;
   const isLoginPage = path.includes("/app/login");
   const isOnboardingPage = path.includes("/app/onboarding");

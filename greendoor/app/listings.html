@@ -101,6 +101,11 @@
         </div>
 
         <!-- Filter Bar -->
+        <button type="button" class="gd-btn gd-btn-sm gd-filters-toggle" id="filters-toggle" aria-expanded="false"
+                onclick="const p=document.querySelector('.gd-listings-filters');const o=p.classList.toggle('open');this.setAttribute('aria-expanded',o);this.querySelector('span').textContent=o?'Hide filters':'Filters';">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+          <span>Filters</span>
+        </button>
         <div class="gd-listings-filters">
           <div class="gd-filter-row">
             <input type="text" id="filter-address" class="gd-input gd-filter-input" placeholder="Search address, city, MLS#...">
@@ -152,7 +157,7 @@
         <!-- Grid View -->
         <div id="listings-grid" class="gd-listings-grid">
           <div class="gd-empty gd-col-full">
-            <div class="gd-empty-icon">&#127968;</div>
+            <div class="gd-empty-icon"><svg class="gd-ico" width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></div>
             <div class="gd-empty-text">No listings yet. Add your first listing to get started.</div>
           </div>
         </div>

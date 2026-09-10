@@ -3,7 +3,7 @@
    Rebuild with: npm run vendor */
 export { initializeApp } from 'firebase/app';
 export {
-  getAuth, initializeAuth, indexedDBLocalPersistence, onAuthStateChanged, signInWithEmailAndPassword, signOut,
+  getAuth, initializeAuth, indexedDBLocalPersistence, browserLocalPersistence, inMemoryPersistence, onAuthStateChanged, signInWithEmailAndPassword, signOut,
   sendPasswordResetEmail, confirmPasswordReset, verifyPasswordResetCode
 } from 'firebase/auth';
 export {

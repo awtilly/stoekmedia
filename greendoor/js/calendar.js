@@ -482,6 +482,7 @@ window.saveEvent = async function () {
           seriesId,
           createdAt: serverTimestamp()
         });
+        window.gdRequestPush?.();
       }
 
       const count = occurrences.length;

@@ -1,5 +1,5 @@
 import { initializeApp } from "./vendor/firebase.js";
-import { getAuth, initializeAuth, indexedDBLocalPersistence } from "./vendor/firebase.js";
+import { getAuth, initializeAuth, browserLocalPersistence, inMemoryPersistence } from "./vendor/firebase.js";
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, memoryLocalCache } from "./vendor/firebase.js";
 import { getStorage } from "./vendor/firebase.js";
 import { getFunctions, httpsCallable } from "./vendor/firebase.js";
@@ -21,9 +21,13 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 /* getAuth() pulls in browser popup/redirect machinery that stalls under the
-   capacitor:// scheme; native gets a plain IndexedDB-persisted auth instead. */
+   capacitor:// scheme; native gets a plain initializeAuth instead.
+   Persistence is localStorage, NOT IndexedDB: WKWebView's IndexedDB can stall
+   on open (seen on iOS 18.7 and again on the iOS 26.3 simulator, 2026-09-10),
+   which left Auth un-resolved and every page on a spinner. localStorage is
+   synchronous and persistent in Capacitor's WKWebView. */
 export const auth = IS_NATIVE
-  ? initializeAuth(app, { persistence: indexedDBLocalPersistence })
+  ? initializeAuth(app, { persistence: [browserLocalPersistence, inMemoryPersistence] })
   : getAuth(app);
 /* Offline cache: client lists, listings and the calendar render instantly from
    IndexedDB and sync when the connection returns. Multi-tab safe. */

@@ -23,6 +23,7 @@ import {
   updateDoc, addDoc, deleteDoc, onSnapshot, query, where
 } from "./vendor/firebase.js";
 import { showToast, escapeHtml, formatDate } from "./auth.js";
+import { icon } from "./icons.js";
 
 /* ------------------------------------------------------------------ */
 /*  Constants                                                          */
@@ -792,7 +793,7 @@ export function renderChecklist() {
       <div class="gd-checklist-overall">
         <div class="gd-checklist-overall-header">
           <span>Closing Progress</span>
-          <button class="gd-btn gd-btn-sm" onclick="openChecklistAI()" style="margin-left: auto;">&#10024; Check in with AI</button>
+          <button class="gd-btn gd-btn-sm" onclick="openChecklistAI()" style="margin-left: auto;">${icon("sparkle", 14)} Check in with AI</button>
           <span class="gd-checklist-progress-text">${doneItems.length}/${activeItems.length} (${overallPct}%)</span>
         </div>
         <div class="gd-checklist-progress">
@@ -884,12 +885,12 @@ function renderChecklistItem(item) {
   }
 
   // Actions
-  let actionsHtml = `<button class="gd-checklist-action-btn" onclick="window.toggleChecklistNotes('${item.id}')" title="Notes">&#128221;</button>`;
+  let actionsHtml = `<button class="gd-checklist-action-btn" onclick="window.toggleChecklistNotes('${item.id}')" title="Notes">${icon("note", 16)}</button>`;
   if (item.isSeeded) {
     actionsHtml += `<button class="gd-checklist-action-btn" onclick="window.toggleChecklistNA('${item.id}')" title="Mark N/A">N/A</button>`;
   }
   if (item.isCustom) {
-    actionsHtml += `<button class="gd-checklist-action-btn" onclick="window.deleteChecklistItem('${item.id}')" title="Delete">&#128465;</button>`;
+    actionsHtml += `<button class="gd-checklist-action-btn" onclick="window.deleteChecklistItem('${item.id}')" title="Delete">${icon("trash", 16)}</button>`;
   }
 
   return `

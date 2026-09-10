@@ -5,6 +5,7 @@ import {
 } from "./vendor/firebase.js";
 import { getCurrentUser, formatCurrency, timeAgo, statusLabel, showToast, escapeHtml } from "./auth.js";
 import { checkAndResumeTour } from "./tour.js";
+import { icon } from "./icons.js";
 
 const askAssistant = httpsCallable(functions, "askAssistant");
 
@@ -56,13 +57,13 @@ function renderClients(clients) {
   wrap.classList.remove("gd-hidden");
 
   tbody.innerHTML = clients.map(c => `
-    <tr>
+    <tr class="gd-client-row" onclick="if(!event.target.closest('button')) location.href='client-detail.html?id=${c.id}'">
       <td><a href="client-detail.html?id=${c.id}">${escapeHtml(c.fullName) || "—"}</a></td>
       <td><span class="gd-badge gd-badge-${c.status || "lead"}">${statusLabel(c.status || "lead")}</span></td>
       <td class="gd-hide-mobile">${c.budgetMin || c.budgetMax ? formatCurrency(c.budgetMin) + " — " + formatCurrency(c.budgetMax) : "—"}</td>
       <td class="gd-hide-mobile">${c.preferredLocations && c.preferredLocations.length ? c.preferredLocations[0] : "—"}</td>
       <td class="gd-hide-mobile">${timeAgo(c.lastActivityDate)}</td>
-      <td><button class="gd-ai-icon-btn" onclick="event.stopPropagation(); showAiSummary('${c.id}', this)" title="Sage Summary">&#10024;</button></td>
+      <td><button class="gd-ai-icon-btn" onclick="event.stopPropagation(); showAiSummary('${c.id}', this)" title="Sage Summary">${icon("sparkle", 16)}</button></td>
     </tr>
   `).join("");
 }

@@ -15,6 +15,7 @@ import {
 import { calculateMatchScore, matchScoreColor, matchScoreLabel } from "./match-engine.js";
 import { buildMergeFields, MO_FORM_STUBS, COMPLIANCE_STATUSES, COMPLIANCE_CATEGORIES, formatComplianceStatus } from "./compliance.js";
 import { seedChecklist, recalculateDeadlines, initChecklist, destroyChecklist } from "./checklist.js";
+import { icon } from "./icons.js";
 
 const params = new URLSearchParams(window.location.search);
 const clientId = params.get("id");
@@ -468,7 +469,7 @@ async function loadActivities(uid) {
 
     if (snap.empty) return;
 
-    const icons = { email: "&#128231;", call: "&#128222;", note: "&#128221;", sms: "&#128172;", file_share: "&#128193;", showing: "&#127968;", followup: "&#128276;" };
+    const icons = { email: icon("mail", 16), call: icon("phone", 16), note: icon("note", 16), sms: icon("message", 16), file_share: icon("folder", 16), showing: icon("home", 16), followup: icon("bell", 16) };
 
     let html = "";
     snap.forEach(d => {
@@ -793,9 +794,9 @@ function renderFolderCards() {
     const count = allFiles.filter(file => file.folderId === f.id).length;
     const isSystem = f.isSystem === true;
     const systemClass = isSystem ? " gd-folder-card--system" : "";
-    const icon = isSystem ? "&#128274;" : "&#128193;";
+    const folderIcon = isSystem ? icon("lock", 18) : icon("folder", 18);
     const kebab = isSystem ? "" : `
-      <button class="gd-folder-kebab" onclick="event.stopPropagation(); toggleFolderMenu('${f.id}')" title="Folder options">&#8942;</button>
+      <button class="gd-folder-kebab" onclick="event.stopPropagation(); toggleFolderMenu('${f.id}')" title="Folder options">${icon("kebab", 18)}</button>
       <div id="folder-menu-${f.id}" class="gd-folder-menu gd-hidden">
         <button onclick="event.stopPropagation(); renameFolder('${f.id}')">Rename</button>
         <button onclick="event.stopPropagation(); deleteFolder('${f.id}')">Delete</button>
@@ -805,7 +806,7 @@ function renderFolderCards() {
       ondragover="event.preventDefault(); this.classList.add('gd-folder-card--dragover')"
       ondragleave="this.classList.remove('gd-folder-card--dragover')"
       ondrop="event.preventDefault(); this.classList.remove('gd-folder-card--dragover'); dropFileOnFolder(event, '${f.id}')">
-      <span class="gd-folder-card-icon">${icon}</span>
+      <span class="gd-folder-card-icon">${folderIcon}</span>
       <span class="gd-folder-card-name">${escapeHtml(f.name)}</span>
       <span class="gd-folder-card-count">${count}</span>
       ${kebab}
@@ -1216,7 +1217,7 @@ function renderFiles() {
   }
 
   if (filtered.length === 0) {
-    el.innerHTML = `<div class="gd-empty"><div class="gd-empty-icon">&#128193;</div><div class="gd-empty-text">No files${currentFolderId ? " in this folder" : " uploaded yet"}</div></div>`;
+    el.innerHTML = `<div class="gd-empty"><div class="gd-empty-icon">${icon("folder", 44)}</div><div class="gd-empty-text">No files${currentFolderId ? " in this folder" : " uploaded yet"}</div></div>`;
     return;
   }
 
@@ -1229,13 +1230,13 @@ function renderFiles() {
     return `
     <div class="gd-file-row" draggable="true" ondragstart="event.dataTransfer.setData('text/plain', '${f.id}')" onclick="openPreview('${f.id}')">
       <input type="checkbox" class="gd-file-check" data-id="${f.id}" ${checked} onclick="event.stopPropagation(); toggleFileSelect('${f.id}')">
-      <span class="gd-file-preview-icon">&#128065;</span>
+      <span class="gd-file-preview-icon">${icon("eye", 16)}</span>
       <span class="gd-file-name">${escapeHtml(f.fileName)}${signedBadge}</span>
       <span class="gd-badge">${escapeHtml(folderName)}</span>
       <span class="gd-file-meta">${formatFileSize(f.fileSize)}</span>
       <span class="gd-file-meta">${formatDate(f.uploadedAt)}</span>
       <button class="gd-btn gd-btn-sm gd-file-send-btn" onclick="event.stopPropagation(); sendSingleFile('${f.id}')" title="Email this file to the client">Email</button>
-      <button class="gd-file-kebab" onclick="event.stopPropagation(); toggleFileRowMenu('${f.id}', event)" title="File options">&#8942;</button>
+      <button class="gd-file-kebab" onclick="event.stopPropagation(); toggleFileRowMenu('${f.id}', event)" title="File options">${icon("kebab", 18)}</button>
       <div id="file-menu-${f.id}" class="gd-file-menu gd-hidden">
         <button onclick="event.stopPropagation(); showFileMoveMenu('${f.id}', event)">Move to folder</button>
         <a href="${f.downloadUrl}" target="_blank" onclick="event.stopPropagation();" style="display:block;padding:0.5rem 0.75rem;font-size:0.82rem;text-decoration:none;color:inherit;">Download</a>
@@ -1505,7 +1506,7 @@ window.openPreview = function (fileId) {
     const viewerUrl = `https://docs.google.com/gview?url=${encodeURIComponent(f.downloadUrl)}&embedded=true`;
     contentEl.innerHTML = `<iframe src="${viewerUrl}"></iframe>`;
   } else {
-    contentEl.innerHTML = `<div class="gd-empty"><div class="gd-empty-icon">&#128196;</div><div class="gd-empty-text">Preview not available for this file type</div><div class="gd-empty-sub">Use the Download button below</div></div>`;
+    contentEl.innerHTML = `<div class="gd-empty"><div class="gd-empty-icon">${icon("file", 44)}</div><div class="gd-empty-text">Preview not available for this file type</div><div class="gd-empty-sub">Use the Download button below</div></div>`;
   }
 
   document.getElementById("file-preview-modal").classList.add("active");
@@ -1695,7 +1696,7 @@ window.renderMatches = function () {
   });
 
   if (matches.length === 0) {
-    el.innerHTML = `<div class="gd-empty" style="grid-column:1/-1;"><div class="gd-empty-icon">&#127968;</div><div class="gd-empty-text">No matched listings yet</div></div>`;
+    el.innerHTML = `<div class="gd-empty" style="grid-column:1/-1;"><div class="gd-empty-icon">${icon("home", 44)}</div><div class="gd-empty-text">No matched listings yet</div></div>`;
     return;
   }
 
@@ -2296,6 +2297,7 @@ window.saveShowing = async function () {
       data.disclosuresSent = false;
       data.followUpId = null;
       const showingRef = await addDoc(collection(db, "showings"), data);
+      window.gdRequestPush?.();
 
       // Log activity
       await addDoc(collection(db, "activities"), {
@@ -2317,6 +2319,7 @@ window.saveShowing = async function () {
           sourceType: "showing", sourceId: showingRef.id,
           createdAt: serverTimestamp()
         });
+        window.gdRequestPush?.();
       }
 
       // Auto-import: create skeleton listing if no matching listing exists
@@ -2455,6 +2458,7 @@ window.submitCompleteShowing = async function () {
         sourceType: "showing", sourceId: completingShowingId,
         createdAt: serverTimestamp()
       });
+      window.gdRequestPush?.();
     }
 
     showToast("Showing completed!");
@@ -2552,6 +2556,7 @@ window.saveFollowUp = async function () {
       sourceId: modal.dataset.sourceId || null,
       createdAt: serverTimestamp()
     });
+    window.gdRequestPush?.();
     showToast("Follow-up created!");
     closeFollowUpModal();
     await loadFollowUps(user.uid);
@@ -2697,11 +2702,11 @@ window.fetchListingFromUrl = async function () {
       renderAddListingTagSuggestions();
     }
 
-    statusEl.innerHTML = "&#10003; Property details extracted!";
+    statusEl.innerHTML = icon("check", 14) + " Property details extracted!";
     statusEl.className = "gd-url-fetch-result gd-url-fetch-success";
   } catch (err) {
     console.error("Fetch listing error:", err);
-    statusEl.innerHTML = "&#10007; " + (err.message || "Failed to extract listing details.");
+    statusEl.innerHTML = icon("x", 14) + " " + (err.message || "Failed to extract listing details.");
     statusEl.className = "gd-url-fetch-result gd-url-fetch-error";
   }
   btn.disabled = false;
@@ -2894,7 +2899,7 @@ async function loadComplianceTemplates(uid) {
   } catch (err) {
     console.error("loadComplianceTemplates error:", err);
     document.getElementById("compliance-list").innerHTML =
-      '<div class="gd-empty"><div class="gd-empty-icon">&#128196;</div><div class="gd-empty-text">Failed to load compliance documents.</div></div>';
+      '<div class="gd-empty"><div class="gd-empty-icon">' + icon("file", 44) + '</div><div class="gd-empty-text">Failed to load compliance documents.</div></div>';
   }
 }
 
@@ -2926,7 +2931,7 @@ function renderComplianceList() {
   }
 
   if (complianceTemplates.length === 0) {
-    listEl.innerHTML = '<div class="gd-empty"><div class="gd-empty-icon">&#128196;</div><div class="gd-empty-text">No compliance documents match this transaction type.</div></div>';
+    listEl.innerHTML = '<div class="gd-empty"><div class="gd-empty-icon">' + icon("file", 44) + '</div><div class="gd-empty-text">No compliance documents match this transaction type.</div></div>';
     return;
   }
 

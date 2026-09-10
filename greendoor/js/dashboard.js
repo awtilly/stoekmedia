@@ -14,6 +14,7 @@ import {
   Timestamp, serverTimestamp
 } from "./vendor/firebase.js";
 import { getCurrentUser, showToast, escapeHtml, safeToDate } from "./auth.js";
+import { icon } from "./icons.js";
 
 const askAssistantFn = httpsCallable(functions, "askAssistant");
 const parseListingUrlFn = httpsCallable(functions, "parseListingUrl");
@@ -24,7 +25,8 @@ let currentUser = null;
 let recentClients = [];   // [{ id, name, status, email, phone, lastContactDays }]
 let recentListings = [];  // [{ id, address }]
 let templates = [];       // [{ id, name, category }]
-let todayShowings = [];   // [{ time, address }]
+let todayShowings = [];   // [{ time, address, clientId }]
+let todayFollowUps = [];  // [{ title, clientId }]
 let conversation = [];    // [{ role, content }] — passed back to Sage for follow-ups
 let briefingShown = false;
 
@@ -59,7 +61,7 @@ async function loadContextSnapshots(uid) {
   const endOfToday = new Date(); endOfToday.setHours(23, 59, 59, 999);
 
   try {
-    const [cSnap, lSnap, tSnap, sSnap] = await Promise.all([
+    const [cSnap, lSnap, tSnap, sSnap, fSnap] = await Promise.all([
       // No orderBy: manually-added clients never had updatedAt, and Firestore
       // drops docs missing the orderBy field. Sort client-side instead.
       getDocs(query(
@@ -83,7 +85,14 @@ async function loadContextSnapshots(uid) {
         where("showingDate", ">=", Timestamp.fromDate(startOfToday)),
         where("showingDate", "<=", Timestamp.fromDate(endOfToday)),
         orderBy("showingDate", "asc")
-      )).catch(() => null) // Index may not exist; non-fatal
+      )).catch(() => null), // Index may not exist; non-fatal
+      getDocs(query(
+        collection(db, "followUps"),
+        where("realtorId", "==", uid),
+        where("dueDate", "<=", Timestamp.fromDate(endOfToday)),
+        orderBy("dueDate", "asc"),
+        limit(10)
+      )).catch(() => null)
     ]);
 
     recentClients = cSnap.docs.map(d => {
@@ -125,10 +134,19 @@ async function loadContextSnapshots(uid) {
           const dt = safeToDate(s.showingDate);
           return {
             time: dt ? dt.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : "",
-            address: s.address || "TBD"
+            address: s.address || "TBD",
+            clientId: s.clientId || null
           };
         });
     }
+
+    if (fSnap) {
+      todayFollowUps = fSnap.docs
+        .map(d => d.data())
+        .filter(f => (f.status || "pending") === "pending")
+        .map(f => ({ title: f.title || "Follow-up", clientId: f.clientId || null }));
+    }
+    renderToday();
   } catch (err) {
     console.warn("Recent context load failed (may need index):", err.message);
   }
@@ -209,6 +227,26 @@ function buildChips() {
     chips.push(c);
   }
   return chips.slice(0, 4);
+}
+
+/* "Today" strip: what's on the calendar and what's due, at a glance.
+   Hidden entirely when there is nothing, so a quiet day stays quiet. */
+function renderToday() {
+  const el = document.getElementById("dash-today");
+  if (!el) return;
+  if (!todayShowings.length && !todayFollowUps.length) { el.hidden = true; return; }
+  const rows = [];
+  for (const s of todayShowings) {
+    const href = s.clientId ? `client-detail.html?id=${encodeURIComponent(s.clientId)}&tab=showings` : "calendar.html";
+    rows.push(`<a class="gd-dash-today-row" href="${href}"><span class="gd-dash-today-time">${escapeHtml(s.time)}</span><span class="gd-dash-today-text">${escapeHtml(s.address)}</span><span class="gd-dash-today-kind">Showing</span></a>`);
+  }
+  for (const f of todayFollowUps) {
+    const name = f.clientId ? clientName(f.clientId) : "";
+    const href = f.clientId ? `client-detail.html?id=${encodeURIComponent(f.clientId)}&tab=activity` : "calendar.html";
+    rows.push(`<a class="gd-dash-today-row" href="${href}"><span class="gd-dash-today-time">Due</span><span class="gd-dash-today-text">${escapeHtml(f.title)}${name && name !== "client" ? ` · ${escapeHtml(name)}` : ""}</span><span class="gd-dash-today-kind gd-dash-today-kind-fu">Follow-up</span></a>`);
+  }
+  el.innerHTML = `<div class="gd-dash-today-title">Today</div>${rows.join("")}`;
+  el.hidden = false;
 }
 
 function renderChips() {
@@ -446,7 +484,7 @@ function previewClientUpdateRows(input) {
 const TOOL_EXECUTORS = {
   create_client: {
     title: "New Client",
-    icon: "&#128100;", // person
+    icon: icon("user", 20),
     confirmLabel: "Create Client",
     preview: (input) => `
       ${previewRow("Name", input.fullName)}
@@ -491,7 +529,7 @@ const TOOL_EXECUTORS = {
 
   create_followup: {
     title: "Follow-up reminder",
-    icon: "&#9745;", // ballot box w/ check
+    icon: icon("checkbox", 20),
     confirmLabel: "Create Follow-Up",
     preview: (input) => {
       const due = new Date(); due.setDate(due.getDate() + (input.days_from_now || 0));
@@ -516,13 +554,14 @@ const TOOL_EXECUTORS = {
         sourceType: "sage",
         createdAt: serverTimestamp()
       });
+      window.gdRequestPush?.();
       return { message: `Reminder set for **${due.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}**.` };
     }
   },
 
   schedule_event: {
     title: "Schedule",
-    icon: "&#128197;", // calendar
+    icon: icon("calendar", 20),
     confirmLabel: "Add to Calendar",
     preview: (input) => `
       ${previewRow("Title", input.title)}
@@ -555,6 +594,7 @@ const TOOL_EXECUTORS = {
         disclosuresSent: false, followUpId: null
       };
       await addDoc(collection(db, "showings"), data);
+      window.gdRequestPush?.();
       return {
         message: `Scheduled **${input.title}** on ${dt.toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}.`,
         followUp: { label: "Open calendar", action: () => executeNavigate({ target: "calendar" }) }
@@ -564,7 +604,7 @@ const TOOL_EXECUTORS = {
 
   send_compliance_doc: {
     title: "Send document",
-    icon: "&#128196;", // page
+    icon: icon("file", 20),
     confirmLabel: "Send for Signature",
     preview: (input) => `
       ${previewRow("Document", templateName(input.templateId))}
@@ -600,7 +640,7 @@ const TOOL_EXECUTORS = {
 
   draft_email: {
     title: "Email draft",
-    icon: "&#9993;", // envelope
+    icon: icon("mail", 20),
     confirmLabel: "Open in client to send",
     preview: (input) => `
       ${previewRow("To", `${clientName(input.clientId)}${clientEmail(input.clientId) ? ` <${clientEmail(input.clientId)}>` : ""}`)}
@@ -618,7 +658,7 @@ const TOOL_EXECUTORS = {
 
   update_client: {
     title: "Update client",
-    icon: "&#9999;", // pencil
+    icon: icon("pencil", 20),
     confirmLabel: "Save Changes",
     preview: (input) => {
       const rows = previewClientUpdateRows(input);
@@ -689,7 +729,7 @@ const TOOL_EXECUTORS = {
 
   add_listing: {
     title: "New Listing",
-    icon: "&#127968;", // house
+    icon: icon("home", 20),
     confirmLabel: "Add Listing",
     preview: (input) => {
       if (input.source_url) {
@@ -853,7 +893,7 @@ function renderConfirmCard(toolName, input) {
         : "";
       card.innerHTML = `
         <div class="gd-dash-card-status gd-dash-card-status-ok">
-          <span class="gd-dash-card-check">&#10003;</span>
+          <span class="gd-dash-card-check">${icon("check", 14)}</span>
           <span>${formatMessageHtml(result?.message || "Done.")}</span>
         </div>
         ${followUpHtml ? `<div class="gd-dash-card-footer">${followUpHtml}</div>` : ""}
