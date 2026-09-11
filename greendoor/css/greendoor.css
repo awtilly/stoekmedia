@@ -9581,3 +9581,261 @@ html.gd-native .gd-web-only { display: none !important; }
 }
 .gd-auth-stuck-text { font-size: 0.95rem; margin-bottom: 10px; }
 .gd-auth-stuck-actions { display: flex; gap: 8px; justify-content: center; }
+
+/* ============================================================
+   NATIVE FEEL PASS (Sept 10 2026 audit)
+   Everything here is additive: tap feel, 44pt targets, 16px
+   inputs, bottom sheets on the phone, compact client header,
+   list rows, skeletons, and a crossfade between page loads.
+   ============================================================ */
+html {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+}
+/* App chrome is not selectable and never shows the copy callout.
+   Content (notes, timeline, inputs) stays selectable. */
+.gd-bottom-tabs, .gd-sidebar, .gd-topbar, .gd-tabs, .gd-settings-sidebar,
+.gd-page-header, #gd-menu-chip, .gd-modal-header, .gd-modal-footer,
+.gd-btn, button, [role="tab"], .gd-dash-chip, .gd-badge {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+/* Pressed state on touch devices (hover lingers after a tap). */
+@media (hover: none) {
+  .gd-btn:active, .gd-tab:active, .gd-settings-tab:active, .gd-dash-chip:active,
+  .gd-client-row:active, .gd-listing-card:active, .gd-view-btn:active,
+  .gd-calendar-view-btn:active, .gd-contact-btn:active, .gd-folder-btn:active,
+  .gd-dash-today-row:active, .gd-followup-item:active {
+    transform: scale(0.97);
+    transition: transform 80ms ease;
+  }
+  .gd-btn:hover, .gd-ai-icon-btn:hover { transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gd-btn:active, .gd-tab:active, .gd-client-row:active, .gd-listing-card:active { transform: none; }
+}
+/* Cross-document crossfade (Safari 18.2+ / iOS 26) — pages fade instead of flashing white. */
+@view-transition { navigation: auto; }
+::view-transition-old(root), ::view-transition-new(root) { animation-duration: 160ms; }
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root), ::view-transition-new(root) { animation: none; }
+}
+
+/* Offline banner (auth.js toggles body.gd-offline) */
+.gd-offline-banner {
+  display: none;
+  position: fixed;
+  top: env(safe-area-inset-top, 0px);
+  left: 0; right: 0;
+  z-index: 1950;
+  background: #b45309;
+  color: #fff;
+  font-size: 0.85rem;
+  text-align: center;
+  padding: 6px 12px;
+}
+body.gd-offline .gd-offline-banner { display: block; }
+
+/* Skeleton rows while a list loads (replaces the spinner on the phone) */
+@keyframes gd-shimmer { from { background-position: -400px 0; } to { background-position: 400px 0; } }
+.gd-skeleton {
+  display: block;
+  height: 56px;
+  margin-bottom: 10px;
+  border-radius: 10px;
+  background: linear-gradient(90deg, #eef2f0 25%, #f7f9f8 50%, #eef2f0 75%);
+  background-size: 800px 100%;
+  animation: gd-shimmer 1.2s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) { .gd-skeleton { animation: none; } }
+.gd-refreshing { opacity: 0.85; }
+
+@media (max-width: 768px) {
+  /* 16px inputs: iOS never zooms; 44pt tall */
+  body.gd-light .gd-input,
+  body.gd-light select.gd-input,
+  body.gd-light input.gd-input { font-size: 16px; min-height: 44px; }
+  body.gd-light textarea.gd-input { font-size: 16px; min-height: 88px; }
+
+  /* 44pt targets */
+  .gd-btn, .gd-btn-sm, .gd-view-btn, .gd-calendar-view-btn, .gd-settings-tab,
+  .gd-dash-chip, .gd-dash-prompt-btn, .gd-filters-toggle, .gd-modal-close { min-height: 44px; }
+  .gd-view-btn, .gd-dash-prompt-btn, .gd-modal-close { min-width: 44px; }
+  .gd-ai-icon-btn {
+    min-width: 44px; min-height: 44px;
+    display: inline-flex; align-items: center; justify-content: center;
+    opacity: 0.75;
+  }
+  .gd-settings-tab { font-size: 0.8rem; }
+  body.gd-light .gd-badge { font-size: 0.72rem; }
+  .gd-client-quick-stat .lbl, .gd-dash-today-title { font-size: 0.78rem; }
+
+  /* Content always clears the floating tab bar */
+  body.gd-light .gd-content { padding-bottom: calc(110px + env(safe-area-inset-bottom, 0px)); }
+  .gd-tab-content.active { padding-bottom: 24px; }
+  .gd-empty, .gd-text-muted:last-child { padding-bottom: 8px; }
+
+  /* Menu chip steps aside while any sheet or drawer is open */
+  body:has(.gd-modal-overlay.active) #gd-menu-chip,
+  body:has(.gd-quick-match-sidebar.active) #gd-menu-chip,
+  body:has(.gd-listings-filters.open) #gd-menu-chip,
+  body:has(.gd-sidebar.open) #gd-menu-chip,
+  body:has(#ai-panel.open) #gd-menu-chip { display: none; }
+  /* The drawer sits above the tab bar */
+  .gd-sidebar { z-index: 1902; }
+  .gd-sidebar-overlay { z-index: 1901; }
+
+  /* ---- Bottom sheets: Quick Match and Filters ---- */
+  .gd-quick-match-sidebar {
+    top: auto; bottom: 0; left: 0; right: 0;
+    width: 100%; height: auto; max-height: 78dvh;
+    border-left: 0; border-top: 1px solid var(--color-border);
+    border-radius: 20px 20px 0 0;
+    transform: translateY(100%);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    z-index: 1850;
+  }
+  .gd-quick-match-sidebar.active { transform: translateY(0); }
+  .gd-quick-match-sidebar::before {
+    content: ""; display: block; width: 36px; height: 5px; border-radius: 3px;
+    background: #cbd5e1; margin: 8px auto 0;
+  }
+  .gd-qm-body { overflow-y: auto; -webkit-overflow-scrolling: touch; }
+
+  .gd-listings-filters:not(.open) { display: block; }
+  .gd-listings-filters {
+    position: fixed; left: 0; right: 0; bottom: 0;
+    z-index: 1850;
+    max-height: 78dvh; overflow-y: auto; -webkit-overflow-scrolling: touch;
+    margin: 0;
+    border-radius: 20px 20px 0 0;
+    border-left: 0; border-right: 0; border-bottom: 0;
+    box-shadow: var(--gd-shadow-xl);
+    transform: translateY(100%);
+    transition: transform 0.3s var(--gd-ease);
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
+  }
+  .gd-listings-filters.open { transform: translateY(0); }
+  .gd-listings-filters::before {
+    content: ""; display: block; width: 36px; height: 5px; border-radius: 3px;
+    background: #cbd5e1; margin: 0 auto 12px;
+  }
+  .gd-filters-done { display: block; width: 100%; margin-top: 12px; }
+  .gd-sheet-scrim {
+    position: fixed; inset: 0; background: rgba(15, 23, 42, 0.35);
+    z-index: 1840; display: none;
+  }
+  body:has(.gd-listings-filters.open) .gd-sheet-scrim,
+  body:has(.gd-quick-match-sidebar.active) .gd-sheet-scrim { display: block; }
+
+  /* ---- Compact client header: name, actions, one-line stats ---- */
+  body.gd-light .gd-client-header {
+    display: block;
+    text-align: left;
+    padding: 4px 0 10px;
+    margin-bottom: 6px;
+  }
+  .gd-client-header > a.gd-btn { display: none; }   /* "Back to clients" duplicates the tab bar */
+  .gd-client-header h1 { font-size: 1.4rem; display: inline; margin-right: 8px; vertical-align: middle; }
+  .gd-client-header #client-badge { vertical-align: middle; }
+  .gd-contact-row { margin: 10px 0 6px; }
+  .gd-contact-row .gd-contact-btn { padding: 0 8px; }
+  .gd-client-quick-stats { display: flex; flex-wrap: wrap; gap: 0; margin-top: 2px; width: auto; }
+  .gd-client-quick-stat {
+    background: none; border: 0; box-shadow: none; padding: 0;
+    text-align: left; flex: 0 0 auto;
+    display: inline-flex; gap: 4px; align-items: baseline;
+  }
+  .gd-client-quick-stat + .gd-client-quick-stat::before { content: "·"; margin: 0 8px; color: var(--color-text-muted, #94a3b8); }
+  .gd-client-quick-stat .num { font-size: 0.95rem; font-weight: 600; }
+  .gd-client-quick-stat .lbl { text-transform: none; letter-spacing: 0; color: var(--color-text-muted, #64748b); }
+
+  /* ---- Clients list as rows ---- */
+  body.gd-light .gd-table-wrap { border: 0; background: none; box-shadow: none; overflow: visible; }
+  .gd-table thead { display: none; }
+  .gd-client-row {
+    display: grid;
+    grid-template-columns: 40px minmax(0, 1fr) auto 44px;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 2px;
+    min-height: 64px;
+    border-bottom: 1px solid var(--color-border, #e5e7eb);
+  }
+  .gd-client-row td { display: block; padding: 0; border: 0; }
+  .gd-client-row td.gd-hide-mobile { display: none; }
+  .gd-client-row td.gd-client-cell-name { grid-column: 2; }
+  .gd-client-row td.gd-client-cell-name a { font-weight: 600; font-size: 1rem; color: var(--color-text, #0f172a); text-decoration: none; }
+  .gd-client-row td.gd-client-cell-name .gd-badge { display: inline-block; margin-top: 3px; }
+  .gd-client-row td.gd-client-cell-avatar { grid-column: 1; grid-row: 1; }
+  .gd-client-row td.gd-client-cell-age { grid-column: 3; }
+  .gd-client-row td:last-child { grid-column: 4; }
+  .gd-client-avatar {
+    width: 40px; height: 40px; border-radius: 50%;
+    background: #dcfce7; color: #15803d;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-weight: 600; font-size: 0.9rem;
+  }
+  .gd-client-age {
+    font-size: 0.8rem; color: var(--color-text-muted, #64748b);
+    font-variant-numeric: tabular-nums; white-space: nowrap;
+    padding: 3px 8px; border-radius: 999px; background: #f1f5f9;
+  }
+  .gd-client-age.stale { background: #fef3c7; color: #b45309; }
+  .gd-client-age.cold { background: #fee2e2; color: #b91c1c; }
+  .gd-top-bar .gd-hide-mobile { display: none; }
+
+  /* Listing sheet photo runs edge to edge */
+  #listing-detail-modal .gd-listing-photo,
+  #listing-detail-modal img.gd-detail-photo,
+  .gd-detail-photo-wrap img { width: 100%; height: 220px; object-fit: cover; border-radius: 12px; }
+
+  /* Settings: title left like every other page, no dead gap */
+  .gd-welcome h1 { text-align: left; }
+  body.gd-light .gd-welcome { text-align: left; margin-bottom: 8px; }
+
+  /* Files tab: two even columns */
+  .gd-folder-grid, .gd-folders { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .gd-folder-btn { width: 100%; min-width: 0; }
+}
+/* Phone-only elements (avatar cells, contact-age pills, CSV hint) */
+@media (min-width: 769px) { .gd-show-mobile { display: none !important; } }
+/* Add Listing: link-first import and the folded "More details" */
+.gd-listing-import-row { align-items: flex-end; }
+.gd-more-details { border-top: 1px solid var(--color-border, #e5e7eb); margin-top: 8px; }
+.gd-more-details > summary {
+  cursor: pointer; list-style: none; padding: 14px 0; font-weight: 600;
+  display: flex; align-items: center; gap: 8px; min-height: 44px;
+  -webkit-user-select: none; user-select: none;
+}
+.gd-more-details > summary::-webkit-details-marker { display: none; }
+.gd-more-details > summary::before {
+  content: ""; width: 8px; height: 8px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor;
+  transform: rotate(-45deg); transition: transform 0.2s; margin-left: 2px;
+}
+.gd-more-details[open] > summary::before { transform: rotate(45deg); }
+.gd-more-details > summary .gd-text-muted { font-weight: 400; font-size: 0.85rem; }
+/* Phone refinements after the first native-feel build */
+@media (max-width: 768px) {
+  .gd-client-row td.gd-client-cell-name { white-space: normal; overflow: visible; text-overflow: clip; min-width: 0; }
+  .gd-client-row td.gd-client-cell-name a { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .gd-client-row td.gd-client-cell-name .gd-badge { display: inline-block; width: fit-content; margin-top: 4px; }
+  .gd-client-row td.gd-client-cell-age { padding-left: 4px; }
+  body.gd-light .gd-table { table-layout: auto; width: 100%; }
+  /* City / State / ZIP stay on one line */
+  .gd-form-row.gd-form-row-inline { flex-direction: row; align-items: flex-end; gap: 8px; }
+  .gd-form-row.gd-form-row-inline .gd-form-group:nth-child(1) { flex: 2 1 0; }
+  .gd-form-row.gd-form-row-inline .gd-form-group:nth-child(2) { flex: 0 0 64px; }
+  .gd-form-row.gd-form-row-inline .gd-form-group:nth-child(3) { flex: 1 1 0; }
+  /* Tab bar and menu chip step out of the way while the keyboard is up */
+  body.gd-kb-open .gd-bottom-tabs, body.gd-kb-open #gd-menu-chip { display: none; }
+}
+@media (max-width: 768px) {
+  /* Table becomes a plain block so each grid row spans the full width */
+  body.gd-light .gd-table, body.gd-light .gd-table tbody { display: block; width: 100%; }
+  .gd-client-row { width: 100%; padding: 8px 2px; min-height: 60px; }
+}
+@media (max-width: 768px) { .gd-client-row td { max-width: none; } }
+@media (max-width: 768px) { body.gd-light .gd-client-row td { padding: 0; } }

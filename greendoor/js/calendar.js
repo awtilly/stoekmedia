@@ -7,7 +7,8 @@ import {
 import { getCurrentUser, formatDateTime, showToast, escapeHtml, safeToDate } from "./auth.js";
 import { checkAndResumeTour } from "./tour.js";
 
-let currentView = "week";
+let currentView = window.innerWidth <= 768 ? "month" : "week"; // phone opens on Month: a week with no events reads as empty
+document.querySelectorAll(".gd-calendar-view-btn").forEach(b => b.classList.toggle("active", b.dataset.view === currentView));
 let currentDate = new Date();
 let allCalEvents = []; // merged showings + followUps + events
 let allClients = {};
@@ -422,8 +423,11 @@ window.openEventModal = function (eventId, prefillDate) {
       const endDate = new Date(prefillDate.getTime() + 3600000);
       document.getElementById("ev-end").value = toLocal(endDate);
     } else {
-      document.getElementById("ev-start").value = "";
-      document.getElementById("ev-end").value = "";
+      // Default to the next whole hour so the form never opens with blank required times.
+      const toLocal = (d) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+      const start = new Date(); start.setMinutes(0, 0, 0); start.setHours(start.getHours() + 1);
+      document.getElementById("ev-start").value = toLocal(start);
+      document.getElementById("ev-end").value = toLocal(new Date(start.getTime() + 3600000));
     }
   }
 

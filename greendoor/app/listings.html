@@ -79,9 +79,8 @@
     <div class="gd-content">
 
       <!-- Loading -->
-      <div id="listings-loading" class="gd-loading">
-        <div class="gd-spinner gd-spinner-lg"></div>
-        <span class="gd-loading-text">Loading listings...</span>
+      <div id="listings-loading" class="gd-loading" aria-label="Loading listings">
+        <span class="gd-skeleton" style="height:220px"></span><span class="gd-skeleton" style="height:220px"></span>
       </div>
 
       <!-- Listings Content -->
@@ -110,9 +109,9 @@
           <div class="gd-filter-row">
             <input type="text" id="filter-address" class="gd-input gd-filter-input" placeholder="Search address, city, MLS#...">
             <div class="gd-filter-group">
-              <input type="number" id="filter-price-min" class="gd-input gd-filter-sm" placeholder="Min $">
+              <input inputmode="decimal" type="number" id="filter-price-min" class="gd-input gd-filter-sm" placeholder="Min $">
               <span class="gd-filter-sep">—</span>
-              <input type="number" id="filter-price-max" class="gd-input gd-filter-sm" placeholder="Max $">
+              <input inputmode="decimal" type="number" id="filter-price-max" class="gd-input gd-filter-sm" placeholder="Max $">
             </div>
             <select id="filter-beds" class="gd-input gd-filter-sm">
               <option value="">Beds</option>
@@ -152,7 +151,9 @@
             <label class="gd-checkbox-label"><input type="checkbox" value="Multi-Family" class="filter-type-cb"> Multi-Family</label>
             <label class="gd-checkbox-label"><input type="checkbox" value="Land" class="filter-type-cb"> Land</label>
           </div>
+          <button type="button" class="gd-btn gd-btn-primary gd-filters-done gd-show-mobile" onclick="document.getElementById('filters-toggle').click()">Done</button>
         </div>
+        <div class="gd-sheet-scrim" onclick="const f=document.querySelector('.gd-listings-filters.open'); if(f) document.getElementById('filters-toggle').click(); if(document.querySelector('.gd-quick-match-sidebar.active')) toggleQuickMatch();"></div>
 
         <!-- Grid View -->
         <div id="listings-grid" class="gd-listings-grid">
@@ -218,6 +219,15 @@
         <button class="gd-modal-close" onclick="closeAddListingModal()">&times;</button>
       </div>
       <div class="gd-modal-body">
+        <div class="gd-form-section gd-listing-import">
+          <div class="gd-form-section-title">Start from a link</div>
+          <div class="gd-form-row gd-listing-import-row">
+            <div class="gd-form-group" style="flex:1;"><label for="lst-import-url">Zillow, Realtor.com, or MLS link</label><input type="url" inputmode="url" id="lst-import-url" class="gd-input" placeholder="Paste a listing link and we fill the rest"></div>
+            <div class="gd-form-group" style="flex:0 0 auto;align-self:flex-end;"><button type="button" class="gd-btn gd-btn-primary" id="lst-import-btn" onclick="importListingFromUrl()">Import</button></div>
+          </div>
+          <div id="lst-import-status" class="gd-text-muted" style="font-size:0.85rem;min-height:1.2em;"></div>
+        </div>
+
 
         <div class="gd-form-section">
           <div class="gd-form-section-title">Address</div>
@@ -225,31 +235,46 @@
             <label for="lst-address">Street Address *</label>
             <input type="text" id="lst-address" class="gd-input" placeholder="Start typing an address...">
           </div>
-          <div class="gd-form-row">
+          <div class="gd-form-row gd-form-row-inline">
             <div class="gd-form-group"><label for="lst-city">City</label><input type="text" id="lst-city" class="gd-input"></div>
             <div class="gd-form-group"><label for="lst-state">State</label><input type="text" id="lst-state" class="gd-input" maxlength="2"></div>
             <div class="gd-form-group"><label for="lst-zip">ZIP</label><input type="text" id="lst-zip" class="gd-input" maxlength="10"></div>
           </div>
-          <div class="gd-form-row">
-            <div class="gd-form-group"><label for="lst-county">County</label><input type="text" id="lst-county" class="gd-input"></div>
-            <div class="gd-form-group"><label for="lst-neighborhood">Neighborhood</label><input type="text" id="lst-neighborhood" class="gd-input"></div>
-          </div>
         </div>
 
         <div class="gd-form-section">
-          <div class="gd-form-section-title">Pricing</div>
+          <div class="gd-form-section-title">Price &amp; status</div>
           <div class="gd-form-row">
-            <div class="gd-form-group"><label for="lst-price">Listing Price *</label><input type="number" id="lst-price" class="gd-input"></div>
-            <div class="gd-form-group"><label for="lst-pricePerSqft">Price/Sq Ft</label><input type="number" id="lst-pricePerSqft" class="gd-input" readonly tabindex="-1"></div>
+            <div class="gd-form-group"><label for="lst-price">Listing Price *</label><input inputmode="decimal" type="number" id="lst-price" class="gd-input"></div>
+            <div class="gd-form-group gd-hide-mobile"><label for="lst-pricePerSqft">Price/Sq Ft</label><input inputmode="decimal" type="number" id="lst-pricePerSqft" class="gd-input" readonly tabindex="-1"></div>
+            <div class="gd-form-group">
+              <label for="lst-status">Status</label>
+              <select id="lst-status" class="gd-input">
+                <option value="active">Active</option>
+                <option value="pending">Pending</option>
+                <option value="sold">Sold</option>
+                <option value="coming_soon">Coming Soon</option>
+                <option value="withdrawn">Withdrawn</option>
+              </select>
+            </div>
           </div>
         </div>
 
         <div class="gd-form-section">
           <div class="gd-form-section-title">Details</div>
           <div class="gd-form-row">
-            <div class="gd-form-group"><label for="lst-beds">Bedrooms</label><input type="number" id="lst-beds" class="gd-input" min="0"></div>
-            <div class="gd-form-group"><label for="lst-baths">Bathrooms</label><input type="number" id="lst-baths" class="gd-input" min="0" step="0.5"></div>
-            <div class="gd-form-group"><label for="lst-sqft">Square Feet</label><input type="number" id="lst-sqft" class="gd-input" min="0"></div>
+            <div class="gd-form-group"><label for="lst-beds">Bedrooms</label><input inputmode="decimal" type="number" id="lst-beds" class="gd-input" min="0"></div>
+            <div class="gd-form-group"><label for="lst-baths">Bathrooms</label><input inputmode="decimal" type="number" id="lst-baths" class="gd-input" min="0" step="0.5"></div>
+            <div class="gd-form-group"><label for="lst-sqft">Square Feet</label><input inputmode="decimal" type="number" id="lst-sqft" class="gd-input" min="0"></div>
+          </div>
+          </div>
+        <details class="gd-more-details" id="lst-more-details">
+          <summary>More details <span class="gd-text-muted">type, year built, features, schools, photos, MLS, notes</span></summary>
+        <div class="gd-form-section">
+          <div class="gd-form-section-title">Property details</div>
+          <div class="gd-form-row">
+            <div class="gd-form-group"><label for="lst-county">County</label><input type="text" id="lst-county" class="gd-input"></div>
+            <div class="gd-form-group"><label for="lst-neighborhood">Neighborhood</label><input type="text" id="lst-neighborhood" class="gd-input"></div>
           </div>
           <div class="gd-form-row">
             <div class="gd-form-group">
@@ -263,12 +288,12 @@
                 <option value="Land">Land</option>
               </select>
             </div>
-            <div class="gd-form-group"><label for="lst-yearBuilt">Year Built</label><input type="number" id="lst-yearBuilt" class="gd-input"></div>
+            <div class="gd-form-group"><label for="lst-yearBuilt">Year Built</label><input inputmode="decimal" type="number" id="lst-yearBuilt" class="gd-input"></div>
             <div class="gd-form-group"><label for="lst-lotSize">Lot Size</label><input type="text" id="lst-lotSize" class="gd-input" placeholder="0.25 acres"></div>
           </div>
           <div class="gd-form-row">
-            <div class="gd-form-group"><label for="lst-garage">Garage Spaces</label><input type="number" id="lst-garage" class="gd-input" min="0"></div>
-            <div class="gd-form-group"><label for="lst-stories">Stories</label><input type="number" id="lst-stories" class="gd-input" min="1"></div>
+            <div class="gd-form-group"><label for="lst-garage">Garage Spaces</label><input inputmode="decimal" type="number" id="lst-garage" class="gd-input" min="0"></div>
+            <div class="gd-form-group"><label for="lst-stories">Stories</label><input inputmode="decimal" type="number" id="lst-stories" class="gd-input" min="1"></div>
           </div>
         </div>
 
@@ -288,7 +313,7 @@
           <div class="gd-form-section-title">Schools</div>
           <div class="gd-form-row">
             <div class="gd-form-group"><label for="lst-schoolDistrict">School District</label><input type="text" id="lst-schoolDistrict" class="gd-input"></div>
-            <div class="gd-form-group"><label for="lst-schoolRating">Rating (1-10)</label><input type="number" id="lst-schoolRating" class="gd-input" min="1" max="10"></div>
+            <div class="gd-form-group"><label for="lst-schoolRating">Rating (1-10)</label><input inputmode="decimal" type="number" id="lst-schoolRating" class="gd-input" min="1" max="10"></div>
           </div>
         </div>
 
@@ -304,7 +329,7 @@
           </div>
           <div class="gd-form-group">
             <label for="lst-virtualTour">Virtual Tour URL</label>
-            <input type="url" id="lst-virtualTour" class="gd-input" placeholder="https://...">
+            <input inputmode="url" type="url" id="lst-virtualTour" class="gd-input" placeholder="https://...">
           </div>
         </div>
 
@@ -312,20 +337,10 @@
           <div class="gd-form-section-title">Listing Info</div>
           <div class="gd-form-row">
             <div class="gd-form-group"><label for="lst-mlsNumber">MLS Number</label><input type="text" id="lst-mlsNumber" class="gd-input"></div>
-            <div class="gd-form-group">
-              <label for="lst-status">Status</label>
-              <select id="lst-status" class="gd-input">
-                <option value="active">Active</option>
-                <option value="pending">Pending</option>
-                <option value="sold">Sold</option>
-                <option value="coming_soon">Coming Soon</option>
-                <option value="withdrawn">Withdrawn</option>
-              </select>
-            </div>
           </div>
           <div class="gd-form-row">
             <div class="gd-form-group"><label for="lst-listDate">List Date</label><input type="date" id="lst-listDate" class="gd-input"></div>
-            <div class="gd-form-group"><label for="lst-listingUrl">Listing URL</label><input type="url" id="lst-listingUrl" class="gd-input" placeholder="https://..."></div>
+            <div class="gd-form-group"><label for="lst-listingUrl">Listing URL</label><input inputmode="url" type="url" id="lst-listingUrl" class="gd-input" placeholder="https://..."></div>
           </div>
         </div>
 
@@ -336,6 +351,7 @@
           </div>
         </div>
 
+        </details>
       </div>
       <div class="gd-modal-footer">
         <button class="gd-btn" onclick="closeAddListingModal()">Cancel</button>

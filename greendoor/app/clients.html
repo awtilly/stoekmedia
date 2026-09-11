@@ -94,14 +94,13 @@
           <option value="closed">Closed</option>
           <option value="inactive">Inactive</option>
         </select>
-        <button class="gd-btn" onclick="openImportModal()">Import CSV</button>
+        <button class="gd-btn gd-hide-mobile" onclick="openImportModal()">Import CSV</button>
         <button class="gd-btn gd-btn-primary" onclick="openAddModal()">+ Add Client</button>
       </div>
 
       <!-- Loading -->
-      <div id="clients-loading" class="gd-loading">
-        <div class="gd-spinner gd-spinner-lg"></div>
-        <span class="gd-loading-text">Loading clients...</span>
+      <div id="clients-loading" class="gd-loading" aria-label="Loading clients">
+        <span class="gd-skeleton"></span><span class="gd-skeleton"></span><span class="gd-skeleton"></span><span class="gd-skeleton"></span><span class="gd-skeleton"></span>
       </div>
 
       <!-- Table -->
@@ -139,6 +138,7 @@
         <h3>Add New Client</h3>
         <button class="gd-modal-close" onclick="closeAddModal()" aria-label="Close">&times;</button>
       </div>
+      <p class="gd-text-muted gd-show-mobile" style="padding:8px 20px 0;font-size:0.9rem;margin:0;">Have a spreadsheet? <a href="#" onclick="closeAddModal(); openImportModal(); return false;">Import a CSV instead</a>.</p>
       <div class="gd-modal-body">
         <div class="gd-form-row">
           <div class="gd-form-group">
@@ -147,13 +147,13 @@
           </div>
           <div class="gd-form-group">
             <label for="add-email">Email *</label>
-            <input type="email" id="add-email" class="gd-input" required>
+            <input inputmode="email" type="email" id="add-email" class="gd-input" required>
           </div>
         </div>
         <div class="gd-form-row">
           <div class="gd-form-group">
             <label for="add-phone">Phone</label>
-            <input type="tel" id="add-phone" class="gd-input">
+            <input inputmode="tel" type="tel" id="add-phone" class="gd-input">
           </div>
           <div class="gd-form-group">
             <label for="add-status">Status</label>
@@ -170,11 +170,11 @@
         <div class="gd-form-row">
           <div class="gd-form-group">
             <label for="add-budgetMin">Budget Min</label>
-            <input type="number" id="add-budgetMin" class="gd-input" placeholder="200000">
+            <input inputmode="decimal" type="number" id="add-budgetMin" class="gd-input" placeholder="200000">
           </div>
           <div class="gd-form-group">
             <label for="add-budgetMax">Budget Max</label>
-            <input type="number" id="add-budgetMax" class="gd-input" placeholder="500000">
+            <input inputmode="decimal" type="number" id="add-budgetMax" class="gd-input" placeholder="500000">
           </div>
         </div>
         <div class="gd-form-row">

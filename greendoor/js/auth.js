@@ -200,7 +200,21 @@ export async function getCurrentUser() {
 }
 
 /* --- Toast notifications (stacking queue) --- */
+/* Haptics (native only): a light tick with every toast so Save / Log it feel
+   confirmed under the thumb. Silently a no-op on the web. */
+export function haptic(kind = "light") {
+  try {
+    const H = window.Capacitor?.isNativePlatform?.() && window.Capacitor.Plugins?.Haptics;
+    if (!H) return;
+    if (kind === "success" || kind === "error" || kind === "warning") H.notification({ type: kind.toUpperCase() });
+    else if (kind === "selection") H.selectionStart().then(() => H.selectionChanged()).then(() => H.selectionEnd()).catch(() => {});
+    else H.impact({ style: kind === "medium" ? "MEDIUM" : "LIGHT" });
+  } catch (_) {}
+}
+window.gdHaptic = haptic;
+
 export function showToast(message, type = "success") {
+  haptic(type === "error" ? "error" : type === "success" ? "success" : "light");
   let container = document.querySelector(".gd-toast-container");
   if (!container) {
     container = document.createElement("div");
@@ -433,4 +447,32 @@ if (/iPad|iPhone|iPod/.test(navigator.userAgent) && !isStandalone() && !localSto
   };
   vv.addEventListener("resize", update);
   vv.addEventListener("scroll", update);
+})();
+
+/* Offline banner: reviewers test in Airplane Mode and realtors lose signal in
+   basements. Say so instead of spinning. */
+(function () {
+  const banner = document.createElement("div");
+  banner.className = "gd-offline-banner";
+  banner.setAttribute("role", "status");
+  banner.textContent = "You're offline. Showing what was last loaded.";
+  const mount = () => document.body && document.body.appendChild(banner);
+  if (document.body) mount(); else document.addEventListener("DOMContentLoaded", mount);
+  const update = () => document.body && document.body.classList.toggle("gd-offline", navigator.onLine === false);
+  window.addEventListener("online", update);
+  window.addEventListener("offline", update);
+  if (document.body) update(); else document.addEventListener("DOMContentLoaded", update);
+})();
+
+/* Keyboard state (native resize mode): when the WebView shrinks by more than a
+   quarter, the keyboard is up — hide the floating tab bar so it doesn't ride on
+   top of the keys. */
+(function () {
+  let base = window.innerHeight;
+  const update = () => {
+    if (window.innerHeight > base) base = window.innerHeight;
+    document.body && document.body.classList.toggle("gd-kb-open", window.innerHeight < base * 0.75);
+  };
+  window.addEventListener("resize", update);
+  window.addEventListener("orientationchange", () => { base = 0; setTimeout(update, 300); });
 })();

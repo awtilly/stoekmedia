@@ -100,6 +100,8 @@ function injectBottomTabs() {
     document.body.appendChild(chip);
   }
 
+  nav.querySelectorAll(".gd-tab-item").forEach(el => el.addEventListener("click", () => window.gdHaptic?.("light")));
+
   const aiTab = nav.querySelector(".gd-tab-ai");
   if (aiTab) {
     aiTab.addEventListener("click", () => {

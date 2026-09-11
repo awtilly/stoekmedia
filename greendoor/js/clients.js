@@ -3,7 +3,7 @@ import { onAuthStateChanged } from "./vendor/firebase.js";
 import {
   collection, query, where, orderBy, getDocs, addDoc, serverTimestamp
 } from "./vendor/firebase.js";
-import { getCurrentUser, formatCurrency, timeAgo, statusLabel, showToast, escapeHtml } from "./auth.js";
+import { getCurrentUser, formatCurrency, timeAgo, statusLabel, showToast, escapeHtml, safeToDate } from "./auth.js";
 import { checkAndResumeTour } from "./tour.js";
 import { icon } from "./icons.js";
 
@@ -15,6 +15,20 @@ function debounce(fn, ms) {
   let timer;
   return (...args) => { clearTimeout(timer); timer = setTimeout(() => fn(...args), ms); };
 }
+
+/* Paint the last known list immediately (stale-while-revalidate) so a tab
+   switch shows rows in the first frame instead of a spinner. */
+const CLIENTS_CACHE_KEY = "gd-cache-clients";
+try {
+  const cached = JSON.parse(sessionStorage.getItem(CLIENTS_CACHE_KEY) || "null");
+  if (Array.isArray(cached) && cached.length) {
+    allClients = cached.map(c => ({ ...c, lastActivityDate: c.lastActivityDate ? new Date(c.lastActivityDate) : null }));
+    renderClients(allClients);
+    document.getElementById("clients-loading").classList.add("gd-hidden");
+    document.getElementById("clients-table-wrap").classList.remove("gd-hidden");
+    document.getElementById("clients-table-wrap").classList.add("gd-refreshing");
+  }
+} catch (_) {}
 
 onAuthStateChanged(auth, async (user) => {
   if (!user) return;
@@ -31,10 +45,17 @@ async function loadClients(uid) {
     const snap = await getDocs(q);
     allClients = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     renderClients(allClients);
+    try {
+      sessionStorage.setItem(CLIENTS_CACHE_KEY, JSON.stringify(allClients.map(c => ({
+        id: c.id, fullName: c.fullName, status: c.status,
+        lastActivityDate: safeToDate(c.lastActivityDate)?.getTime() || null
+      }))));
+    } catch (_) {}
   } catch (e) {
     console.error("Load clients error:", e);
     showToast("Could not load clients. Please refresh the page.", "error");
   }
+  document.getElementById("clients-table-wrap").classList.remove("gd-refreshing");
 
   document.getElementById("clients-loading").classList.add("gd-hidden");
   document.getElementById("clients-table-wrap").classList.remove("gd-hidden");
@@ -56,16 +77,37 @@ function renderClients(clients) {
   empty.classList.add("gd-hidden");
   wrap.classList.remove("gd-hidden");
 
-  tbody.innerHTML = clients.map(c => `
+  tbody.innerHTML = clients.map(c => {
+    const age = contactAge(c.lastActivityDate);
+    return `
     <tr class="gd-client-row" onclick="if(!event.target.closest('button')) location.href='client-detail.html?id=${c.id}'">
-      <td><a href="client-detail.html?id=${c.id}">${escapeHtml(c.fullName) || "—"}</a></td>
-      <td><span class="gd-badge gd-badge-${c.status || "lead"}">${statusLabel(c.status || "lead")}</span></td>
+      <td class="gd-client-cell-avatar gd-show-mobile"><span class="gd-client-avatar" aria-hidden="true">${initials(c.fullName)}</span></td>
+      <td class="gd-client-cell-name"><a href="client-detail.html?id=${c.id}">${escapeHtml(c.fullName) || "—"}</a>
+        <span class="gd-badge gd-badge-${c.status || "lead"} gd-show-mobile">${statusLabel(c.status || "lead")}</span></td>
+      <td class="gd-hide-mobile"><span class="gd-badge gd-badge-${c.status || "lead"}">${statusLabel(c.status || "lead")}</span></td>
       <td class="gd-hide-mobile">${c.budgetMin || c.budgetMax ? formatCurrency(c.budgetMin) + " — " + formatCurrency(c.budgetMax) : "—"}</td>
       <td class="gd-hide-mobile">${c.preferredLocations && c.preferredLocations.length ? c.preferredLocations[0] : "—"}</td>
       <td class="gd-hide-mobile">${timeAgo(c.lastActivityDate)}</td>
-      <td><button class="gd-ai-icon-btn" onclick="event.stopPropagation(); showAiSummary('${c.id}', this)" title="Sage Summary">${icon("sparkle", 16)}</button></td>
+      <td class="gd-client-cell-age gd-show-mobile"><span class="gd-client-age ${age.cls}" title="Last contact">${age.label}</span></td>
+      <td><button class="gd-ai-icon-btn" onclick="event.stopPropagation(); showAiSummary('${c.id}', this)" title="Sage Summary" aria-label="Sage summary">${icon("sparkle", 16)}</button></td>
     </tr>
-  `).join("");
+  `; }).join("");
+}
+
+function initials(name) {
+  const parts = String(name || "").replace(/&/g, " ").split(/\s+/).filter(Boolean);
+  if (!parts.length) return "?";
+  return ((parts[0][0] || "") + (parts.length > 1 ? parts[parts.length - 1][0] || "" : "")).toUpperCase();
+}
+
+/* "26 d" pill: amber after two weeks, red after a month, so the list answers
+   "who needs me today" before a single tap. */
+function contactAge(ts) {
+  const d = safeToDate(ts);
+  if (!d) return { label: "new", cls: "" };
+  const days = Math.max(0, Math.floor((Date.now() - d.getTime()) / 86400000));
+  const label = days === 0 ? "today" : days < 30 ? `${days} d` : days < 365 ? `${Math.floor(days / 30)} mo` : `${Math.floor(days / 365)} y`;
+  return { label, cls: days >= 30 ? "cold" : days >= 14 ? "stale" : "" };
 }
 
 /* --- Search & Filter --- */

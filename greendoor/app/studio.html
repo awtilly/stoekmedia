@@ -35,7 +35,7 @@ header .ttl{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);fo
    dashboard being on screen is the indicator. */
 .tabs{display:flex;gap:3px;overflow-x:auto;scrollbar-width:none;flex:1;justify-content:flex-start}
 .tabs::-webkit-scrollbar{display:none}
-.tab{background:#F1F5F9;color:#475569;border:0;padding:8px 13px;font:600 10px/1 var(--fb);
+.tab{background:#F1F5F9;color:#475569;border:0;padding:13px 15px;font:600 11px/1 var(--fb);min-height:40px;
      letter-spacing:.13em;text-transform:uppercase;cursor:pointer;border-radius:99px;white-space:nowrap}
 .tab[aria-selected=true]{background:var(--gdb);color:#fff}
 
@@ -91,7 +91,7 @@ body.dashboard #tabs{display:none}
 aside{width:var(--panelw);flex:0 0 var(--panelw);background:#fff;border-right:1px solid var(--stone);
       display:flex;flex-direction:column;min-height:0}
 .ptabs{display:flex;border-bottom:1px solid var(--stone);flex:0 0 auto}
-.ptab{flex:1;background:none;border:0;padding:11px 4px;font:600 9.5px/1 var(--fb);letter-spacing:.14em;
+.ptab{flex:1;background:none;border:0;padding:15px 4px;font:600 11px/1 var(--fb);letter-spacing:.14em;min-height:44px;
       text-transform:uppercase;color:var(--ink-soft);cursor:pointer;border-bottom:2px solid transparent}
 .ptab[aria-selected=true]{color:var(--ink);border-bottom-color:var(--brass)}
 .pbody{flex:1;overflow-y:auto;padding:15px}
@@ -100,14 +100,14 @@ aside{width:var(--panelw);flex:0 0 var(--panelw);background:#fff;border-right:1p
 /* ---------- stage ---------- */
 .stage{flex:1;overflow:auto;display:flex;flex-direction:column;align-items:center;gap:14px;padding:14px 14px 20px;min-width:0;background:#EDEFF2}
 .stagebar{display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:center;max-width:100%}
-.chip{background:#fff;border:1px solid #E5E7EB;padding:8px 14px;font:600 9.5px/1 var(--fb);
+.chip{background:#fff;border:1px solid #E5E7EB;padding:12px 15px;font:600 11px/1 var(--fb);
       letter-spacing:.11em;text-transform:uppercase;cursor:pointer;border-radius:99px;color:var(--ink-soft);white-space:nowrap}
 .chip[aria-selected=true]{background:var(--ink);color:#fff;border-color:var(--ink)}
-.btn{background:var(--brass);color:#fff;border:0;padding:10px 16px;font:600 9.5px/1 var(--fb);
+.btn{background:var(--brass);color:#fff;border:0;padding:14px 16px;font:600 11px/1 var(--fb);min-height:44px;
      letter-spacing:.13em;text-transform:uppercase;cursor:pointer;border-radius:8px;white-space:nowrap}
 .btn.grow{flex:1}
 .btn.ghost{background:#fff;color:var(--ink);border:1px solid var(--ink)}
-.btn.sm{padding:7px 11px;font-size:9px}
+.btn.sm{padding:11px 12px;font-size:10px;min-height:40px}
 .btn:disabled{opacity:.5;cursor:wait}
 
 /* ---------- form ---------- */

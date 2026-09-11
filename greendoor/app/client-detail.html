@@ -173,12 +173,12 @@
                 </div>
                 <div class="gd-form-group">
                   <label for="ov-email">Email</label>
-                  <input type="email" id="ov-email" class="gd-input">
+                  <input inputmode="email" type="email" id="ov-email" class="gd-input">
                 </div>
               </div>
               <div class="gd-form-group">
                 <label for="ov-phone">Phone</label>
-                <input type="tel" id="ov-phone" class="gd-input">
+                <input inputmode="tel" type="tel" id="ov-phone" class="gd-input">
               </div>
             </div>
 
@@ -246,11 +246,11 @@
               <div class="gd-form-row">
                 <div class="gd-form-group">
                   <label for="ov-budgetMin">Budget Min ($)</label>
-                  <input type="number" id="ov-budgetMin" class="gd-input">
+                  <input inputmode="decimal" type="number" id="ov-budgetMin" class="gd-input">
                 </div>
                 <div class="gd-form-group">
                   <label for="ov-budgetMax">Budget Max ($)</label>
-                  <input type="number" id="ov-budgetMax" class="gd-input">
+                  <input inputmode="decimal" type="number" id="ov-budgetMax" class="gd-input">
                 </div>
               </div>
             </div>
@@ -272,16 +272,16 @@
                 </div>
               </div>
               <div class="gd-form-row">
-                <div class="gd-form-group"><label for="ov-bedsMin">Beds Min</label><input type="number" id="ov-bedsMin" class="gd-input"></div>
-                <div class="gd-form-group"><label for="ov-bedsMax">Beds Max</label><input type="number" id="ov-bedsMax" class="gd-input"></div>
+                <div class="gd-form-group"><label for="ov-bedsMin">Beds Min</label><input inputmode="decimal" type="number" id="ov-bedsMin" class="gd-input"></div>
+                <div class="gd-form-group"><label for="ov-bedsMax">Beds Max</label><input inputmode="decimal" type="number" id="ov-bedsMax" class="gd-input"></div>
               </div>
               <div class="gd-form-row">
-                <div class="gd-form-group"><label for="ov-bathsMin">Baths Min</label><input type="number" id="ov-bathsMin" class="gd-input"></div>
-                <div class="gd-form-group"><label for="ov-bathsMax">Baths Max</label><input type="number" id="ov-bathsMax" class="gd-input"></div>
+                <div class="gd-form-group"><label for="ov-bathsMin">Baths Min</label><input inputmode="decimal" type="number" id="ov-bathsMin" class="gd-input"></div>
+                <div class="gd-form-group"><label for="ov-bathsMax">Baths Max</label><input inputmode="decimal" type="number" id="ov-bathsMax" class="gd-input"></div>
               </div>
               <div class="gd-form-row">
-                <div class="gd-form-group"><label for="ov-sqftMin">Sq Ft Min</label><input type="number" id="ov-sqftMin" class="gd-input"></div>
-                <div class="gd-form-group"><label for="ov-sqftMax">Sq Ft Max</label><input type="number" id="ov-sqftMax" class="gd-input"></div>
+                <div class="gd-form-group"><label for="ov-sqftMin">Sq Ft Min</label><input inputmode="decimal" type="number" id="ov-sqftMin" class="gd-input"></div>
+                <div class="gd-form-group"><label for="ov-sqftMax">Sq Ft Max</label><input inputmode="decimal" type="number" id="ov-sqftMax" class="gd-input"></div>
               </div>
               <div class="gd-form-group">
                 <label for="ov-mustHaveFeatures">Must-Have Features (comma-separated)</label>
@@ -308,7 +308,7 @@
                 </div>
                 <div class="gd-form-group">
                   <label for="ov-preApprovalAmount">Pre-Approval Amount ($)</label>
-                  <input type="number" id="ov-preApprovalAmount" class="gd-input">
+                  <input inputmode="decimal" type="number" id="ov-preApprovalAmount" class="gd-input">
                 </div>
               </div>
             </div>
@@ -455,6 +455,7 @@
           <div id="checklist-container">
             <div id="checklist-empty" class="gd-empty-state" style="display:none;">
               <p>Set a transaction type on the Overview tab to generate a closing checklist.</p>
+              <button type="button" class="gd-btn gd-btn-sm" onclick="document.querySelector('.gd-tab[data-tab=overview]').click(); (document.getElementById('detail-transactionType')||document.getElementById('client-transactionType')||{}).focus?.()">Set transaction type</button>
             </div>
             <div id="checklist-content" style="display:none;">
               <div id="checklist-overall-progress"></div>
@@ -676,11 +677,11 @@
       <div class="gd-modal-body">
         <div class="gd-form-group">
           <label for="send-doc-to">To</label>
-          <input type="email" id="send-doc-to" class="gd-input">
+          <input inputmode="email" type="email" id="send-doc-to" class="gd-input">
         </div>
         <div class="gd-form-group">
           <label for="send-doc-cc">CC (optional)</label>
-          <input type="email" id="send-doc-cc" class="gd-input">
+          <input inputmode="email" type="email" id="send-doc-cc" class="gd-input">
         </div>
         <div class="gd-form-group">
           <label for="send-doc-subject">Subject</label>
@@ -731,7 +732,7 @@
           </div>
           <div class="gd-form-group">
             <label for="show-price">Listing Price</label>
-            <input type="number" id="show-price" class="gd-input">
+            <input inputmode="decimal" type="number" id="show-price" class="gd-input">
           </div>
         </div>
         <div class="gd-form-row">
@@ -741,7 +742,7 @@
           </div>
           <div class="gd-form-group">
             <label for="show-duration">Duration (min)</label>
-            <input type="number" id="show-duration" class="gd-input" value="60" min="15" step="15">
+            <input inputmode="decimal" type="number" id="show-duration" class="gd-input" value="60" min="15" step="15">
           </div>
         </div>
         <div class="gd-form-group">
@@ -848,7 +849,7 @@
           <div class="gd-form-group gd-mb-0">
             <label>Import from URL</label>
             <div class="gd-flex gd-gap-sm">
-              <input type="url" id="al-url" class="gd-input gd-flex-1" placeholder="Paste a Zillow, Realtor.com, or other listing URL...">
+              <input inputmode="url" type="url" id="al-url" class="gd-input gd-flex-1" placeholder="Paste a Zillow, Realtor.com, or other listing URL...">
               <button id="al-fetch-btn" class="gd-btn gd-btn-primary" onclick="fetchListingFromUrl()">Fetch</button>
             </div>
           </div>
@@ -880,7 +881,7 @@
             <div class="gd-form-section-title">Pricing</div>
             <div class="gd-form-group">
               <label for="al-price">List Price ($)</label>
-              <input type="number" id="al-price" class="gd-input">
+              <input inputmode="decimal" type="number" id="al-price" class="gd-input">
             </div>
           </div>
 
@@ -897,17 +898,17 @@
                   <option value="Land">Land</option>
                 </select>
               </div>
-              <div class="gd-form-group"><label for="al-beds">Beds</label><input type="number" id="al-beds" class="gd-input"></div>
-              <div class="gd-form-group"><label for="al-baths">Baths</label><input type="number" id="al-baths" class="gd-input" step="0.5"></div>
+              <div class="gd-form-group"><label for="al-beds">Beds</label><input inputmode="decimal" type="number" id="al-beds" class="gd-input"></div>
+              <div class="gd-form-group"><label for="al-baths">Baths</label><input inputmode="decimal" type="number" id="al-baths" class="gd-input" step="0.5"></div>
             </div>
             <div class="gd-form-row">
-              <div class="gd-form-group"><label for="al-sqft">Sq Ft</label><input type="number" id="al-sqft" class="gd-input"></div>
-              <div class="gd-form-group"><label for="al-yearBuilt">Year Built</label><input type="number" id="al-yearBuilt" class="gd-input"></div>
+              <div class="gd-form-group"><label for="al-sqft">Sq Ft</label><input inputmode="decimal" type="number" id="al-sqft" class="gd-input"></div>
+              <div class="gd-form-group"><label for="al-yearBuilt">Year Built</label><input inputmode="decimal" type="number" id="al-yearBuilt" class="gd-input"></div>
               <div class="gd-form-group"><label for="al-lotSize">Lot Size</label><input type="text" id="al-lotSize" class="gd-input" placeholder="0.25 acres"></div>
             </div>
             <div class="gd-form-row">
-              <div class="gd-form-group"><label for="al-garage">Garage Spaces</label><input type="number" id="al-garage" class="gd-input"></div>
-              <div class="gd-form-group"><label for="al-stories">Stories</label><input type="number" id="al-stories" class="gd-input"></div>
+              <div class="gd-form-group"><label for="al-garage">Garage Spaces</label><input inputmode="decimal" type="number" id="al-garage" class="gd-input"></div>
+              <div class="gd-form-group"><label for="al-stories">Stories</label><input inputmode="decimal" type="number" id="al-stories" class="gd-input"></div>
             </div>
           </div>
 
@@ -938,7 +939,7 @@
             </div>
             <div class="gd-form-group">
               <label for="al-listingUrl">Listing URL</label>
-              <input type="url" id="al-listingUrl" class="gd-input">
+              <input inputmode="url" type="url" id="al-listingUrl" class="gd-input">
             </div>
             <div class="gd-form-group">
               <label for="al-description">Description</label>

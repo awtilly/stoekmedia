@@ -389,6 +389,13 @@ async function uploadPhotos(listingId) {
 window.openAddListingModal = function (listingId) {
   editingListingId = listingId || null;
   document.getElementById("add-listing-title").textContent = listingId ? "Edit Listing" : "Add Listing";
+  // Phone: five essentials up top, everything else folded. Desktop and edit mode show it all.
+  const more = document.getElementById("lst-more-details");
+  if (more) more.open = !!listingId || window.innerWidth > 768;
+  const importStatus = document.getElementById("lst-import-status");
+  if (importStatus) importStatus.textContent = "";
+  const importUrl = document.getElementById("lst-import-url");
+  if (importUrl) importUrl.value = "";
 
   if (listingId) {
     const l = allListings.find(x => x.id === listingId);
@@ -896,4 +903,42 @@ window.sendToStudio = (id) => {
   if (!l) return;
   try { sessionStorage.setItem("gd-studio-listing", JSON.stringify(l)); } catch (e) {}
   window.location.href = "studio.html";
+};
+
+
+/* ===== LINK-FIRST IMPORT =====
+   Paste a Zillow / Realtor.com / MLS link and the parser fills the form.
+   Same Cloud Function the client Matches tab uses. */
+const parseListingUrlFn = httpsCallable(functions, "parseListingUrl");
+window.importListingFromUrl = async function () {
+  const input = document.getElementById("lst-import-url");
+  const status = document.getElementById("lst-import-status");
+  const btn = document.getElementById("lst-import-btn");
+  const url = (input.value || "").trim();
+  if (!/^https?:\/\//i.test(url)) { status.textContent = "Paste a full link that starts with https://"; input.focus(); return; }
+  btn.disabled = true; status.textContent = "Reading the listing…";
+  try {
+    const r = await parseListingUrlFn({ url });
+    const l = r.data?.listing || {};
+    const set = (id, v) => { const el = document.getElementById(id); if (el && v != null && v !== "") el.value = v; };
+    if (l.address) {
+      set("lst-address", l.address.full || l.address.street);
+      set("lst-city", l.address.city); set("lst-state", l.address.state); set("lst-zip", l.address.zip);
+      set("lst-county", l.address.county); set("lst-neighborhood", l.address.neighborhood);
+    }
+    set("lst-price", l.listingPrice); set("lst-beds", l.bedrooms); set("lst-baths", l.bathrooms); set("lst-sqft", l.squareFeet);
+    set("lst-type", l.propertyType); set("lst-yearBuilt", l.yearBuilt); set("lst-lotSize", l.lotSize);
+    set("lst-garage", l.garageSpaces); set("lst-stories", l.stories); set("lst-mlsNumber", l.mlsNumber);
+    set("lst-status", l.status); set("lst-description", l.description); set("lst-listingUrl", url);
+    if (l.listingPrice && l.squareFeet) set("lst-pricePerSqft", Math.round(l.listingPrice / l.squareFeet));
+    const got = ["lst-address","lst-price","lst-beds","lst-baths"].filter(id => document.getElementById(id)?.value).length;
+    status.textContent = got ? "Filled in what the listing page showed. Check the price and status, then save." : "Couldn't read that page. Enter the details below.";
+    window.gdHaptic?.(got ? "success" : "warning");
+    document.getElementById("lst-price").focus();
+  } catch (e) {
+    console.error("Listing import error:", e);
+    status.textContent = e?.message?.includes("limit") ? e.message : "Couldn't read that link. Enter the details below.";
+  } finally {
+    btn.disabled = false;
+  }
 };
