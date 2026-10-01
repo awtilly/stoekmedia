@@ -1329,6 +1329,55 @@ When the realtor asks you to draft an email, create a follow-up, schedule a show
     }
   }
 
+  let studioTool = null;
+  if (context === "studio" && contextData) {
+    // GreenDoor Studio "Write it with Sage": the realtor is designing a
+    // marketing piece and wants the words written for them. The client sends
+    // the template's writable fields; Sage answers with ONE fill_studio
+    // tool_use whose keys are exactly those fields. Facts (price, beds,
+    // address, stats) are never invented — they are passed in and quoted.
+    const cd = contextData;
+    const fields = (Array.isArray(cd.fields) ? cd.fields : [])
+      .filter(f => f && typeof f.k === "string" && /^[a-zA-Z0-9_]{1,40}$/.test(f.k))
+      .slice(0, 12);
+    if (!fields.length) {
+      throw new HttpsError("invalid-argument", "No writable fields were sent.");
+    }
+    const props = {};
+    for (const f of fields) {
+      props[f.k] = {
+        type: "string",
+        description: `${f.l || f.k}${f.max ? ` (at most ${f.max} characters)` : ""}${f.current ? `. Current text: "${String(f.current).slice(0, 300)}"` : ""}`
+      };
+    }
+    studioTool = {
+      name: "fill_studio",
+      description: "Return the finished marketing copy for the design. Include every field you were asked to write; omit a field only if you have nothing better than what is already there.",
+      input_schema: { type: "object", properties: props, required: [] }
+    };
+    const facts = cd.facts && typeof cd.facts === "object"
+      ? Object.entries(cd.facts).filter(([, v]) => v !== null && v !== undefined && String(v).trim() !== "")
+          .slice(0, 30).map(([k, v]) => `- ${k}: ${String(v).slice(0, 400)}`).join("\n")
+      : "";
+    systemPrompt = `You are Sage, the in-app assistant for GreenDoor (a real estate CRM). The realtor is in the Studio, the built-in marketing designer, working on a "${String(cd.label || cd.template || "design").slice(0, 40)}" piece for ${String(cd.sizeName || "social media").slice(0, 40)}. Write the copy for the fields listed in the fill_studio tool and reply with exactly one fill_studio tool_use plus one short sentence (under 15 words) saying what you wrote.
+
+REALTOR: ${String(cd.agentName || "the agent").slice(0, 80)}${cd.brokerage ? ` · ${String(cd.brokerage).slice(0, 80)}` : ""}
+MARKET: ${String(cd.market || "St. Louis, Missouri").slice(0, 80)}
+TODAY: ${new Date().toISOString().slice(0, 10)}
+
+KNOWN FACTS (use these; never invent numbers, prices, dates, awards, or claims):
+${facts || "- (none provided)"}
+
+RULES:
+- Every string you write is final artwork text. No markdown, no quotes around it, no emoji, no hashtags, no placeholder brackets.
+- Respect each field's character limit. Headlines and hooks are ONE line. Eyebrows are 2-4 words.
+- Fair-housing safe: never describe who should live there (families, couples, professionals, religion, nationality, disability, "safe neighborhood"). Describe the property and the lifestyle it offers instead.
+- Do not make guarantees about value, investment returns, schools, or crime.
+- A testimonial must come from the realtor's own words. If asked to write a testimonial field with no source text, only tighten what is already there; never invent a review.
+- Market report numbers are never yours to write. Only label text may be written for a market piece.
+- If the realtor gave a direction in their message (tone, audience, angle, what to emphasize), follow it. Otherwise write warm, confident, specific copy in the voice of a seasoned local agent. Specific beats generic: use the address, neighborhood, and feature facts you were given.`;
+  }
+
   // Build messages array
   const messages = [];
   if (history && Array.isArray(history)) {
@@ -1356,6 +1405,9 @@ When the realtor asks you to draft an email, create a follow-up, schedule a show
     apiBody.tools = SAGE_DASHBOARD_TOOLS.map((t, i, arr) =>
       i === arr.length - 1 ? { ...t, cache_control: { type: "ephemeral" } } : t
     );
+  } else if (studioTool) {
+    apiBody.tools = [studioTool];
+    apiBody.tool_choice = { type: "tool", name: "fill_studio" };
   }
 
   // Call Anthropic Claude

@@ -18,10 +18,10 @@
 }
 *{box-sizing:border-box}
 html,body{margin:0;height:100%;overflow:hidden}
-/* min-height breaks the circular dependency when the host frame sizes itself
-   from content: without it, 100%/vh can resolve against a collapsed iframe. */
+/* dvh so the panel footer (Save / Publish) is never pushed below a short
+   laptop viewport, which overflow:hidden would then clip for good. */
 body{font-family:var(--fb);background:#F3F4F6;color:var(--ink);display:flex;flex-direction:column;
-     height:100vh;min-height:760px;-webkit-font-smoothing:antialiased}
+     height:100vh;height:100dvh;-webkit-font-smoothing:antialiased}
 button,input,select,textarea{font-family:inherit}
 
 /* ---------- header ---------- */
@@ -109,6 +109,48 @@ aside{width:var(--panelw);flex:0 0 var(--panelw);background:#fff;border-right:1p
 .btn.ghost{background:#fff;color:var(--ink);border:1px solid var(--ink)}
 .btn.sm{padding:11px 12px;font-size:10px;min-height:40px}
 .btn:disabled{opacity:.5;cursor:wait}
+
+/* ---------- desktop / web ---------- */
+.hdr-right{display:flex;align-items:center;gap:8px}
+.hdr-actions{display:none;gap:6px;align-items:center}
+.sync{display:none;font:600 9.5px/1 var(--fb);letter-spacing:.12em;text-transform:uppercase;color:var(--ink-soft);
+  padding:7px 10px;border-radius:99px;background:#F1F5F9;white-space:nowrap}
+.sync[data-s=saving]{color:#92400E;background:#FEF3C7}
+.sync[data-s=synced]{color:#166534;background:#DCFCE7}
+.sync[data-s=offline]{color:#991B1B;background:#FEE2E2}
+@media (min-width:861px){
+  .hdr-actions{display:flex}
+  .sync{display:inline-block}
+  .popmenu .desk-dup{display:none}
+  header{padding:10px 18px}
+  header .ttl{font-size:15px}
+}
+@media (min-width:1280px){ :root{--panelw:384px} .pbody{padding:18px} }
+@media (hover:hover){
+  .tab:not([aria-selected=true]):hover{background:#E2E8F0;color:var(--ink)}
+  .chip:not([aria-selected=true]):hover{border-color:var(--ink);color:var(--ink)}
+  .btn:hover:not(:disabled){filter:brightness(.94)}
+  .btn.ghost:hover:not(:disabled){background:#F8FAFC;filter:none}
+  .ptab:not([aria-selected=true]):hover{color:var(--ink)}
+}
+/* logo slot (Your info tab) */
+.logoslot{display:flex;gap:10px;align-items:center;margin:4px 0 10px}
+.logoslot .lprev{width:96px;height:66px;border:1px dashed var(--stone);border-radius:8px;flex:0 0 auto;cursor:pointer;
+  background:repeating-conic-gradient(#EEF0F2 0 25%,#fff 0 50%) 0 0/16px 16px;display:grid;place-items:center;overflow:hidden}
+.logoslot .lprev.drop{border-color:var(--sage-deep);background:#EDF2E8}
+.logoslot .lprev img{max-width:86px;max-height:56px;object-fit:contain;display:block}
+.logoslot .lprev span{font-size:22px;color:var(--ink-soft)}
+.logoslot .lacts{display:flex;flex-direction:column;gap:6px;flex:1;min-width:0}
+.logoslot .lacts .btn{width:100%}
+/* Sage card (Content tab) */
+.sage{border:1px solid #D9E7D0;background:linear-gradient(180deg,#F4F9F0,#fff);border-radius:10px;padding:12px;margin:0 0 14px}
+.sage h4{margin:0 0 8px;font:600 10px/1 var(--fb);letter-spacing:.16em;text-transform:uppercase;color:var(--sage-deep);display:flex;align-items:center;gap:6px}
+.sage h4 svg{width:13px;height:13px}
+.sage textarea{min-height:48px;font-size:12px;margin-bottom:8px}
+.sage .btn{width:100%;background:var(--sage-deep)}
+.sage .hint{margin:7px 0 0}
+#notice button{background:#fff;color:var(--ink);border:0;border-radius:4px;padding:5px 9px;margin-left:10px;
+  font:600 10px/1 var(--fb);letter-spacing:.1em;text-transform:uppercase;cursor:pointer;vertical-align:middle}
 
 /* ---------- form ---------- */
 .grp{margin:0 0 6px}
@@ -274,16 +316,23 @@ body.export .art{box-shadow:none;margin:0}
 <header>
   <a href="dashboard.html" id="crm" title="Back to GreenDoor">&#8249; GreenDoor</a>
   <span class="ttl">Studio</span>
+  <div class="hdr-right">
+    <span class="sync" id="sync" hidden></span>
+    <div class="hdr-actions">
+      <button class="btn ghost sm" id="dl2" title="Download PNG  (Cmd/Ctrl + Shift + E)">Download</button>
+      <button class="btn ghost sm" id="pr2" title="Print or save as PDF  (Cmd/Ctrl + P)">Print</button>
+    </div>
   <div class="menuwrap">
     <button class="btn ghost sm" id="morebtn" aria-label="More">&#8943;</button>
     <div class="popmenu" id="moremenu" hidden>
-      <button id="dl">Download PNG</button>
+      <button id="dl" class="desk-dup">Download PNG</button>
       <button id="dlall">Download all sizes</button>
-      <button id="pr">Print / PDF</button>
+      <button id="pr" class="desk-dup">Print / PDF</button>
       <hr>
       <button id="imp">Restore backup</button>
       <button id="rs">Reset design</button>
     </div>
+  </div>
   </div>
 </header>
 <div class="tabstrip"><div class="tabs" id="tabs"></div></div>
@@ -333,10 +382,21 @@ body.export .art{box-shadow:none;margin:0}
    html-to-image. Everything is driven from the S state object.
    ============================================================ */
 /* No baked-in logo: the Studio serves many realtors. Designs carry a
-   typographic mark built from the agent's own name. */
+   typographic mark built from the agent's own name -- until she uploads her
+   own logo under "Your info", which then replaces the mark on every template.
+   Over a photo or a dark theme the logo sits on a white chip so a dark logo
+   stays legible; the Design tab can switch the chip off. */
 const initials = () => (String(S.agentName||'').trim().split(/\s+/).map(w=>w[0]||'').join('').slice(0,2).toUpperCase()) || 'GD';
-const markDisc = (u,t) => `<div style="width:${u*2.2}px;height:${u*2.2}px;border-radius:50%;background:${AC()};color:#fff;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:${u*.78}px;letter-spacing:.04em;flex:0 0 auto;font-family:var(--fb)">${esc(initials())}</div>`;
-const nameMark = (u,t,c) => `<div class="addr" style="font-size:${u*.95}px;color:${c||t.ink};letter-spacing:.01em;white-space:nowrap">${esc(S.agentName)}</div>`;
+const hasLogo  = () => typeof S.logo==='string' && S.logo.startsWith('data:image');
+const logoImg  = (u,onDark) => {
+  const h=u*2.2*(+S.logoScale||1), chip=onDark && has('logoChip');
+  return `<div style="display:inline-flex;align-items:center;flex:0 0 auto;max-width:100%;${chip?`background:#fff;border-radius:${u*.28}px;padding:${u*.26}px ${u*.4}px;`:''}">
+    <img src="${S.logo}" alt="" style="height:${h}px;max-width:${u*8}px;object-fit:contain;display:block"></div>`;
+};
+const markDisc = (u,t) => hasLogo() ? logoImg(u, !t || !t.bg || !!t.dark)
+  : `<div style="width:${u*2.2}px;height:${u*2.2}px;border-radius:50%;background:${AC()};color:#fff;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:${u*.78}px;letter-spacing:.04em;flex:0 0 auto;font-family:var(--fb)">${esc(initials())}</div>`;
+const nameMark = (u,t,c) => hasLogo() ? logoImg(u, c==='#fff' || !!(t&&t.dark))
+  : `<div class="addr" style="font-size:${u*.95}px;color:${c||t.ink};letter-spacing:.01em;white-space:nowrap">${esc(S.agentName)}</div>`;
 
 /* ---------- themes: every template reads these, never a literal ---------- */
 const THEMES = {
@@ -366,8 +426,8 @@ const DEFAULTS = {
   agentName:'Your Name', agentTitle:'REALTOR®', 
   phone:'(555) 555-5555', email:'', site:'',
   brokerage:'Your Brokerage', brokerPhone:'', license:'',
-  theme:'cream', accent:'#B08D57', layout:'stack', scale:1,
-  show:{logo:true, agent:true, compliance:true, hook:true, specs:true, price:true, badge:true},
+  theme:'cream', accent:'#B08D57', layout:'stack', scale:1, logo:null, logoScale:1,
+  show:{logo:true, logoChip:true, agent:true, compliance:true, hook:true, specs:true, price:true, badge:true},
   focal:[[50,50],[50,50],[50,50],[50,50]],
   status:'Just Listed', price:'425000', addr:'5243 Winona Avenue', city:'St. Louis, MO 63109',
   beds:'3', baths:'2', sqft:'1780', lot:'0.14',
@@ -404,6 +464,8 @@ function normalize(v){
   if(typeof s.accent!=='string' || !s.accent) s.accent=DEFAULTS.accent;
   s.scale = Math.min(1.25, Math.max(0.8, +s.scale || 1));
   if(!['stack','overlay','split'].includes(s.layout)) s.layout=DEFAULTS.layout;
+  s.logo = (typeof s.logo==='string' && s.logo.startsWith('data:image')) ? s.logo : null;
+  s.logoScale = Math.min(1.6, Math.max(0.6, +s.logoScale || 1));
   return s;
 }
 /* One-time migration: storage keys used to carry a previous realtor's initials
@@ -422,19 +484,24 @@ let S = (()=>{ try{ return normalize(JSON.parse(localStorage.getItem('gd-studio'
    The CRM stashes the signed-in agent's details and, when "Create marketing
    in Studio" is pressed, the listing itself. Deferred to a task so every
    const below (GD_STATUS_BACK etc.) is initialized before we touch it. */
+function applyProfile(prof){
+  if(!(prof && prof.fullName && S.agentName===DEFAULTS.agentName && prof.fullName!==DEFAULTS.agentName)) return false;
+  S.agentName = prof.fullName;
+  const ph = String(prof.phone||'').replace(/\D/g,'');
+  if(ph.length===10) S.phone = '('+ph.slice(0,3)+') '+ph.slice(3,6)+'-'+ph.slice(6);
+  else if(prof.phone) S.phone = prof.phone;
+  if(prof.email) S.email = prof.email;
+  if(prof.company){ S.agentTitle = 'REALTOR\u00AE \u00B7 '+prof.company; S.brokerage = prof.company; }
+  return true;
+}
+/* The bridge calls this when the Studio is opened straight from a bookmark
+   (no dashboard visit in this tab to stash gd-profile). */
+window.gdApplyProfile = prof => { if(applyProfile(prof)){ save(); buildPanel(); draw(); } };
 setTimeout(function(){
   let applied=false;
   try{
     const prof = JSON.parse(sessionStorage.getItem('gd-profile')||'null');
-    if(prof && prof.fullName && S.agentName===DEFAULTS.agentName && prof.fullName!==DEFAULTS.agentName){
-      applied=true;
-      S.agentName = prof.fullName;
-      const ph = String(prof.phone||'').replace(/\D/g,'');
-      if(ph.length===10) S.phone = '('+ph.slice(0,3)+') '+ph.slice(3,6)+'-'+ph.slice(6);
-      else if(prof.phone) S.phone = prof.phone;
-      if(prof.email) S.email = prof.email;
-      if(prof.company){ S.agentTitle = 'REALTOR\u00AE \u00B7 '+prof.company; S.brokerage = prof.company; }
-    }
+    if(applyProfile(prof)) applied=true;
     const raw = sessionStorage.getItem('gd-studio-listing');
     if(raw){
       sessionStorage.removeItem('gd-studio-listing');
@@ -742,20 +809,20 @@ const PHOTO_FIELD = l => ({k:'photos',t:'photos',l:l});
 const T_REG = {
   listing:{label:'Listing', sizes:['square','portrait','story','link','flyer','postcard'],
     render:renderListing, layouts:['stack','overlay','split'], fields:[
-    {t:'gdimport'},
+    {t:'gdimport'},{t:'sage'},
     {g:'Listing'},
     {k:'status',t:'select',l:'Status',o:['Coming Soon','Just Listed','Open House','Under Contract','Price Improved','Just Sold','Back on Market']},
     {k:'price',t:'text',l:'Price'},{k:'addr',t:'text',l:'Street address'},{k:'city',t:'text',l:'City, State ZIP'},
     {k:'beds',t:'text',l:'Beds',half:1},{k:'baths',t:'text',l:'Baths',half:1},
     {k:'sqft',t:'text',l:'Sq ft',half:1},{k:'lot',t:'text',l:'Lot (ac)',half:1},
-    {k:'hook',t:'textarea',l:'Hook (one line)'},{k:'desc',t:'textarea',l:'Description (flyer only)'},
+    {k:'hook',t:'textarea',l:'Hook (one line)',ai:1,max:90},{k:'desc',t:'textarea',l:'Description (flyer only)',ai:1,max:420},
     {g:'Photos'}, PHOTO_FIELD('Photo 1 = main · 2–4 = flyer thumbnails')]},
 
   openhouse:{label:'Open House', sizes:['square','portrait','story','link','postcard'],
     render:renderOpen, layouts:[], fields:[
-    {t:'gdimport'},
+    {t:'gdimport'},{t:'sage'},
     {g:'Open house'},{k:'ohDate',t:'text',l:'Date'},{k:'ohTime',t:'text',l:'Time'},
-    {k:'ohNote',t:'text',l:'Note (optional)'},
+    {k:'ohNote',t:'text',l:'Note (optional)',ai:1,max:60},
     {k:'addr',t:'text',l:'Street address'},{k:'city',t:'text',l:'City, State ZIP'},{k:'price',t:'text',l:'Price'},
     {g:'Photo'}, PHOTO_FIELD('One photo — it fills the whole design')]},
 
@@ -767,25 +834,25 @@ const T_REG = {
     {k:'s4v',t:'text',l:'Value',half:1},{k:'s4d',t:'text',l:'Change',half:1},{k:'s4l',t:'text',l:'Label 4'}]},
 
   quote:{label:'Testimonial', sizes:['square','portrait','story','link'], render:renderQuote, layouts:[], fields:[
-    {g:'Testimonial'},{k:'quote',t:'textarea',l:'Quote'},{k:'qname',t:'text',l:'Client'},{k:'qloc',t:'text',l:'Location'}]},
+    {t:'sage'},{g:'Testimonial'},{k:'quote',t:'textarea',l:'Quote',ai:1,max:260},{k:'qname',t:'text',l:'Client'},{k:'qloc',t:'text',l:'Location'}]},
 
   note:{label:'Tip', sizes:['square','portrait','story','link'], render:renderNote, layouts:[], fields:[
-    {g:'Content'},{k:'noteEyebrow',t:'text',l:'Eyebrow'},{k:'noteHead',t:'textarea',l:'Headline'},{k:'noteBody',t:'textarea',l:'Body'}]},
+    {t:'sage'},{g:'Content'},{k:'noteEyebrow',t:'text',l:'Eyebrow',ai:1,max:24},{k:'noteHead',t:'textarea',l:'Headline',ai:1,max:70},{k:'noteBody',t:'textarea',l:'Body',ai:1,max:300}]},
 
   agent:{label:'About', sizes:['square','portrait','story','link'], render:renderAgent, layouts:[], fields:[
-    {g:'About you'},{k:'bioEyebrow',t:'text',l:'Eyebrow'},{k:'bioHead',t:'text',l:'Headline'},{k:'bioBody',t:'textarea',l:'Bio'},
+    {t:'sage'},{g:'About you'},{k:'bioEyebrow',t:'text',l:'Eyebrow',ai:1,max:24},{k:'bioHead',t:'text',l:'Headline',ai:1,max:50},{k:'bioBody',t:'textarea',l:'Bio',ai:1,max:320},
     {g:'Photo'}, PHOTO_FIELD('Your headshot (optional — logo is used without one)')]},
 
   custom:{label:'Custom', sizes:['square','portrait','story','link'], render:renderCustom, layouts:[], fields:[
-    {g:'Anything you want'},{k:'cuEyebrow',t:'text',l:'Eyebrow (optional)'},{k:'cuHead',t:'textarea',l:'Headline'},
-    {k:'cuBody',t:'textarea',l:'Body (optional)'},
+    {t:'sage'},{g:'Anything you want'},{k:'cuEyebrow',t:'text',l:'Eyebrow (optional)',ai:1,max:24},{k:'cuHead',t:'textarea',l:'Headline',ai:1,max:60},
+    {k:'cuBody',t:'textarea',l:'Body (optional)',ai:1,max:220},
     {g:'Photo'}, PHOTO_FIELD('Optional — text goes over it')]},
 
   banner:{label:'Banner', sizes:['fbcover','linkedin'], render:renderBanner, layouts:[], fields:[
-    {g:'Cover banner'},{k:'bnHead',t:'text',l:'Headline'},{k:'bnSub',t:'text',l:'Sub-line'},
+    {t:'sage'},{g:'Cover banner'},{k:'bnHead',t:'text',l:'Headline',ai:1,max:40},{k:'bnSub',t:'text',l:'Sub-line',ai:1,max:50},
     {g:'Photo'}, PHOTO_FIELD('Optional background photo')]},
 };
-const BRAND_FIELDS=[{g:'Your details'},
+const BRAND_FIELDS=[{g:'Your logo'},{t:'logo'},{g:'Your details'},
   {k:'agentName',t:'text',l:'Name'},{k:'agentTitle',t:'text',l:'Title / brokerage'},
   {k:'phone',t:'text',l:'Phone',half:1},{k:'site',t:'text',l:'Website',half:1},
   {k:'email',t:'text',l:'Email'},
@@ -1003,11 +1070,14 @@ function downscale(file){
   });
 }
 let _warned=false;
-function notice(msg){
+function notice(msg, action){
   let n=$('#notice');
   if(!n){ n=document.createElement('div'); n.id='notice'; document.body.appendChild(n); }
-  n.textContent=msg; n.style.display='block';
-  clearTimeout(notice._t); notice._t=setTimeout(()=>{ n.style.display='none'; }, 9000);
+  n.textContent=msg;
+  if(action){ const b=document.createElement('button'); b.type='button'; b.textContent=action.label;
+    b.onclick=()=>{ n.style.display='none'; action.fn(); }; n.appendChild(b); }
+  n.style.display='block';
+  clearTimeout(notice._t); notice._t=setTimeout(()=>{ n.style.display='none'; }, action?14000:9000);
 }
 function save(){
   try{ localStorage.setItem('gd-studio', JSON.stringify(S)); return true; }
@@ -1054,6 +1124,30 @@ function field(f){
       </div>
     </div>`;
   }
+  if(f.t==='logo'){
+    const on=hasLogo(), pct=Math.round((S.logoScale||1)*100);
+    return `<div class="logoslot">
+      <div class="lprev" id="logoprev" title="${on?'Replace logo':'Upload logo'}" role="button" tabindex="0">${on?`<img src="${S.logo}" alt="Your logo">`:'<span>+</span>'}</div>
+      <div class="lacts">
+        <button class="btn ghost sm" id="logopick" type="button">${on?'Replace':'Upload logo'}</button>
+        ${on?`<button class="btn ghost sm" id="logorm" type="button">Remove</button>`:''}
+      </div></div>
+      ${on?`<label><span>Logo size — ${pct}%</span><input type="range" id="logoscale" min="60" max="160" value="${pct}"></label>`:''}
+      <div class="hint">${on
+        ? 'Your logo replaces the initials mark on every design. On photos it sits on a white backing — switch that off under Design.'
+        : 'PNG with a transparent background looks best; JPG and SVG work too. Until you add one, designs carry your initials in the accent colour.'}</div>`;
+  }
+  if(f.t==='sage'){
+    const ks=(T_REG[cur].fields||[]).filter(x=>x.ai).map(x=>x.l.replace(/\s*\(.*\)$/,'').toLowerCase());
+    if(!ks.length) return '';
+    const ph = cur==='quote' ? 'Optional: paste the client’s words above, then say how to tighten them'
+             : cur==='listing' ? 'Optional: the angle — “first-time buyers, warm and simple” or “lead with the kitchen”'
+             : 'Optional: tone, audience, or what to emphasize';
+    return `<div class="sage"><h4><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 17l.8 2.2L22 20l-2.2.8L19 23l-.8-2.2L16 20l2.2-.8z"/></svg>Write it with Sage</h4>
+      <textarea id="sagehint" rows="2" placeholder="${esc(ph)}">${esc(sageHint)}</textarea>
+      <button class="btn sm" id="sagego" type="button">Write ${ks.length>1?'these':'this'} for me</button>
+      <div class="hint">Fills: ${esc(ks.join(', '))}. Prices, specs and the address stay exactly as entered. Edit anything after.</div></div>`;
+  }
   if(f.t==='photos'){
     const slots=[0,1,2,3].map(i=>`<div class="slot${S.photos[i]?' on':''}${i===focusPhoto?' sel':''}" data-i="${i}"
         style="${S.photos[i]?`background-image:url('${S.photos[i]}');background-position:${(S.focal[i]||[50,50])[0]}% ${(S.focal[i]||[50,50])[1]}%`:''}"
@@ -1087,7 +1181,7 @@ function designHtml(){
   // nothing on them read as a broken button
   const lays=SZ[curSize].pdf ? [] : (T_REG[cur].layouts||[]);
   const layNames={stack:'Stacked', overlay:'Photo behind', split:'Side by side'};
-  const toggles=[['logo','Logo'],['price','Price'],['specs','Beds / baths / sq ft'],['hook','Hook line'],
+  const toggles=[['logo',hasLogo()?'Logo':'Initials mark'],...(hasLogo()?[['logoChip','White backing behind logo on photos']]:[]),['price','Price'],['specs','Beds / baths / sq ft'],['hook','Hook line'],
                  ['badge','Status badge'],['agent','Your name bar'],['compliance','Required disclosure']];
   return `<div class="grp"><h4>Colour theme</h4></div>
     <div class="sw" id="themes">${Object.entries(THEMES).map(([k,v])=>
@@ -1121,12 +1215,105 @@ async function setPhoto(i,file){
     S.focal[i]=[50,50]; focusPhoto=i; save(); buildPanel(); draw();
   }catch(e){ notice('That file could not be read as an image.'); }
 }
+/* ---------- logo ---------- */
+/* Logos keep their transparency: PNG/SVG/WebP come back as PNG, photos as
+   JPEG. Long edge capped at 900px -- plenty for a 300 DPI flyer mark. */
+function downscaleLogo(file){
+  const outType = /jpe?g/i.test(file.type) ? 'image/jpeg' : 'image/png';
+  return new Promise((res,rej)=>{
+    const r=new FileReader();
+    r.onerror=()=>rej(new Error('could not read that file'));
+    r.onload=()=>{
+      const img=new Image();
+      img.onerror=()=>res(r.result);
+      img.onload=()=>{
+        const W=img.naturalWidth||img.width, H=img.naturalHeight||img.height;
+        if(!W||!H) return res(r.result);                         // sizeless SVG: keep as-is
+        const k=Math.min(1, 900/Math.max(W,H));
+        if(k===1 && r.result.length < 400*1024) return res(r.result);
+        const c=document.createElement('canvas');
+        c.width=Math.max(1,Math.round(W*k)); c.height=Math.max(1,Math.round(H*k));
+        c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+        try{ res(c.toDataURL(outType, 0.9)); }catch(e){ res(r.result); }
+      };
+      img.src=r.result;
+    };
+    r.readAsDataURL(file);
+  });
+}
+function pickLogo(){
+  const inp=document.createElement('input'); inp.type='file'; inp.accept='image/png,image/jpeg,image/svg+xml,image/webp,image/gif';
+  inp.onchange=()=>{ const f=inp.files[0]; if(f) setLogo(f); };
+  inp.click();
+}
+async function setLogo(file){
+  if(!file || !/^image\//.test(file.type||'')) return notice('Pick an image file — PNG, JPG, or SVG.');
+  if(file.size > 8*1024*1024) return notice('That file is over 8 MB. Export a smaller PNG and try again.');
+  try{
+    S.logo=await downscaleLogo(file); S.show.logo=true;
+    save(); buildPanel(); draw();
+    notice('Logo added. It now appears on every design in place of your initials.');
+    brandChanged('logo');
+  }catch(e){ notice('That file could not be read as an image.'); }
+}
+function removeLogo(){
+  if(!confirm('Remove your logo? Designs go back to the initials mark.')) return;
+  S.logo=null; save(); buildPanel(); draw(); brandChanged('remove');
+}
+
+/* ---------- Sage: write the words ---------- */
+let sageHint='';
+const SAGE_FACTS={
+  listing:['status','price','addr','city','beds','baths','sqft','lot','desc'],
+  openhouse:['status','ohDate','ohTime','addr','city','price','beds','baths','sqft'],
+  quote:['qname','qloc'], agent:['agentTitle','site'], banner:['agentTitle','site'], note:[], custom:[]
+};
+async function sageFill(btn){
+  if(typeof window.gdAskSage!=='function') return notice('Sign in to GreenDoor to use Sage.');
+  const fields=(T_REG[cur].fields||[]).filter(f=>f.ai&&f.k)
+    .map(f=>({k:f.k, l:f.l.replace(/\s*\(.*\)$/,''), max:f.max||null, current:String(S[f.k]||'').slice(0,300)}));
+  if(!fields.length) return;
+  if(cur==='quote' && !String(S.quote||'').trim())
+    return notice('Paste the client’s own words into Quote first. Sage tidies a testimonial; it never invents one.');
+  const facts={};
+  for(const k of (SAGE_FACTS[cur]||[])) if(String(S[k]||'').trim()) facts[k]= k==='price' ? money(S[k]) : S[k];
+  const t=btn.textContent; btn.disabled=true; btn.textContent='Sage is writing…';
+  try{
+    const r=await window.gdAskSage({
+      question: sageHint.trim() || 'Write the copy for this design.',
+      context:'studio',
+      contextData:{ template:cur, label:T_REG[cur].label, sizeName:SZ[curSize].n, fields, facts,
+                    agentName:S.agentName, brokerage:S.brokerage, market:S.city||S.mkArea||'' }
+    });
+    const act=((r&&r.actions)||[]).find(a=>a.name==='fill_studio');
+    if(!act) throw new Error((r&&r.response)||'Sage had nothing to add.');
+    const allowed=new Set(fields.map(f=>f.k)); const snap={}; let n=0;
+    for(const [k,v] of Object.entries(act.input||{})){
+      if(!allowed.has(k) || typeof v!=='string' || !v.trim()) continue;
+      snap[k]=S[k]; S[k]=v.trim(); n++;
+    }
+    if(!n) return notice('Sage had nothing better than what is already there.');
+    save(); buildPanel(); draw();
+    notice(`Sage wrote ${n} field${n===1?'':'s'}. Read it over before you post.`,
+      {label:'Undo', fn:()=>{ Object.assign(S,snap); save(); buildPanel(); draw(); }});
+  }catch(err){
+    const m=String((err&&err.message)||err);
+    notice(/limit|exhausted/i.test(m) ? 'Sage has reached today’s limit. Try again tomorrow.'
+         : /unauth/i.test(m) ? 'Sign in to GreenDoor to use Sage.'
+         : 'Sage could not write that: '+m);
+  }finally{ btn.disabled=false; btn.textContent=t; }
+}
+
 function wirePanel(){
   const p=$('#panel');
   p.oninput = e=>{
     const el=e.target;
     if(el.id==='impbox') return;
-    if(el.dataset.k){ S[el.dataset.k]=el.value; save(); if(el.dataset.k==='status'){buildPanel();} draw(); return; }
+    if(el.id==='sagehint'){ sageHint=el.value; return; }
+    if(el.id==='logoscale'){ S.logoScale=+el.value/100; save(); draw(); brandChanged();
+      el.closest('label').querySelector('span').textContent='Logo size — '+el.value+'%'; return; }
+    if(el.dataset.k){ S[el.dataset.k]=el.value; save(); if(el.dataset.k==='status'){buildPanel();} draw();
+      if(BRAND_KEYS.includes(el.dataset.k)) brandChanged(); return; }
     if(el.dataset.focal){ const f=S.focal[focusPhoto]||[50,50];
       if(el.dataset.focal==='x') f[0]=+el.value; else f[1]=+el.value;
       S.focal[focusPhoto]=f; save(); draw();
@@ -1135,11 +1322,11 @@ function wirePanel(){
       return; }
     if(el.id==='scale'){ S.scale=+el.value/100; save(); draw();
       el.closest('label').querySelector('span').textContent=el.value+'%'; return; }
-    if(el.id==='accpick'){ S.accent=el.value; save(); buildPanel(); draw(); return; }
+    if(el.id==='accpick'){ S.accent=el.value; save(); buildPanel(); draw(); brandChanged(); return; }
   };
   p.onchange = e=>{
     const el=e.target;
-    if(el.dataset.show!==undefined){ S.show[el.dataset.show]=el.checked; save(); draw(); }
+    if(el.dataset.show!==undefined){ S.show[el.dataset.show]=el.checked; save(); draw(); brandChanged(); }
   };
   p.onclick = e=>{
     const b=e.target.closest('button');
@@ -1147,10 +1334,14 @@ function wirePanel(){
       if(b.id==='impgo'){ importListing(p.querySelector('#impbox').value); return; }
       if(b.id==='pastetoggle'){ const pb=p.querySelector('#pastebox'); pb.hidden=!pb.hidden; return; }
       if(b.id==='gdpick'){ openGdPicker(); return; }
-      if(b.dataset.th){ S.theme=b.dataset.th; save(); buildPanel(); draw(); return; }
-      if(b.dataset.ac){ S.accent=b.dataset.ac; save(); buildPanel(); draw(); return; }
+      if(b.id==='sagego'){ sageFill(b); return; }
+      if(b.id==='logopick'){ pickLogo(); return; }
+      if(b.id==='logorm'){ removeLogo(); return; }
+      if(b.dataset.th){ S.theme=b.dataset.th; save(); buildPanel(); draw(); brandChanged(); return; }
+      if(b.dataset.ac){ S.accent=b.dataset.ac; save(); buildPanel(); draw(); brandChanged(); return; }
       if(b.dataset.lay){ S.layout=b.dataset.lay; save(); buildPanel(); draw(); return; }
     }
+    if(e.target.closest('#logoprev')){ pickLogo(); return; }
     const x=e.target.dataset.x;
     if(x!==undefined){ e.stopPropagation(); S.photos[+x]=null; S.focal[+x]=[50,50]; save(); buildPanel(); draw(); return; }
     const sl=e.target.closest('[data-i]');
@@ -1163,13 +1354,14 @@ function wirePanel(){
     }
   };
   /* Drag a photo straight out of Finder, Photos, or a listing page onto a slot. */
-  p.ondragover = e=>{ const sl=e.target.closest?.('[data-i]'); if(!sl) return;
+  p.ondragover = e=>{ const sl=e.target.closest?.('[data-i],#logoprev'); if(!sl) return;
     e.preventDefault(); e.dataTransfer.dropEffect='copy'; sl.classList.add('drop'); };
-  p.ondragleave = e=>{ e.target.closest?.('[data-i]')?.classList.remove('drop'); };
+  p.ondragleave = e=>{ e.target.closest?.('[data-i],#logoprev')?.classList.remove('drop'); };
   p.ondrop = async e=>{
-    const sl=e.target.closest?.('[data-i]'); if(!sl) return;
+    const sl=e.target.closest?.('[data-i],#logoprev'); if(!sl) return;
     e.preventDefault(); sl.classList.remove('drop');
     const f=[...(e.dataTransfer.files||[])].find(x=>/^image\//.test(x.type));
+    if(f && sl.id==='logoprev') return setLogo(f);
     if(f) return setPhoto(+sl.dataset.i, f);
     notice('Drop an image file. A photo dragged off a web page comes across as a link, not a picture — save it first, then drop the file.');
   };
@@ -1277,11 +1469,14 @@ async function exportPng(size){
   if(prev!==curSize){ curSize=prev; buildSizes(); draw(); }
   return r;
 }
-$('#dl').onclick = async e=>{
-  const b=e.target, t=b.textContent; b.disabled=true; b.textContent='Rendering…';
-  try{ await exportPng(curSize); }catch(err){ alert('Export failed: '+err.message); }
+async function busy(b, label, fn){
+  const t=b.textContent; b.disabled=true; b.textContent=label;
+  try{ await fn(); }catch(err){ alert('Export failed: '+err.message); }
   b.disabled=false; b.textContent=t;
-};
+}
+$('#dl').onclick  = e=> busy(e.target,'Rendering…',()=>exportPng(curSize));
+$('#dl2').onclick = e=> busy(e.target,'Rendering…',()=>exportPng(curSize));
+$('#pr2').onclick = ()=> $('#pr').click();
 $('#dlall').onclick = async e=>{
   const b=e.target, t=b.textContent; b.disabled=true;
   const list=T_REG[cur].sizes.filter(s=>!SZ[s].pdf);
@@ -1426,7 +1621,7 @@ function projectCard(rec){
     beds:     on('beds'), baths: on('baths'), sqft: on('sqft'),
     template: tpl,
     accent:   st.accent || DEFAULTS.accent,
-    photo:    (st.photos||[])[0] || null,
+    photo:    (st.photos||[])[0] || (rec.photoUrls||[])[0] || null,
     focal:    ((st.focal||[])[0]) || [50,50],
     created:  rec.created || 0,
     updated:  rec.updated || rec.created || 0,
@@ -1538,6 +1733,14 @@ function openProject(id){
   save(); showDash(false);
   buildTabs(); buildSizes(); buildPanel(); draw();
   notice(`Opened ${rec.name}.`);
+  // a project that arrived from another device carries Storage URLs, not pixels
+  const urls=(rec.photoUrls||[]).filter(Boolean);
+  if(urls.length && !S.photos.some(Boolean)){
+    pullListingPhotos(rec.photoUrls).then(ph=>{
+      if(curProject!==id || !ph.some(Boolean)) return;
+      S.photos=ph; _pushed[id]=ph.slice(); save(); buildPanel(); draw();
+    }).catch(()=>{});
+  }
 }
 
 $('#save').onclick = ()=>{
@@ -1545,6 +1748,7 @@ $('#save').onclick = ()=>{
   if(!id) return;
   setCurProject(id);
   notice(`Saved. Find it under Projects, bottom left.`);
+  cloudPushProject(id);
 };
 $('#open').onclick = ()=> showDash(true);
 
@@ -1618,7 +1822,7 @@ function showDash(on){
 $('#dnew').onclick = ()=>{
   const keep={agentName:S.agentName,agentTitle:S.agentTitle,phone:S.phone,email:S.email,site:S.site,
               brokerage:S.brokerage,brokerPhone:S.brokerPhone,license:S.license,
-              theme:S.theme,accent:S.accent};
+              theme:S.theme,accent:S.accent,logo:S.logo,logoScale:S.logoScale,show:S.show};
   S=normalize(Object.assign(clone(DEFAULTS), keep, {photos:[null,null,null,null]}));
   setCurProject(null); focusPhoto=0; cur='listing'; curSize='square';
   save(); showDash(false); buildTabs(); buildSizes(); buildPanel(); draw();
@@ -1632,19 +1836,20 @@ $('#dgrid').onclick = e=>{
     e.stopPropagation();
     const store=readStore(), rec=store.items[a.dataset.id];
     if(!rec) return;
+    let touched=rec.id, removed=null;
     if(a.dataset.act==='rename'){
       const n=prompt('Name this project:', rec.name); if(!n) return;
       rec.name=n.trim(); rec.autoName=null; rec.updated=Date.now();
     } else if(a.dataset.act==='dup'){
       const copy=clone(rec); copy.id=uid(); copy.name=rec.name+' copy';
-      copy.autoName=null; copy.created=copy.updated=Date.now();
-      store.items[copy.id]=copy;
+      copy.autoName=null; copy.created=copy.updated=Date.now(); copy.photoUrls=[];
+      store.items[copy.id]=copy; touched=copy.id;
     } else if(a.dataset.act==='del'){
       if(!confirm(`Delete “${rec.name}”? This cannot be undone.`)) return;
-      delete store.items[rec.id];
+      delete store.items[rec.id]; removed=rec.id; touched=null;
       if(curProject===rec.id) setCurProject(null);
     }
-    if(writeStore(store)) buildDash();
+    if(writeStore(store)){ buildDash(); if(touched) cloudPushProject(touched); if(removed) cloudDeleteProject(removed); }
     return;
   }
   const card=e.target.closest('.card');
@@ -1680,9 +1885,119 @@ $('#imp').onclick = ()=>{
 $('#rs').onclick = ()=>{
   if(!confirm('Reset the design back to the sample? Your saved designs and your details are kept.')) return;
   const keep={agentName:S.agentName,agentTitle:S.agentTitle,phone:S.phone,email:S.email,site:S.site,
-              brokerage:S.brokerage,brokerPhone:S.brokerPhone,license:S.license};
+              brokerage:S.brokerage,brokerPhone:S.brokerPhone,license:S.license,logo:S.logo,logoScale:S.logoScale};
   S=normalize(Object.assign(clone(DEFAULTS), keep)); focusPhoto=0; save(); buildPanel(); draw();
 };
+
+/* ============================================================
+   CLOUD SYNC
+   ------------------------------------------------------------
+   localStorage stays the working copy -- everything above keeps working with
+   the internet off. When the realtor is signed in, the bridge at the bottom of
+   this file (window.gdCloud) mirrors projects, the brand line and the logo to
+   her GreenDoor account so the phone and the desktop show the same Studio.
+   Newest copy wins in both directions; nothing here blocks on the network.
+   ============================================================ */
+const BRAND_KEYS=['agentName','agentTitle','phone','email','site','brokerage','brokerPhone','license','theme','accent','logoScale'];
+const cloud = () => (window.gdCloud && window.gdCloud.user) ? window.gdCloud : null;
+function setSync(state,text){ const el=$('#sync'); if(!el) return; el.hidden=false; el.dataset.s=state; el.textContent=text; }
+let _brandT=null, _logoDirty=null, _booting=false;
+const _pushed={};   // project id -> photos last uploaded this session (skip re-uploads)
+function brandChanged(logo){
+  if(logo==='logo') _logoDirty='set'; else if(logo==='remove') _logoDirty='remove';
+  clearTimeout(_brandT); _brandT=setTimeout(pushBrand, 1200);
+}
+async function pushBrand(){
+  const c=cloud(); if(!c) return;
+  const brand={}; BRAND_KEYS.forEach(k=>{ brand[k]=S[k]; }); brand.show=clone(S.show);
+  try{
+    setSync('saving','Saving…');
+    if(_logoDirty==='remove'){ await c.removeLogo(); brand.logoUrl=null; }
+    else if(_logoDirty==='set' && hasLogo()){ brand.logoUrl=await c.uploadLogo(dataUrlToBlob(S.logo)); }
+    _logoDirty=null;
+    await c.pushBrand(brand);
+    try{ localStorage.setItem('gd-brand-synced', String(Date.now())); }catch(e){}
+    setSync('synced','Synced');
+  }catch(e){ console.warn('brand sync:', e); setSync('offline','Not synced'); }
+}
+async function cloudPushProject(id){
+  const c=cloud(); if(!c) return;
+  const rec=readStore().items[id]; if(!rec) return;
+  try{
+    setSync('saving','Saving…');
+    const st=rec.state||{}, photos=st.photos||[];
+    const urls=(rec.photoUrls||[]).slice(0,4); while(urls.length<4) urls.push(null);
+    const prev=_pushed[id]||[];
+    for(let i=0;i<4;i++){
+      const ph=photos[i];
+      if(ph && /^data:image/.test(ph)){ if(prev[i]!==ph) urls[i]=await c.uploadPhoto(id,i,dataUrlToBlob(ph)); }
+      else urls[i]=null;
+    }
+    _pushed[id]=photos.slice();
+    const cs=Object.assign({},st); delete cs.photos; delete cs.logo;
+    // Firestore takes neither nested arrays (focal) nor undefined: the state travels as JSON text
+    await c.pushProject({id:rec.id, name:rec.name||'Untitled', autoName:rec.autoName||null, template:rec.template||'listing',
+                         created:rec.created||Date.now(), updated:rec.updated||Date.now(), stateJson:JSON.stringify(cs), photoUrls:urls});
+    const store=readStore(); if(store.items[id]){ store.items[id].photoUrls=urls; writeStore(store); }
+    setSync('synced','Synced');
+  }catch(e){ console.warn('project sync:', e); setSync('offline','Not synced'); }
+}
+async function cloudDeleteProject(id){
+  const c=cloud(); if(!c) return;
+  try{ await c.deleteProject(id); }catch(e){ console.warn('project delete:', e); }
+}
+async function cloudBoot(){
+  if(_booting) return; _booting=true;
+  try{
+    const c=cloud();
+    if(!c){ setSync('local','On this device'); return; }
+    setSync('saving','Syncing…');
+    const [brand, list]=await Promise.all([c.pullBrand(), c.pullProjects()]);
+
+    // brand kit: the cloud copy wins when it is newer than this device's last sync
+    const lastSync=+(localStorage.getItem('gd-brand-synced')||0);
+    if(brand && (brand.updated||0) > lastSync){
+      BRAND_KEYS.forEach(k=>{ if(brand[k]!==undefined && brand[k]!==null && brand[k]!=='') S[k]=brand[k]; });
+      if(brand.show && typeof brand.show==='object') S.show=Object.assign({}, S.show, brand.show);
+      if(brand.logoUrl){ try{ S.logo=await c.fetchDataUrl(brand.logoUrl); }catch(e){ console.warn('logo fetch:', e); } }
+      else if(brand.logoUrl===null) S.logo=null;
+      S=normalize(S); save(); buildPanel(); draw();
+      try{ localStorage.setItem('gd-brand-synced', String(brand.updated||Date.now())); }catch(e){}
+    } else if(!brand && (hasLogo() || S.agentName!==DEFAULTS.agentName)){
+      _logoDirty = hasLogo() ? 'set' : null;     // first sign-in from a device that already has a brand
+      await pushBrand();
+    }
+
+    // projects: merge, newest copy wins; anything only on one side is copied over
+    const store=readStore(), toPush=[];
+    for(const r of list){
+      if(!r || !r.id) continue;
+      const l=store.items[r.id];
+      if(!l || (r.updated||0) > (l.updated||0)){
+        let st={}; try{ st=r.stateJson ? JSON.parse(r.stateJson) : (r.state||{}); }catch(e){}
+        store.items[r.id]={ id:r.id, name:r.name||'Untitled', autoName:r.autoName||null, template:r.template||'listing',
+          created:r.created||r.updated||Date.now(), updated:r.updated||Date.now(),
+          state:Object.assign({}, st, {photos:[null,null,null,null]}), photoUrls:r.photoUrls||[] };
+      } else if((l.updated||0) > (r.updated||0)) toPush.push(r.id);
+    }
+    const cloudIds=new Set(list.map(r=>r&&r.id));
+    for(const id of Object.keys(store.items)) if(!cloudIds.has(id)) toPush.push(id);
+    writeStore(store);
+    if(!$('#dash').hidden) buildDash();
+    for(const id of toPush) await cloudPushProject(id);
+    setSync('synced','Synced');
+  }catch(e){ console.warn('cloud boot:', e); setSync('offline','Not synced'); }
+  finally{ _booting=false; }
+}
+addEventListener('gd-cloud-ready', cloudBoot);
+
+/* keyboard: Cmd/Ctrl+S saves, Cmd/Ctrl+Shift+E downloads, Cmd/Ctrl+P prints (browser) */
+addEventListener('keydown', e=>{
+  if(!(e.metaKey||e.ctrlKey)) return;
+  const k=e.key.toLowerCase();
+  if(k==='s'){ e.preventDefault(); $('#save').click(); }
+  else if(k==='e' && e.shiftKey){ e.preventDefault(); $('#dl').click(); }
+});
 
 /* ---------- wiring ---------- */
 $('#tabs').onclick = e=>{ const b=e.target.closest('[data-k]'); if(!b) return;
@@ -1706,8 +2021,18 @@ addEventListener('click', e => {
   if(!e.target.closest('.menuwrap')) document.querySelectorAll('.popmenu').forEach(m=>m.hidden=true);
 });
 
-/* Share: system share sheet -> Facebook / Instagram / Messages / anywhere */
+/* Share: system share sheet -> Facebook / Instagram / Messages / anywhere.
+   A desktop browser with no file sharing (Chrome, Firefox) gets a plain
+   Download as the primary button instead of a Publish that silently falls
+   back. */
+const canShareFiles = (()=>{
+  if(isNative()) return true;
+  try{ return !!(navigator.canShare && navigator.canShare({files:[new File([''],'x.png',{type:'image/png'})]})); }
+  catch(e){ return false; }
+})();
+if(!canShareFiles){ const b=$('#share'); b.textContent='Download'; b.title='Download PNG'; }
 $('#share').onclick = async e => {
+  if(!canShareFiles) return busy(e.target,'Rendering…',()=>exportPng(curSize));
   const b=e.target, t=b.textContent; b.disabled=true; b.textContent='Rendering…';
   try{
     const sz=SZ[curSize];
@@ -1733,13 +2058,54 @@ addEventListener('resize', fit);
 buildTabs(); buildSizes(); buildPtabs(); buildPanel(); draw();
 </script>
 <script type="module">
-/* GreenDoor bridge: lets the Studio read the signed-in realtor's listings.
+/* GreenDoor bridge: the only place this file touches Firebase. Listings for
+   the picker, Sage for the copywriter, and Firestore/Storage under
+   users/{uid}/studio for the realtor's projects, brand line and logo.
    Fails silently when opened outside the app (e.g. a saved offline copy). */
 try {
-  const [{ auth, db }, fb] = await Promise.all([
+  const [{ auth, db, storage, functions, httpsCallable }, fb] = await Promise.all([
     import("../js/firebase-config.js"),
     import("../js/vendor/firebase.js"),
   ]);
+  const ask = httpsCallable(functions, "askAssistant");
+  const sdoc = (uid, id) => fb.doc(db, "users", uid, "studio", id);
+  const sref = (uid, path) => fb.ref(storage, `users/${uid}/studio/${path}`);
+  const C = {
+    user: null,
+    async pullProjects(){
+      const snap = await fb.getDocs(fb.collection(db, "users", C.user.uid, "studio"));
+      return snap.docs.filter(d => d.id !== "_brand").map(d => d.data());
+    },
+    async pushProject(rec){ await fb.setDoc(sdoc(C.user.uid, rec.id), rec); },
+    async deleteProject(id){
+      await fb.deleteDoc(sdoc(C.user.uid, id));
+      for (let i = 0; i < 4; i++) for (const ext of ["jpg", "png"])
+        fb.deleteObject(sref(C.user.uid, `${id}/${i}.${ext}`)).catch(() => {});
+    },
+    async pullBrand(){ const s = await fb.getDoc(sdoc(C.user.uid, "_brand")); return s.exists() ? s.data() : null; },
+    async pushBrand(b){ await fb.setDoc(sdoc(C.user.uid, "_brand"), { ...b, updated: Date.now() }, { merge: true }); },
+    async uploadPhoto(id, i, blob){
+      const ext = /png/.test(blob.type) ? "png" : "jpg";
+      const r = sref(C.user.uid, `${id}/${i}.${ext}`);
+      await fb.uploadBytes(r, blob, { contentType: blob.type || "image/jpeg" });
+      return fb.getDownloadURL(r);
+    },
+    async uploadLogo(blob){
+      const ext = /svg/.test(blob.type) ? "svg" : /png/.test(blob.type) ? "png" : "jpg";
+      const r = sref(C.user.uid, `logo.${ext}`);
+      await fb.uploadBytes(r, blob, { contentType: blob.type || "image/png" });
+      return fb.getDownloadURL(r);
+    },
+    async removeLogo(){
+      for (const ext of ["png", "jpg", "svg"]) await fb.deleteObject(sref(C.user.uid, `logo.${ext}`)).catch(() => {});
+    },
+    async fetchDataUrl(url){
+      const b = await (await fetch(url)).blob();
+      return new Promise((res, rej) => { const r = new FileReader(); r.onerror = rej; r.onload = () => res(r.result); r.readAsDataURL(b); });
+    },
+  };
+  window.gdCloud = C;
+  window.gdAskSage = async payload => (await ask(payload)).data;
   window.gdFetchListings = async () => {
     const u = auth.currentUser;
     if (!u) return null;
@@ -1747,5 +2113,22 @@ try {
     return snap.docs.map(d => ({ id: d.id, ...d.data() }))
       .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
   };
+  fb.onAuthStateChanged(auth, async user => {
+    C.user = user || null;
+    if (user) {
+      /* "Your info" prefill when the Studio is opened straight from a bookmark
+         (no dashboard visit in this tab to stash gd-profile). */
+      try {
+        const u = await fb.getDoc(fb.doc(db, "users", user.uid));
+        if (u.exists()) {
+          const d = u.data();
+          const prof = { fullName: d.fullName || "", phone: d.phone || "", email: d.email || user.email || "", company: d.company || "" };
+          try { sessionStorage.setItem("gd-profile", JSON.stringify(prof)); } catch (e) {}
+          if (typeof window.gdApplyProfile === "function") window.gdApplyProfile(prof);
+        }
+      } catch (e) {}
+    }
+    dispatchEvent(new CustomEvent("gd-cloud-ready"));
+  });
 } catch (e) { /* standalone use: picker offers sign-in notice */ }
 </script>

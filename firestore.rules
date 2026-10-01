@@ -49,6 +49,12 @@ service cloud.firestore {
       allow create, delete: if isAuthenticated() && isAdmin();
       allow update: if isAuthenticated() && isAdmin();
 
+      // Studio: the realtor's saved marketing designs and brand kit (logo URL,
+      // brokerage line). Owner only; photos live in Storage under users/{uid}/studio.
+      match /studio/{docId} {
+        allow read, write: if isAuthenticated() && request.auth.uid == userId;
+      }
+
       // Push/in-app notifications: written by Cloud Functions only (admin SDK
       // bypasses rules); the owner may read, mark read, and dismiss.
       match /notifications/{notificationId} {
