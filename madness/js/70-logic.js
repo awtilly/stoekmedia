@@ -270,3 +270,20 @@ function scores(){
   }).sort((a,b) => b.tot - a.tot);
 }
 
+
+/* ── Shared-state merge (guards the debounced whole-state write) ──
+ * Picks are committed by transactions; everything else is written as the whole state blob after a
+ * debounce. If a pick landed between our last snapshot and that write, our copy of ds/rosters is
+ * stale and would roll the pick back. Draft progress only ever moves forward, so when the server
+ * is further along we keep the server's ds and rosters and layer our other edits on top. */
+function mergeSharedState(local, remote){
+  const out = Object.assign({}, local);
+  if(!remote || !remote.ds || !local || !local.ds) return out;
+  const remoteCp = remote.ds.cp || 0, localCp = local.ds.cp || 0;
+  if(remoteCp <= localCp) return out;
+  out.ds = remote.ds;
+  const remoteRosters = {};
+  for(const p of (remote.players || [])) remoteRosters[p.id] = p.teamIds || [];
+  out.players = (local.players || []).map(p => Object.assign({}, p, { teamIds: remoteRosters[p.id] || p.teamIds || [] }));
+  return out;
+}
