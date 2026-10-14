@@ -39,6 +39,9 @@ code (which is nearly all in `30-state.js` and `90-boot.js`) depends on order.
    an installed PWA keeps using the old file until the URL changes. `index.html` itself is
    network-first, so a new hash in it is enough to pull the new files.
 3. Run `node --test "test/*.test.js"`. The suite fails if the stamp is out of date.
+4. Merging two branches that both touched `js/` conflicts on the stamped script tags in
+   `index.html` and nowhere else. Run `node scripts/stamp.js` again: it collapses a conflict
+   block made only of those tags, then `git add index.html` and finish the merge.
 
 ## Tests
 
