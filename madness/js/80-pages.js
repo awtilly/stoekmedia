@@ -25,6 +25,12 @@ function goHome() {
 /* ── Main Render ── */
 function render(){
   try {
+  // Remote snapshots re-render mid-typing; remember the focused input and scroll so they survive.
+  const _active = document.activeElement;
+  const _keep = _active && _active.id && (_active.tagName === 'INPUT' || _active.tagName === 'TEXTAREA')
+    ? { id: _active.id, value: _active.value, start: _active.selectionStart, end: _active.selectionEnd } : null;
+  const _scrollEl = document.querySelector('.content-scroll');
+  const _scrollTop = _scrollEl ? _scrollEl.scrollTop : 0;
   if(roomId && !adminUnlocked){
     const myId = getMyPlayerId();
     if(!myId || !S.players.some(p => p.id === myId)){ renderJoinScreen(); return; }
@@ -74,6 +80,16 @@ function render(){
     }
   }
   repositionInstallBanner();
+  if(_keep){
+    const el = document.getElementById(_keep.id);
+    if(el){
+      if(el.value === '' && _keep.value) el.value = _keep.value;
+      el.focus();
+      try { if(_keep.start != null) el.setSelectionRange(_keep.start, _keep.end); } catch(e){}
+    }
+  }
+  const _scrollAfter = document.querySelector('.content-scroll');
+  if(_scrollAfter && _scrollTop) _scrollAfter.scrollTop = _scrollTop;
   if(roomId && getMyPlayerId()) showNotificationPrompt();
   } catch(e) {
     console.error('Render error:', e);
