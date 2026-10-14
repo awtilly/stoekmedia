@@ -26,12 +26,23 @@ function _debouncedFirestoreWrite(){
 function _writeSharedState(){
   const shared = {};
   for(const k in S){ if(!VIEW_LOCAL.includes(k)) shared[k] = S[k]; }
-  const json = JSON.stringify(shared);
-  _lastSyncedState = json;
-  db.collection("rooms").doc(roomId).set({
-    state: json,
-    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-  }, {merge: true}).catch(e => {
+  const localJson = JSON.stringify(shared);
+  const ref = db.collection("rooms").doc(roomId);
+  // Transaction + mergeSharedState: never roll back a pick that landed since our last snapshot.
+  db.runTransaction(async tx => {
+    const snap = await tx.get(ref);
+    const remote = snap.exists && snap.data().state ? JSON.parse(snap.data().state) : null;
+    const merged = remote ? mergeSharedState(shared, remote) : shared;
+    const json = JSON.stringify(merged);
+    // The echo of this write is skipped by _applyRoomSnapshot only when it carries exactly what we
+    // hold. If the merge took the server's draft progress, leave the echo to be applied so this
+    // device catches up too.
+    _lastSyncedState = json === localJson ? json : null;
+    tx.set(ref, {
+      state: json,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    }, {merge: true});
+  }).catch(e => {
     console.warn("Firestore write error:", e);
     showToast("Sync error \u2014 changes saved locally");
   });

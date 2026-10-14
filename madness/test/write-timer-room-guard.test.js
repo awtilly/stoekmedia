@@ -11,10 +11,10 @@ function roomApp(code) {
   const app = createApp();
   const writes = [];
   app.firebase = { firestore: { FieldValue: { serverTimestamp: () => 'ts' } } };
+  // The debounced write runs in a transaction (sync-merge): record what tx.set() writes, keyed by room.
   app.db = {
-    collection: () => ({
-      doc: (id) => ({ set: (data) => { writes.push({ id, state: JSON.parse(data.state) }); return Promise.resolve(); } })
-    })
+    collection: () => ({ doc: (id) => ({ id }) }),
+    runTransaction: async (fn) => { await fn({ get: async () => ({ exists: false }), set: (ref, data) => { writes.push({ id: ref.id, state: JSON.parse(data.state) }); } }); }
   };
   vm.runInThisContext('_firestoreWriteTimer = null; _isRemoteUpdate = false; _lastSyncedState = null');
   app.roomId = code;
@@ -22,14 +22,17 @@ function roomApp(code) {
   return { app, writes };
 }
 
-test('a debounced write lands in the room the change was made in, 800 ms later', () => {
+/** Let the transaction callback (one awaited tx.get) reach tx.set. */
+const settle = () => new Promise(r => setImmediate(r));
+
+test('a debounced write lands in the room the change was made in, 800 ms later', async () => {
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
     const { app, writes } = roomApp('AAAA');
     app._debouncedFirestoreWrite();
-    mock.timers.tick(799);
+    mock.timers.tick(799); await settle();
     assert.equal(writes.length, 0, 'still inside the debounce window');
-    mock.timers.tick(1);
+    mock.timers.tick(1); await settle();
     assert.equal(writes.length, 1);
     assert.equal(writes[0].id, 'AAAA');
     assert.equal(writes[0].state.players[0].name, 'Ann');
@@ -37,7 +40,7 @@ test('a debounced write lands in the room the change was made in, 800 ms later',
   } finally { mock.timers.reset(); }
 });
 
-test('a write scheduled in one room never fires into a room entered inside the window', () => {
+test('a write scheduled in one room never fires into a room entered inside the window', async () => {
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
     const { app, writes } = roomApp('AAAA');
@@ -46,38 +49,38 @@ test('a write scheduled in one room never fires into a room entered inside the w
     app.roomId = null;
     app.roomId = 'BBBB';
     app.S.players = [{ id: 'p9', name: 'Stale cache of BBBB', teamIds: [] }];
-    mock.timers.tick(800);
+    mock.timers.tick(800); await settle();
     assert.equal(writes.length, 0, 'the old timer must not overwrite BBBB on the server');
   } finally { mock.timers.reset(); }
 });
 
-test('flushFirestoreWrite sends the pending edit to its own room immediately and disarms the timer', () => {
+test('flushFirestoreWrite sends the pending edit to its own room immediately and disarms the timer', async () => {
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
     const { app, writes } = roomApp('AAAA');
     app._debouncedFirestoreWrite();
-    app.flushFirestoreWrite();
+    app.flushFirestoreWrite(); await settle();
     assert.equal(writes.length, 1);
     assert.equal(writes[0].id, 'AAAA');
     assert.equal(writes[0].state.players[0].name, 'Ann');
     app.roomId = 'BBBB';
-    mock.timers.tick(800);
+    mock.timers.tick(800); await settle();
     assert.equal(writes.length, 1, 'nothing left to fire after the flush');
   } finally { mock.timers.reset(); }
 });
 
-test('flush is a no-op with nothing pending, and discards a write gated by a remote update', () => {
+test('flush is a no-op with nothing pending, and discards a write gated by a remote update', async () => {
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
     const { app, writes } = roomApp('AAAA');
-    app.flushFirestoreWrite();
+    app.flushFirestoreWrite(); await settle();
     assert.equal(writes.length, 0);
     app._debouncedFirestoreWrite();
     vm.runInThisContext('_isRemoteUpdate = true');
-    app.flushFirestoreWrite();
+    app.flushFirestoreWrite(); await settle();
     assert.equal(writes.length, 0, 'a snapshot is being applied: never echo it back');
     vm.runInThisContext('_isRemoteUpdate = false');
-    mock.timers.tick(800);
+    mock.timers.tick(800); await settle();
     assert.equal(writes.length, 0, 'the flushed timer did not fire later');
   } finally { mock.timers.reset(); }
 });
