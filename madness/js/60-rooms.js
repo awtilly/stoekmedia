@@ -9,10 +9,17 @@ function _debouncedFirestoreWrite(){
     if(!roomId || _isRemoteUpdate) return;
     const shared = {};
     for(const k in S){ if(!VIEW_LOCAL.includes(k)) shared[k] = S[k]; }
-    db.collection("rooms").doc(roomId).set({
-      state: JSON.stringify(shared),
-      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-    }, {merge: true}).catch(e => {
+    const ref = db.collection("rooms").doc(roomId);
+    // Transaction + mergeSharedState: never roll back a pick that landed since our last snapshot.
+    db.runTransaction(async tx => {
+      const snap = await tx.get(ref);
+      const remote = snap.exists && snap.data().state ? JSON.parse(snap.data().state) : null;
+      const merged = remote ? mergeSharedState(shared, remote) : shared;
+      tx.set(ref, {
+        state: JSON.stringify(merged),
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      }, {merge: true});
+    }).catch(e => {
       console.warn("Firestore write error:", e);
       showToast("Sync error \u2014 changes saved locally");
     });
