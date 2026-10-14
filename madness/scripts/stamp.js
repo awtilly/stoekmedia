@@ -28,7 +28,8 @@ function computeStamp() {
   const h = crypto.createHash('sha256');
   for (const f of listJsFiles()) {
     h.update(f + '\n');
-    h.update(fs.readFileSync(path.join(JS_DIR, f)));
+    // normalise line endings so the hash is identical on Windows (autocrlf) and Linux checkouts
+    h.update(fs.readFileSync(path.join(JS_DIR, f), 'utf8').replace(/\r\n/g, '\n'));
   }
   return h.digest('hex').slice(0, 10);
 }
