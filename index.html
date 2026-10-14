@@ -3,16 +3,16 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Stoek Media — Building Digital Ventures That Matter | SaaS & Web</title>
-  <meta name="description" content="Stoek Media is a holding company that builds, operates, and invests in digital products. SaaS platforms like GreenDoor CRM and client websites. Founded by Joe Stoehner.">
+  <title>Stoek Media — Joe Stoehner builds and ships software | GreenDoor CRM</title>
+  <meta name="description" content="Stoek Media is Joe Stoehner's studio. Flagship: GreenDoor CRM, live in St. Louis, MO. Also building Gateway, Madness, and more.">
   <meta name="keywords" content="Stoek Media, digital ventures, SaaS holding company, GreenDoor CRM, web development, Joe Stoehner">
   <link rel="canonical" href="https://stoekmedia.com/">
 
   <!-- Open Graph -->
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Stoek Media">
-  <meta property="og:title" content="Stoek Media — Building Digital Ventures That Matter">
-  <meta property="og:description" content="Stoek Media builds, operates, and invests in digital products — SaaS platforms and client websites.">
+  <meta property="og:title" content="Stoek Media — Joe Stoehner builds and ships software">
+  <meta property="og:description" content="GreenDoor CRM, live in St. Louis, MO, plus Gateway, Madness, and more. Built and run by one person.">
   <meta property="og:url" content="https://stoekmedia.com/">
   <meta property="og:image" content="https://stoekmedia.com/assets/images/stoek-media-og.png">
   <meta property="og:image:width" content="1200">
@@ -21,16 +21,19 @@
 
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="Stoek Media — Building Digital Ventures That Matter">
-  <meta name="twitter:description" content="A holding company that builds SaaS products and designs websites.">
+  <meta name="twitter:title" content="Stoek Media — Joe Stoehner builds and ships software">
+  <meta name="twitter:description" content="GreenDoor CRM, live in St. Louis, MO, plus Gateway, Madness, and more.">
   <meta name="twitter:image" content="https://stoekmedia.com/assets/images/stoek-media-og.png">
   <meta name="twitter:site" content="@stoekmedia">
 
   <!-- Additional SEO -->
   <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1">
   <meta name="author" content="Joe Stoehner">
-  <meta name="theme-color" content="#15151f">
+  <meta name="theme-color" content="#0a0a0b">
 
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="assets/css/style.css">
   <link rel="icon" type="image/png" href="/assets/images/favicon.png">
 
@@ -120,18 +123,16 @@
 
   <!-- ===== NAVIGATION ===== -->
   <nav class="nav">
-    <div class="container">
-      <a href="/" class="nav-logo">Stoek <span>Media</span></a>
+    <div class="container nav-inner">
+      <a href="/" class="nav-logo">Stoek<span>Media</span></a>
       <ul class="nav-links">
-        <li><a href="/#ventures">Ventures</a></li>
         <li><a href="/#work">Work</a></li>
         <li><a href="/software/">Software</a></li>
-
         <li><a href="/#about">About</a></li>
         <li><a href="/greendoor/app/login" class="nav-greendoor"><span class="gd-green">Green</span><span class="gd-door">Door</span></a></li>
-        <li><a href="/bookings/" class="btn btn-primary" style="padding: 0.6rem 1.4rem;">Get in Touch</a></li>
+        <li><a href="/bookings/" class="nav-cta">Contact</a></li>
       </ul>
-      <button class="nav-toggle" aria-label="Menu">
+      <button class="nav-toggle" aria-label="Menu" aria-expanded="false">
         <span></span>
         <span></span>
         <span></span>
@@ -140,110 +141,219 @@
   </nav>
 
   <!-- ===== HERO ===== -->
-  <section class="hero">
-    <div class="hero-bg"></div>
+  <header class="hero">
     <div class="container">
-      <div class="hero-content">
-        <h1>Building Digital<br>Ventures That<br><em>Matter.</em></h1>
-        <p class="hero-sub">Stoek Media is a holding company that builds, operates, and invests in digital products — SaaS platforms and client websites.</p>
-        <div class="hero-cta">
-          <a href="#ventures" class="btn btn-primary btn-arrow">Our Ventures</a>
-          <a href="#work" class="btn btn-arrow">Our Work</a>
+      <div class="hero-meta mono">
+        <span>Stoek Media LLC</span>
+        <span>St. Louis, Missouri</span>
+        <span>Est. 2024</span>
+        <span class="hero-meta-right">Solo founder / operator</span>
+      </div>
+
+      <h1 class="hero-title">
+        I build software.<br>
+        I ship it.<br>
+        I run it.
+      </h1>
+
+      <div class="hero-row">
+        <p class="hero-sub">
+          I'm Joe Stoehner. Stoek Media is the name on the LLC, but there's no team behind it.
+          I write the code, deploy it, answer the support email, and keep it running.
+          GreenDoor, my real estate CRM, is in production with a working agent in St. Louis right now.
+        </p>
+        <div class="hero-actions">
+          <a href="#work" class="link-arrow">See the work</a>
+          <a href="/bookings/" class="link-arrow">Book a call</a>
         </div>
       </div>
     </div>
-  </section>
 
-  <!-- ===== VENTURES OVERVIEW ===== -->
-  <section id="ventures" class="section-pad-lg">
+    <div class="hero-status mono">
+      <div class="container hero-status-inner">
+        <span class="status"><i class="dot dot-live" aria-hidden="true"></i>GreenDoor CRM &mdash; Live &mdash; St. Louis, MO</span>
+        <span class="hero-status-stack">Firebase &middot; Firestore &middot; Cloud Functions &middot; Vanilla JS</span>
+        <span class="hero-status-scroll">Scroll &darr;</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- ===== WORK: FEATURED (GREENDOOR) ===== -->
+  <section id="work" class="section">
     <div class="container">
-      <div class="value-grid reveal">
-        <div class="value-text">
-          <span class="section-label">What We Do</span>
-          <h2>One company. <em>Many ventures.</em></h2>
-          <p>Stoek Media operates at the intersection of technology and digital strategy. We build software products and design websites for clients.</p>
-          <p>Every venture under the Stoek Media umbrella shares the same principle: create real value, skip the fluff, and ship things that work.</p>
-          <div style="margin-top: 2rem;">
-            <a href="#work" class="btn btn-arrow">See Our Work</a>
+      <div class="section-head reveal">
+        <span class="eyebrow mono">01 &nbsp;/&nbsp; Flagship</span>
+        <h2 class="section-title">GreenDoor CRM</h2>
+      </div>
+
+      <div class="featured reveal">
+        <div class="featured-spec mono">
+          <dl class="spec">
+            <div class="spec-row">
+              <dt>Status</dt>
+              <dd><i class="dot dot-live" aria-hidden="true"></i>Live &mdash; St. Louis, MO</dd>
+            </div>
+            <div class="spec-row">
+              <dt>Customer</dt>
+              <dd>Solo real estate agent, in daily use</dd>
+            </div>
+            <div class="spec-row">
+              <dt>Built for</dt>
+              <dd>Solo agents and small teams</dd>
+            </div>
+            <div class="spec-row">
+              <dt>Front end</dt>
+              <dd>Vanilla HTML / CSS / JS. No framework.</dd>
+            </div>
+            <div class="spec-row">
+              <dt>Back end</dt>
+              <dd>Firebase Auth, Firestore, Storage, Cloud Functions</dd>
+            </div>
+            <div class="spec-row">
+              <dt>Integrations</dt>
+              <dd>BoldSign e-signature, SendGrid email</dd>
+            </div>
+            <div class="spec-row">
+              <dt>Engineer</dt>
+              <dd>Joe Stoehner. All of it.</dd>
+            </div>
+          </dl>
+        </div>
+
+        <div class="featured-body">
+          <p class="featured-lede">
+            A real estate CRM built around how one agent actually works a day: clients in,
+            listings matched, showings scheduled, documents signed, follow-ups sent.
+            One codebase, no plugins, no per-seat upsell.
+          </p>
+
+          <ul class="cap-list">
+            <li>Client records with full create, read, update, delete</li>
+            <li>Listing-to-client matching engine</li>
+            <li>Showing scheduling</li>
+            <li>BoldSign e-signature, in-app</li>
+            <li>AI assistant chatbot with voice input</li>
+            <li>AI-generated daily briefing</li>
+            <li>SendGrid transactional and outreach email</li>
+            <li>Admin panel with role-based access</li>
+          </ul>
+
+          <div class="featured-links">
+            <a href="/greendoor/" class="link-arrow">Explore GreenDoor</a>
+            <a href="/greendoor/app/login" class="link-arrow link-muted">Sign in</a>
           </div>
         </div>
-        <div class="value-image">
-          <img src="https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800&q=80" alt="Digital ventures and strategy">
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== WORK: OTHER PROJECTS ===== -->
+  <section class="section section-tight">
+    <div class="container">
+      <div class="section-head reveal">
+        <span class="eyebrow mono">02 &nbsp;/&nbsp; Also built</span>
+        <h2 class="section-title section-title-sm">Other things I've shipped</h2>
+      </div>
+
+      <ol class="index reveal">
+        <li class="index-row">
+          <span class="index-num mono">01</span>
+          <span class="index-name">Gateway</span>
+          <span class="index-desc">Security and lead-generation product.</span>
+          <span class="index-tag mono">Security &middot; Lead gen</span>
+        </li>
+        <li class="index-row">
+          <span class="index-num mono">02</span>
+          <span class="index-name">Madness</span>
+          <span class="index-desc">Bracket-pool app. Make a pool, invite people, argue about seeds.</span>
+          <span class="index-tag mono">Consumer app</span>
+        </li>
+        <li class="index-row">
+          <span class="index-num mono">03</span>
+          <span class="index-name">Retirement Planner</span>
+          <span class="index-desc">Built for my mom. One user, zero marketing site, works every day.</span>
+          <span class="index-tag mono">Personal &middot; Single user</span>
+        </li>
+        <li class="index-row">
+          <span class="index-num mono">04</span>
+          <span class="index-name">Momentum</span>
+          <span class="index-desc">Current project. Details when it ships.</span>
+          <span class="index-tag mono">In development</span>
+        </li>
+      </ol>
+
+      <div class="section-foot reveal">
+        <a href="/software/" class="link-arrow link-muted">Full software index</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== ABOUT ===== -->
+  <section id="about" class="section">
+    <div class="container">
+      <div class="section-head reveal">
+        <span class="eyebrow mono">03 &nbsp;/&nbsp; Operator</span>
+        <h2 class="section-title section-title-sm">Joe Stoehner</h2>
+      </div>
+
+      <div class="about reveal">
+        <figure class="about-photo">
+          <img src="/assets/images/joe-stoehner.jpeg" alt="Joe Stoehner, founder and operator of Stoek Media" loading="lazy">
+          <figcaption class="mono">Joe Stoehner &mdash; St. Louis, MO</figcaption>
+        </figure>
+
+        <div class="about-text">
+          <p class="about-lede">
+            I'm one person. I'm the engineering department, the product department,
+            and the support inbox.
+          </p>
+          <p>
+            Stoek Media is a legal structure, not a company with floors. Everything under it
+            was designed, coded, deployed, and maintained by me. When something breaks at
+            11pm, I'm the one who gets the alert and I'm the one who fixes it.
+          </p>
+          <p>
+            GreenDoor exists because a working agent needed a CRM that didn't fight her.
+            It's in production today. The other projects exist because I wanted them to
+            exist and nobody else was going to build them.
+          </p>
+
+          <dl class="principles mono">
+            <div class="principle">
+              <dt>Stack</dt>
+              <dd>Small on purpose. Vanilla front end, Firebase back end. Fewer moving parts to babysit.</dd>
+            </div>
+            <div class="principle">
+              <dt>Scope</dt>
+              <dd>Ship the real thing to a real user, then expand. No roadmap theater.</dd>
+            </div>
+            <div class="principle">
+              <dt>Support</dt>
+              <dd>The person who wrote the code answers the email.</dd>
+            </div>
+          </dl>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- ===== DIVISIONS ===== -->
-  <section class="section-pad-lg" style="background: var(--color-bg-elevated);">
+  <!-- ===== CONTACT ===== -->
+  <section id="contact" class="section contact">
     <div class="container">
-      <span class="section-label reveal">Our Divisions</span>
-      <h2 class="reveal section-heading">Everything under <em>one roof.</em></h2>
-
-      <div class="services-grid services-grid--two">
-        <div class="service-card reveal">
-          <span class="service-number">01</span>
-          <h3>Software Products</h3>
-          <p>We build SaaS products that solve real problems. GreenDoor is our real estate CRM with AI, e-signatures, and smart listing matching.</p>
+      <div class="contact-grid reveal">
+        <div class="contact-text">
+          <span class="eyebrow mono">04 &nbsp;/&nbsp; Contact</span>
+          <h2 class="contact-title">Need something built?</h2>
+          <p>
+            If you want software built by the person who will also maintain it,
+            book thirty minutes. I read every message myself and I'll tell you
+            straight if it's not a fit.
+          </p>
         </div>
-        <div class="service-card reveal">
-          <span class="service-number">02</span>
-          <h3>Web &amp; Digital</h3>
-          <p>We design and build websites for clients — from brand sites to full digital platforms.</p>
+        <div class="contact-actions">
+          <a href="/bookings/" class="btn btn-primary">Book a call</a>
+          <span class="contact-note mono">No sales team. You get me.</span>
         </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ===== WORK / PORTFOLIO ===== -->
-  <section id="work" class="section-pad-lg">
-    <div class="container">
-      <span class="section-label reveal">Our Work</span>
-      <h2 class="reveal section-heading">Select <em>projects.</em></h2>
-
-      <a href="/greendoor/" class="work-featured reveal">
-        <div class="work-featured-visual gd-tile">
-          <span class="gd-tile-mark"><span class="gd-green">Green</span>Door</span>
-          <span class="gd-tile-sub">Real Estate CRM</span>
-        </div>
-        <div class="work-featured-body">
-          <span class="work-card-tag">Software &middot; Flagship Product</span>
-          <h3>GreenDoor CRM</h3>
-          <p>A full-featured real estate CRM with an AI assistant, built-in e-signatures, smart listing matching, showing management, and document handling. Built around how agents actually work — not how legacy software thinks they should.</p>
-          <span class="view-link">Explore GreenDoor &rarr;</span>
-        </div>
-      </a>
-    </div>
-  </section>
-
-  <!-- ===== FOUNDER / ABOUT ===== -->
-  <section id="about" class="section-pad-lg" style="background: var(--color-bg-elevated);">
-    <div class="container">
-      <div class="founder-grid reveal">
-        <div class="founder-image">
-          <img src="/assets/images/joe-stoehner.jpeg" alt="Joe Stoehner, Founder of Stoek Media">
-        </div>
-        <div class="founder-text">
-          <span class="section-label">The Founder</span>
-          <h2>Building things that <em>work.</em></h2>
-          <p>I'm Joe Stoehner, founder of Stoek Media. What started as a side project has grown into a holding company that spans software products and web development.</p>
-          <p>I built GreenDoor, a CRM for real estate agents, and I design and ship websites and digital platforms for clients. More products are on the way.</p>
-          <p>The through line across everything I do is the same: build real things, deliver real value, and cut the noise.</p>
-          <div class="founder-name">Joe Stoehner</div>
-          <div class="founder-title">Founder &amp; Operator, Stoek Media</div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ===== CTA BANNER ===== -->
-  <section class="section-pad-lg">
-    <div class="container">
-      <div class="cta-banner reveal">
-        <span class="section-label">Let's Connect</span>
-        <h2>Have a project or <em>idea?</em></h2>
-        <p>Whether you need a website, want to explore a partnership, or just want to say hello — let's talk.</p>
-        <a href="/bookings/" class="btn btn-primary btn-arrow">Get in Touch</a>
       </div>
     </div>
   </section>
@@ -252,9 +362,8 @@
   <footer class="footer">
     <div class="container">
       <div class="footer-grid">
-        <div class="footer-brand">Stoek <span>Media</span></div>
+        <div class="footer-brand">Stoek<span>Media</span></div>
         <ul class="footer-links">
-          <li><a href="/#ventures">Ventures</a></li>
           <li><a href="/#work">Work</a></li>
           <li><a href="/software/">Software</a></li>
           <li><a href="/greendoor/app/login">GreenDoor</a></li>
@@ -262,8 +371,10 @@
           <li><a href="/bookings/">Contact</a></li>
         </ul>
       </div>
-      <div class="footer-bottom">
-        <span class="footer-copy">&copy; 2026 Stoek Media. All Rights Reserved.</span>
+      <div class="footer-bottom mono">
+        <span class="footer-copy">&copy; 2026 Stoek Media LLC</span>
+        <span>St. Louis, Missouri</span>
+        <span>Built and maintained by Joe Stoehner</span>
       </div>
     </div>
   </footer>
