@@ -842,6 +842,23 @@ ul, ol {
   border-top: 1px solid var(--line);
 }
 
+.founder-name a {
+  color: inherit;
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.founder-name a:hover,
+.founder-name a:focus-visible {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.about-aside .founder-image {
+  margin-bottom: var(--s-4);
+}
+
 .founder-title {
   font-family: var(--font-mono);
   font-size: 0.72rem;
