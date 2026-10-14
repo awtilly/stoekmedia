@@ -65,6 +65,10 @@ polling ESPN directly every 30 seconds, exactly as before. Force the function on
 outside the window with a `scoreboard/_config` doc `{ enabled: true | false }`.
 `functions/espn-parse.js` is a copy of the client parser; a test keeps the two in sync.
 
+`test/browser/*.html` are zero-dependency browser checks for DOM behaviour (currently the
+Live tab's per-card diff). Serve the repo root and open one in headless Chrome; every line
+of `#out` must start with `ok`. The command is in each file's header comment.
+
 ## Rules of the road
 
 - Never auto-merge. Every change is a PR for Joe to review.
