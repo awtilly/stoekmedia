@@ -55,6 +55,10 @@ parsing and tournament-team import filtering (the conference-tournament bug from
 Not covered: anything that touches Firestore transactions (`pickTeam`, `undoDraft`,
 `autoPickHighestSeed`), the PIN flow, and all rendering.
 
+`test/browser/*.html` are zero-dependency browser checks for DOM behaviour (currently the
+Live tab's per-card diff). Serve the repo root and open one in headless Chrome; every line
+of `#out` must start with `ok`. The command is in each file's header comment.
+
 ## Rules of the road
 
 - Never auto-merge. Every change is a PR for Joe to review.

@@ -405,14 +405,26 @@ function renderLive(c){
     ) || null;
   }
 
-  c.innerHTML = `
+  const counts = {
+    all: liveScores.length,
+    live: liveScores.filter(g=>g.state==='in').length,
+    upcoming: liveScores.filter(g=>g.state==='pre').length,
+    final: liveScores.filter(g=>g.state==='post').length
+  };
+  const updatedStr = liveLastRefresh ? 'Updated ' + new Date(liveLastRefresh).toLocaleTimeString() : '';
+
+  // Shell is painted once per visit; later refreshes patch the dynamic bits in place
+  // so the 30 s poll does not rebuild every card (and reload every logo).
+  if(!c.querySelector('#live-grid')){
+    _liveCardCache = new Map();
+    c.innerHTML = `
     <div class="live-header">
       <div>
         <div class="section-title">Live Scores</div>
         <p class="section-desc" style="margin-bottom:0">
-          ${displayDate}
-          ${hasLive ? ' <span class="live-pulse"><span class="dot"></span>LIVE</span>' : ''}
-          ${liveLastRefresh ? ` <span style="font-size:11px;color:var(--g400)">Updated ${new Date(liveLastRefresh).toLocaleTimeString()}</span>` : ''}
+          <span id="live-date"></span>
+          <span id="live-pulse" class="live-pulse" style="display:none"><span class="dot"></span>LIVE</span>
+          <span id="live-updated" style="font-size:11px;color:var(--g400)"></span>
         </p>
       </div>
       <div class="row" style="gap:8px">
@@ -423,14 +435,25 @@ function renderLive(c){
       </div>
     </div>
     <div class="live-filter-bar">
-      <button class="live-filter-btn ${S.liveScoresFilter==='all'?'active':''}" onclick="S.liveScoresFilter='all';renderLiveInPlace()">All (${liveScores.length})</button>
-      <button class="live-filter-btn ${S.liveScoresFilter==='live'?'active':''}" onclick="S.liveScoresFilter='live';renderLiveInPlace()">Live (${liveScores.filter(g=>g.state==='in').length})</button>
-      <button class="live-filter-btn ${S.liveScoresFilter==='upcoming'?'active':''}" onclick="S.liveScoresFilter='upcoming';renderLiveInPlace()">Upcoming (${liveScores.filter(g=>g.state==='pre').length})</button>
-      <button class="live-filter-btn ${S.liveScoresFilter==='final'?'active':''}" onclick="S.liveScoresFilter='final';renderLiveInPlace()">Final (${liveScores.filter(g=>g.state==='post').length})</button>
+      ${['all','live','upcoming','final'].map(k => `<button class="live-filter-btn" data-filter="${k}" onclick="S.liveScoresFilter='${k}';renderLiveInPlace()">${k[0].toUpperCase()+k.slice(1)} (<span id="live-cnt-${k}"></span>)</button>`).join('')}
     </div>
-    ${filtered.length === 0 ? '<div class="card" style="text-align:center;padding:40px;color:var(--g400)"><p style="font-size:16px;font-weight:700;margin-bottom:4px">No games found</p><p style="font-size:13px">Try a different date or check back later.</p></div>' : ''}
-    <div class="scores-grid">
-      ${filtered.map(game => {
+    <div id="live-empty" class="card" style="display:none;text-align:center;padding:40px;color:var(--g400)"><p style="font-size:16px;font-weight:700;margin-bottom:4px">No games found</p><p style="font-size:13px">Try a different date or check back later.</p></div>
+    <div id="live-grid" class="scores-grid"></div>
+    <div style="margin-top:16px;text-align:center;font-size:11px;color:var(--g400)">
+      Scores refresh automatically every 30 seconds. Data from ESPN.
+    </div>`;
+  }
+
+  c.querySelector('#live-date').textContent = displayDate;
+  c.querySelector('#live-pulse').style.display = hasLive ? '' : 'none';
+  c.querySelector('#live-updated').textContent = updatedStr;
+  for(const k of Object.keys(counts)){
+    c.querySelector('#live-cnt-' + k).textContent = counts[k];
+    c.querySelector(`.live-filter-btn[data-filter="${k}"]`).classList.toggle('active', S.liveScoresFilter === k);
+  }
+  c.querySelector('#live-empty').style.display = filtered.length === 0 ? '' : 'none';
+
+  const cardHtml = game => {
         const awayOur = findOurTeam(game.away);
         const homeOur = findOurTeam(game.home);
         const awayOwner = awayOur ? owner(awayOur.id) : '';
@@ -445,7 +468,7 @@ function renderLive(c){
         const gameTime = new Date(game.date);
         const timeStr = gameTime.toLocaleTimeString([], {hour:'numeric', minute:'2-digit'});
 
-        return `<div class="score-card ${isLive?'live':''} ${isFinal?'final':''}">
+        return `<div class="score-card ${isLive?'live':''} ${isFinal?'final':''}" data-gid="${escapeHtml(game.id)}">
           <div class="score-teams">
             <div class="score-team-row ${awayWon?'winner':''} ${isFinal&&!awayWon?'loser':''}">
               ${game.away.logo ? `<img src="${game.away.logo}" alt="">` : '<span style="width:24px"></span>'}
@@ -469,11 +492,26 @@ function renderLive(c){
             ${game.venue ? `<div class="score-broadcast">${escapeHtml(game.venue)}</div>` : ''}
           </div>
         </div>`;
-      }).join('')}
-    </div>
-    <div style="margin-top:16px;text-align:center;font-size:11px;color:var(--g400)">
-      Scores refresh automatically every 30 seconds. Data from ESPN.
-    </div>`;
+  };
+  patchLiveGrid(c.querySelector('#live-grid'), filtered, cardHtml);
+}
+
+let _liveCardCache = new Map(); // game.id -> card HTML as last painted
+
+/* Reuse a card's DOM node when its HTML is unchanged; rebuild only changed cards; keep order. */
+function patchLiveGrid(grid, games, cardHtml){
+  const existing = new Map();
+  for(const el of grid.children) existing.set(el.dataset.gid, el);
+  const tpl = document.createElement('template');
+  const nodes = games.map(game => {
+    const html = cardHtml(game);
+    const el = existing.get(game.id);
+    if(el && _liveCardCache.get(game.id) === html) return el;
+    tpl.innerHTML = html;
+    _liveCardCache.set(game.id, html);
+    return tpl.content.firstElementChild;
+  });
+  grid.replaceChildren(...nodes);
 }
 
 function renderLiveInPlace(){
