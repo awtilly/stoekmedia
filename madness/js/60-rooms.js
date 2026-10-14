@@ -20,13 +20,15 @@ function _debouncedFirestoreWrite(){
 }
 
 function saveState(){
-  try { localStorage.setItem("mm4", JSON.stringify(S)); } catch(e){}
+  try { localStorage.setItem(stateKey(), JSON.stringify(S)); } catch(e){}
   if(roomId && !_isRemoteUpdate) _debouncedFirestoreWrite();
 }
 
+/* Replace S with the defaults plus whatever this room (or offline play) last cached locally. */
 function loadState(){
+  S = defaultState();
   try {
-    const s = localStorage.getItem("mm4");
+    const s = localStorage.getItem(stateKey());
     if(s) Object.assign(S, JSON.parse(s));
     // Reconstruct Firestore Timestamp from serialized JSON
     if(S.ds && S.ds.pickDeadline && typeof S.ds.pickDeadline === 'object' && S.ds.pickDeadline.seconds){
@@ -69,6 +71,7 @@ function joinRoom(){
   const url = new URL(window.location);
   url.searchParams.set("room", code);
   window.history.replaceState({}, "", url);
+  loadState();
   checkAdminSession();
   connectToRoom(code);
   render();
@@ -112,7 +115,7 @@ function _applyRoomSnapshot(doc){
   if(S.ds && S.ds.pickDeadline && typeof S.ds.pickDeadline === 'object' && S.ds.pickDeadline.seconds){
     S.ds.pickDeadline = new firebase.firestore.Timestamp(S.ds.pickDeadline.seconds, S.ds.pickDeadline.nanoseconds || 0);
   }
-  localStorage.setItem("mm4", JSON.stringify(S));
+  localStorage.setItem(stateKey(), JSON.stringify(S));
   render();
   updateAppBadge();
   if('Notification' in window && Notification.permission === 'granted') initFCM().catch(() => {});
@@ -147,6 +150,7 @@ function rejoinRoom(code){
   const url = new URL(window.location);
   url.searchParams.set("room", code);
   window.history.replaceState({}, "", url);
+  loadState();
   checkAdminSession();
   connectToRoom(code);
   render();

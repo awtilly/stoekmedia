@@ -176,7 +176,7 @@ async function resetAll(){
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     }).catch(() => {});
   }
-  localStorage.removeItem("mm4");
+  localStorage.removeItem(stateKey());
   if(roomId) localStorage.removeItem('mm4_me_' + roomId);
   location.reload();
 }

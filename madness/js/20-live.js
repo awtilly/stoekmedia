@@ -95,7 +95,7 @@ async function checkGameFinals() {
     if (shouldSync) {
       saveState();
     } else {
-      try { localStorage.setItem("mm4", JSON.stringify(S)); } catch(e){}
+      try { localStorage.setItem(stateKey(), JSON.stringify(S)); } catch(e){}
     }
     render();
   }
