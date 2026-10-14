@@ -1,0 +1,9 @@
+{
+  "name": "madness",
+  "private": true,
+  "description": "Madness snake-draft bracket pool PWA. Zero runtime dependencies by design; this file only exists for the test/stamp scripts.",
+  "scripts": {
+    "test": "node --test \"test/*.test.js\"",
+    "stamp": "node scripts/stamp.js"
+  }
+}
