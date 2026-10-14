@@ -58,7 +58,22 @@ async function createRoom(){
   if(!S.bracketRegion) S.bracketRegion = "South";
   if(!S.games) S.games = [];
   syncGames();
-  await db.collection("rooms").doc(code).set({ adminPin: hashedPin, state: JSON.stringify(S), updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+  // Create inside a transaction: the get() above is only a courtesy check. If someone else grabbed the
+  // same code in the meantime, their room (and admin PIN) must not be overwritten.
+  const ref = db.collection("rooms").doc(code);
+  const created = await db.runTransaction(async tx => {
+    const snap = await tx.get(ref);
+    if(snap.exists) return false;
+    tx.set(ref, { adminPin: hashedPin, state: JSON.stringify(S), updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+    return true;
+  }).catch(e => { console.warn("Room create error:", e); return false; });
+  if(!created){
+    roomId = null;
+    url.searchParams.delete("room");
+    window.history.replaceState({}, "", url);
+    await appAlert("That room name was just taken. Try another.");
+    return;
+  }
   unlockAdmin();
   connectToRoom(code);
   render();
