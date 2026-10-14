@@ -376,7 +376,7 @@ function renderLive(c){
   const currentDate = S.liveScoresDate || todayStr;
   const displayDate = currentDate.replace(/(\d{4})(\d{2})(\d{2})/, '$2/$3/$1');
 
-  let filtered = liveScores;
+  let filtered = liveScores.slice(); // copy: the sort below must not reorder the shared liveScores array
   if(S.liveScoresFilter === 'live') filtered = liveScores.filter(g => g.state === 'in');
   else if(S.liveScoresFilter === 'final') filtered = liveScores.filter(g => g.state === 'post');
   else if(S.liveScoresFilter === 'upcoming') filtered = liveScores.filter(g => g.state === 'pre');
