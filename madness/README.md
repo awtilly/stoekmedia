@@ -55,6 +55,16 @@ parsing and tournament-team import filtering (the conference-tournament bug from
 Not covered: anything that touches Firestore transactions (`pickTeam`, `undoDraft`,
 `autoPickHighestSeed`), the PIN flow, and all rendering.
 
+## Scoreboard cache
+
+`functions/scoreboard.js` (`pollScoreboard`) runs every minute, March 10 to April 10
+Eastern, fetches the ESPN scoreboard for today (and yesterday before 4am), and writes the
+parsed events to Firestore `scoreboard/{YYYYMMDD}`. Clients (`js/20-live.js`) listen to that
+document. If it is missing, older than 3 minutes, or unreadable, the client falls back to
+polling ESPN directly every 30 seconds, exactly as before. Force the function on or off
+outside the window with a `scoreboard/_config` doc `{ enabled: true | false }`.
+`functions/espn-parse.js` is a copy of the client parser; a test keeps the two in sync.
+
 ## Rules of the road
 
 - Never auto-merge. Every change is a PR for Joe to review.
