@@ -31,24 +31,37 @@ test('applyCachedScoreboard: a fresh doc replaces liveScores and pauses direct p
   assert.equal(fetches, 0, 'refreshLiveScores must not hit ESPN while the cache is fresh');
 });
 
-test('applyCachedScoreboard: a stale doc is ignored and direct polling resumes', async () => {
+test('applyCachedScoreboard: a stale doc replayed from on-device cache is ignored and direct polling resumes', async () => {
   const app = createApp();
   let fetches = 0;
   app.fetch = async () => { fetches++; return { ok: true, json: async () => ({ events: [] }) }; };
-  const applied = app.applyCachedScoreboard({ events: sampleEvents(), fetchedAt: ts(Date.now() - 10 * 60_000) });
+  const applied = app.applyCachedScoreboard({ events: sampleEvents(), fetchedAt: ts(Date.now() - 10 * 60_000) }, true);
   assert.equal(applied, false);
   await app.refreshLiveScores();
   assert.equal(fetches, 1, 'stale cache => ESPN is polled directly');
+});
+
+test('applyCachedScoreboard: a server-delivered doc is used even when the phone clock disagrees with fetchedAt', async () => {
+  const app = createApp();
+  let fetches = 0;
+  app.fetch = async () => { fetches++; return { ok: true, json: async () => ({ events: [] }) }; };
+  // phone clock 10 minutes fast: fetchedAt looks "old" but the server just delivered it
+  assert.equal(app.applyCachedScoreboard({ events: sampleEvents(), fetchedAt: ts(Date.now() - 10 * 60_000) }, false), true);
+  await app.refreshLiveScores();
+  assert.equal(fetches, 0, 'must not fall back to ESPN because of clock skew');
+  // phone clock slow: fetchedAt in the future
+  assert.equal(app.applyCachedScoreboard({ events: sampleEvents(), fetchedAt: ts(Date.now() + 10 * 60_000) }, false), true);
+  assert.equal(app.applyCachedScoreboard({ events: sampleEvents() }, false), false, 'doc without fetchedAt is malformed');
 });
 
 test('refreshLiveScores: falls back to direct polling once a previously fresh cache ages out', async () => {
   const app = createApp();
   let fetches = 0;
   app.fetch = async () => { fetches++; return { ok: true, json: async () => ({ events: [] }) }; };
-  app.applyCachedScoreboard({ events: sampleEvents(), fetchedAt: ts(Date.now() - 2 * 60_000) });
+  app.applyCachedScoreboard({ events: sampleEvents(), fetchedAt: ts(Date.now()) });
   await app.refreshLiveScores();
   assert.equal(fetches, 0, 'still inside the window');
-  app.applyCachedScoreboard({ events: sampleEvents(), fetchedAt: ts(Date.now() - 3 * 60_000 - 1) });
+  app.eval('_scoreboardSeenAt = Date.now() - 3 * 60 * 1000 - 1'); // last snapshot arrived just over 3 minutes ago
   await app.refreshLiveScores();
   assert.equal(fetches, 1, 'just past the window => poll');
 });
@@ -74,14 +87,18 @@ test('subscribeScoreboard: listens on scoreboard/{date}, uses fresh docs, polls 
   await new Promise(r => setImmediate(r));
   assert.equal(fetches, 1, 'missing doc => direct poll');
 
-  listener({ exists: true, data: () => ({ events: sampleEvents(), fetchedAt: ts(Date.now()) }) });
+  listener({ exists: true, metadata: { fromCache: true }, data: () => ({ events: sampleEvents(), fetchedAt: ts(Date.now() - 20 * 60_000) }) });
+  await new Promise(r => setImmediate(r));
+  assert.equal(fetches, 2, 'old doc replayed from on-device cache => direct poll');
+
+  listener({ exists: true, metadata: { fromCache: false }, data: () => ({ events: sampleEvents(), fetchedAt: ts(Date.now()) }) });
   assert.equal(app.eval('liveScores')[0].id, '401');
   await app.refreshLiveScores();
-  assert.equal(fetches, 1, 'fresh doc => no extra poll');
+  assert.equal(fetches, 2, 'fresh doc => no extra poll');
 
   errHandler({ code: 'permission-denied' });
   await new Promise(r => setImmediate(r));
-  assert.equal(fetches, 2, 'listener error (e.g. rules not updated) => direct poll');
+  assert.equal(fetches, 3, 'listener error (e.g. rules not updated) => direct poll');
 
   app.unsubscribeScoreboard();
   assert.equal(unsubscribed, 1);

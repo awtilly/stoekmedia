@@ -14,21 +14,29 @@ const SCOREBOARD_COLLECTION = 'scoreboard';
 const SCOREBOARD_MAX_AGE_MS = 3 * 60 * 1000; // doc older than this => poll ESPN directly
 let _scoreboardUnsub = null;
 let _scoreboardFresh = false; // true while the cached doc is current; direct polling pauses
+let _scoreboardSeenAt = 0;    // local clock when the last usable snapshot arrived (freshness is measured from here, so a wrong phone clock cannot defeat the cache)
 
 function localDateStr(d) {
   const n = d || new Date();
   return n.getFullYear() + String(n.getMonth()+1).padStart(2,'0') + String(n.getDate()).padStart(2,'0');
 }
 
-function scoreboardIsFresh(data, now) {
-  if (!data || !Array.isArray(data.events)) return false;
-  const fetchedAt = data.fetchedAt && data.fetchedAt.toMillis ? data.fetchedAt.toMillis() : 0;
-  return fetchedAt > 0 && ((now || Date.now()) - fetchedAt) < SCOREBOARD_MAX_AGE_MS;
+function scoreboardDocValid(data) {
+  return !!(data && Array.isArray(data.events) && data.fetchedAt && data.fetchedAt.toMillis && data.fetchedAt.toMillis() > 0);
 }
 
-function applyCachedScoreboard(data) {
-  if (!scoreboardIsFresh(data)) { _scoreboardFresh = false; return false; }
+function scoreboardIsFresh(data, now) {
+  if (!scoreboardDocValid(data)) return false;
+  return ((now || Date.now()) - data.fetchedAt.toMillis()) < SCOREBOARD_MAX_AGE_MS;
+}
+
+/* fromCache: the snapshot was replayed from Firestore's on-device persistence rather than delivered
+ * by the server. A server-delivered doc is current by definition; a replayed one is judged by fetchedAt. */
+function applyCachedScoreboard(data, fromCache) {
+  const usable = fromCache ? scoreboardIsFresh(data) : scoreboardDocValid(data);
+  if (!usable) { _scoreboardFresh = false; return false; }
   _scoreboardFresh = true;
+  _scoreboardSeenAt = Date.now();
   liveScores = data.events;
   liveLastRefresh = data.fetchedAt.toMillis();
   checkGameFinals();
@@ -43,7 +51,7 @@ function subscribeScoreboard(dateStr) {
   unsubscribeScoreboard();
   if (typeof db === 'undefined' || !db) return;
   _scoreboardUnsub = db.collection(SCOREBOARD_COLLECTION).doc(dateStr).onSnapshot(doc => {
-    if (!doc.exists || !applyCachedScoreboard(doc.data())) {
+    if (!doc.exists || !applyCachedScoreboard(doc.data(), !!(doc.metadata && doc.metadata.fromCache))) {
       _scoreboardFresh = false;
       refreshLiveScores();
     }
@@ -61,7 +69,7 @@ function unsubscribeScoreboard() {
 
 async function refreshLiveScores() {
   // Cached doc is current: the Cloud Function is doing the polling for everyone.
-  if (_scoreboardFresh && (Date.now() - liveLastRefresh) < SCOREBOARD_MAX_AGE_MS) return;
+  if (_scoreboardFresh && (Date.now() - _scoreboardSeenAt) < SCOREBOARD_MAX_AGE_MS) return;
   _scoreboardFresh = false;
   const dateStr = S.liveScoresDate || localDateStr();
   const data = await espn.fetchScoreboard(dateStr);
