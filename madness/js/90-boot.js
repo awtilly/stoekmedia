@@ -50,6 +50,15 @@ function showUpdateBanner(){
 }
 
 let deferredInstallPrompt = null;
+const INSTALL_DISMISS_KEY = 'mm4_install_dismissed';
+const INSTALL_DISMISS_DAYS = 14;
+
+function installBannerDismissed(){
+  try {
+    const ts = Number(localStorage.getItem(INSTALL_DISMISS_KEY));
+    return ts > 0 && Date.now() - ts < INSTALL_DISMISS_DAYS * 86400 * 1000;
+  } catch(e){ return false; }
+}
 
 function isStandalone(){
   return window.matchMedia('(display-mode: standalone)').matches
@@ -58,9 +67,10 @@ function isStandalone(){
 
 function showInstallBanner(){
   if(isStandalone()) return;
+  if(installBannerDismissed()) return;
   if(document.getElementById('install-banner')) return;
 
-  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  const isIOS = isIOSDevice();
   const banner = document.createElement('div');
   banner.id = 'install-banner';
   banner.className = 'install-banner';
@@ -71,14 +81,16 @@ function showInstallBanner(){
       <small>${isIOS ? 'Tap Share then "Add to Home Screen"' : 'Add to your home screen for quick access'}</small>
     </div>
     ${isIOS ? '' : '<button class="btn-install" onclick="installApp()">Install</button>'}
-    <button class="btn-dismiss" onclick="dismissInstallBanner()">&times;</button>`;
+    <button class="btn-dismiss" onclick="dismissInstallBanner(true)">&times;</button>`;
   document.body.appendChild(banner);
   repositionInstallBanner();
 }
 
-function dismissInstallBanner(){
+function dismissInstallBanner(remember){
   const banner = document.getElementById('install-banner');
   if(banner) banner.remove();
+  // Remember an explicit dismissal so the banner does not come back on every visit.
+  if(remember){ try { localStorage.setItem(INSTALL_DISMISS_KEY, String(Date.now())); } catch(e){} }
 }
 
 function repositionInstallBanner(){
@@ -116,6 +128,6 @@ window.addEventListener('appinstalled', () => {
 });
 
 // On iOS, show the banner after a short delay since there's no beforeinstallprompt
-if(/iPad|iPhone|iPod/.test(navigator.userAgent) && !isStandalone()){
+if(isIOSDevice() && !isStandalone()){
   setTimeout(showInstallBanner, 2000);
 }

@@ -10,3 +10,7 @@ GAME_ROUND[12] = 3; GAME_ROUND[13] = 3; GAME_ROUND[14] = 4;
 
 const generateId = () => crypto.randomUUID();
 
+// iPadOS 13+ sends a Macintosh user agent; the touch-point check catches it.
+const isIOSDevice = () => /iPad|iPhone|iPod/.test(navigator.userAgent)
+  || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
