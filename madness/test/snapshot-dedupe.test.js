@@ -66,7 +66,12 @@ test('the echo of our own debounced write is skipped, a later remote change is n
   app.S.players = [{ id: 'p1', name: 'Ann', teamIds: [] }];
   app.S.ds = { order: ['p1'], cp: 0, started: true, complete: false };
   let written = null;
-  app.db = { collection: () => ({ doc: () => ({ set: (doc) => { written = doc; return Promise.resolve(); } }) }) };
+  // Stub both write paths: plain set() and the transaction form (tx.get sees no doc, tx.set captures).
+  const ref = { set: (doc) => { written = doc; return Promise.resolve(); } };
+  app.db = {
+    collection: () => ({ doc: () => ref }),
+    runTransaction: async (fn) => { await fn({ get: async () => ({ exists: false }), set: (_r, doc) => { written = doc; } }); }
+  };
   app._debouncedFirestoreWrite();
   await new Promise(r => setTimeout(r, 900)); // the 800 ms debounce
   assert.ok(written && typeof written.state === 'string', 'write happened');
