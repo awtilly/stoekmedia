@@ -24,7 +24,8 @@ function teamRecordDisplay(t) {
 async function resolvePlayIn(teamId, winnerIdx) {
   const team = S.teams.find(t => t.id === teamId);
   if (!team || !team.playIn) return;
-  const winner = team.playInTeams[winnerIdx];
+  const winner = team.playInTeams && team.playInTeams[winnerIdx];
+  if (!winner) return;
   team.name = winner.name;
   team.logo = winner.logo;
   team.abbr = winner.abbr;
@@ -51,10 +52,13 @@ async function autoResolvePlayIns() {
   if (now - _lastAutoResolve < 3600000) return; // once per hour max
   const unresolved = S.teams.filter(t => t.playIn && !t.playInResolved);
   if (unresolved.length === 0) return;
-  _lastAutoResolve = now;
   const dateCandidates = [];
   for (let d = 14; d <= 21; d++) dateCandidates.push(`${S.year}03${String(d).padStart(2,'0')}`);
   const results = await Promise.allSettled(dateCandidates.map(ds => espn.fetchScoreboard(ds)));
+  // Only arm the hourly throttle once ESPN actually answered; a dead network on First Four night
+  // must not lock auto-resolve out for an hour.
+  if (!results.some(r => r.status === 'fulfilled' && r.value)) return;
+  _lastAutoResolve = now;
   for (const r of results) {
     if (r.status !== 'fulfilled' || !r.value) continue;
     for (const ev of espn.parseScoreboardEvents(r.value)) {
@@ -63,8 +67,16 @@ async function autoResolvePlayIns() {
         if (ut.playInResolved) continue;
         const abbrs = ut.playInTeams.map(pt => pt.abbr);
         if (abbrs.includes(ev.away.abbr) && abbrs.includes(ev.home.abbr)) {
-          const winnerAbbr = ev.away.winner ? ev.away.abbr : ev.home.abbr;
-          const winnerIdx = abbrs.indexOf(winnerAbbr);
+          // ESPN flags exactly one winner on a final; if the flag is missing fall back to the score,
+          // and if that is a tie or absent leave the slot for the admin rather than guessing home.
+          let winnerAbbr = null;
+          if (ev.away.winner && !ev.home.winner) winnerAbbr = ev.away.abbr;
+          else if (ev.home.winner && !ev.away.winner) winnerAbbr = ev.home.abbr;
+          else {
+            const a = parseInt(ev.away.score, 10), h = parseInt(ev.home.score, 10);
+            if (a > h) winnerAbbr = ev.away.abbr; else if (h > a) winnerAbbr = ev.home.abbr;
+          }
+          const winnerIdx = winnerAbbr ? abbrs.indexOf(winnerAbbr) : -1;
           if (winnerIdx >= 0) await resolvePlayIn(ut.id, winnerIdx);
         }
       }
