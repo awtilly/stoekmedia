@@ -16,6 +16,7 @@ function goHome() {
   stopLiveRefresh();
   if(unsubRoom) { unsubRoom(); unsubRoom = null; }
   roomId = null;
+  loadState(); // drop the room's state from memory so nothing from it can reach the offline cache
   const url = new URL(window.location);
   url.searchParams.delete("room");
   window.history.replaceState({}, "", url);
