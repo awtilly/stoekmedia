@@ -165,7 +165,7 @@ async function resetAll(){
     // Reset to defaults but keep year
     Object.assign(freshState, {
       phase: 'draft', players: [], teams: [],
-      ds: {order:[], cp:0, started:false, complete:false},
+      ds: {order:[], cp:0, started:false, complete:false, epoch: ((S.ds && S.ds.epoch) || 0) + 1},
       rp: {1:1, 2:2, 3:4, 4:8, 5:16, 6:32}, ub: true,
       bracket: {South:Array(15).fill(null), East:Array(15).fill(null), Midwest:Array(15).fill(null), West:Array(15).fill(null), ff:Array(3).fill(null)},
       bracketRegion:'South', fr:'All', fs:'All', liveScoresDate:'', liveScoresFilter:'all'
@@ -565,6 +565,7 @@ async function startDraft(){
   S.ds = {
     order: snakeOrder(S.players.map(p => p.id), S.teams.length),
     cp: 0, started: true, complete: false,
+    epoch: ((S.ds && S.ds.epoch) || 0) + 1, // draft went backwards: outranks any in-flight stale write
     timerDuration: duration,
     pickDeadline: duration > 0 ? firebase.firestore.Timestamp.fromDate(new Date(Date.now() + duration * 1000)) : null,
     timerPaused: false,
@@ -674,6 +675,7 @@ async function undoDraft(){
         if(!ds.order || ds.cp === 0) return;
         ds.cp--;
         ds.complete = false;
+        ds.epoch = (ds.epoch || 0) + 1;
         const pl = (remote.players || []).find(p => p.id === ds.order[ds.cp]);
         if(pl && pl.teamIds && pl.teamIds.length){ pl.teamIds.pop(); }
         if(ds.timerDuration && ds.timerDuration > 0){
@@ -696,6 +698,7 @@ async function undoDraft(){
   _beeped = false;
   ds.cp--;
   ds.complete = false;
+  ds.epoch = (ds.epoch || 0) + 1;
   const pl = S.players.find(p => p.id === ds.order[ds.cp]);
   if(pl) pl.teamIds.pop();
   if(ds.timerDuration && ds.timerDuration > 0){
@@ -711,7 +714,7 @@ async function resetDraft(){
   if(!await requireAdmin()) return;
   if(!await appConfirm("Reset the entire draft? All picks will be lost.", { title: 'Reset Draft', danger: true, confirmLabel: 'Reset' })) return;
   stopDraftClock();
-  S.ds = {order:[], cp:0, started:false, complete:false};
+  S.ds = {order:[], cp:0, started:false, complete:false, epoch: ((S.ds && S.ds.epoch) || 0) + 1};
   S.players.forEach(p => p.teamIds = []);
   saveState();
   render();

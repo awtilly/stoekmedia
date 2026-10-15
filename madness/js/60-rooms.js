@@ -43,6 +43,14 @@ function _writeSharedState(){
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     }, {merge: true});
   }).catch(e => {
+    // Transactions need the network. Offline, fall back to the plain merge write, which Firestore
+    // queues and flushes on reconnect (the pre-transaction behaviour).
+    if(e && (e.code === 'unavailable' || e.code === 'failed-precondition' || (typeof navigator !== 'undefined' && navigator.onLine === false))){
+      _lastSyncedState = localJson;
+      ref.set({ state: localJson, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, {merge: true})
+        .catch(err => console.warn("Firestore offline write error:", err));
+      return;
+    }
     console.warn("Firestore write error:", e);
     showToast("Sync error \u2014 changes saved locally");
   });
