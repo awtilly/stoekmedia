@@ -296,7 +296,7 @@ async function importFromESPN(){
 
     // Sanity check: 4 regions × 16 slots = 64 bracket slots. With play-ins, total team
     // entries should be 64-68. Anything outside that means ESPN data is partial/stale.
-    const slotCount = new Set(teams.map(t => `${t.seed}_${t.region}`)).size;
+    const slotCount = new Set(teams.map(t => `${escapeHtml(t.seed)}_${escapeHtml(t.region)}`)).size;
     const regionCounts = teams.reduce((acc, t) => { acc[t.region] = (acc[t.region]||0)+1; return acc; }, {});
     const incomplete = slotCount < 64 || Object.values(regionCounts).some(n => n < 16) || REGIONS.some(r => !regionCounts[r]);
     if(incomplete){
@@ -522,7 +522,7 @@ function renderDraft(c){
     const pt = myP ? S.teams.filter(t => myP.teamIds.includes(t.id)).sort((a,b) => a.seed - b.seed) : [];
     c.innerHTML = `<div class="section-title">Your Team</div>
     ${myP ? `<div class="card"><span class="label">Team ${escapeHtml(myP.name)} (${pt.length} teams)</span>
-      ${pt.map(t => { const w = (S.games||[]).filter(g => g.wid===t.id).length; const el = (S.games||[]).some(g => (g.t1===t.id||g.t2===t.id) && g.wid && g.wid!==t.id); return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--g100)">${teamLogoHTML(t, 24)}${seedBadge(t.seed)}<div style="flex:1"><div style="font-weight:600">${escapeHtml(teamDisplayName(t))}</div><div style="font-size:11px;color:var(--g400)">${t.region}</div></div><div style="text-align:right">${el ? '<span style="color:var(--red);font-weight:700">Eliminated</span>' : `<span style="color:var(--green);font-weight:700">${w > 0 ? w + 'W' : 'Alive'}</span>`}</div></div>`}).join('')}
+      ${pt.map(t => { const w = (S.games||[]).filter(g => g.wid===t.id).length; const el = (S.games||[]).some(g => (g.t1===t.id||g.t2===t.id) && g.wid && g.wid!==t.id); return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--g100)">${teamLogoHTML(t, 24)}${seedBadge(t.seed)}<div style="flex:1"><div style="font-weight:600">${escapeHtml(teamDisplayName(t))}</div><div style="font-size:11px;color:var(--g400)">${escapeHtml(t.region)}</div></div><div style="text-align:right">${el ? '<span style="color:var(--red);font-weight:700">Eliminated</span>' : `<span style="color:var(--green);font-weight:700">${w > 0 ? w + 'W' : 'Alive'}</span>`}</div></div>`}).join('')}
     </div>` : '<div class="card" style="text-align:center;padding:20px;color:var(--g400)">Join as a player to see your team.</div>'}
     ${adminUnlocked ? `<div style="margin-top:14px"><div class="row" style="gap:6px;justify-content:center"><button class="btn btn-secondary btn-sm" onclick="undoDraft()" ${ds.cp === 0 ? 'disabled' : ''}>Undo Last Pick</button><button class="btn btn-danger btn-sm" onclick="resetDraft()">Reset Draft</button></div></div>` : ''}`;
     return;
@@ -566,7 +566,7 @@ function renderDraft(c){
       <select onchange="S.fr=this.value;render()" style="width:130px"><option value="All" ${S.fr==='All'?'selected':''}>All Regions</option>${REGIONS.map(r => `<option value="${r}" ${S.fr===r?'selected':''}>${r}</option>`).join('')}</select>
       <select onchange="S.fs=this.value;render()" style="width:110px"><option value="All" ${S.fs==='All'?'selected':''}>All Seeds</option>${SEEDS.map(s => `<option value="${s}" ${String(S.fs)===String(s)?'selected':''}>Seed ${s}</option>`).join('')}</select>
       <span style="color:var(--g400);font-size:12px">${av.length} available</span></div>
-    <div class="draft-teams">${av.map(t => `<button class="pick-btn" onclick="pickTeam('${t.id}')" ${!isMyTurn ? 'disabled' : ''}>${teamLogoHTML(t, 20)}${seedBadge(t.seed)}<div><div style="font-weight:600">${escapeHtml(teamDisplayName(t))}</div><div style="font-size:11px;color:var(--g400)">${t.region}${teamRecordDisplay(t) ? ` · ${teamRecordDisplay(t)}` : ''}</div></div></button>`).join('')}</div></div>
+    <div class="draft-teams">${av.map(t => `<button class="pick-btn" onclick="pickTeam('${t.id}')" ${!isMyTurn ? 'disabled' : ''}>${teamLogoHTML(t, 20)}${seedBadge(t.seed)}<div><div style="font-weight:600">${escapeHtml(teamDisplayName(t))}</div><div style="font-size:11px;color:var(--g400)">${escapeHtml(t.region)}${teamRecordDisplay(t) ? ` · ${escapeHtml(teamRecordDisplay(t))}` : ''}</div></div></button>`).join('')}</div></div>
   <div><span class="label">Rosters</span>
     ${S.players.map(p => {const pt = S.teams.filter(t => p.teamIds.includes(t.id)).sort((a,b) => a.seed - b.seed); const act = p.id === cid; const _isMe = p.id === myId; return `<div class="roster-card ${act?'active':''}"><div class="row" style="justify-content:space-between;margin-bottom:4px"><span style="font-weight:700;font-size:13px;color:${act||_isMe?'var(--gold)':'var(--black)'}${_isMe?';font-weight:800':''}">${escapeHtml(p.name)}</span><span style="color:var(--g400);font-size:11px">${pt.length}</span></div>${pt.map(t => `<div style="display:flex;align-items:center;gap:5px;font-size:12px;padding:1px 0">${teamLogoHTML(t, 20)}${seedBadge(t.seed)} ${escapeHtml(teamDisplayName(t))}</div>`).join('')}</div>`}).join('')}
   </div></div>`;
@@ -994,7 +994,7 @@ function renderRegionBracket(region){
   const _rwMine = rw && _rwMyP && _rwMyP.teamIds.includes(rw.id);
   html += `<div class="round" style="min-width:120px;justify-content:center"><div class="round-header">Region Winner</div>
     <div class="gw ${_rwMine?'region-winner mine':''}"><div style="text-align:center;padding:12px">
-      ${rw ? `${teamLogoHTML(rw, 28) ? `<div style="margin-bottom:4px">${teamLogoHTML(rw, 28)}</div>` : ''}<div style="font-size:11px;color:var(--gold);font-weight:800">${rw.seed}</div><div style="font-weight:800;font-size:14px">${escapeHtml(teamDisplayName(rw))}</div><div style="font-size:11px;color:var(--g400)">${owner(rw.id) || ''}</div>` : '<div style="color:var(--g300);font-size:13px">TBD</div>'}
+      ${rw ? `${teamLogoHTML(rw, 28) ? `<div style="margin-bottom:4px">${teamLogoHTML(rw, 28)}</div>` : ''}<div style="font-size:11px;color:var(--gold);font-weight:800">${escapeHtml(rw.seed)}</div><div style="font-weight:800;font-size:14px">${escapeHtml(teamDisplayName(rw))}</div><div style="font-size:11px;color:var(--g400)">${escapeHtml(owner(rw.id))}</div>` : '<div style="color:var(--g300);font-size:13px">TBD</div>'}
     </div></div></div>`;
   html += `</div></div>`;
   area.innerHTML = html;
@@ -1014,7 +1014,7 @@ function slotHTML(region, gi, team, winnerId){
     ontouchstart="startLongPress(()=>clearBracketGame('${region}',${gi}))"
     ontouchend="endLongPress(event)"
     ontouchmove="cancelLongPress()">
-    ${teamLogoHTML(team, 16)}<span class="sd">${team.seed}</span><span class="tn">${escapeHtml(teamDisplayName(team))}</span>${ow ? `<span class="ow">${escapeHtml(ow)}</span>` : ''}
+    ${teamLogoHTML(team, 16)}<span class="sd">${escapeHtml(team.seed)}</span><span class="tn">${escapeHtml(teamDisplayName(team))}</span>${ow ? `<span class="ow">${escapeHtml(ow)}</span>` : ''}
   </div>`;
 }
 
@@ -1044,7 +1044,7 @@ function renderFF(){
       ontouchstart="startLongPress(()=>clearFFGame(${ffIdx}))"
       ontouchend="endLongPress(event)"
       ontouchmove="cancelLongPress()">
-      ${teamLogoHTML(team, 20)}<span class="sd">${team.seed}</span>${escapeHtml(teamDisplayName(team))}<span style="margin-left:auto;font-size:10px;color:var(--g400)">${owner(team.id) || ''}</span></div>`;
+      ${teamLogoHTML(team, 20)}<span class="sd">${escapeHtml(team.seed)}</span>${escapeHtml(teamDisplayName(team))}<span style="margin-left:auto;font-size:10px;color:var(--g400)">${escapeHtml(owner(team.id))}</span></div>`;
   }
 
   const ff0t = ff0 ? S.teams.find(t => t.id === ff0) : null;
@@ -1080,7 +1080,7 @@ function renderFF(){
         </div>
         <div class="champ-box">
           <div class="champ-label">Champion</div>
-          ${champt ? `${teamLogoHTML(champt, 32) ? `<div style="margin-bottom:4px">${teamLogoHTML(champt, 32)}</div>` : ''}<div class="champ-team">${seedBadge(champt.seed)} ${escapeHtml(teamDisplayName(champt))}</div><div class="champ-owner">${owner(champt.id) || ''}</div>` : '<div class="champ-team" style="color:var(--g300)">TBD</div>'}
+          ${champt ? `${teamLogoHTML(champt, 32) ? `<div style="margin-bottom:4px">${teamLogoHTML(champt, 32)}</div>` : ''}<div class="champ-team">${seedBadge(champt.seed)} ${escapeHtml(teamDisplayName(champt))}</div><div class="champ-owner">${escapeHtml(owner(champt.id))}</div>` : '<div class="champ-team" style="color:var(--g300)">TBD</div>'}
         </div>
       </div>
     </div>

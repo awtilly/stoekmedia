@@ -28,6 +28,7 @@ function loadState(){
   try {
     const s = localStorage.getItem("mm4");
     if(s) Object.assign(S, JSON.parse(s));
+    sanitizeSharedState(S);
     // Reconstruct Firestore Timestamp from serialized JSON
     if(S.ds && S.ds.pickDeadline && typeof S.ds.pickDeadline === 'object' && S.ds.pickDeadline.seconds){
       S.ds.pickDeadline = new firebase.firestore.Timestamp(S.ds.pickDeadline.seconds, S.ds.pickDeadline.nanoseconds || 0);
@@ -99,6 +100,7 @@ function _applyRoomSnapshot(doc){
   for(const k of VIEW_LOCAL) local[k] = S[k];
   const remote = JSON.parse(data.state);
   Object.assign(S, remote, local);
+  sanitizeSharedState(S);
   if(S.ds && S.ds.pickDeadline && typeof S.ds.pickDeadline === 'object' && S.ds.pickDeadline.seconds){
     S.ds.pickDeadline = new firebase.firestore.Timestamp(S.ds.pickDeadline.seconds, S.ds.pickDeadline.nanoseconds || 0);
   }
