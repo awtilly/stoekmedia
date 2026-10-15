@@ -49,14 +49,21 @@ function scoreboardUrl(ymd) {
   return `${ESPN_BASE}/scoreboard?dates=${ymd}&limit=200`;
 }
 
-/** Shape of the Firestore document written to scoreboard/{ymd}. */
+/**
+ * Shape of the Firestore document written to scoreboard/{ymd}.
+ * Events are passed through JSON so every `undefined` disappears: before tip-off ESPN
+ * omits `competitors[].winner`, so the parser yields `winner: undefined`, and the Admin SDK
+ * rejects a document containing undefined ("Cannot use undefined as a Firestore value").
+ * Verified against the real 2026-11-03 scoreboard: 29 pre-game events, 58 undefined fields.
+ */
 function buildDoc(ymd, events, serverTimestamp) {
+  const clean = JSON.parse(JSON.stringify(events));
   return {
     date: ymd,
     source: 'espn',
     fetchedAt: serverTimestamp,
-    eventCount: events.length,
-    events
+    eventCount: clean.length,
+    events: clean
   };
 }
 

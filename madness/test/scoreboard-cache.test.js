@@ -151,3 +151,26 @@ test('scoreboard-logic: document shape and ESPN URL', () => {
   assert.equal(doc.fetchedAt, 'SERVER_TS');
   assert.equal(logic.scoreboardUrl('20270318'), 'https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/scoreboard?dates=20270318&limit=200');
 });
+
+test('scoreboard-logic: buildDoc strips the undefined fields pre-game ESPN events produce (Firestore rejects them)', () => {
+  // Real pre-game shape: no `winner`, no `curatedRank`, no score yet.
+  const preGame = { events: [{ id: '9', shortName: 'A @ B', date: '2027-03-18T17:00Z', competitions: [{
+    status: { type: { state: 'pre', name: 'STATUS_SCHEDULED', shortDetail: '3/18 - 12:15 PM EDT' } },
+    competitors: [
+      { homeAway: 'home', team: { id: '20', shortDisplayName: 'Kentucky', abbreviation: 'UK' } },
+      { homeAway: 'away', team: { id: '10', shortDisplayName: 'Oakland', abbreviation: 'OAK' } }
+    ] }] }] };
+  const parsed = serverParse.parseScoreboardEvents(preGame);
+  assert.equal(parsed[0].home.winner, undefined, 'precondition: parser leaves winner undefined before tip-off');
+  const doc = logic.buildDoc('20270318', parsed, 'SERVER_TS');
+  const undefinedPaths = [];
+  (function walk(v, path) {
+    if (v === undefined) { undefinedPaths.push(path); return; }
+    if (v && typeof v === 'object') for (const k of Object.keys(v)) walk(v[k], path + '.' + k);
+  })(doc, 'doc');
+  assert.deepEqual(undefinedPaths, []);
+  assert.equal(doc.eventCount, 1);
+  assert.equal(doc.events[0].state, 'pre');
+  assert.equal(doc.events[0].home.name, 'Kentucky');
+  assert.equal('winner' in doc.events[0].home, false);
+});
