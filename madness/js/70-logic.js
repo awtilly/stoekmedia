@@ -36,15 +36,6 @@ async function resolvePlayIn(teamId, winnerIdx) {
   render();
 }
 
-async function showResolvePlayIn(teamId) {
-  if (!await requireAdmin()) return;
-  const team = S.teams.find(t => t.id === teamId);
-  if (!team || !team.playIn || team.playInResolved) return;
-  const choice = await appChoice('Which team won the play-in game?', [team.playInTeams[0].name, team.playInTeams[1].name], { title: 'Resolve Play-In' });
-  if (choice === 0) resolvePlayIn(teamId, 0);
-  else if (choice === 1) resolvePlayIn(teamId, 1);
-}
-
 let _lastAutoResolve = 0;
 async function autoResolvePlayIns() {
   const now = Date.now();

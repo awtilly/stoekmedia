@@ -226,13 +226,6 @@ async function addTeam(){
   setTimeout(() => document.getElementById("tn")?.focus(), 0);
 }
 
-async function deleteTeam(id){
-  if(!await requireAdmin()) return;
-  S.teams = S.teams.filter(t => t.id !== id);
-  saveState();
-  render();
-}
-
 async function parseBulkImport(){
   if(!await requireAdmin()) return;
   const lines = document.getElementById("bt").value.split("\n").filter(l => l.trim());
