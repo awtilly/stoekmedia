@@ -138,6 +138,24 @@ function saveRecentRoom(code){
   } catch(e){}
 }
 
+/* One-time migration from the single "mm4" key. Before per-room keys, "mm4" held the cached copy of
+ * whichever room was open last. Move it under that room's key so the user keeps their cache and
+ * Play Offline does not open on the old room's players and picks. Leave it alone when there is no
+ * recent room (then it really is offline state). */
+function migrateLegacyStateKey(){
+  try {
+    if(localStorage.getItem('mm4_state_migrated')) return;
+    const legacy = localStorage.getItem('mm4');
+    const rooms = JSON.parse(localStorage.getItem('mm4_rooms') || '[]');
+    const last = rooms[0] && rooms[0].code;
+    if(legacy && last){
+      if(!localStorage.getItem('mm4_state_' + last)) localStorage.setItem('mm4_state_' + last, legacy);
+      localStorage.removeItem('mm4');
+    }
+    localStorage.setItem('mm4_state_migrated', '1');
+  } catch(e){}
+}
+
 function forgetRecentRoom(code){
   try {
     const rooms = JSON.parse(localStorage.getItem('mm4_rooms') || '[]').filter(r => r && r.code !== code);
