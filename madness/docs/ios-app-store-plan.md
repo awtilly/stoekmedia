@@ -122,8 +122,10 @@ console, APNs auth key (.p8) uploaded to Firebase > Project settings > Cloud Mes
 
 ## 7. Privacy policy (required, needs a public URL)
 
-Proposed location: `https://stoekmedia.com/madness/privacy` (a static page in the repo).
-Draft content outline:
+Location: `https://stoekmedia.com/madness/privacy.html`. **Drafted**: `madness/privacy.html` on this branch (same
+layout as `greendoor/privacy.html`; goes live when this PR merges to main). Review it for the product name (uses
+"Madness Draft", see §2) and the contact address (support@stoekmedia.com). The service worker only intercepts
+`/madness/` navigations when the network fails, so the page is served normally. Content covered:
 
 - What we collect: display name you enter, a salted hash of your 4-digit PIN, your draft picks and
   bracket, and (if you opt in) a push notification token. No email, no account, no location.
