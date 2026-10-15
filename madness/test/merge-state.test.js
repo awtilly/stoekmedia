@@ -83,6 +83,67 @@ test('mergeSharedState: legacy states without epoch behave as epoch 0', () => {
   assert.equal(app.mergeSharedState(remote, local).ds.cp, 3);
 });
 
+test('mergeSharedState: a player added on another device since our snapshot is kept, not dropped', () => {
+  const app = createApp();
+  // Both admins are pre-draft (cp 0, same epoch) so "local wins"; the other device added c since our snapshot had a, b.
+  const local = { ds: { cp: 0, epoch: 1 }, players: players({ a: [], b: [] }) };
+  const remote = { ds: { cp: 0, epoch: 1 }, players: players({ a: [], b: [], c: [] }) };
+  const out = app.mergeSharedState(local, remote, ['a', 'b']);
+  assert.deepEqual(out.players.map(p => p.id), ['a', 'b', 'c'], 'c appended');
+  assert.deepEqual(out.players[2], { id: 'c', name: 'c', teamIds: [] });
+  assert.deepEqual(local.players.map(p => p.id), ['a', 'b'], 'local input untouched');
+});
+
+test('mergeSharedState: a player we removed stays removed even though the server still has them', () => {
+  const app = createApp();
+  const local = { ds: { cp: 0, epoch: 1 }, players: players({ a: [] }) };
+  const remote = { ds: { cp: 0, epoch: 1 }, players: players({ a: [], b: [] }) };
+  const out = app.mergeSharedState(local, remote, ['a', 'b']);
+  assert.deepEqual(out.players.map(p => p.id), ['a'], 'b was in our last snapshot, so its absence is our removal');
+});
+
+test('mergeSharedState: remove here + add elsewhere in the same window resolve independently', () => {
+  const app = createApp();
+  const local = { ds: { cp: 0, epoch: 1 }, players: players({ a: [] }) };
+  const remote = { ds: { cp: 0, epoch: 1 }, players: players({ a: [], b: [], c: [] }) };
+  const out = app.mergeSharedState(local, remote, ['a', 'b']);
+  assert.deepEqual(out.players.map(p => p.id), ['a', 'c']);
+});
+
+test('mergeSharedState: newcomers are kept when the server is ahead too, with the server roster', () => {
+  const app = createApp();
+  const local = { ds: { cp: 2, epoch: 1 }, players: players({ a: ['t1'], b: ['t2'] }) };
+  const remote = { ds: { cp: 3, epoch: 1 }, players: players({ a: ['t1', 't3'], b: ['t2'], c: [] }) };
+  const out = app.mergeSharedState(local, remote, ['a', 'b']);
+  assert.equal(out.ds.cp, 3);
+  assert.deepEqual(out.players.map(p => p.id), ['a', 'b', 'c']);
+  assert.deepEqual(out.players[0].teamIds, ['t1', 't3']);
+});
+
+test('mergeSharedState: after a local reset a newcomer from the server starts with an empty roster', () => {
+  const app = createApp();
+  const local = { ds: { cp: 0, epoch: 2 }, players: players({ a: [] }) };
+  const remote = { ds: { cp: 4, epoch: 1 }, players: players({ a: ['t1', 't2'], c: ['t3'] }) };
+  const out = app.mergeSharedState(local, remote, ['a']);
+  assert.equal(out.ds.cp, 0, 'reset survives');
+  assert.deepEqual(out.players, [{ id: 'a', name: 'a', teamIds: [] }, { id: 'c', name: 'c', teamIds: [] }]);
+});
+
+test('mergeSharedState: with no snapshot history (knownIds null) nobody is dropped', () => {
+  const app = createApp();
+  const local = { ds: { cp: 0 }, players: players({ a: [] }) };
+  const remote = { ds: { cp: 0 }, players: players({ a: [], b: [] }) };
+  assert.deepEqual(app.mergeSharedState(local, remote).players.map(p => p.id), ['a', 'b']);
+  assert.deepEqual(app.mergeSharedState(local, remote, null).players.map(p => p.id), ['a', 'b']);
+});
+
+test('60-rooms.js records the snapshot roster and passes it to mergeSharedState', () => {
+  const src = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'js', '60-rooms.js'), 'utf8');
+  assert.match(src, /_lastSnapshotPlayerIds = \(remote\.players \|\| \[\]\)\.map\(p => p\.id\)/, 'set in _applyRoomSnapshot');
+  assert.match(src, /mergeSharedState\(shared, remote, _lastSnapshotPlayerIds\)/, 'passed to the write transaction');
+  assert.match(src, /_lastSnapshotPlayerIds = null;/, 'cleared when switching rooms');
+});
+
 test('every backwards draft move in 80-pages.js bumps ds.epoch (start, reset, undo x2, new tournament)', () => {
   const src = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'js', '80-pages.js'), 'utf8');
   const bumps = src.match(/epoch\s*[:=]\s*\(?\(?\(?(S\.ds && S\.ds\.epoch\)|ds\.epoch)/g) || [];
