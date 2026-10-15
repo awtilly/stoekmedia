@@ -1,5 +1,7 @@
 /* ── State Persistence ── */
 const VIEW_LOCAL = ['phase','bracketRegion','fr','fs','liveScoresDate','liveScoresFilter'];
+// Player ids in the last room snapshot we applied; lets mergeSharedState tell "removed here" from "added elsewhere".
+let _lastSnapshotPlayerIds = null;
 
 let _isRemoteUpdate = false;
 let _firestoreWriteTimer = null;
@@ -32,7 +34,7 @@ function _writeSharedState(){
   db.runTransaction(async tx => {
     const snap = await tx.get(ref);
     const remote = snap.exists && snap.data().state ? JSON.parse(snap.data().state) : null;
-    const merged = remote ? mergeSharedState(shared, remote) : shared;
+    const merged = remote ? mergeSharedState(shared, remote, _lastSnapshotPlayerIds) : shared;
     const json = JSON.stringify(merged);
     // The echo of this write is skipped by _applyRoomSnapshot only when it carries exactly what we
     // hold. If the merge took the server's draft progress, leave the echo to be applied so this
@@ -125,6 +127,7 @@ function joinRoom(){
 
 function connectToRoom(code){
   if(unsubRoom) unsubRoom();
+  _lastSnapshotPlayerIds = null; // the previous room's roster says nothing about this one
   saveRecentRoom(code);
   const gen = ++_roomGeneration;
   _lastSyncedState = null; // never let the previous room's string suppress this room's first snapshot
@@ -175,6 +178,7 @@ function _applyRoomSnapshot(doc){
   const local = {};
   for(const k of VIEW_LOCAL) local[k] = S[k];
   const remote = JSON.parse(data.state);
+  _lastSnapshotPlayerIds = (remote.players || []).map(p => p.id);
   Object.assign(S, remote, local);
   if(S.ds && S.ds.pickDeadline && typeof S.ds.pickDeadline === 'object' && S.ds.pickDeadline.seconds){
     S.ds.pickDeadline = new firebase.firestore.Timestamp(S.ds.pickDeadline.seconds, S.ds.pickDeadline.nanoseconds || 0);

@@ -276,18 +276,33 @@ function scores(){
  * debounce. If a pick landed between our last snapshot and that write, our copy of ds/rosters is
  * stale and would roll the pick back. Draft progress only ever moves forward, so when the server
  * is further along we keep the server's ds and rosters and layer our other edits on top. */
-function mergeSharedState(local, remote){
+// knownIds: ids of the players in the last snapshot we applied, i.e. the server state `local` was
+// derived from. A player the server has but we do not is either one we removed on purpose (was in
+// knownIds, stays removed) or one another device added since our snapshot (not in knownIds, kept).
+// Without knownIds nobody is dropped: resurrecting a removed player is a redo, losing one is data loss.
+function mergeSharedState(local, remote, knownIds){
   const out = Object.assign({}, local);
   if(!remote || !remote.ds || !local || !local.ds) return out;
   // ds.epoch is bumped by every action that moves the draft backwards (start, reset, undo). A higher
   // epoch always wins; only within the same epoch does "further along" (higher cp) mean "newer".
   const remoteEpoch = remote.ds.epoch || 0, localEpoch = local.ds.epoch || 0;
-  if(localEpoch > remoteEpoch) return out;
   const remoteCp = remote.ds.cp || 0, localCp = local.ds.cp || 0;
-  if(remoteEpoch === localEpoch && remoteCp <= localCp) return out;
-  out.ds = remote.ds;
-  const remoteRosters = {};
-  for(const p of (remote.players || [])) remoteRosters[p.id] = p.teamIds || [];
-  out.players = (local.players || []).map(p => Object.assign({}, p, { teamIds: remoteRosters[p.id] || p.teamIds || [] }));
+  const remoteWins = remoteEpoch > localEpoch || (remoteEpoch === localEpoch && remoteCp > localCp);
+  let players = local.players || [];
+  if(remoteWins){
+    out.ds = remote.ds;
+    const remoteRosters = {};
+    for(const p of (remote.players || [])) remoteRosters[p.id] = p.teamIds || [];
+    players = players.map(p => Object.assign({}, p, { teamIds: remoteRosters[p.id] || p.teamIds || [] }));
+  }
+  const have = new Set(players.map(p => p.id));
+  const known = knownIds ? new Set(knownIds) : null;
+  const added = (remote.players || []).filter(p => p && p.id && !have.has(p.id) && !(known && known.has(p.id)));
+  if(added.length){
+    // A newcomer has no picks in a draft they were not part of: when our draft state wins, start them empty.
+    out.players = players.concat(added.map(p => Object.assign({}, p, remoteWins ? {} : { teamIds: [] })));
+  } else if(remoteWins){
+    out.players = players;
+  }
   return out;
 }
