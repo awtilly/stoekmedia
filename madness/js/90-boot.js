@@ -2,7 +2,6 @@
 const params = new URLSearchParams(window.location.search);
 const urlRoom = params.get("room");
 const tabParam = params.get("tab");
-migrateLegacyStateKey();
 
 if(urlRoom){
   roomId = urlRoom.toUpperCase();

@@ -155,6 +155,7 @@ function migrateLegacyStateKey(){
     localStorage.setItem('mm4_state_migrated', '1');
   } catch(e){}
 }
+migrateLegacyStateKey(); // runs once at load, before boot reads any cache
 
 function forgetRecentRoom(code){
   try {
