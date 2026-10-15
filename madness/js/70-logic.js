@@ -279,8 +279,12 @@ function scores(){
 function mergeSharedState(local, remote){
   const out = Object.assign({}, local);
   if(!remote || !remote.ds || !local || !local.ds) return out;
+  // ds.epoch is bumped by every action that moves the draft backwards (start, reset, undo). A higher
+  // epoch always wins; only within the same epoch does "further along" (higher cp) mean "newer".
+  const remoteEpoch = remote.ds.epoch || 0, localEpoch = local.ds.epoch || 0;
+  if(localEpoch > remoteEpoch) return out;
   const remoteCp = remote.ds.cp || 0, localCp = local.ds.cp || 0;
-  if(remoteCp <= localCp) return out;
+  if(remoteEpoch === localEpoch && remoteCp <= localCp) return out;
   out.ds = remote.ds;
   const remoteRosters = {};
   for(const p of (remote.players || [])) remoteRosters[p.id] = p.teamIds || [];
