@@ -44,3 +44,19 @@ test('sanitizeSharedState leaves a well-formed state untouched and tolerates mis
   assert.doesNotThrow(() => app.sanitizeSharedState(null));
   assert.doesNotThrow(() => app.sanitizeSharedState({ players: 'nope', bracket: 'nope', ds: {} }));
 });
+
+test('seedBadge escapes a hostile seed instead of rendering it as HTML', () => {
+  const app = createApp();
+  const html = app.seedBadge('<img src=x onerror=alert(1)>');
+  assert.equal(html.includes('<img'), false);
+  assert.equal(html.includes('&lt;img'), true);
+  assert.equal(app.seedBadge(1), '<span class="seed-badge ' + app.seedClass(1) + '">1</span>');
+});
+
+test('80-pages.js never interpolates owner(), seed or region into HTML without escapeHtml', () => {
+  // Every participant can write room state, so player names, seeds and regions are untrusted.
+  // owner() returns a raw player name; the sanitizer only vets ids, so the render layer must escape.
+  const src = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'js', '80-pages.js'), 'utf8');
+  const raw = src.match(/\$\{(owner\([^)]*\)( \|\| '')?|awayOwner|homeOwner|ow|[a-z]+\.seed|[a-z]+\.region)\}/g) || [];
+  assert.deepEqual(raw, []);
+});
