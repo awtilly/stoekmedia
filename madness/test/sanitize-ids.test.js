@@ -60,3 +60,10 @@ test('80-pages.js never interpolates owner(), seed or region into HTML without e
   const raw = src.match(/\$\{(owner\([^)]*\)( \|\| '')?|awayOwner|homeOwner|ow|[a-z]+\.seed|[a-z]+\.region)\}/g) || [];
   assert.deepEqual(raw, []);
 });
+
+test('80-pages.js never interpolates a team record into HTML unescaped (records live in shared state)', () => {
+  const src = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'js', '80-pages.js'), 'utf8');
+  // Allow only the escaped form ${escapeHtml(teamRecordDisplay(t))}; the ternary guard ${teamRecordDisplay(t) ? ...} is fine.
+  const raw = src.match(/\$\{teamRecordDisplay\([a-z]+\)\}/g) || [];
+  assert.deepEqual(raw, [], 'unescaped interpolations: ' + raw.join(', '));
+});
