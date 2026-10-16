@@ -796,8 +796,13 @@ function updateDraftClock(){
 
   const el = document.getElementById('draft-timer');
   if(el){
-    el.textContent = seconds + 's';
-    el.className = 'draft-timer ' + (seconds > 30 ? 'timer-green' : seconds > 10 ? 'timer-yellow' : 'timer-red');
+    // The clock ticks 4x a second but the label only changes once a second. Compare against what
+    // the element already shows (not a remembered value: render() rebuilds the element empty) so
+    // the three in-between ticks touch no DOM and force no style/layout work on phones.
+    const text = seconds + 's';
+    const cls = 'draft-timer ' + (seconds > 30 ? 'timer-green' : seconds > 10 ? 'timer-yellow' : 'timer-red');
+    if(el.textContent !== text) el.textContent = text;
+    if(el.className !== cls) el.className = cls;
   }
 
   // Audio + haptic alert at 10 seconds (once per pick)
