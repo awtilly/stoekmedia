@@ -91,7 +91,17 @@ function connectToRoom(code){
 }
 
 function _applyRoomSnapshot(doc){
-  if(!doc.exists){ saveState(); return; }
+  if(!doc.exists){
+    // Offline with nothing cached: wait for the server instead of deciding the room is gone.
+    if(doc.metadata && doc.metadata.fromCache) return;
+    // Unknown code (typo or deleted room). Never create it from here: that used to upload whatever
+    // state was in memory (usually the previous room's players and picks) under the new code.
+    const code = roomId;
+    forgetRecentRoom(code);
+    goHome();
+    showToast('Room ' + code + ' not found');
+    return;
+  }
   const data = doc.data();
   if(!data || !data.state) return;
   _isRemoteUpdate = true;
@@ -122,6 +132,13 @@ function saveRecentRoom(code){
     rooms = rooms.filter(r => r.code !== code);
     rooms.unshift({ code, ts: Date.now() });
     localStorage.setItem('mm4_rooms', JSON.stringify(rooms.slice(0, 10)));
+  } catch(e){}
+}
+
+function forgetRecentRoom(code){
+  try {
+    const rooms = JSON.parse(localStorage.getItem('mm4_rooms') || '[]').filter(r => r && r.code !== code);
+    localStorage.setItem('mm4_rooms', JSON.stringify(rooms));
   } catch(e){}
 }
 
