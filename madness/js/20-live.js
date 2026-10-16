@@ -25,7 +25,7 @@ async function refreshLiveScores() {
 const _reportedFinals = new Set();
 
 async function checkGameFinals() {
-  if (!roomId || !S.teams || S.teams.length === 0) return;
+  if (!S.teams || S.teams.length === 0) return;
 
   // Build a set of ESPN IDs for teams in this room
   const roomEspnIds = new Set(S.teams.map(t => t.espnId).filter(Boolean));
@@ -41,8 +41,6 @@ async function checkGameFinals() {
     const homeInRoom = roomEspnIds.has(game.home.espnId);
     if (!awayInRoom && !homeInRoom) continue;
 
-    _reportedFinals.add(game.id);
-
     // Determine winner/loser
     const winner = game.away.winner ? game.away : game.home;
     const loser = game.away.winner ? game.home : game.away;
@@ -54,32 +52,38 @@ async function checkGameFinals() {
     // Write to gameResults subcollection -- Cloud Function will trigger
     // Check-before-write: only the first client to report triggers Firestore sync
     let isFirstReporter = false;
-    try {
-      const resultRef = db.collection('rooms').doc(roomId)
-        .collection('gameResults').doc(game.id);
-      const existing = await resultRef.get();
-      if (!existing.exists) {
-        await resultRef.set({
-          awayName: game.away.name,
-          awayScore: game.away.score,
-          awaySeed: game.away.seed || null,
-          homeName: game.home.name,
-          homeScore: game.home.score,
-          homeSeed: game.home.seed || null,
-          winnerName: winner.name,
-          winnerSeed: winner.seed || null,
-          loserName: loser.name,
-          loserSeed: loser.seed || null,
-          isUpset,
-          rankingsBefore,
-          reportedAt: firebase.firestore.FieldValue.serverTimestamp(),
-          reportedBy: getMyPlayerId() || 'unknown'
-        });
-        isFirstReporter = true;
+    let reported = !roomId; // solo/offline rooms have nowhere to report; they still auto-advance below
+    if (roomId) {
+      try {
+        const resultRef = db.collection('rooms').doc(roomId)
+          .collection('gameResults').doc(game.id);
+        const existing = await resultRef.get();
+        if (!existing.exists) {
+          await resultRef.set({
+            awayName: game.away.name,
+            awayScore: game.away.score,
+            awaySeed: game.away.seed || null,
+            homeName: game.home.name,
+            homeScore: game.home.score,
+            homeSeed: game.home.seed || null,
+            winnerName: winner.name,
+            winnerSeed: winner.seed || null,
+            loserName: loser.name,
+            loserSeed: loser.seed || null,
+            isUpset,
+            rankingsBefore,
+            reportedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            reportedBy: getMyPlayerId() || 'unknown'
+          });
+          isFirstReporter = true;
+        }
+        reported = true;
+      } catch (err) {
+        // Left out of _reportedFinals so the next poll retries the report (the bracket advance below is idempotent).
+        console.warn('Failed to report game final:', game.id, err);
       }
-    } catch (err) {
-      console.warn('Failed to report game final:', game.id, err);
     }
+    if (reported) _reportedFinals.add(game.id);
 
     // Auto-advance bracket locally for all clients (instant feedback)
     if (autoAdvanceBracket(game)) {
