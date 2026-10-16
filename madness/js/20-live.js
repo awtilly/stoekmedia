@@ -171,17 +171,26 @@ function stopLiveRefresh() {
 
 let wakeLock = null;
 
+// Bumped by every releaseWakeLock(). A request that resolves after a newer release (or after a
+// second request) lets its lock go again, so at most one screen lock is ever held and leaving the
+// Live tab while the request is still pending does not leave the screen pinned awake.
+let _wakeLockReq = 0;
+
 async function requestWakeLock() {
-  if (!('wakeLock' in navigator)) return;
+  if (!('wakeLock' in navigator) || wakeLock) return;
+  const req = ++_wakeLockReq;
   try {
-    wakeLock = await navigator.wakeLock.request('screen');
-    wakeLock.addEventListener('release', () => { wakeLock = null; });
+    const lock = await navigator.wakeLock.request('screen');
+    if (req !== _wakeLockReq || wakeLock) { lock.release(); return; }
+    wakeLock = lock;
+    lock.addEventListener('release', () => { if (wakeLock === lock) wakeLock = null; });
   } catch (err) {
     console.warn('Wake Lock failed:', err.message);
   }
 }
 
 function releaseWakeLock() {
+  _wakeLockReq++;
   if (wakeLock) {
     wakeLock.release();
     wakeLock = null;
