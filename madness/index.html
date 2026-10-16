@@ -1981,6 +1981,8 @@ button, a, .pick-btn, .preset-btn, .round-tab, .live-filter-btn, .icon-btn {
 .podium-card.mine { border-color: var(--gold); box-shadow: 0 0 0 2px var(--gold); }
 .slot.mine { border-left: 3px solid var(--gold); }
 .ff-slot.mine { border-left: 3px solid var(--gold); }
+.bracket .slot, .ff-slot { -webkit-touch-callout: none; }
+.bracket .slot img, .ff-slot img { pointer-events: none; }
 .region-winner.mine { border: 2px solid var(--gold); background: var(--gold-bg); }
 .your-standing { background: var(--gold-bg); border: 2px solid var(--gold); border-radius: 10px; padding: 14px 18px; margin-bottom: 18px; }
 .your-standing .rank { font-size: 28px; font-weight: 800; color: var(--gold); }
@@ -2002,15 +2004,15 @@ button, a, .pick-btn, .preset-btn, .round-tab, .live-filter-btn, .icon-btn {
 <!-- App code lives in js/ as classic scripts sharing one global scope (not ES modules).
      Load order = filename prefix. ?v= is a content hash maintained by scripts/stamp.js
      (sw.js is cache-first for these files, so the URL must change when they do). -->
-<script src="js/00-constants.js?v=bafd49a0d2"></script>
-<script src="js/10-espn.js?v=bafd49a0d2"></script>
-<script src="js/20-live.js?v=bafd49a0d2"></script>
-<script src="js/30-state.js?v=bafd49a0d2"></script>
-<script src="js/40-ui.js?v=bafd49a0d2"></script>
-<script src="js/50-auth.js?v=bafd49a0d2"></script>
-<script src="js/60-rooms.js?v=bafd49a0d2"></script>
-<script src="js/70-logic.js?v=bafd49a0d2"></script>
-<script src="js/80-pages.js?v=bafd49a0d2"></script>
-<script src="js/90-boot.js?v=bafd49a0d2"></script>
+<script src="js/00-constants.js?v=68bc2c9746"></script>
+<script src="js/10-espn.js?v=68bc2c9746"></script>
+<script src="js/20-live.js?v=68bc2c9746"></script>
+<script src="js/30-state.js?v=68bc2c9746"></script>
+<script src="js/40-ui.js?v=68bc2c9746"></script>
+<script src="js/50-auth.js?v=68bc2c9746"></script>
+<script src="js/60-rooms.js?v=68bc2c9746"></script>
+<script src="js/70-logic.js?v=68bc2c9746"></script>
+<script src="js/80-pages.js?v=68bc2c9746"></script>
+<script src="js/90-boot.js?v=68bc2c9746"></script>
 </body>
 </html>

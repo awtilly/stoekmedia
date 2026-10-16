@@ -1011,9 +1011,7 @@ function slotHTML(region, gi, team, winnerId){
   return `<div class="slot ${isWinner?'winner':''} ${isLoser?'loser':''} ${isMine?'mine':''}"
     onclick="advanceTeam('${region}',${gi},'${team.id}')"
     oncontextmenu="clearBracketGame('${region}',${gi},event)"
-    ontouchstart="startLongPress(()=>clearBracketGame('${region}',${gi}))"
-    ontouchend="endLongPress(event)"
-    ontouchmove="cancelLongPress()">
+    data-lp="r:${region}:${gi}">
     ${teamLogoHTML(team, 16)}<span class="sd">${escapeHtml(team.seed)}</span><span class="tn">${escapeHtml(teamDisplayName(team))}</span>${ow ? `<span class="ow">${escapeHtml(ow)}</span>` : ''}
   </div>`;
 }
@@ -1041,9 +1039,7 @@ function renderFF(){
     return `<div class="ff-slot ${isW?'winner':''} ${isL?'loser':''} ${_isMine?'mine':''}"
       onclick="advanceFF(${ffIdx},'${team.id}')"
       oncontextmenu="clearFFGame(${ffIdx},event)"
-      ontouchstart="startLongPress(()=>clearFFGame(${ffIdx}))"
-      ontouchend="endLongPress(event)"
-      ontouchmove="cancelLongPress()">
+      data-lp="ff:${ffIdx}">
       ${teamLogoHTML(team, 20)}<span class="sd">${escapeHtml(team.seed)}</span>${escapeHtml(teamDisplayName(team))}<span style="margin-left:auto;font-size:10px;color:var(--g400)">${escapeHtml(owner(team.id))}</span></div>`;
   }
 
@@ -1066,16 +1062,12 @@ function renderFF(){
           ${ff0t ? `<div class="ff-slot ${champ===ff0?'winner':''} ${champ&&champ!==ff0?'loser':''}"
             onclick="advanceFF(2,'${ff0}')"
             oncontextmenu="clearFFGame(2,event)"
-            ontouchstart="startLongPress(()=>clearFFGame(2))"
-            ontouchend="endLongPress(event)"
-            ontouchmove="cancelLongPress()">
+            data-lp="ff:2">
             <span class="sd">${ff0t.seed}</span>${escapeHtml(teamDisplayName(ff0t))}</div>` : '<div class="ff-slot empty">TBD</div>'}
           ${ff1t ? `<div class="ff-slot ${champ===ff1?'winner':''} ${champ&&champ!==ff1?'loser':''}"
             onclick="advanceFF(2,'${ff1}')"
             oncontextmenu="clearFFGame(2,event)"
-            ontouchstart="startLongPress(()=>clearFFGame(2))"
-            ontouchend="endLongPress(event)"
-            ontouchmove="cancelLongPress()">
+            data-lp="ff:2">
             <span class="sd">${ff1t.seed}</span>${escapeHtml(teamDisplayName(ff1t))}</div>` : '<div class="ff-slot empty">TBD</div>'}
         </div>
         <div class="champ-box">
