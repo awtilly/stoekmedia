@@ -72,3 +72,28 @@ Deploy: `cd madness && firebase deploy --only functions`.
 ```
 
 Bump `CACHE_NAME` again when shipping this.
+
+## 5. functions/espn-parse.js: same final-detection guard as the client parser (with the `espn-final-guards` branch)
+
+`functions/espn-parse.js` on PR #3 is a copy of `espn.parseScoreboardEvents()`. The `espn-final-guards` branch changes the
+client copy so that a "post" game with no decided winner is not reported as `completed` (otherwise `checkGameFinals()`
+crowns the home team) and an event with fewer than two competitors is dropped. Once Track 2 is live, clients read the
+server-parsed events, so the server copy needs the identical change or the bug comes back. Replace, in `parseScoreboardEvents`:
+
+```js
+    const away = teams.find(t => t.homeAway === 'away') || teams[0];
+    const home = teams.find(t => t.homeAway === 'home') || teams[1];
+    if (!away || !home || away === home) return null;
+
+    let completed = statusType.completed || false;
+    if (completed && !!away.winner === !!home.winner) {
+      const a = parseInt(away.score, 10), h = parseInt(home.score, 10);
+      if (a > h) { away.winner = true; home.winner = false; }
+      else if (h > a) { home.winner = true; away.winner = false; }
+      else completed = false;
+    }
+```
+
+and `completed: statusType.completed || false,` → `completed,` in the returned object. Then `firebase deploy --only functions`.
+The five tests added to `test/espn.test.js` on `espn-final-guards` are the spec; run them against the server copy if you want
+(`require('../functions/espn-parse')` in place of `app.espn`).
