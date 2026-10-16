@@ -112,7 +112,9 @@ function _applyRoomSnapshot(doc){
 function getRecentRooms(){
   try {
     const rooms = JSON.parse(localStorage.getItem('mm4_rooms') || '[]');
-    return rooms.filter(r => r && r.code).slice(0, 5);
+    // Codes saved before the URL/Join box were sanitised may be junk; the lobby puts them inside an
+    // inline onclick string, so only clean codes get a button (escapeHtml decodes back to a quote there).
+    return rooms.filter(r => r && typeof r.code === 'string' && sanitizeRoomCode(r.code) === r.code).slice(0, 5);
   } catch(e){ return []; }
 }
 
