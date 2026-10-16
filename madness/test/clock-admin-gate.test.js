@@ -18,6 +18,9 @@ function clockApp(adminAnswer) {
     pagesLoaded = true;
   }
   app.requireAdmin = async () => adminAnswer;
+  app.__clock = { start: 0, stop: 0 }; // keep the real 250 ms interval out of the test run
+  app.startDraftClock = () => { app.__clock.start++; };
+  app.stopDraftClock = () => { app.__clock.stop++; };
   app.firebase = { firestore: { Timestamp: { fromDate: d => d.getTime() } } };
   app.S.ds = { started: true, complete: false, cp: 0, order: ['a', 'b'], timerDuration: 60, pickDeadline: Date.now() + 30000, timerPaused: false, pausedRemaining: null };
   return app;
@@ -44,6 +47,7 @@ test('pause and resume still work for the commissioner', async () => {
   assert.equal(app.S.ds.timerPaused, false);
   assert.ok(app.S.ds.pickDeadline > Date.now());
   assert.equal(app.__calls.saveState, 2);
+  assert.deepEqual(app.__clock, { start: 1, stop: 1 });
 });
 
 test('every draft control asks requireAdmin before touching state (source check)', () => {
@@ -51,7 +55,7 @@ test('every draft control asks requireAdmin before touching state (source check)
   for (const fn of ['pauseDraftClock', 'resumeDraftClock', 'undoDraft', 'resetDraft', 'setDraftClock', 'startDraft']) {
     const body = src.slice(src.indexOf('async function ' + fn + '('));
     const admin = body.indexOf('if(!await requireAdmin()) return;');
-    const state = body.search(/S\./);
+    const state = body.search(/[^A-Za-z0-9_]S[.]/);
     assert.ok(admin >= 0 && admin < state, fn + ' checks requireAdmin before its first S. access');
   }
 });
