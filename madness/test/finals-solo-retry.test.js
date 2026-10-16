@@ -6,12 +6,13 @@ const { createApp, finalGame } = require('./_harness');
 /* checkGameFinals(): solo rooms (no roomId) must still auto-advance the bracket from ESPN finals,
  * and a final whose gameResults write failed must be retried on the next poll. liveScores and
  * _reportedFinals are module-level bindings in 20-live.js, reached through vm. */
-const setLive = vm.runInThisContext('(v) => { liveScores = v; }');
-const reported = vm.runInThisContext('_reportedFinals');
+let setLive = null, reported = null; // resolved after createApp() has loaded 20-live.js
 
 function finalsApp(roomId, dbBehaviour) {
-  reported.clear();
   const app = createApp({ players: [{ id: 'p1', name: 'Ann', teamIds: ['South-1'] }] });
+  setLive = setLive || vm.runInThisContext('(v) => { liveScores = v; }');
+  reported = reported || vm.runInThisContext('_reportedFinals');
+  reported.clear();
   app.roomId = roomId;
   app.firebase = { firestore: { FieldValue: { serverTimestamp: () => 'SERVER_TS' } } };
   const calls = { get: 0, set: 0 };
