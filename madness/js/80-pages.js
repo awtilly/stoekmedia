@@ -202,6 +202,8 @@ async function addPlayer(){
 
 async function removePlayer(id){
   if(!await requireAdmin()) return;
+  // ds.order was fixed when the draft started; dropping a player leaves their id in it (a turn nobody can take).
+  if(S.ds && S.ds.started){ showToast('The draft has started. Reset the draft before removing a player.'); return; }
   S.players = S.players.filter(p => p.id !== id);
   saveState();
   render();

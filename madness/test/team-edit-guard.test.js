@@ -54,3 +54,15 @@ test('importFromESPN and clearAllTeams consult the guard right after the admin c
   }
   assert.doesNotMatch(src.slice(src.indexOf('async function parseBulkImport(')).split('async function importFromESPN')[0], /teamEditBlockedReason/, 'bulk import only appends teams: not guarded');
 });
+
+test('removePlayer refuses once the draft has started, before touching S.players', () => {
+  const src = fs.readFileSync(path.join(__dirname, '..', 'js', '80-pages.js'), 'utf8');
+  const body = src.slice(src.indexOf('async function removePlayer('));
+  const admin = body.indexOf('if(!await requireAdmin()) return;');
+  const guard = body.indexOf("if(S.ds && S.ds.started){ showToast('The draft has started. Reset the draft before removing a player.'); return; }");
+  const mutate = body.indexOf('S.players = S.players.filter');
+  assert.ok(admin >= 0 && guard > admin && mutate > guard, 'guard sits between the PIN check and the mutation');
+  const moveStart = src.indexOf('async function movePlayer(');
+  const move = src.slice(moveStart, src.indexOf('saveState();', moveStart));
+  assert.doesNotMatch(move, /ds[.]started/, 'movePlayer only reorders the lobby list: not guarded');
+});
