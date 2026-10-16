@@ -51,6 +51,7 @@ test('every draft control asks requireAdmin before touching state (source check)
   for (const fn of ['pauseDraftClock', 'resumeDraftClock', 'undoDraft', 'resetDraft', 'setDraftClock', 'startDraft']) {
     const body = src.slice(src.indexOf('async function ' + fn + '('));
     const admin = body.indexOf('if(!await requireAdmin()) return;');
-    assert.ok(admin >= 0 && admin < body.indexOf('S.ds'), fn + ' checks requireAdmin before S.ds');
+    const state = body.search(/S\./);
+    assert.ok(admin >= 0 && admin < state, fn + ' checks requireAdmin before its first S. access');
   }
 });
