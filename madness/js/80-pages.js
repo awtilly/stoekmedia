@@ -251,6 +251,8 @@ async function parseBulkImport(){
 /* ── ESPN Import ── */
 async function importFromESPN(){
   if(!await requireAdmin()) return;
+  const locked = teamEditBlockedReason();
+  if(locked){ showToast(locked); return; }
   // Year sanity: if S.year is stale (last tournament's year), offer to bump
   const thisYear = new Date().getFullYear();
   if(S.year < thisYear){
@@ -1165,6 +1167,8 @@ async function changeYear(v){
 
 async function clearAllTeams(){
   if(!await requireAdmin()) return;
+  const locked = teamEditBlockedReason();
+  if(locked){ showToast(locked); return; }
   if(!await appConfirm('Clear all teams?', { title: 'Clear Teams', danger: true, confirmLabel: 'Clear All' })) return;
   S.teams = [];
   saveState();
