@@ -1,6 +1,8 @@
 <!doctype html>
 <!--
+  browser-check: ua=iphone
   Browser check for the iOS install banner dismissal memory (js/90-boot.js).
+  Run with `node scripts/browser-check.js install-dismiss` (the runner picks up the ua line above), or by hand:
   Needs a persistent profile and an iPhone user agent across three headless runs
   (from repo root, server on :8787):
     1. chrome --headless=new --dump-dom --user-data-dir=PROF --user-agent="iPhone UA" --virtual-time-budget=6000 http://127.0.0.1:8787/madness/   -> 1 install-banner
