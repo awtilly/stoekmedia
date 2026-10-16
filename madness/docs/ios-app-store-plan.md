@@ -81,6 +81,13 @@ so the PWA is untouched. Capacitor injects `window.Capacitor`; no import needed,
 
 Rough size: ~80 changed lines across three js files. One PR, after #2 merges.
 
+Status 2026-10-16: the branch `madness/capacitor-guards` (staged, see the PR #2 queue table) already
+carries the service-worker and install-banner rows (`isNativeShell` in `90-boot.js`) and makes
+`initFCM()` return early when native, because `navigator.serviceWorker.ready` never resolves without
+a registration and the web-push token flow does not apply in the shell. Still open: the native
+token/foreground-message code in the Push token row, haptics, share fallback, badge, and the
+notification-prompt skip.
+
 ## 5. Native push via the existing Cloud Functions (needs Joe for `functions/`)
 
 `functions/index.js` sends **data-only** messages (`{ tokens, data: {...} }`). The web service
