@@ -94,7 +94,7 @@ function navigate(p){
   if (S.phase === 'live' && p !== 'live') { stopLiveRefresh(); releaseWakeLock(); }
   S.phase = p;
   saveState();
-  if (p === 'live') { startLiveRefresh(); requestWakeLock(); }
+  if (p === 'live') startLiveRefresh(); // startLiveRefresh() requests the wake lock itself
   render();
   // Page transition + scroll to top
   requestAnimationFrame(() => {
