@@ -24,6 +24,7 @@ Deployed by GitHub Pages straight from `main`, so **merging to `main` is deployi
 | `firestore.rules` | Security rules. |
 | `test/` | Node unit tests for the pure logic. |
 | `scripts/stamp.js` | Maintains the `?v=` cache-busting hash on the script tags. |
+| `scripts/browser-check.js` | Runs the `test/browser/*.html` checks in headless Chrome (see Browser checks). |
 
 The `js/` files are **classic scripts, not ES modules**. They share one global scope,
 exactly as if they were still one `<script>` block, because the markup uses inline
@@ -48,6 +49,25 @@ code (which is nearly all in `30-state.js` and `90-boot.js`) depends on order.
 ```
 node --test "test/*.test.js"
 ```
+
+### Browser checks
+
+```
+node scripts/browser-check.js              # every test/browser/*.html
+node scripts/browser-check.js live-diff    # only files whose name contains "live-diff"
+UA=iphone node scripts/browser-check.js    # iPhone user agent for every page
+CHROME="C:/path/to/chrome.exe" node scripts/browser-check.js
+```
+
+Rendering and touch/focus behaviour cannot run under `node --test`, so those checks are
+plain HTML pages in `test/browser/`. Each page loads the real `js/` files, drives the DOM,
+and appends one line per assertion to `<pre id="out">`, starting with `ok` on success.
+The runner serves the repo from an in-process Node `http` server (no extra dependencies,
+no stray servers left behind), opens each page in headless Chrome with `--dump-dom`, and
+exits 1 if any line is not `ok`. A page that must run as an iPhone says so with the text
+`browser-check: ua=iphone` anywhere in its HTML. The runner prints a notice and exits 0 on a branch with no
+`test/browser/` directory. Chrome is found at the usual Windows/macOS/Linux install paths
+or via `CHROME`.
 
 `test/_harness.js` evaluates `00`, `10`, `20` and `70` in the Node process with stubs for
 `S`, `requireAdmin`, `saveState`, `render`, `fetch`, etc. Covered so far: snake-draft order,
