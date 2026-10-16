@@ -46,6 +46,10 @@ const VAPID_KEY = 'BEXX7JkBZweOVvbMXeHVasxvxILeP44a0BOkf0FX9hRTudpCodwj9hBIby4Kt
 async function initFCM(){
   try {
     if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    // Inside the Capacitor shell push rides the native Firebase Messaging plugin (docs/ios-app-store-plan.md
+    // section 4): no service worker is registered there, so navigator.serviceWorker.ready would never resolve
+    // and the await below would hang (and requestNotificationPermission's toast would never show).
+    if (typeof isNativeShell !== 'undefined' && isNativeShell) return;
     const messaging = firebase.messaging();
     const swReg = await navigator.serviceWorker.ready;
     const token = await messaging.getToken({ vapidKey: VAPID_KEY, serviceWorkerRegistration: swReg });
