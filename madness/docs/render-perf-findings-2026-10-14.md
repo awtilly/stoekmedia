@@ -20,3 +20,16 @@ Listed so the category is covered and so nobody "optimises" the wrong thing.
 1. Preserve input focus/caret and `.content-scroll` scroll position across `render()` (UX, not speed).
 2. Build `ownerByTeamId` and `teamById` once at the top of `render()` and pass them down (findings 2-3).
 3. Per-card keyed update on the Live tab to stop the 30 s flicker (finding 4).
+
+## Update 2026-10-16
+
+Items 1 and 4 above are now staged branches (`render-focus`, `live-card-diff`). Two findings the
+grep pass missed, both found by reading the page code rather than counting call sites:
+
+| # | Severity | Finding | Status |
+|---|----------|---------|--------|
+| 8 | Medium (phones) | Every bracket slot carried inline `ontouchstart`/`ontouchmove`/`ontouchend` attributes. Inline handlers are non-passive, and they sat inside the horizontally scrolling `.bracket-wrap`, so iOS Safari and Chrome had to run JS before starting any pan of the bracket. | Staged as `bracket-passive-touch`: slots carry `data-lp`, one passive document-level listener set handles the long press. |
+| 9 | Low (battery) | `navigate('live')` requested the screen wake lock twice; the second lock object overwrote the first, which was then never released, so the screen stayed awake after leaving the Live tab. | Staged as `wake-lock-leak`: one lock at a time, superseded or late locks are released. |
+
+Item 2 (`ownerByTeamId` map) is still not worth a PR on its own; do it only if the bracket is ever
+touched for another reason.
