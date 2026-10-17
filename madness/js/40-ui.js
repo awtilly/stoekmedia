@@ -36,12 +36,23 @@ function _showModal(html) {
   });
 }
 
-function appPrompt(message, { title = '', placeholder = '', defaultValue = '' } = {}) {
+/* Attributes for appPrompt's <input>. PIN prompts (the message says "4-digit", or the caller passes
+   inputmode: 'numeric') get the phone number pad, a 4-character cap and no autocorrect/suggestions;
+   every other prompt keeps exactly the attributes it had. */
+function promptInputAttrs(message, { placeholder = '', defaultValue = '', inputmode = '' } = {}) {
+  const numeric = inputmode === 'numeric' || /(^|[^0-9a-z])4-digit([^0-9a-z]|$)/i.test(message || '');
+  let attrs = `placeholder="${escapeHtml(placeholder)}" value="${escapeHtml(defaultValue)}"`;
+  if (numeric) attrs += ' inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="done"';
+  else if (inputmode) attrs += ` inputmode="${escapeHtml(inputmode)}"`;
+  return attrs;
+}
+
+function appPrompt(message, { title = '', placeholder = '', defaultValue = '', inputmode = '' } = {}) {
   const id = 'mp_' + Date.now();
   const html = `
     ${title ? `<div class="modal-title">${escapeHtml(title)}</div>` : ''}
     <div class="modal-msg">${escapeHtml(message)}</div>
-    <input class="modal-input" id="${id}" placeholder="${escapeHtml(placeholder)}" value="${escapeHtml(defaultValue)}">
+    <input class="modal-input" id="${id}" ${promptInputAttrs(message, { placeholder, defaultValue, inputmode })}>
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="this.closest('.modal-overlay')._close(null)">Cancel</button>
       <button class="btn btn-primary" onclick="this.closest('.modal-overlay')._close(document.getElementById('${id}').value)">OK</button>
