@@ -413,6 +413,7 @@ function renderLive(c){
           ${displayDate}
           ${hasLive ? ' <span class="live-pulse"><span class="dot"></span>LIVE</span>' : ''}
           ${liveLastRefresh ? ` <span style="font-size:11px;color:var(--g400)">Updated ${new Date(liveLastRefresh).toLocaleTimeString()}</span>` : ''}
+          ${liveLastError ? ` <span class="live-error" style="font-size:11px;color:var(--red)">Scores unavailable, retrying</span>` : ''}
         </p>
       </div>
       <div class="row" style="gap:8px">
@@ -428,7 +429,9 @@ function renderLive(c){
       <button class="live-filter-btn ${S.liveScoresFilter==='upcoming'?'active':''}" onclick="S.liveScoresFilter='upcoming';renderLiveInPlace()">Upcoming (${liveScores.filter(g=>g.state==='pre').length})</button>
       <button class="live-filter-btn ${S.liveScoresFilter==='final'?'active':''}" onclick="S.liveScoresFilter='final';renderLiveInPlace()">Final (${liveScores.filter(g=>g.state==='post').length})</button>
     </div>
-    ${filtered.length === 0 ? '<div class="card" style="text-align:center;padding:40px;color:var(--g400)"><p style="font-size:16px;font-weight:700;margin-bottom:4px">No games found</p><p style="font-size:13px">Try a different date or check back later.</p></div>' : ''}
+    ${filtered.length === 0 ? (liveLastError && liveScores.length === 0
+      ? '<div class="card live-error" style="text-align:center;padding:40px;color:var(--g400)"><p style="font-size:16px;font-weight:700;margin-bottom:4px">Scores unavailable</p><p style="font-size:13px">Could not reach the scoreboard. Check your connection; this page retries automatically.</p></div>'
+      : '<div class="card" style="text-align:center;padding:40px;color:var(--g400)"><p style="font-size:16px;font-weight:700;margin-bottom:4px">No games found</p><p style="font-size:13px">Try a different date or check back later.</p></div>') : ''}
     <div class="scores-grid">
       ${filtered.map(game => {
         const awayOur = findOurTeam(game.away);
