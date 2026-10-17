@@ -117,3 +117,67 @@ test('fetchTournamentTeams: tolerates failed dates and sorts by region order the
   assert.deepEqual(teams.map(t => t.region), ['South', 'South', 'East', 'East', 'West', 'West']);
   assert.deepEqual(teams.filter(t => t.region === 'South').map(t => t.seed), [1, 16]);
 });
+
+/* ── Final-detection guards (parseScoreboardEvents) ── */
+
+test('parseScoreboardEvents: a final with no winner flag takes the winner from the score', () => {
+  const app = createApp();
+  const [g] = app.espn.parseScoreboardEvents({ events: [espnEvent({
+    id: '3', away: { id: '1', name: 'A', abbr: 'A', score: '70' }, home: { id: '2', name: 'B', abbr: 'B', score: '81' }
+  })] });
+  assert.equal(g.completed, true);
+  assert.equal(g.home.winner, true);
+  assert.equal(g.away.winner, false);
+});
+
+test('parseScoreboardEvents: a "post" game with no decided winner is not a completed final', () => {
+  const app = createApp();
+  const postponed = espnEvent({ id: '4', away: { id: '1', name: 'A', abbr: 'A', score: '0' }, home: { id: '2', name: 'B', abbr: 'B', score: '0' } });
+  postponed.competitions[0].status.type.name = 'STATUS_POSTPONED';
+  const noScores = espnEvent({ id: '5', away: { id: '3', name: 'C', abbr: 'C' }, home: { id: '4', name: 'D', abbr: 'D' } });
+  const [p, n] = app.espn.parseScoreboardEvents({ events: [postponed, noScores] });
+  for (const g of [p, n]) {
+    assert.equal(g.state, 'post', 'still listed under Final for display');
+    assert.equal(g.completed, false);
+    assert.ok(!g.away.winner && !g.home.winner, 'nobody is crowned');
+  }
+});
+
+test('parseScoreboardEvents: an explicit ESPN winner flag beats the score', () => {
+  const app = createApp();
+  const [g] = app.espn.parseScoreboardEvents({ events: [espnEvent({
+    id: '6', away: { id: '1', name: 'A', abbr: 'A', score: '2', winner: true }, home: { id: '2', name: 'B', abbr: 'B', score: '0', winner: false }
+  })] });
+  assert.equal(g.away.winner, true);
+  assert.equal(g.completed, true);
+});
+
+test('parseScoreboardEvents: drops events with fewer than two competitors', () => {
+  const app = createApp();
+  const one = espnEvent({ id: '7', away: { id: '1', name: 'A', abbr: 'A' }, home: { id: '2', name: 'B', abbr: 'B' } });
+  one.competitions[0].competitors = one.competitions[0].competitors.slice(0, 1);
+  const none = espnEvent({ id: '8', away: { id: '1', name: 'A', abbr: 'A' }, home: { id: '2', name: 'B', abbr: 'B' } });
+  none.competitions[0].competitors = [];
+  const ok = espnEvent({ id: '9', away: { id: '1', name: 'A', abbr: 'A' }, home: { id: '2', name: 'B', abbr: 'B' } });
+  assert.deepEqual(app.espn.parseScoreboardEvents({ events: [one, none, ok] }).map(g => g.id), ['9']);
+});
+
+test('checkGameFinals: a postponed tournament game never advances the bracket or writes a result', async () => {
+  const vm = require('node:vm');
+  const app = createApp({ players: [{ id: 'p1', name: 'Ann', teamIds: ['South-1'] }] });
+  app.roomId = 'R';
+  app.getMyPlayerId = () => 'p1';
+  let dbCalls = 0;
+  app.db = { collection: () => { dbCalls++; return { doc: () => ({ collection: () => ({ doc: () => ({ get: async () => ({ exists: false }), set: async () => {} }) }) }) }; } };
+  const t = id => app.S.teams.find(x => x.id === id);
+  const ev = espnEvent({
+    id: 'pp', away: { id: t('South-16').espnId, name: 'S16', abbr: 'S16', score: '0' },
+    home: { id: t('South-1').espnId, name: 'S1', abbr: 'S1', score: '0' }
+  });
+  ev.competitions[0].status.type.name = 'STATUS_POSTPONED';
+  vm.runInThisContext('(v) => { liveScores = v; }')(app.espn.parseScoreboardEvents({ events: [ev] }));
+  await app.checkGameFinals();
+  assert.equal(app.S.bracket.South[0], null);
+  assert.equal(dbCalls, 0);
+  assert.equal(app.__calls.render, 0);
+});
