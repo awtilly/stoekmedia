@@ -84,6 +84,17 @@ function snakeOrder(pids, tot){
 }
 
 /* ── Bracket Logic ── */
+/* True when the room's pick deadline is no longer the one this client watched expire. On expiry the
+ * active drafter's client AND every admin-unlocked client call autoPickHighestSeed(); whichever
+ * transaction commits first resets the deadline, and the others must stand down instead of taking
+ * the NEXT player's turn. expectedSeconds is the local deadline's Timestamp.seconds; remoteDeadline
+ * is the deadline as parsed from the room document ({seconds, nanoseconds} or null). */
+function pickDeadlineMoved(expectedSeconds, remoteDeadline){
+  if(expectedSeconds == null) return false; // no reference deadline: keep the old behaviour
+  const rs = remoteDeadline && typeof remoteDeadline === 'object' ? remoteDeadline.seconds : null;
+  return rs !== expectedSeconds;
+}
+
 function getTeamForSlot(region, gameIdx, slotIdx){
   const rTeams = S.teams.filter(t => t.region === region);
   if(gameIdx < 8){
