@@ -84,7 +84,7 @@ function loadOnce() {
     const code = fs.readFileSync(path.join(JS_DIR, f), 'utf8');
     vm.runInThisContext(code, { filename: f });
   }
-  lexicals = vm.runInThisContext('({ espn, RN, REGIONS, SEEDS, R1_SEEDS, FEEDERS, GAME_ROUND, generateId })');
+  lexicals = vm.runInThisContext('({ espn, RN, REGIONS, SEEDS, R1_SEEDS, FEEDERS, generateId })');
   loaded = true;
 }
 
