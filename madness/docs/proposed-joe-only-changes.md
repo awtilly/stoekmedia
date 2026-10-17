@@ -97,3 +97,37 @@ server-parsed events, so the server copy needs the identical change or the bug c
 and `completed: statusType.completed || false,` → `completed,` in the returned object. Then `firebase deploy --only functions`.
 The five tests added to `test/espn.test.js` on `espn-final-guards` are the spec; run them against the server copy if you want
 (`require('../functions/espn-parse')` in place of `app.espn`).
+
+## 6. functions/index.js: the "Leaderboard Shake-up" push compares the room against itself (found Shift 11, 2026-10-17)
+
+`notifyGameFinal` fires on `rooms/{roomId}/gameResults/{gameId}` create, then reads `rooms/{roomId}` and compares
+`computeRankings(state)` with `result.rankingsBefore`. But the client (`checkGameFinals()` in `js/20-live.js`) writes the
+gameResults document BEFORE it advances the bracket, and the room document only changes 800 ms later via the debounced
+`saveState()` write (same order on `finals-solo-retry`). So the function always reads the pre-game state: "current"
+rankings equal `rankingsBefore`, `rankingsChanged` is false, and the shake-up notification never sends. When it does
+differ it is because of some unrelated earlier edit, not this game. Two smaller problems in the same block: the message
+says "<leader> takes the lead" whenever ANY position changed, even a 3rd/4th swap; and `sendEachForMulticast` caps at 500
+tokens (fine for a room, noting it for the day a public room exists).
+
+Fix in two halves. Client half (night-shift branch `finals-rankings-after`, to be staged on top of `finals-solo-retry`):
+in `checkGameFinals()` compute `rankingsAfter` by running `autoAdvanceBracket(game)` + `syncGames()` BEFORE the
+gameResults write and store both `rankingsBefore` and `rankingsAfter` (plus `leaderBefore`/`leaderAfter` names) in the
+document. Server half (yours):
+
+```js
+  // in notifyGameFinal, replace the computeRankings/previousRankings block with:
+  const previousRankings = result.rankingsBefore || [];
+  const currentRankings = Array.isArray(result.rankingsAfter) && result.rankingsAfter.length
+    ? result.rankingsAfter            // written by the reporting client from its post-advance state
+    : computeRankings(state);         // older clients: best effort (usually equal to previousRankings)
+  const leaderChanged = previousRankings[0] !== currentRankings[0];
+  const rankingsChanged = previousRankings.length > 0 &&
+    currentRankings.some((pid, idx) => previousRankings[idx] !== pid);
+  ...
+  body: leaderChanged
+    ? `${leaderName} takes the lead after ${result.winnerName} wins`
+    : `Standings shuffled after ${result.winnerName} wins`,
+```
+
+Then `firebase deploy --only functions`. Until both halves are in, the shake-up push is effectively off, which is harmless;
+the game-final push is unaffected.
