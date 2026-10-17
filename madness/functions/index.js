@@ -6,6 +6,9 @@ const { initializeApp } = require('firebase-admin/app');
 initializeApp();
 const db = getFirestore();
 
+// Scheduled ESPN scoreboard cache (see scoreboard.js)
+exports.pollScoreboard = require('./scoreboard').pollScoreboard;
+
 /* ── Helpers ── */
 
 function computeRankings(state) {
