@@ -190,3 +190,30 @@ Reviewers get a demo in the Review Notes, no account needed (good: no login = no
 - Should the App Store build ship with the ESPN cache enabled by default (needs #3 deployed)?
   Fewer direct ESPN calls from phones is also a privacy-policy simplification.
 - Web Share availability in WKWebView: verify on the first simulator build before relying on it.
+
+## Appendix A. Every place the "March Madness" name lives (inventory 2026-10-17)
+
+Thirteen occurrences in nine shipped files. Once you pick the name (section 2), this is the whole rename; the
+`.planning/` notes also say it but do not ship. Store-facing and push-facing strings are marked **store**.
+
+| File:line | String | Note |
+|---|---|---|
+| `manifest.json:2` | `"name": "March Madness Draft"` | **store** (home-screen / install name) |
+| `manifest.json:4` | `"description": "March Madness bracket pool with snake draft"` | **store** |
+| `index.html:6` | `<title>March Madness Draft</title>` | tab title, share previews |
+| `js/90-boot.js:70` | `Install March Madness Draft` | install banner |
+| `js/30-state.js:70` | `data.title || 'March Madness Draft'` | foreground push fallback title |
+| `sw.js:18` | `data.title || 'March Madness Draft'` | background push fallback title (**Joe-only file**) |
+| `js/80-pages.js:43` | `<h1><span>March Madness</span> Draft</h1>` | in-room header |
+| `js/50-auth.js:207` | same header | join screen |
+| `js/60-rooms.js:142` | same header | home screen |
+| `js/80-pages.js:119` | share `title: 'March Madness Draft'` | Web Share invite |
+| `js/80-pages.js:120` | `'Join my March Madness bracket pool! Room: '` | Web Share invite text |
+| `js/80-pages.js:142` | `'March Madness Draft ' + S.year + ' - Leaderboard'` | leaderboard share text |
+| `js/80-pages.js:147` | share `title: 'March Madness Leaderboard'` | leaderboard share |
+| `functions/package.json:3` | package description | not user-visible (**Joe-only**) |
+
+Recommended split once decided: one small client PR (manifest, index.html, the three headers, 90-boot, 30-state,
+the four share strings in 80-pages; ~12 changed lines) and a one-line note for you for `sw.js` and
+`functions/package.json`. The three `<h1>` headers are duplicated verbatim across three modules; the rename PR
+should fold them into one `appHeaderHtml()` helper so the name lives in one place afterwards.
