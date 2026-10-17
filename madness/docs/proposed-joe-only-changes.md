@@ -131,3 +131,82 @@ document. Server half (yours):
 
 Then `firebase deploy --only functions`. Until both halves are in, the shake-up push is effectively off, which is harmless;
 the game-final push is unaffected.
+
+## 7. sw.js: push and offline-shell fixes from the Shift 12 review (2026-10-17)
+
+All five are inside `sw.js`, so they are yours. 7a and 7b change what users see today; the rest are housekeeping.
+Bump `CACHE_NAME` once for the whole batch (shares the bump in 2).
+
+### 7a. The badge call throws before the notification is shown (every push lost on browsers without the Badging API)
+
+`onBackgroundMessage` calls `self.navigator.setAppBadge(...)` unguarded whenever the payload has `badgeCount`. Firefox
+(desktop and Android) and Safari before 16.4 have no `setAppBadge` on the worker navigator, so the call is a
+synchronous `TypeError`; the `.catch` never attaches, and the throw happens **before** `showNotification`, so those
+users get no notification at all (Chrome then shows its own "This site has been updated in the background").
+
+```diff
+-  if (data.badgeCount) {
++  if (data.badgeCount && 'setAppBadge' in self.navigator) {
+     self.navigator.setAppBadge(parseInt(data.badgeCount)).catch(() => {});
+   }
+```
+
+### 7b. Return the notification promise so the push event waits for it
+
+The handler calls `self.registration.showNotification(title, options)` without returning it. Firebase wraps the push
+in `event.waitUntil(handler(payload))`; with `undefined` returned, the event settles immediately and the worker can be
+torn down before the notification is posted (seen as missing or duplicate "updated in the background" toasts).
+
+```diff
+-  self.registration.showNotification(title, options);
++  return self.registration.showNotification(title, options);
+```
+
+### 7c. The offline shell is frozen at service-worker install time
+
+Network-first navigations store the response under the navigation URL (`./`, `./?room=ABC`, ...), but the offline
+fallback always reads `caches.match('./index.html')`, which only the install-time precache ever writes. Offline users
+therefore get the `index.html` from whenever `CACHE_NAME` last changed, not the last page they loaded online. It still
+runs (its old `?v=` js entries are never evicted), but every stamp-only deploy is invisible offline until you bump the
+cache name. Also, each distinct `?room=` URL adds a cache entry that nothing evicts.
+
+```diff
+           if (response.ok) {
+             const clone = response.clone();
+-            caches.open(CACHE_NAME).then(c => c.put(event.request, clone));
++            caches.open(CACHE_NAME).then(c => c.put('./index.html', clone));
+           }
+```
+
+Keying every navigation under `./index.html` keeps one fresh shell and stops the per-room growth.
+
+### 7d. Notification click focuses the first Madness tab even if it is a different room
+
+`notificationclick` focuses any window whose URL contains `/madness/` and ignores `data.url`. With two rooms open, or
+a tab parked on Live Scores, the tap lands on the wrong page. Navigate the focused client when the URL differs:
+
+```diff
+         if (client.url.includes('/madness/') && 'focus' in client) {
+-          return client.focus();
++          return client.focus().then(c => (c && 'navigate' in c && !c.url.endsWith(url)) ? c.navigate(url) : c);
+         }
+```
+
+(`url` is relative to the worker scope, so compare after `new URL(url, self.registration.scope).href` if you want it exact.)
+
+### 7e. `firebase-messaging-compat.js` is loaded by `index.html` but not precached
+
+`PRECACHE_URLS` lists app-compat and firestore-compat only. The messaging script is fetched by a plain `<script>` tag
+(no-cors, opaque response), and the runtime cache skips opaque responses (`response.ok` is false), so it is never cached
+and fails to load offline. Harmless today because `initFCM` is guarded, but it is a console error on every offline open.
+
+```diff
+   'https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js',
+-  'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js'
++  'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js',
++  'https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging-compat.js'
+ ];
+```
+
+Reviewed and left alone: `skipWaiting` + `clients.claim` are fine because `90-boot.js` only shows a "Refresh" banner
+and never reloads a live draft; the Firestore pass-through test; the `response.ok && GET` guard on runtime caching.
