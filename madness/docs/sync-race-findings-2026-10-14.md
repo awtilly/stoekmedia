@@ -13,6 +13,7 @@ Reviewed: `js/60-rooms.js` (`saveState`, `_debouncedFirestoreWrite`, `_applyRoom
 | 3 | **Low** | `resetAll` uses `update(...).catch(() => {})` then `location.reload()`. If the update fails (offline, rules), the page reloads into the old state with local storage already cleared; the user sees the room as if it were never reset, with no error. |
 | 4 | **Low** | `connectToRoom` drops snapshots while `_pickInFlight`. Correct for the pick itself, but a snapshot carrying someone else's change arriving during a slow transaction is discarded; Firestore delivers the next snapshot after the transaction commits, so this self-heals. Noted only. |
 | 5 | **Info** | `_applyRoomSnapshot` sets `_isRemoteUpdate` around `render()` so any `saveState()` triggered by rendering (legacy phase redirect) skips the Firestore write. Intentional and fine; the flag is synchronous so no leak. |
+| 6 | **Medium during a timed draft** | **Draft clock trusts the writing device's wall clock.** (added 2026-10-18) `pickDeadline` is written as `Timestamp.fromDate(new Date(Date.now() + timerDuration * 1000))` at seven sites in `js/80-pages.js` (start, pick, undo, auto-pick, skip, resume). Every other device then counts down `deadline - Date.now()` with *its own* clock. A phone that is 40 s fast sees the clock hit zero 40 s early; with `draft-clock-any-tab` queued (every tab runs the fallback) an admin tab whose clock is fast auto-picks for the drafter before their real time is up, and a slow clock lets a pick run long. Phones are usually within a few seconds (NTP), but a laptop with a drifted BIOS clock or a device with manual time is enough. |
 
 ## Proposed fix for 1 and 2 (one PR, ~40 lines in `js/60-rooms.js`)
 
@@ -41,6 +42,15 @@ null. Both are unit-testable through the harness if the merge step is pulled int
 `mergeSharedState(local, remote)` function in `70-logic.js`; write the tests first, they are the
 point of the PR. Risk: Medium (touches every Firestore write); run the headless smoke test and a
 two-tab manual draft before merging.
+
+## Finding 6: clock skew, proposed fix (no code yet; small nightly PR, ~30 lines in `js/80-pages.js` + `js/60-rooms.js`)
+
+Do not trust `Date.now()` on either side. Two options, cheapest first:
+
+1. **Server offset estimate (preferred, no data-model change).** Every room write already goes through Firestore; add `lastWriteAt: firebase.firestore.FieldValue.serverTimestamp()` to the room doc in `_debouncedFirestoreWrite` and the pick transaction. In `_applyRoomSnapshot`, when the snapshot is not from local cache (`!snap.metadata.hasPendingWrites`), compute `_clockOffset = lastWriteAt.toMillis() - Date.now()` (clamped to +/-5 min, ignore if `lastWriteAt` is null during a pending server timestamp). `updateDraftClock` then uses `Date.now() + _clockOffset`. The deadline itself can keep being written from the picker's clock, because the picker's skew is folded into the offset every other device computes against the same server time. Accuracy: snapshot latency, about 0.5 s, far better than today.
+2. **Server-stamped deadline.** Write `pickStartedAt: serverTimestamp()` + `timerDuration` instead of an absolute `pickDeadline` and derive the deadline on read. Cleaner but every one of the seven write sites, `updateDraftClock`, the pause/resume math and `autopick-double-fire`'s guard change; wait until the queued draft-clock PRs (tick, beep, any-tab) have merged so they do not all conflict.
+
+Either way, unit-test with a fake `Date.now` and a fake server time in the harness (`draft-clock.test.js` is the template). Keep the autopick fallback rule as is: at most one device should fire, and `autopick-double-fire` already makes the second transaction a no-op.
 
 ## Not findings
 
