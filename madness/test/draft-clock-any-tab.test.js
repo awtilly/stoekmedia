@@ -11,6 +11,10 @@ const { createApp } = require('./_harness');
  * an absent drafter stalled the whole room. render() now gates the clock on the draft state alone, and
  * updateDraftClock() copes with a tab that has no #draft-timer element.
  */
+// adminUnlocked is a top-level `let` in 50-auth.js once the harness loads that file (auth-tests), and a let
+// shadows globalThis, so assign it in script scope. Without 50-auth loaded this simply creates the global.
+function setAdmin(v) { vm.runInThisContext('adminUnlocked = ' + v); }
+
 let pagesLoaded = false;
 function offTabApp(ds) {
   const app = createApp({ phase: 'live', ds });
@@ -53,14 +57,14 @@ test('the commissioner on the Live tab (no #draft-timer) still auto-picks for an
     Date.now = () => now;
     const app = offTabApp({ order: ['p1', 'p2'], cp: 0, started: true, complete: false, pickDeadline: now + 1_000, timerPaused: false });
     app.getMyPlayerId = () => 'p2';   // not the drafter
-    app.adminUnlocked = true;         // but the commissioner
+    setAdmin(true);                   // but the commissioner
     let picks = 0;
     app.autoPickHighestSeed = () => { picks++; };
     app.updateDraftClock();           // 1 s left: nothing yet
     assert.equal(picks, 0);
     now += 1_000; app.updateDraftClock();
     assert.equal(picks, 1, 'expiry fired the auto-pick with no timer element on the page');
-    app.adminUnlocked = false;
+    setAdmin(false);
     app.S.ds.pickDeadline = now + 500; now += 500; app.updateDraftClock();
     assert.equal(picks, 1, 'a plain spectator never auto-picks');
   } finally { Date.now = realNow; }
