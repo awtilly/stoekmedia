@@ -261,6 +261,7 @@ function sanitizeSharedState(s){
   if(!s || typeof s !== 'object') return s;
   if(Array.isArray(s.players)) s.players = s.players.filter(p => p && isSafeId(p.id));
   if(Array.isArray(s.teams)) s.teams = s.teams.filter(t => t && isSafeId(t.id));
+  for(const t of (s.teams || [])) if(t.seed != null && typeof t.seed !== 'number'){ const n = Number(t.seed); t.seed = Number.isFinite(n) ? n : 0; }
   for(const p of (s.players || [])) p.teamIds = (Array.isArray(p.teamIds) ? p.teamIds : []).filter(isSafeId);
   if(s.ds && Array.isArray(s.ds.order)) s.ds.order = s.ds.order.filter(isSafeId);
   if(s.bracket && typeof s.bracket === 'object'){
