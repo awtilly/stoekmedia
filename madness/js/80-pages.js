@@ -546,7 +546,7 @@ function renderDraft(c){
       if(prevPlayer && prevPlayer.teamIds.length > 0){
         const lastTid = prevPlayer.teamIds[prevPlayer.teamIds.length - 1];
         const lastTeam = S.teams.find(t => t.id === lastTid);
-        if(lastTeam) lastPickHTML = `<div class="last-pick">Last: <strong>${escapeHtml(prevPlayer.name)}</strong> picked ${teamLogoHTML(lastTeam, 16)} #${lastTeam.seed} ${escapeHtml(teamDisplayName(lastTeam))}</div>`;
+        if(lastTeam) lastPickHTML = `<div class="last-pick">Last: <strong>${escapeHtml(prevPlayer.name)}</strong> picked ${teamLogoHTML(lastTeam, 16)} #${escapeHtml(lastTeam.seed)} ${escapeHtml(teamDisplayName(lastTeam))}</div>`;
       }
     }
     const upNextNames = [];
