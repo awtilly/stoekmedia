@@ -5,8 +5,9 @@
   "scripts": {
     "www": "node scripts/sync-www.js",
     "sync": "node scripts/sync-www.js && cap sync ios",
-    "assets": "capacitor-assets generate --ios --iconBackgroundColor #ffffff --iconBackgroundColorDark #ffffff --splashBackgroundColor #ffffff --splashBackgroundColorDark #1a1a1a",
-    "open": "cap open ios"
+    "assets": "capacitor-assets generate --ios --iconBackgroundColor '#ffffff' --iconBackgroundColorDark '#ffffff' --splashBackgroundColor '#ffffff' --splashBackgroundColorDark '#1a1a1a'",
+    "open": "cap open ios",
+    "firebase-config": "firebase apps:sdkconfig IOS 1:564071043666:ios:c3057ac95585bd22ebc58b --project march-madness-snake-draft --out ios/App/App/GoogleService-Info.plist"
   },
   "devDependencies": {
     "@capacitor/assets": "^3.0.5"
