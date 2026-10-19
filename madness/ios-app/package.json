@@ -1,0 +1,23 @@
+{
+  "name": "madness-ios",
+  "private": true,
+  "description": "Capacitor shell that packages the Madness web app (../) for iOS. The web app stays zero-dependency; every npm package lives here.",
+  "scripts": {
+    "www": "node scripts/sync-www.js",
+    "sync": "node scripts/sync-www.js && cap sync ios",
+    "assets": "capacitor-assets generate --ios --iconBackgroundColor #ffffff --iconBackgroundColorDark #ffffff --splashBackgroundColor #ffffff --splashBackgroundColorDark #1a1a1a",
+    "open": "cap open ios"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "^3.0.5"
+  },
+  "dependencies": {
+    "@capacitor/cli": "8.5.0",
+    "@capacitor/core": "8.5.0",
+    "@capacitor/haptics": "^8.0.2",
+    "@capacitor/ios": "8.5.0",
+    "@capacitor/keyboard": "^8.0.5",
+    "@capacitor/push-notifications": "^8.1.2",
+    "@capacitor/share": "^8.0.1"
+  }
+}
