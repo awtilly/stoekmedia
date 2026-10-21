@@ -93,8 +93,8 @@ Status 2026-10-20: every remaining row is now coded on two staged branches (see 
 event carries the FCM token the `ios-app/` AppDelegate forwards; foreground toast; tap handling; delivered
 notifications cleared on open; the notification-prompt row) and `madness/native-haptics-share` (Haptics and
 Share rows). The `@capacitor-firebase/messaging` plugin named above was not used; the shell uses
-`@capacitor/push-notifications` plus Firebase Messaging in Swift. Still open: the app-icon badge number, which
-the APNs `badge` field (section 5) sets and a one-line `AppDelegate` change on `madness/ios-app` should reset.
+`@capacitor/push-notifications` plus Firebase Messaging in Swift. The app-icon badge number, which the APNs `badge` field (section 5) sets, is reset in
+`applicationDidBecomeActive` on the staged branch `madness/ios-badge-reset` (Swift, to be built on the Mac).
 
 ## 5. Native push via the existing Cloud Functions (needs Joe for `functions/`)
 
