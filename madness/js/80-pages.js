@@ -120,6 +120,7 @@ async function shareRoomLink() {
     text: 'Join my March Madness bracket pool! Room: ' + roomId,
     url: shareUrl
   };
+  if (await nativeShare(shareData)) return;
   if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
     try {
       await navigator.share(shareData);
@@ -145,6 +146,7 @@ async function shareLeaderboard() {
     text += prefix + ' ' + s.name + ' - ' + s.tot + ' pts\n';
   });
   const shareData = { title: 'March Madness Leaderboard', text: text };
+  if (await nativeShare(shareData)) return;
   if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
     try {
       await navigator.share(shareData);
@@ -760,7 +762,26 @@ function playTimerBeep(){
   }
 }
 
+/* Capacitor shell: WKWebView does not expose navigator.share, so the Share plugin opens the iOS share
+ * sheet instead. Returns true when the plugin handled it (shared or cancelled), false to use the web path. */
+async function nativeShare(shareData) {
+  const Sh = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Share;
+  if (!Sh || (navigator.share && navigator.canShare && navigator.canShare(shareData))) return false;
+  try {
+    await Sh.share({ title: shareData.title, text: shareData.text, url: shareData.url, dialogTitle: shareData.title });
+    return true;
+  } catch (err) {
+    return /cancel/i.test((err && err.message) || ''); // cancelled: done; any other failure falls back to the clipboard
+  }
+}
+
 function triggerHaptic(){
+  // Capacitor shell: the Haptics plugin drives the Taptic Engine (the switch trick below is Safari-only)
+  const H = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Haptics;
+  if(H){
+    H.impact({ style: 'MEDIUM' }).catch(() => {});
+    return;
+  }
   // Android: standard Vibration API
   if(navigator.vibrate){
     navigator.vibrate(50);
