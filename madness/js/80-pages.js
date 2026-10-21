@@ -900,7 +900,8 @@ async function autoPickHighestSeed(){
   updateAppBadge();
 }
 
-function pauseDraftClock(){
+async function pauseDraftClock(){
+  if(!await requireAdmin()) return;
   const ds = S.ds;
   if(!ds.pickDeadline) return;
   const deadline = ds.pickDeadline.toMillis ? ds.pickDeadline.toMillis() : ds.pickDeadline;
@@ -913,7 +914,8 @@ function pauseDraftClock(){
   render();
 }
 
-function resumeDraftClock(){
+async function resumeDraftClock(){
+  if(!await requireAdmin()) return;
   _beeped = false;
   const ds = S.ds;
   if(!ds.timerPaused) return;
