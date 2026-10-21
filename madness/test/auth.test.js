@@ -11,7 +11,9 @@ function fakeDb(roomData) {
     async get() { return { exists: roomData !== null, data: () => roomData }; },
     async set(data, opts) { writes.push({ data, opts }); Object.assign(roomData || (roomData = {}), data); }
   };
-  const db = { collection: () => ({ doc: () => docRef }) };
+  // requireAdmin writes a first PIN inside a transaction; route tx.get/tx.set to the same doc.
+  const db = { collection: () => ({ doc: () => docRef }),
+    async runTransaction(fn) { await fn({ get: () => docRef.get(), set: (ref, data, opts) => docRef.set(data, opts) }); } };
   return { db, writes };
 }
 
