@@ -718,7 +718,7 @@ async function resetDraft(){
 /* -- Draft Clock Audio & Haptics -- */
 let _audioCtx = null;
 let _hapticCheckbox = null;
-let _beeped = false; // reset on each new pick
+let _beeped = false; // deadline (ms) the 10 s alert last fired for; false = not yet
 
 function warmupAudio(){
   if(!_audioCtx){
@@ -805,9 +805,11 @@ function updateDraftClock(){
     if(el.className !== cls) el.className = cls;
   }
 
-  // Audio + haptic alert at 10 seconds (once per pick)
-  if(seconds === 10 && !_beeped){
-    _beeped = true;
+  // Audio + haptic alert at 10 seconds, once per pick. Keyed to this pick's deadline rather than a flag:
+  // the flag was only cleared by the device that made the pick, so every other device in the room
+  // beeped once in the whole draft and then stayed silent.
+  if(seconds === 10 && _beeped !== deadline){
+    _beeped = deadline;
     playTimerBeep();
     triggerHaptic();
   }
