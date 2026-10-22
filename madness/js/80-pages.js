@@ -739,7 +739,13 @@ function warmupAudio(){
   if(!_audioCtx){
     _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   }
-  if(_audioCtx.state === 'suspended') _audioCtx.resume();
+  // iOS Safari parks the context in 'interrupted' (not 'suspended') after a phone call, Siri, or a trip to
+  // the home screen; it stays there until resume() is called, so the 10 s beep was silent for the rest of
+  // the draft on any iPhone that had switched away. resume() rejects when no gesture has unlocked audio yet.
+  if(_audioCtx.state === 'suspended' || _audioCtx.state === 'interrupted'){
+    const p = _audioCtx.resume();
+    if(p && typeof p.catch === 'function') p.catch(() => {});
+  }
 }
 
 function playTimerBeep(){
