@@ -83,6 +83,8 @@ function connectToRoom(code){
   const gen = ++_roomGeneration;
   unsubRoom = db.collection("rooms").doc(code).onSnapshot(doc => {
     if(gen !== _roomGeneration) return; // stale listener
+    // Calibrate the draft clock against Firestore's clock (defined in 80-pages.js; unit tests load this file alone).
+    if(typeof noteServerTime === 'function') noteServerTime(doc);
     // A pick transaction is currently writing — drop this snapshot.
     // Our transaction commit will deliver its own snapshot with the post-pick state shortly.
     if(_pickInFlight) return;

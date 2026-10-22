@@ -781,6 +781,37 @@ function draftClockShouldRun(ds){
   return !!(ds && ds.started && !ds.complete && ds.pickDeadline && !ds.timerPaused);
 }
 
+/* -- Server clock offset --
+   Every device counts the pick clock down against its own Date.now(), so a phone whose clock is 40 s fast
+   reaches zero 40 s early (and, as the any-tab autopick fallback, picks for the drafter early). Each room
+   write carries updatedAt: serverTimestamp(). When a server snapshot arrives whose updatedAt moved while
+   this device was listening, that commit happened on the server a snapshot-latency ago, so
+   server-now ~= Date.now() + (updatedAt - Date.now()). The first snapshot of a room only sets the baseline
+   (its updatedAt may be hours old); own writes calibrate too, through their server-ack snapshot. */
+let _serverOffsetMs = 0;
+let _serverOffsetRoom = null;
+let _serverLastUpdatedAt = null;
+const SERVER_OFFSET_MAX_MS = 5 * 60 * 1000;
+
+function serverNow(){ return Date.now() + _serverOffsetMs; }
+
+function noteServerTime(doc){
+  if(!doc || !doc.exists || !doc.metadata || doc.metadata.hasPendingWrites || doc.metadata.fromCache) return;
+  const data = doc.data();
+  const at = data && data.updatedAt && typeof data.updatedAt.toMillis === 'function' ? data.updatedAt.toMillis() : null;
+  if(at === null) return;
+  if(_serverOffsetRoom !== roomId || _serverLastUpdatedAt === null){
+    _serverOffsetRoom = roomId;
+    _serverLastUpdatedAt = at;
+    return;
+  }
+  if(at <= _serverLastUpdatedAt) return;
+  _serverLastUpdatedAt = at;
+  const offset = at - Date.now();
+  if(Math.abs(offset) > SERVER_OFFSET_MAX_MS) return;
+  _serverOffsetMs = offset;
+}
+
 let _draftClockInterval = null;
 
 function startDraftClock(){
@@ -798,7 +829,7 @@ function updateDraftClock(){
   const ds = S.ds;
   if(!ds.pickDeadline || ds.timerPaused || ds.complete){ return; }
   const deadline = ds.pickDeadline.toMillis ? ds.pickDeadline.toMillis() : ds.pickDeadline;
-  const remaining = Math.max(0, deadline - Date.now());
+  const remaining = Math.max(0, deadline - serverNow());
   const seconds = Math.ceil(remaining / 1000);
 
   const el = document.getElementById('draft-timer');
@@ -905,7 +936,7 @@ function pauseDraftClock(){
   const ds = S.ds;
   if(!ds.pickDeadline) return;
   const deadline = ds.pickDeadline.toMillis ? ds.pickDeadline.toMillis() : ds.pickDeadline;
-  const remaining = Math.max(0, deadline - Date.now());
+  const remaining = Math.max(0, deadline - serverNow());
   ds.timerPaused = true;
   ds.pausedRemaining = remaining;
   ds.pickDeadline = null;
