@@ -16,6 +16,7 @@ const has = (s, part, label) => assert.ok(s.includes(part), (label || '') + ' ex
 test('PIN prompts get the phone number pad, a 4-char cap and no autocorrect', () => {
   for (const msg of ['Enter 4-digit admin PIN:', 'Set a 4-digit PIN for Joe:', 'Enter your 4-digit PIN:', 'Set a 4-digit admin PIN to protect editing:']) {
     const attrs = attrsFor(msg, { placeholder: '4-digit PIN' });
+    has(attrs, 'type="password"', msg);
     has(attrs, 'inputmode="numeric"', msg);
     has(attrs, 'pattern="[0-9]*"', msg);
     has(attrs, 'maxlength="4"', msg);
@@ -31,8 +32,16 @@ test('name and passphrase prompts keep exactly the old attributes', () => {
   assert.equal(attrsFor('Pick 14-digits worth of luck:', {}), 'placeholder="" value=""', 'only the whole word 4-digit counts');
 });
 
+test('PIN digits are masked; name, passphrase and other-keyboard prompts stay visible text', () => {
+  has(attrsFor('Enter 4-digit admin PIN:', {}), 'type="password" inputmode="numeric"');
+  for (const [msg, opts] of [['Enter your player name:', {}], ['Enter your passphrase:', {}], ['Enter your email:', { inputmode: 'email' }], ['Room name:', { defaultValue: 'type="password"' }]]) {
+    const attrs = attrsFor(msg, opts);
+    assert.ok(!/(^|\s)type=/.test(attrs), msg + ' must not set type: ' + attrs);
+  }
+});
+
 test('an explicit inputmode wins: numeric without "4-digit", or another keyboard verbatim', () => {
-  has(attrsFor('Enter the code:', { inputmode: 'numeric' }), 'inputmode="numeric" pattern=');
+  has(attrsFor('Enter the code:', { inputmode: 'numeric' }), 'type="password" inputmode="numeric" pattern=');
   assert.equal(attrsFor('Enter your email:', { inputmode: 'email' }), 'placeholder="" value="" inputmode="email"');
   assert.ok(!attrsFor('Enter your email:', { inputmode: 'em"ail' }).includes('em"ail'), 'escaped');
 });
