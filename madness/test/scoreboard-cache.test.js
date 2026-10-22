@@ -80,6 +80,7 @@ test('subscribeScoreboard: listens on scoreboard/{date}, uses fresh docs, polls 
   app.db = {
     collection: (c) => ({ doc: (d) => ({ onSnapshot: (ok, err) => { docPath = c + '/' + d; listener = ok; errHandler = err; return () => { unsubscribed++; }; } }) })
   };
+  app.S.liveScoresDate = '20270318'; // the listener and the direct poll always share the selected date; a mismatch would (rightly) re-subscribe
   app.subscribeScoreboard('20270318');
   assert.equal(docPath, 'scoreboard/20270318');
 
