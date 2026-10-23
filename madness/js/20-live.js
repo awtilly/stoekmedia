@@ -15,9 +15,9 @@ const SCOREBOARD_COLLECTION = 'scoreboard';
 const SCOREBOARD_MAX_AGE_MS = 3 * 60 * 1000; // doc older than this => poll ESPN directly
 let _scoreboardUnsub = null;
 let _scoreboardFresh = false; // true while the cached doc is current; direct polling pauses
-let _scoreboardSeenAt = 0;
+let _scoreboardSeenAt = 0;    // local clock when the last usable snapshot arrived (freshness is measured from here, so a wrong phone clock cannot defeat the cache)
 let _scoreboardDate = null;   // the scoreboard/{date} doc the listener is on (null = not listening)
-let _liveFallbackTimer = null; // startLiveRefresh's one-shot "cached doc did not arrive" poll    // local clock when the last usable snapshot arrived (freshness is measured from here, so a wrong phone clock cannot defeat the cache)
+let _liveFallbackTimer = null; // startLiveRefresh's one-shot "cached doc did not arrive" poll
 
 function localDateStr(d) {
   const n = d || new Date();
