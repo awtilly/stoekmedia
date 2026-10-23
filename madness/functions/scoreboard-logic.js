@@ -5,6 +5,11 @@
 const ESPN_BASE = 'https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball';
 const TZ = 'America/New_York';
 
+// Identify ourselves with a bare product token. ESPN's edge (Akamai) answers 403 "Access Denied"
+// to any User-Agent that carries a URL such as "(+https://...)"; plain tokens, the Node default
+// and browser strings all get JSON. Verified against the live endpoint 2026-10-23.
+const FETCH_HEADERS = { 'User-Agent': 'madness-scoreboard-cache/1' };
+
 // Poll window when no scoreboard/_config override exists: March 10 through April 10.
 // First Four is ~March 17 and the title game is the first Monday of April.
 const WINDOW_START = { month: 3, day: 10 };
@@ -67,4 +72,4 @@ function buildDoc(ymd, events, serverTimestamp) {
   };
 }
 
-module.exports = { ESPN_BASE, TZ, dateParts, shouldPoll, datesToPoll, scoreboardUrl, buildDoc };
+module.exports = { ESPN_BASE, TZ, FETCH_HEADERS, dateParts, shouldPoll, datesToPoll, scoreboardUrl, buildDoc };
