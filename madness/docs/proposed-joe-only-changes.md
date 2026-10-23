@@ -111,8 +111,8 @@ tokens (fine for a room, noting it for the day a public room exists).
 
 Fix in two halves. Client half (night-shift branch `finals-rankings-after`, to be staged on top of `finals-solo-retry`):
 in `checkGameFinals()` compute `rankingsAfter` by running `autoAdvanceBracket(game)` + `syncGames()` BEFORE the
-gameResults write and store both `rankingsBefore` and `rankingsAfter` (plus `leaderBefore`/`leaderAfter` names) in the
-document. Server half (yours):
+gameResults write and store both `rankingsBefore` and `rankingsAfter` in the document (player ids only; the
+function resolves the leader name from room state as it does today). Server half (yours):
 
 ```js
   // in notifyGameFinal, replace the computeRankings/previousRankings block with:
