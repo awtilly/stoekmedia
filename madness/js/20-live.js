@@ -24,6 +24,20 @@ async function refreshLiveScores() {
 /* ── Game Final Detection ── */
 const _reportedFinals = new Set();
 
+/* Finals whose gameResult is reported but whose bracket slot could not be decided yet (a feeder slot was
+ * still empty, e.g. the scoreboard arrived before the room snapshot carrying yesterday's winners, or the
+ * Live date picker was on a later day). Retried on every poll; the device that finally advances it saves. */
+const _pendingAdvance = new Map(); // game.id -> parsed game
+const _advancedFinals = new Set(); // game ids that already filled a slot (autoAdvanceBracket is false for those too)
+
+function retryPendingAdvances() {
+  let any = false;
+  for (const [id, g] of _pendingAdvance) {
+    if (autoAdvanceBracket(g)) { _pendingAdvance.delete(id); _advancedFinals.add(id); any = true; }
+  }
+  return any;
+}
+
 async function checkGameFinals() {
   if (!S.teams || S.teams.length === 0) return;
 
@@ -31,6 +45,8 @@ async function checkGameFinals() {
   const roomEspnIds = new Set(S.teams.map(t => t.espnId).filter(Boolean));
   let advanced = false;
   let shouldSync = false;
+
+  if (retryPendingAdvances()) { advanced = true; shouldSync = true; }
 
   for (const game of liveScores) {
     if (game.state !== 'post' || !game.completed) continue;
@@ -93,8 +109,15 @@ async function checkGameFinals() {
       }
     }
     if (reported) _reportedFinals.add(game.id);
-    if (didAdvance && isFirstReporter) shouldSync = true;
+    if (didAdvance) {
+      _advancedFinals.add(game.id);
+      if (isFirstReporter) shouldSync = true;
+    } else if (reported && awayInRoom && homeInRoom && !_advancedFinals.has(game.id)) {
+      // Both teams are ours but no slot matched: a feeder is still undecided. Keep it for the next poll.
+      _pendingAdvance.set(game.id, game);
+    }
   }
+  if (retryPendingAdvances()) { advanced = true; shouldSync = true; }
 
   if (advanced) {
     syncGames();
