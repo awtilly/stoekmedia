@@ -567,7 +567,7 @@ async function startDraft(){
     order: snakeOrder(S.players.map(p => p.id), S.teams.length),
     cp: 0, started: true, complete: false,
     timerDuration: duration,
-    pickDeadline: duration > 0 ? firebase.firestore.Timestamp.fromDate(new Date(Date.now() + duration * 1000)) : null,
+    pickDeadline: duration > 0 ? firebase.firestore.Timestamp.fromDate(new Date(serverNow() + duration * 1000)) : null,
     timerPaused: false,
     pausedRemaining: null
   };
@@ -614,7 +614,7 @@ async function pickTeam(tid){
         ds.complete = true;
         ds.pickDeadline = null;
       } else if(ds.timerDuration && ds.timerDuration > 0){
-        ds.pickDeadline = firebase.firestore.Timestamp.fromDate(new Date(Date.now() + ds.timerDuration * 1000));
+        ds.pickDeadline = firebase.firestore.Timestamp.fromDate(new Date(serverNow() + ds.timerDuration * 1000));
         ds.timerPaused = false;
         ds.pausedRemaining = null;
       }
@@ -651,7 +651,7 @@ function _pickTeamLocal(tid, myId){
     ds.pickDeadline = null;
     stopDraftClock();
   } else if(ds.timerDuration && ds.timerDuration > 0){
-    ds.pickDeadline = firebase.firestore.Timestamp.fromDate(new Date(Date.now() + ds.timerDuration * 1000));
+    ds.pickDeadline = firebase.firestore.Timestamp.fromDate(new Date(serverNow() + ds.timerDuration * 1000));
     ds.timerPaused = false;
     ds.pausedRemaining = null;
   }
@@ -677,7 +677,7 @@ async function undoDraft(){
         const pl = (remote.players || []).find(p => p.id === ds.order[ds.cp]);
         if(pl && pl.teamIds && pl.teamIds.length){ pl.teamIds.pop(); }
         if(ds.timerDuration && ds.timerDuration > 0){
-          ds.pickDeadline = firebase.firestore.Timestamp.fromDate(new Date(Date.now() + ds.timerDuration * 1000));
+          ds.pickDeadline = firebase.firestore.Timestamp.fromDate(new Date(serverNow() + ds.timerDuration * 1000));
           ds.timerPaused = false;
           ds.pausedRemaining = null;
         }
@@ -699,7 +699,7 @@ async function undoDraft(){
   const pl = S.players.find(p => p.id === ds.order[ds.cp]);
   if(pl) pl.teamIds.pop();
   if(ds.timerDuration && ds.timerDuration > 0){
-    ds.pickDeadline = firebase.firestore.Timestamp.fromDate(new Date(Date.now() + ds.timerDuration * 1000));
+    ds.pickDeadline = firebase.firestore.Timestamp.fromDate(new Date(serverNow() + ds.timerDuration * 1000));
     ds.timerPaused = false;
     ds.pausedRemaining = null;
   }
@@ -793,6 +793,7 @@ let _serverOffsetRoom = null;
 let _serverLastUpdatedAt = null;
 const SERVER_OFFSET_MAX_MS = 5 * 60 * 1000;
 
+// Deadlines are written with serverNow() too, so a picker whose own clock is off does not lengthen or shorten their pick.
 function serverNow(){ return Date.now() + _serverOffsetMs; }
 
 function noteServerTime(doc){
@@ -894,7 +895,7 @@ async function autoPickHighestSeed(expiredDeadlineSeconds){
           ds.complete = true;
           ds.pickDeadline = null;
         } else if(ds.timerDuration && ds.timerDuration > 0){
-          ds.pickDeadline = firebase.firestore.Timestamp.fromDate(new Date(Date.now() + ds.timerDuration * 1000));
+          ds.pickDeadline = firebase.firestore.Timestamp.fromDate(new Date(serverNow() + ds.timerDuration * 1000));
           ds.timerPaused = false;
         }
         remote.ds = ds;
@@ -923,7 +924,7 @@ async function autoPickHighestSeed(expiredDeadlineSeconds){
     ds.complete = true;
     ds.pickDeadline = null;
   } else if(ds.timerDuration && ds.timerDuration > 0){
-    ds.pickDeadline = firebase.firestore.Timestamp.fromDate(new Date(Date.now() + ds.timerDuration * 1000));
+    ds.pickDeadline = firebase.firestore.Timestamp.fromDate(new Date(serverNow() + ds.timerDuration * 1000));
     ds.timerPaused = false;
   }
   showToast('Auto-picked: ' + (S.teams.find(t => t.id === tid)?.name || 'Unknown'));
@@ -949,7 +950,7 @@ function resumeDraftClock(){
   _beeped = false;
   const ds = S.ds;
   if(!ds.timerPaused) return;
-  const deadline = new Date(Date.now() + (ds.pausedRemaining || ds.timerDuration * 1000));
+  const deadline = new Date(serverNow() + (ds.pausedRemaining || ds.timerDuration * 1000));
   ds.pickDeadline = firebase.firestore.Timestamp.fromDate(deadline);
   ds.timerPaused = false;
   ds.pausedRemaining = null;
