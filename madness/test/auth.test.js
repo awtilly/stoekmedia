@@ -231,6 +231,37 @@ test('requireAdmin: backoff doubles per failure and caps at 8 s', async () => {
 
 /* ── Player identity ── */
 
+test('requireAdmin: a failed room read toasts, returns false and never prompts', async () => {
+  const { app } = adminApp({ adminPin: 'x' }, ['1234']);
+  app.db = { collection: () => ({ doc: () => ({ async get() { throw new Error('offline'); } }) }) };
+  const warn = console.warn; console.warn = () => {};
+  try { assert.equal(await app.requireAdmin(), false); } finally { console.warn = warn; }
+  assert.equal(app.__calls.toasts.length, 1, 'one toast');
+  assert.match(app.__calls.toasts[0], /verify the PIN/);
+  assert.equal(app.__calls.alerts.length, 0, 'no alert');
+  assert.equal(app.eval('adminUnlocked'), false);
+  assert.equal(app.eval('_pinFailCount'), 0, 'an outage is not a wrong PIN');
+});
+
+test('requireAdmin: an unlocked tab whose 4 h session expired asks for the PIN again', async () => {
+  const stored = await createApp().hashPin('1357');
+  const { app } = adminApp({ adminPin: stored }, ['1357']);
+  app.eval('adminUnlocked = true');
+  app.localStorage.setItem('mm4_admin_ROOM1', String(Date.now() - 5 * 3600 * 1000));
+  assert.equal(await app.requireAdmin(), true, 'correct PIN after re-prompt');
+  assert.equal(app.eval('adminUnlocked'), true);
+  const ts = Number(app.localStorage.getItem('mm4_admin_ROOM1'));
+  assert.ok(Date.now() - ts < 60 * 1000, 'session timestamp refreshed');
+});
+
+test('requireAdmin: an unlocked tab with a fresh session stays unlocked without a prompt', async () => {
+  const { app } = adminApp({ adminPin: 'x' }, []);
+  app.db = { collection() { throw new Error('must not hit db'); } };
+  app.roomId = 'ROOM1';
+  app.unlockAdmin();
+  assert.equal(await app.requireAdmin(), true);
+});
+
 test('getMyPlayerId/setMyPlayerId are scoped to the room and no-ops without one', () => {
   const app = createApp();
   app.setMyPlayerId('p1');

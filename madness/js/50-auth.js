@@ -69,10 +69,30 @@ function lockAdmin(){
 
 let _pinFailCount = 0;
 
+/* True only when a stored session exists and is older than the 4 h window. */
+function adminSessionExpired(){
+  const k = adminSessionKey();
+  if(!k) return false;
+  try {
+    const raw = localStorage.getItem(k);
+    if(!raw) return false;
+    return Date.now() - Number(raw) > ADMIN_SESSION_HOURS * 3600 * 1000;
+  } catch(e){ return false; }
+}
+
 async function requireAdmin(){
   if(!roomId) return true;
+  // A tab left open past the 4 h window stays unlocked in memory; drop it so the PIN is asked again.
+  if(adminUnlocked && adminSessionExpired()) checkAdminSession();
   if(adminUnlocked) return true;
-  const doc = await db.collection("rooms").doc(roomId).get();
+  let doc;
+  try {
+    doc = await db.collection("rooms").doc(roomId).get();
+  } catch(e){
+    console.warn('requireAdmin: could not read the room', e);
+    showToast("Can't verify the PIN right now. Check your connection and try again.");
+    return false;
+  }
   const data = doc.exists ? doc.data() : null;
   if(!data || !data.adminPin){
     const pin = await appPrompt("This room has no admin PIN yet.\nSet a 4-digit PIN to protect editing:", { title: 'Set Admin PIN', placeholder: '4-digit PIN' });
