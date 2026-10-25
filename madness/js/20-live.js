@@ -114,7 +114,7 @@ async function checkGameFinals() {
     // Write to gameResults subcollection -- Cloud Function will trigger
     // Check-before-write: only the first client to report triggers Firestore sync
     let isFirstReporter = false;
-    let reported = !roomId; // solo/offline rooms have nowhere to report; they still auto-advance below
+    let reported = !roomId; // solo/offline rooms have nowhere to report; they already auto-advanced above
     if (roomId) {
       try {
         const resultRef = db.collection('rooms').doc(roomId)
@@ -142,7 +142,7 @@ async function checkGameFinals() {
         }
         reported = true;
       } catch (err) {
-        // Left out of _reportedFinals so the next poll retries the report (the bracket advance below is idempotent).
+        // Left out of _reportedFinals so the next poll retries the report (the bracket advance above re-runs then; it is idempotent).
         console.warn('Failed to report game final:', game.id, err);
       }
     }
