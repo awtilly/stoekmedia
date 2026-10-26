@@ -210,3 +210,41 @@ and fails to load offline. Harmless today because `initFCM` is guarded, but it i
 
 Reviewed and left alone: `skipWaiting` + `clients.claim` are fine because `90-boot.js` only shows a "Refresh" banner
 and never reloads a live draft; the Firestore pass-through test; the `response.ok && GET` guard on runtime caching.
+
+## 8. functions/package.json + firebase.json: move off the nodejs20 runtime before 2026-10-30 (found Shift 36, 2026-10-26)
+
+**Time-critical.** Google's Cloud Functions runtime table lists `nodejs20` as deprecated 2026-04-30 and
+**decommissioned 2026-10-30**. After that date you cannot create or update a function on that runtime, and
+workloads still on it "may be disabled". Both live functions (`notifyDraftTurn`, `notifyGameFinal`, checked with
+`firebase functions:list` on 2026-10-26) run on `nodejs20`, and PR #3 (`espn-cache`) pins the same runtime, so its
+`firebase deploy --only functions` would be refused once the date passes.
+
+`nodejs22` is supported until 2027-10-31 (deprecation 2027-04-30), which covers the 2027 tournament. The installed
+Firebase CLI (15.29.0) knows the runtime. `firebase-functions ^6` and `firebase-admin ^12` both run on Node 22, and
+the code uses nothing version-specific (`require`, global `fetch`, Firestore v2 triggers).
+
+```diff
+--- madness/functions/package.json
+-  "engines": { "node": "20" },
++  "engines": { "node": "22" },
+```
+
+```diff
+--- madness/firebase.json
+   "functions": {
+     "source": "functions",
+-    "runtime": "nodejs20"
++    "runtime": "nodejs22"
+   },
+```
+
+Then, from `madness/`:
+
+```sh
+firebase deploy --only functions --project march-madness-snake-draft
+firebase functions:list --project march-madness-snake-draft   # both rows should now say nodejs22
+```
+
+Apply the same two-line change to PR #3's copy of `functions/package.json` when you merge it (its `firebase.json`
+is the same file). If you deploy after 2026-10-30 without this change the deploy fails with a runtime error rather
+than silently keeping the old version, so the risk is downtime of the push notifications, not corruption.
