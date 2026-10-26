@@ -13,6 +13,10 @@ Target go/no-go: **2027-02-01**. Selection Sunday 2027 is **2027-03-14**. Featur
 - **Firebase stays as-is.** Same project `march-madness-snake-draft`, same Firestore rooms, same
   Cloud Functions. Native push reuses the existing FCM-based functions (section 5).
 - **No NCAA marks anywhere store-facing.** See section 2.
+- **Toolchain: Xcode 26 on the Mac.** Capacitor 8 requires Xcode 26.0 or later, and since 2026-04-28 App
+  Store Connect refuses uploads not built with Xcode 26 / the iOS 26 SDK. Xcode 26 needs macOS 15.6 or later.
+  The scaffold's deployment target (iOS 15.0) and `swift-tools-version: 5.9` are fine as they are. Check this
+  before the Nov 2026 simulator build; an older Xcode is a hard stop, not a warning (checked 2026-10-26).
 
 ## 2. Naming (NCAA trademark)
 
@@ -190,6 +194,7 @@ Reviewers get a demo in the Review Notes, no account needed (good: no login = no
   `march-madness-snake-draft`; download `GoogleService-Info.plist` for the iOS app.
 - Approve the `functions/` push-payload change and the `sw.js` double-notification guard.
 - Publish the privacy page.
+- Install or update to Xcode 26 (section 1) before the first build; `xcodebuild -version` should print 26.x.
 - Build and submit from Xcode. The night shift must never submit anything to App Store Connect.
 
 ## 11. Open questions
