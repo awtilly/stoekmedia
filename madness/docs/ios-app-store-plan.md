@@ -135,6 +135,7 @@ console, APNs auth key (.p8) uploaded to Firebase > Project settings > Cloud Mes
 | 5.1.1 Data collection | Low | Privacy policy URL (section 7). Only name, PIN hash, push token, room data. |
 | 2.1 App completeness | Medium: off-season there is no live tournament | Reviewer demo room (section 8) with a completed draft and partially filled bracket. |
 | 2.3.8 Metadata | Low | Screenshots must match the app; no NCAA marks. |
+| 5.1.1 / privacy manifest (ITMS-91053) | Low (checked 2026-10-26) | The app's own Swift (`AppDelegate`, `SceneDelegate`) calls no required-reason APIs, and Capacitor 8 and the Firebase iOS SDK ship their own `PrivacyInfo.xcprivacy`, so no app-level manifest is required. If a plugin or Swift addition ever touches `UserDefaults`, file timestamps or disk space, add `App/PrivacyInfo.xcprivacy` in Xcode (project uses explicit file references, so it must be added through Xcode, not by dropping a file). Fill the App Store Connect **App Privacy** questionnaire before the first upload: Name, Other User Content (picks, room data), Device ID (push token); not used for tracking; linked to the user only by their own display name. |
 | 4.0 Design / iOS feel | Low-Medium | Bottom nav and tap states already exist. Check keyboard does not cover the PIN input. |
 | 3.1.1 In-app purchase | None | No purchases. |
 | Intellectual property (5.2) | Medium | ESPN team logos are rendered from ESPN CDN URLs. For the store listing, screenshots should use a room without logos or with logos cropped. In-app is lower risk but Joe should know. |
@@ -195,6 +196,8 @@ Reviewers get a demo in the Review Notes, no account needed (good: no login = no
 - Approve the `functions/` push-payload change and the `sw.js` double-notification guard.
 - Publish the privacy page.
 - Install or update to Xcode 26 (section 1) before the first build; `xcodebuild -version` should print 26.x.
+- Answer the App Privacy questionnaire in App Store Connect (section 6 row for 5.1.1) before the first TestFlight
+  external build; Xcode's Product > Generate Privacy Report lists what the SDK manifests declare.
 - Build and submit from Xcode. The night shift must never submit anything to App Store Connect.
 
 ## 11. Open questions
