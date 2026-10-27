@@ -53,7 +53,7 @@ function render(){
     </nav>
     <div class="content-scroll">
       <div id="c"></div>
-      <div class="footer"><strong>Scoring:</strong> ${Object.entries(S.rp).map(([r,p]) => `${RN[r]}=${p}pt${p!==1?'s':''}`).join(' \u00b7 ')}${S.ub ? ' \u00b7 Upset bonus=seed diff' : ''}</div>
+      <div class="footer"><strong>Scoring:</strong> ${Object.entries(S.rp).map(([r,p]) => `${escapeHtml(RN[r])}=${escapeHtml(p)}pt${p!==1?'s':''}`).join(' \u00b7 ')}${S.ub ? ' \u00b7 Upset bonus=seed diff' : ''}</div>
     </div>
     ${bottomNavHTML(canD, canT)}`;
   const c = document.getElementById("c");
@@ -559,7 +559,7 @@ function renderDraft(c){
     const _turnMyId = getMyPlayerId();
     const _isMyTurn = _turnMyId === ds.order[ds.cp];
     const _turnMsg = _isMyTurn ? `<div class="turn-indicator your-turn">Your turn to pick!</div>` : `<div class="turn-indicator waiting">Waiting for ${escapeHtml(cp?.name || '')}...</div>`;
-    return `<div class="card active-pick" style="margin-bottom:14px">${lastPickHTML}<div style="font-size:12px;font-weight:700;color:var(--g500);text-transform:uppercase;letter-spacing:.8px">Pick ${ds.cp+1} of ${ds.order.length} — Round ${Math.floor(ds.cp/S.players.length)+1}</div><div class="pick-row"><div style="font-size:20px;font-weight:800;color:var(--gold)">${escapeHtml(cp?.name || '')}'s Pick</div><div id="draft-timer" class="draft-timer" style="display:${ds.pickDeadline || ds.timerPaused ? 'inline' : 'none'}"></div></div>${upNextHTML}<div class="progress-bar"><div class="progress-fill" style="width:${(ds.cp/ds.order.length)*100}%"></div></div></div>${_turnMyId ? _turnMsg : ''}`;
+    return `<div class="card active-pick" style="margin-bottom:14px">${lastPickHTML}<div style="font-size:12px;font-weight:700;color:var(--g500);text-transform:uppercase;letter-spacing:.8px">Pick ${escapeHtml(ds.cp+1)} of ${escapeHtml(ds.order.length)} — Round ${Math.floor(ds.cp/S.players.length)+1}</div><div class="pick-row"><div style="font-size:20px;font-weight:800;color:var(--gold)">${escapeHtml(cp?.name || '')}'s Pick</div><div id="draft-timer" class="draft-timer" style="display:${ds.pickDeadline || ds.timerPaused ? 'inline' : 'none'}"></div></div>${upNextHTML}<div class="progress-bar"><div class="progress-fill" style="width:${(ds.cp/ds.order.length)*100}%"></div></div></div>${_turnMyId ? _turnMsg : ''}`;
   })()}
   <div class="draft-grid"><div>
     <div class="row" style="margin-bottom:10px;gap:8px;flex-wrap:wrap">
@@ -1069,14 +1069,14 @@ function renderFF(){
             ontouchstart="startLongPress(()=>clearFFGame(2))"
             ontouchend="endLongPress(event)"
             ontouchmove="cancelLongPress()">
-            <span class="sd">${ff0t.seed}</span>${escapeHtml(teamDisplayName(ff0t))}</div>` : '<div class="ff-slot empty">TBD</div>'}
+            <span class="sd">${escapeHtml(ff0t.seed)}</span>${escapeHtml(teamDisplayName(ff0t))}</div>` : '<div class="ff-slot empty">TBD</div>'}
           ${ff1t ? `<div class="ff-slot ${champ===ff1?'winner':''} ${champ&&champ!==ff1?'loser':''}"
             onclick="advanceFF(2,'${ff1}')"
             oncontextmenu="clearFFGame(2,event)"
             ontouchstart="startLongPress(()=>clearFFGame(2))"
             ontouchend="endLongPress(event)"
             ontouchmove="cancelLongPress()">
-            <span class="sd">${ff1t.seed}</span>${escapeHtml(teamDisplayName(ff1t))}</div>` : '<div class="ff-slot empty">TBD</div>'}
+            <span class="sd">${escapeHtml(ff1t.seed)}</span>${escapeHtml(teamDisplayName(ff1t))}</div>` : '<div class="ff-slot empty">TBD</div>'}
         </div>
         <div class="champ-box">
           <div class="champ-label">Champion</div>
@@ -1104,15 +1104,15 @@ function renderLeaderboard(c){
   </div>
   ${mySc ? `<div class="your-standing"><div class="row" style="justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
     <div><div class="rank">#${myIdx+1}</div><div style="font-weight:700">${escapeHtml(mySc.name)}</div></div>
-    <div style="text-align:right"><div class="stat"><strong>${mySc.tot}</strong> points</div><div class="stat"><strong>${myAlive}</strong> teams alive</div>
+    <div style="text-align:right"><div class="stat"><strong>${escapeHtml(mySc.tot)}</strong> points</div><div class="stat"><strong>${myAlive}</strong> teams alive</div>
     ${myIdx > 0 ? `<div class="stat">${sc[myIdx-1].tot - mySc.tot} pts behind #${myIdx}</div>` : ''}${myIdx < sc.length-1 && myIdx >= 0 ? `<div class="stat">${mySc.tot - sc[myIdx+1].tot} pts ahead of #${myIdx+2}</div>` : ''}</div>
   </div></div>` : ''}
   <div class="row" style="gap:12px;margin-bottom:24px;flex-wrap:wrap">
-    ${sc.slice(0,3).map((s,i) => `<div class="podium-card ${i===0?'first':''} ${s.pid===myId?'mine':''}"><div style="font-size:28px;margin-bottom:2px">${md[i]||''}</div><div style="font-size:16px;font-weight:800${s.pid===myId?';color:var(--gold)':''}">${escapeHtml(s.name)}</div><div class="podium-pts">${s.tot}</div><div style="font-size:11px;color:var(--g400)">points</div><div style="font-size:11px;color:var(--g400)">${aliveCount(s.pid)} alive</div></div>`).join('')}</div>
+    ${sc.slice(0,3).map((s,i) => `<div class="podium-card ${i===0?'first':''} ${s.pid===myId?'mine':''}"><div style="font-size:28px;margin-bottom:2px">${md[i]||''}</div><div style="font-size:16px;font-weight:800${s.pid===myId?';color:var(--gold)':''}">${escapeHtml(s.name)}</div><div class="podium-pts">${escapeHtml(s.tot)}</div><div style="font-size:11px;color:var(--g400)">points</div><div style="font-size:11px;color:var(--g400)">${aliveCount(s.pid)} alive</div></div>`).join('')}</div>
   <div class="card" style="margin-bottom:14px"><span class="label">Points by Round</span><div style="overflow-x:auto"><table><thead><tr><th>Player</th>${[1,2,3,4,5,6].map(r => `<th style="text-align:center;font-size:10px">${RN[r].replace('Round of ','R')}</th>`).join('')}<th style="text-align:center;color:var(--gold)">Total</th><th style="text-align:center;font-size:10px">Alive</th></tr></thead><tbody>
-    ${sc.map((s,i) => `<tr class="${s.pid===myId?'lb-row-mine':''}" style="background:${i%2===0?'var(--g50)':'var(--white)'}"><td style="font-weight:700"><span style="color:var(--g300);margin-right:6px">#${i+1}</span><span${s.pid===myId?' style="color:var(--gold)"':''}>${escapeHtml(s.name)}</span></td>${[1,2,3,4,5,6].map(r => `<td class="${s.rp[r]>0?'val':'dim'}">${s.rp[r]}</td>`).join('')}<td class="pts">${s.tot}</td><td style="text-align:center;font-size:12px;color:var(--g500)">${aliveCount(s.pid)}</td></tr>`).join('')}</tbody></table></div></div>
+    ${sc.map((s,i) => `<tr class="${s.pid===myId?'lb-row-mine':''}" style="background:${i%2===0?'var(--g50)':'var(--white)'}"><td style="font-weight:700"><span style="color:var(--g300);margin-right:6px">#${i+1}</span><span${s.pid===myId?' style="color:var(--gold)"':''}>${escapeHtml(s.name)}</span></td>${[1,2,3,4,5,6].map(r => `<td class="${s.rp[r]>0?'val':'dim'}">${escapeHtml(s.rp[r])}</td>`).join('')}<td class="pts">${escapeHtml(s.tot)}</td><td style="text-align:center;font-size:12px;color:var(--g500)">${aliveCount(s.pid)}</td></tr>`).join('')}</tbody></table></div></div>
   <div class="card" style="margin-bottom:14px"><span class="label">Score Bars</span>
-    ${sc.map(s => `<div class="row" style="margin-bottom:6px"><span style="width:70px;font-weight:${s.pid===myId?'800':'700'};font-size:13px;text-align:right${s.pid===myId?';color:var(--gold)':''}">${escapeHtml(s.name)}</span><div class="bar-container"><div class="bar-fill ${s.pid===myId?'mine':''}" style="width:${(s.tot/mx)*100}%"></div></div><span style="width:36px;font-weight:800;font-size:14px;color:var(--gold)">${s.tot}</span><span style="width:40px;font-size:11px;color:var(--g400);text-align:center">${aliveCount(s.pid)}&#x1f7e2;</span></div>`).join('')}</div>
+    ${sc.map(s => `<div class="row" style="margin-bottom:6px"><span style="width:70px;font-weight:${s.pid===myId?'800':'700'};font-size:13px;text-align:right${s.pid===myId?';color:var(--gold)':''}">${escapeHtml(s.name)}</span><div class="bar-container"><div class="bar-fill ${s.pid===myId?'mine':''}" style="width:${(s.tot/mx)*100}%"></div></div><span style="width:36px;font-weight:800;font-size:14px;color:var(--gold)">${escapeHtml(s.tot)}</span><span style="width:40px;font-size:11px;color:var(--g400);text-align:center">${aliveCount(s.pid)}&#x1f7e2;</span></div>`).join('')}</div>
   <div class="card"><span class="label">Team Rosters & Status</span>
     ${S.players.map(p => {const isMe = p.id === myId; const pt = S.teams.filter(t => p.teamIds.includes(t.id)).sort((a,b) => a.seed - b.seed); return `<div class="${isMe?'roster-mine':''}" style="${isMe?'':'margin-bottom:14px'}"><h4 style="font-weight:${isMe?'800':'700'};margin-bottom:6px;font-size:14px${isMe?';color:var(--gold)':''}">${escapeHtml(p.name)}</h4><div class="row" style="flex-wrap:wrap;gap:5px">${pt.map(t => {const w = (S.games||[]).filter(g => g.wid===t.id).length; const el = (S.games||[]).some(g => (g.t1===t.id||g.t2===t.id) && g.wid && g.wid!==t.id); return `<span class="tag ${el?'tag-elim':'tag-alive'}">${teamLogoHTML(t, 16)}${seedBadge(t.seed)} ${escapeHtml(teamDisplayName(t))}${w>0?`<span style="color:var(--green);font-weight:700">W${w}</span>`:''}${el?'<span style="color:var(--red)">\u2715</span>':''}</span>`}).join('')}</div></div>`}).join('')}</div>`;
 }
@@ -1129,10 +1129,10 @@ function renderSettings(c){
       <button class="preset-btn ${isP('backLoaded')?'active':''}" onclick="setPreset('backLoaded')">Back-loaded (1,2,4,8,20,40)</button>
       <button class="preset-btn ${isP('flat')?'active':''}" onclick="setPreset('flat')">Flat (1 per round)</button></div>
     <span class="label">Points Per Round</span>
-    <div class="grid-3">${[1,2,3,4,5,6].map(r => `<div><div style="font-size:12px;color:var(--g500);margin-bottom:4px">${RN[r]}</div><input type="number" value="${S.rp[r]}" style="width:100%" onchange="changeScoring(${r},this.value)"></div>`).join('')}</div></div>
+    <div class="grid-3">${[1,2,3,4,5,6].map(r => `<div><div style="font-size:12px;color:var(--g500);margin-bottom:4px">${RN[r]}</div><input type="number" value="${escapeHtml(S.rp[r])}" style="width:100%" onchange="changeScoring(${r},this.value)"></div>`).join('')}</div></div>
   <div class="card" style="margin-bottom:14px"><div class="row" style="justify-content:space-between"><div><div style="font-weight:700;margin-bottom:4px">Upset Bonus</div><div style="font-size:13px;color:var(--g500)">Upsets award bonus = seed difference (e.g. 12 beats 5 = +7).</div></div>
     <button class="toggle ${S.ub?'on':'off'}" onclick="toggleUpsetBonus()"><span class="toggle-knob"></span></button></div></div>
-  <div class="card"><span class="label">Preview</span><p style="font-size:13px;color:var(--g500);line-height:1.7">12-seed beats 5-seed in R64: Base <strong style="color:var(--gold)">${S.rp[1]}</strong>${S.ub ? ' + Upset <strong style="color:var(--gold)">7</strong>' : ''} = <strong>${S.rp[1]+(S.ub?7:0)} pts</strong></p></div>
+  <div class="card"><span class="label">Preview</span><p style="font-size:13px;color:var(--g500);line-height:1.7">12-seed beats 5-seed in R64: Base <strong style="color:var(--gold)">${escapeHtml(S.rp[1])}</strong>${S.ub ? ' + Upset <strong style="color:var(--gold)">7</strong>' : ''} = <strong>${escapeHtml(S.rp[1]+(S.ub?7:0))} pts</strong></p></div>
   ${roomId ? `<div class="card" style="margin-bottom:14px"><span class="label">Admin Access</span>
     <div class="row" style="justify-content:space-between;align-items:center">
       <div><div style="font-weight:700;margin-bottom:4px">${adminUnlocked?'Unlocked':'Locked'}</div>
@@ -1153,7 +1153,7 @@ function renderSettings(c){
       <div class="import-espn-card" onclick="importFromESPN()" id="espn-import">
         <h3>Import from ESPN</h3>
         <p>Auto-import all 64 tournament teams with seeds, regions, logos, and rankings from ESPN.</p>
-        <button class="btn btn-primary" id="espn-import-btn">Import ${S.year} Tournament Teams</button>
+        <button class="btn btn-primary" id="espn-import-btn">Import ${escapeHtml(S.year)} Tournament Teams</button>
       </div>` : `
       <div style="margin-bottom:14px;display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-secondary btn-sm" id="espn-import-btn" onclick="importFromESPN()">Re-Import from ESPN</button>
@@ -1169,8 +1169,8 @@ function renderSettings(c){
         <div style="width:110px"><span class="label" style="font-size:11px">Region</span><select id="tr" style="width:100%">${REGIONS.map(r => `<option value="${r}">${r}</option>`).join('')}</select></div>
         <button class="btn btn-primary" onclick="addTeam()">Add</button></div></div>
     ${S.teams.length > 0 ? `<div style="border-top:1px solid var(--g200);margin-top:14px;padding-top:14px;text-align:right"><button class="btn btn-danger btn-sm" onclick="clearAllTeams()">Clear All Teams</button></div>` : ''}</div>
-  <div class="card" style="margin-bottom:14px"><div class="row" style="justify-content:space-between;align-items:center"><div><div style="font-weight:700;margin-bottom:4px">Year</div><div style="font-size:13px;color:var(--g500)">Auto-detected: ${S.year}</div></div>
-    <input type="number" value="${S.year}" style="width:90px" onchange="changeYear(this.value)"></div></div>
+  <div class="card" style="margin-bottom:14px"><div class="row" style="justify-content:space-between;align-items:center"><div><div style="font-weight:700;margin-bottom:4px">Year</div><div style="font-size:13px;color:var(--g500)">Auto-detected: ${escapeHtml(S.year)}</div></div>
+    <input type="number" value="${escapeHtml(S.year)}" style="width:90px" onchange="changeYear(this.value)"></div></div>
   <div class="card" style="border-color:var(--red)"><span class="label" style="color:var(--red)">Danger Zone</span>
     <div class="row" style="justify-content:space-between;align-items:center">
       <div><div style="font-weight:700;margin-bottom:4px">New Tournament</div><div style="font-size:13px;color:var(--g500)">Delete this room and start fresh.</div></div>

@@ -269,11 +269,13 @@ const SAFE_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
 function isSafeId(id){ return typeof id === 'string' && SAFE_ID_RE.test(id); }
 function sanitizeSharedState(s){
   if(!s || typeof s !== 'object') return s;
-  if(Array.isArray(s.players)) s.players = s.players.filter(p => p && isSafeId(p.id));
-  if(Array.isArray(s.teams)) s.teams = s.teams.filter(t => t && isSafeId(t.id));
+  // Renderers print .length of these; a {"length":"<img ...>"} object must not get that far (and would
+  // make the for..of below throw, skipping the rest of this pass). Anything that is not an array is [].
+  s.players = (Array.isArray(s.players) ? s.players : []).filter(p => p && isSafeId(p.id));
+  s.teams = (Array.isArray(s.teams) ? s.teams : []).filter(t => t && isSafeId(t.id));
   for(const t of (s.teams || [])) if(t.seed != null && typeof t.seed !== 'number'){ const n = Number(t.seed); t.seed = Number.isFinite(n) ? n : 0; }
   for(const p of (s.players || [])) p.teamIds = (Array.isArray(p.teamIds) ? p.teamIds : []).filter(isSafeId);
-  if(s.ds && Array.isArray(s.ds.order)) s.ds.order = s.ds.order.filter(isSafeId);
+  if(s.ds && typeof s.ds === 'object') s.ds.order = (Array.isArray(s.ds.order) ? s.ds.order : []).filter(isSafeId);
   if(s.bracket && typeof s.bracket === 'object'){
     for(const k of Object.keys(s.bracket)){
       if(Array.isArray(s.bracket[k])) s.bracket[k] = s.bracket[k].map(id => (id == null || isSafeId(id)) ? id : null);
