@@ -26,36 +26,72 @@
     import { auth, functions, httpsCallable } from "../js/firebase-config.js";
     import { onAuthStateChanged } from "../js/vendor/firebase.js";
 
+    // Must match OAUTH_STATE_KEY in js/settings.js (connectGmail).
+    const OAUTH_STATE_KEY = "gd-oauth-state";
+
     const params = new URLSearchParams(window.location.search);
     const code = params.get("code");
     const error = params.get("error");
-    const titleEl = document.getElementById("oauth-title");
-    const detailEl = document.getElementById("oauth-detail");
+    const returnedState = params.get("state");
     const cardEl = document.getElementById("oauth-card");
-    const returnTo = sessionStorage.getItem("oauthReturnTo") || "settings.html";
+
+    // One-shot: read and clear the state stashed by connectGmail, whatever the outcome.
+    const expectedState = sessionStorage.getItem(OAUTH_STATE_KEY);
+    sessionStorage.removeItem(OAUTH_STATE_KEY);
+
+    // Only follow same-origin relative paths ("/..."), never "//host" or "/\host".
+    const storedReturnTo = sessionStorage.getItem("oauthReturnTo");
+    const returnTo = storedReturnTo && /^\/(?![\/\\])/.test(storedReturnTo) ? storedReturnTo : "settings.html";
+
+    // All UI below is built with DOM APIs + textContent so no URL parameter or
+    // server-supplied string is ever parsed as HTML.
+    function el(tag, props = {}, children = []) {
+      const node = document.createElement(tag);
+      Object.assign(node, props);
+      node.append(...children);
+      return node;
+    }
+
+    function renderCard(nodes) {
+      cardEl.textContent = "";
+      cardEl.append(...nodes);
+    }
 
     function showError(message, recoverable = true) {
-      cardEl.innerHTML = `
-        <div class="oauth-icon">⚠️</div>
-        <h2>Could not connect Gmail</h2>
-        <p class="gd-text-muted-sm">${message}</p>
-        <div class="oauth-actions">
-          ${recoverable ? '<a class="gd-btn gd-btn-primary" href="settings.html">Back to settings</a>' : ''}
-        </div>`;
+      const actions = el("div", { className: "oauth-actions" });
+      if (recoverable) {
+        actions.append(el("a", { className: "gd-btn gd-btn-primary", href: "settings.html", textContent: "Back to settings" }));
+      }
+      renderCard([
+        el("div", { className: "oauth-icon", textContent: "⚠️" }),
+        el("h2", { textContent: "Could not connect Gmail" }),
+        el("p", { className: "gd-text-muted-sm", textContent: String(message) }),
+        actions
+      ]);
     }
 
     function showSuccess(email) {
-      cardEl.innerHTML = `
-        <div class="oauth-icon">✅</div>
-        <h2>Gmail connected</h2>
-        <p class="gd-text-muted-sm">Emails will now send from <strong>${email}</strong>. Redirecting you back…</p>`;
+      renderCard([
+        el("div", { className: "oauth-icon", textContent: "✅" }),
+        el("h2", { textContent: "Gmail connected" }),
+        el("p", { className: "gd-text-muted-sm" }, [
+          "Emails will now send from ",
+          el("strong", { textContent: String(email) }),
+          ". Redirecting you back…"
+        ])
+      ]);
       setTimeout(() => { window.location.href = returnTo; }, 1500);
     }
 
     if (error) {
-      showError(`Google returned an error: ${error}. You can try again any time.`);
+      // OAuth error codes are short tokens (e.g. access_denied); don't echo arbitrary text.
+      const errorCode = /^[A-Za-z0-9_.-]{1,64}$/.test(error) ? error : "unknown_error";
+      showError(`Google returned an error: ${errorCode}. You can try again any time.`);
     } else if (!code) {
       showError("Missing authorization code — please try connecting again from Settings.");
+    } else if (!returnedState || !expectedState || returnedState !== expectedState) {
+      // CSRF / login-binding check failed: never exchange a code this browser didn't request.
+      showError("This sign-in link didn't match a connection request from this browser session. Please start again from Settings.");
     } else {
       onAuthStateChanged(auth, async (user) => {
         if (!user) {

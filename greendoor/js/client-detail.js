@@ -478,7 +478,7 @@ async function loadActivities(uid) {
       const truncated = body.length > 200;
       html += `
         <div class="gd-timeline-item">
-          <div class="gd-timeline-dot ${a.type}">${icons[a.type] || ""}</div>
+          <div class="gd-timeline-dot ${escapeHtml(a.type)}">${icons[a.type] || ""}</div>
           <div class="gd-timeline-date">${formatDateTime(a.timestamp)}</div>
           <div class="gd-timeline-subject">${escapeHtml(a.subject)}</div>
           ${body ? `<div class="gd-timeline-body ${truncated ? "truncated" : ""}" onclick="this.classList.toggle('truncated')">${escapeHtml(body)}</div>` : ""}
@@ -605,7 +605,7 @@ async function loadEmailTemplates(uid) {
     select.innerHTML = '<option value="">— No template —</option>';
     emailTemplates.forEach((t, i) => {
       const label = t.createdBy === "system" ? t.name : t.name + " (Custom)";
-      select.innerHTML += `<option value="${i}">${label}</option>`;
+      select.add(new Option(label, String(i)));
     });
   } catch (e) {
     console.error("Load templates error:", e);
@@ -1499,7 +1499,7 @@ window.openPreview = function (fileId) {
   const mime = (f.mimeType || "").toLowerCase();
 
   if (mime.startsWith("image/") || ["jpg", "jpeg", "png", "gif", "webp"].includes(ext)) {
-    contentEl.innerHTML = `<img src="${f.downloadUrl}" alt="${f.fileName}">`;
+    contentEl.innerHTML = `<img src="${f.downloadUrl}" alt="${escapeHtml(f.fileName)}">`;
   } else if (mime === "application/pdf" || ext === "pdf") {
     contentEl.innerHTML = `<iframe src="${f.downloadUrl}"></iframe>`;
   } else if (["doc", "docx", "xlsx", "xls", "csv", "ppt", "pptx"].includes(ext)) {
@@ -1852,7 +1852,7 @@ function renderMatchListingResults() {
       <div class="gd-match-listing-row">
         <div>
           ${l._score != null ? `<span class="gd-match-badge-inline" style="background:${l._color}">${l._score}%</span>` : ""}
-          <strong>${addr}</strong>
+          <strong>${escapeHtml(addr)}</strong>
           <span class="gd-text-muted">${l.listingPrice ? formatCurrency(l.listingPrice) : ""}</span>
           <span class="gd-text-muted">${[l.bedrooms ? l.bedrooms + "bd" : "", l.bathrooms ? l.bathrooms + "ba" : ""].filter(Boolean).join(" / ")}</span>
         </div>
@@ -1921,7 +1921,7 @@ window.showComparison = function () {
 
   let headerRow = "<tr><th></th>" + matches.map(m => {
     const addr = m.listing?.address?.full || "—";
-    return `<th>${addr}</th>`;
+    return `<th>${escapeHtml(addr)}</th>`;
   }).join("") + "</tr>";
 
   const rows = [
@@ -1930,11 +1930,11 @@ window.showComparison = function () {
     { label: "Beds", render: m => m.listing?.bedrooms ?? "—" },
     { label: "Baths", render: m => m.listing?.bathrooms ?? "—" },
     { label: "Sq Ft", render: m => m.listing?.squareFeet ? Number(m.listing.squareFeet).toLocaleString() : "—" },
-    { label: "Type", render: m => m.listing?.propertyType || "—" },
-    { label: "Year Built", render: m => m.listing?.yearBuilt || "—" },
+    { label: "Type", render: m => escapeHtml(m.listing?.propertyType) || "—" },
+    { label: "Year Built", render: m => escapeHtml(m.listing?.yearBuilt) || "—" },
     { label: "Status", render: m => statusLabel(m.status) },
     { label: "Rating", render: m => renderStars(m.clientRating || 0) },
-    { label: "Feedback", render: m => m.clientFeedback || "—" }
+    { label: "Feedback", render: m => escapeHtml(m.clientFeedback) || "—" }
   ];
 
   const values = {};
@@ -1964,7 +1964,7 @@ window.openCopyToClientModal = async function () {
   summaryEl.innerHTML = selected.map(m => {
     const addr = m.listing?.address?.full || "Unknown";
     const price = m.listing?.listingPrice ? formatCurrency(m.listing.listingPrice) : "";
-    return `<div class="gd-copy-summary-item"><span>${addr}</span>${price ? `<span class="gd-text-muted">${price}</span>` : ""}</div>`;
+    return `<div class="gd-copy-summary-item"><span>${escapeHtml(addr)}</span>${price ? `<span class="gd-text-muted">${price}</span>` : ""}</div>`;
   }).join("");
 
   document.getElementById("copy-client-search").value = "";
@@ -2188,7 +2188,7 @@ function renderShowingCard(s, isUpcoming) {
       <div class="gd-showing-card-meta">
         <span>${date}</span>
         ${price ? `<span>${price}</span>` : ""}
-        ${s.mlsNumber ? `<span>MLS: ${s.mlsNumber}</span>` : ""}
+        ${s.mlsNumber ? `<span>MLS: ${escapeHtml(s.mlsNumber)}</span>` : ""}
         ${stars ? `<span class="gd-stars">${stars}</span>` : ""}
       </div>
       ${s.clientFeedback ? `<div style="font-size:0.8rem;color:#4b5563;margin-bottom:0.35rem;">${escapeHtml(s.clientFeedback)}</div>` : ""}

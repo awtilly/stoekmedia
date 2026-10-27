@@ -17,6 +17,14 @@ let offboardState = {};        // wizard state
 let auditLastDoc = null;       // pagination cursor
 let tabsLoaded = { overview: false, users: false, audit: false, invitations: false, platform: false };
 
+/* Encode a value as a JS string literal that is safe inside a double-quoted
+   inline handler attribute, e.g. onclick="fn(${jsArg(id)})". JSON.stringify
+   handles the JS-string context; escapeHtml handles the attribute context
+   (the browser decodes &quot; back to " before the handler runs). */
+function jsArg(value) {
+  return escapeHtml(JSON.stringify(String(value ?? "")));
+}
+
 /* ================================================================
    INIT
    ================================================================ */
@@ -177,7 +185,7 @@ async function loadActivityChart() {
       const pct = Math.round((count / maxVal) * 100);
       return `
         <div class="gd-admin-bar-row">
-          <span class="gd-admin-bar-label">${type}</span>
+          <span class="gd-admin-bar-label">${escapeHtml(type)}</span>
           <div class="gd-admin-bar-track">
             <div class="gd-admin-bar-fill" style="width: ${pct}%;"></div>
           </div>
@@ -265,15 +273,15 @@ function renderRealtorTable() {
       <td>${getStatusBadge(status)}</td>
       <td>
         <label class="gd-toggle">
-          <input type="checkbox" ${r.isActive ? "checked" : ""} ${isOffboarded ? "disabled" : ""} onchange="toggleActive('${r.id}', this.checked)">
+          <input type="checkbox" ${r.isActive ? "checked" : ""} ${isOffboarded ? "disabled" : ""} onchange="toggleActive(${jsArg(r.id)}, this.checked)">
           <span class="gd-toggle-slider"></span>
         </label>
       </td>
       <td>${realtorClientCounts[r.id] ?? "—"}</td>
       <td>${formatDate(r.lastLogin)}</td>
       <td style="white-space: nowrap;">
-        <button class="gd-btn gd-btn-sm" onclick="openRealtorDetail('${r.id}')">View</button>
-        ${!isOffboarded ? `<button class="gd-btn gd-btn-sm gd-btn-danger" onclick="startOffboardFromTable('${r.id}')" style="margin-left: 0.25rem;">Offboard</button>` : ""}
+        <button class="gd-btn gd-btn-sm" onclick="openRealtorDetail(${jsArg(r.id)})">View</button>
+        ${!isOffboarded ? `<button class="gd-btn gd-btn-sm gd-btn-danger" onclick="startOffboardFromTable(${jsArg(r.id)})" style="margin-left: 0.25rem;">Offboard</button>` : ""}
       </td>
     </tr>
     `;
@@ -331,9 +339,9 @@ window.loadAuditLog = async function (reset) {
       row.innerHTML = `
         <td>${formatDate(data.timestamp)}</td>
         <td>${actionBadge}</td>
-        <td>${data.targetUser || "—"}</td>
-        <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${data.details || "—"}</td>
-        <td>${data.adminName || "—"}</td>
+        <td>${escapeHtml(data.targetUser) || "—"}</td>
+        <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(data.details) || "—"}</td>
+        <td>${escapeHtml(data.adminName) || "—"}</td>
       `;
       tbody.appendChild(row);
     });
@@ -354,7 +362,7 @@ function getAuditBadge(action) {
     settings_change: "gd-badge-audit-settings",
     reassign: "gd-badge-audit-reassign"
   };
-  return `<span class="gd-badge ${colors[action] || "gd-badge-other"}">${action || "unknown"}</span>`;
+  return `<span class="gd-badge ${colors[action] || "gd-badge-other"}">${escapeHtml(action || "unknown")}</span>`;
 }
 
 /* ================================================================
@@ -398,7 +406,7 @@ async function loadInvitations() {
         <td>${escapeHtml(r.company) || "—"}</td>
         <td>${formatDate(r.lastInviteSentAt || r.createdAt)}</td>
         <td>${statusBadge}</td>
-        <td>${canResend ? `<button class="gd-btn gd-btn-sm" onclick="resendInvite('${r.id}', this)">Resend</button>` : "—"}</td>
+        <td>${canResend ? `<button class="gd-btn gd-btn-sm" onclick="resendInvite(${jsArg(r.id)}, this)">Resend</button>` : "—"}</td>
       </tr>
       `;
     }).join("");
@@ -743,7 +751,7 @@ function renderOffboardClients() {
 
   // Build reassign target options from other active realtors
   const otherRealtors = allRealtors.filter(r => r.id !== offboardState.realtorId && r.isActive && !r.offboardedAt);
-  const reassignOpts = otherRealtors.map(r => `<option value="reassign:${r.id}">${r.fullName}</option>`).join("");
+  const reassignOpts = otherRealtors.map(r => `<option value="reassign:${escapeHtml(r.id)}">${escapeHtml(r.fullName)}</option>`).join("");
 
   // Also populate bulk reassign select
   const bulkSelect = document.getElementById("ob-bulk-action");
@@ -752,19 +760,19 @@ function renderOffboardClients() {
     <option value="">Select action for all...</option>
     <option value="unassign">Leave All Unassigned</option>
     <option value="delete">Delete All</option>
-    ${otherRealtors.map(r => `<option value="reassign:${r.id}">Reassign All to ${r.fullName}</option>`).join("")}
+    ${otherRealtors.map(r => `<option value="reassign:${escapeHtml(r.id)}">Reassign All to ${escapeHtml(r.fullName)}</option>`).join("")}
   `;
 
   tbody.innerHTML = clients.map(c => {
     const currentVal = offboardState.clientDispositions[c.id] || "";
     return `
     <tr>
-      <td style="color: var(--color-text-primary); font-weight: 500;">${c.fullName || "—"}</td>
+      <td style="color: var(--color-text-primary); font-weight: 500;">${escapeHtml(c.fullName) || "—"}</td>
       <td>${getStatusBadge(c.status || "lead")}</td>
       <td>
-        <select class="gd-input" style="font-size: 0.8rem; padding: 0.4rem 0.6rem;" onchange="setClientDisposition('${c.id}', this.value)">
+        <select class="gd-input" style="font-size: 0.8rem; padding: 0.4rem 0.6rem;" onchange="setClientDisposition(${jsArg(c.id)}, this.value)">
           <option value="unassign" ${currentVal === "unassign" || !currentVal ? "selected" : ""}>Leave Unassigned</option>
-          ${reassignOpts.replace(`value="${currentVal}"`, `value="${currentVal}" selected`)}
+          ${reassignOpts.replace(`value="${escapeHtml(currentVal)}"`, () => `value="${escapeHtml(currentVal)}" selected`)}
           <option value="delete" ${currentVal === "delete" ? "selected" : ""}>Delete</option>
         </select>
       </td>
@@ -795,7 +803,7 @@ function renderOffboardSummary() {
   offboardState.options.disableAuth = document.getElementById("ob-disable-auth").checked;
 
   const lines = [];
-  lines.push(`<strong>Realtor:</strong> ${offboardState.realtorName} (${offboardState.realtorEmail})`);
+  lines.push(`<strong>Realtor:</strong> ${escapeHtml(offboardState.realtorName)} (${escapeHtml(offboardState.realtorEmail)})`);
 
   // Client summary
   const dispositions = offboardState.clientDispositions;

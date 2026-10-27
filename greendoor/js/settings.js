@@ -180,7 +180,7 @@ function renderTemplates() {
   el.innerHTML = allTemplates.map(t => `
     <div class="gd-tpl-row" data-id="${t.id}">
       <input type="text" class="gd-tpl-name-input" value="${(t.templateName || t.fileName || "").replace(/"/g, '&quot;')}" data-id="${t.id}" title="Click to rename">
-      <span class="gd-badge gd-badge-${t.category || 'other'}" style="font-size:0.7rem;">${t.category || 'other'}</span>
+      <span class="gd-badge gd-badge-${escapeHtml(t.category || 'other')}" style="font-size:0.7rem;">${escapeHtml(t.category || 'other')}</span>
       <span class="gd-text-muted" style="font-size:0.75rem; white-space:nowrap;">${formatFileSize(t.fileSize)}</span>
       <button class="gd-tpl-delete" onclick="deleteTemplate('${t.id}', '${(t.storagePath || "").replace(/'/g, "\\'")}')" title="Delete template">&times;</button>
     </div>`).join("");
@@ -316,6 +316,16 @@ function gmailRedirectUri() {
   return `${window.location.origin}/greendoor/app/oauth-callback.html`;
 }
 
+// sessionStorage key for the OAuth `state` value; app/oauth-callback.html reads
+// the same key and refuses to exchange the code unless it matches.
+const OAUTH_STATE_KEY = "gd-oauth-state";
+
+function generateOAuthState() {
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, b => b.toString(16).padStart(2, "0")).join("");
+}
+
 function renderGmailConnection(profile) {
   const el = document.getElementById("gmail-connection-status");
   if (!el) return;
@@ -359,6 +369,9 @@ window.connectGmail = async function () {
     }
     // Stash the current location so the callback can return us here.
     sessionStorage.setItem("oauthReturnTo", window.location.pathname + window.location.search);
+    // CSRF / login-binding: the callback only exchanges the code if Google echoes this back.
+    const state = generateOAuthState();
+    sessionStorage.setItem(OAUTH_STATE_KEY, state);
 
     const params = new URLSearchParams({
       client_id: data.clientId,
@@ -367,7 +380,8 @@ window.connectGmail = async function () {
       scope: GMAIL_SEND_SCOPE,
       access_type: "offline",
       include_granted_scopes: "true",
-      prompt: "consent" // force refresh_token issuance
+      prompt: "consent", // force refresh_token issuance
+      state
     });
     window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
   } catch (e) {
