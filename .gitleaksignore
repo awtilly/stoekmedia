@@ -1,0 +1,9 @@
+# Known historical findings, ignored so a full-history scan stays meaningful.
+# Format: <commit>:<file>:<rule>:<line>
+#
+# The App Review demo-account password (security audit 2026-10-27, C1). It is
+# still in git history; removing it from the files doesn't change that, and
+# ROTATING THE PASSWORD is what makes it harmless. Delete these two lines if
+# history is purged with git filter-repo.
+166bb3885977d794a6a92d7de8ca235ca677b6e6:greendoor/store-assets/SUBMISSION-CHECKLIST.md:doc-plaintext-password:91
+7233f859299bcc0b345ff467471d5eda83a48d47:greendoor/store-assets/metadata.md:doc-plaintext-password:50

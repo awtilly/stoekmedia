@@ -1,0 +1,44 @@
+# gitleaks config for stoekmedia: the default ruleset plus one narrow allowlist.
+# Used by .github/workflows/secret-scan.yml. Run locally (winget install Gitleaks.Gitleaks):
+#   gitleaks git --redact -v .    # commit history
+#   gitleaks dir --redact -v .    # working tree, incl. untracked files
+title = "stoekmedia"
+
+[extend]
+useDefault = true
+
+# The default rules don't flag a human password typed into a doc, which is
+# exactly how the App Review demo login leaked (2026-08-27). Flags
+# `password: <value>` / `passwd = <value>` lines in Markdown/text files when
+# the value contains a digit or symbol (plain prose words don't).
+[[rules]]
+id = "doc-plaintext-password"
+description = "Plaintext password written in a document"
+regex = '''(?i)\b(?:password|passwd|pwd)\b[`*_ ]*[:=][`*_ ]*([^\s`*'"<>]{3,}[0-9!@#$%^&+?~][^\s`*'"<>]*)'''
+secretGroup = 1
+path = '''(?i)\.(md|markdown|txt)$'''
+keywords = ["pass"]
+
+  [[rules.allowlists]]
+  description = "Pointers to where the password lives, and placeholders"
+  regexTarget = "secret"
+  regexes = ['''(?i)^(see|stored|kept|in|the|your|from|via|redacted|removed|n/?a|none|\*+|x+|\.\.\.|\[.*|\{.*|\$.*)''']
+
+# The four Firebase client API keys (web/iOS config for greendoor-2da47 and
+# march-madness-snake-draft). They are public by design: every browser must
+# have them, and they are API-restricted in GCP (security audit 2026-10-27, M5).
+# Matched by their last four characters, so a NEW Google API key anywhere still
+# fails the scan, and the full values don't need to appear here.
+[[allowlists]]
+description = "Public Firebase client API keys"
+targetRules = ["gcp-api-key", "generic-api-key"]
+regexTarget = "secret"
+regexes = ['''^AIza[0-9A-Za-z_-]{31}(SlQY|ULXI|UWfo|zKZA)$''']
+
+# Madness's FCM Web Push VAPID *public* key (madness/index.html VAPID_KEY).
+# Browsers need it to subscribe; the private half lives only in Firebase.
+[[allowlists]]
+description = "Public FCM VAPID key"
+targetRules = ["generic-api-key"]
+regexTarget = "secret"
+regexes = ['''^BEXX[0-9A-Za-z_-]{79}N_bM$''']
