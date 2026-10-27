@@ -2,6 +2,7 @@
    Explicit re-exports only — everything the app imports, nothing more.
    Rebuild with: npm run vendor */
 export { initializeApp } from 'firebase/app';
+export { initializeAppCheck, ReCaptchaEnterpriseProvider } from 'firebase/app-check';
 export {
   getAuth, initializeAuth, indexedDBLocalPersistence, browserLocalPersistence, inMemoryPersistence, onAuthStateChanged, signInWithEmailAndPassword, signOut,
   sendPasswordResetEmail, confirmPasswordReset, verifyPasswordResetCode

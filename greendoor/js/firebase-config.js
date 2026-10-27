@@ -1,4 +1,4 @@
-import { initializeApp } from "./vendor/firebase.js";
+import { initializeApp, initializeAppCheck, ReCaptchaEnterpriseProvider } from "./vendor/firebase.js";
 import { getAuth, initializeAuth, browserLocalPersistence, inMemoryPersistence } from "./vendor/firebase.js";
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, memoryLocalCache } from "./vendor/firebase.js";
 import { getStorage } from "./vendor/firebase.js";
@@ -20,6 +20,26 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
+
+/* App Check: attests that requests come from this web app, not a script
+   holding the public API key. Paste the reCAPTCHA Enterprise site key from
+   Firebase console → App Check → Apps → web app to turn it on (a site key is
+   public, like the API key). Web only: reCAPTCHA can't run under
+   capacitor://, so the iOS shell needs the App Attest provider in native
+   code first. Turning it on here only attaches tokens; nothing is rejected
+   until enforcement is enabled in the console (Firestore/Storage) and
+   ENFORCE_APP_CHECK in functions/index.js (callables). */
+const APP_CHECK_SITE_KEY = "";
+if (APP_CHECK_SITE_KEY && !IS_NATIVE) {
+  // Local dev: the SDK prints a debug token to register in the console.
+  if (location.hostname === "localhost" || location.hostname === "127.0.0.1") {
+    self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
+  }
+  initializeAppCheck(app, {
+    provider: new ReCaptchaEnterpriseProvider(APP_CHECK_SITE_KEY),
+    isTokenAutoRefreshEnabled: true
+  });
+}
 /* getAuth() pulls in browser popup/redirect machinery that stalls under the
    capacitor:// scheme; native gets a plain initializeAuth instead.
    Persistence is localStorage, NOT IndexedDB: WKWebView's IndexedDB can stall
