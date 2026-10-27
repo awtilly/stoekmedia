@@ -448,22 +448,22 @@ function renderLive(c){
         return `<div class="score-card ${isLive?'live':''} ${isFinal?'final':''}">
           <div class="score-teams">
             <div class="score-team-row ${awayWon?'winner':''} ${isFinal&&!awayWon?'loser':''}">
-              ${game.away.logo ? `<img src="${game.away.logo}" alt="">` : '<span style="width:24px"></span>'}
-              <span class="team-seed">${game.away.seed && game.away.seed <= 16 ? game.away.seed : ''}</span>
+              ${game.away.logo ? `<img src="${escapeHtml(game.away.logo)}" alt="">` : '<span style="width:24px"></span>'}
+              <span class="team-seed">${game.away.seed && game.away.seed <= 16 ? escapeHtml(game.away.seed) : ''}</span>
               <span class="team-name">${escapeHtml(game.away.name)}${awayOwner ? ` <span style="font-size:10px;color:var(--gold);font-weight:700">(${escapeHtml(awayOwner)})</span>` : ''}</span>
-              <span class="team-record">${game.away.record || ''}</span>
-              <span class="team-score">${game.away.score || (isPre ? '' : '0')}</span>
+              <span class="team-record">${escapeHtml(game.away.record || '')}</span>
+              <span class="team-score">${escapeHtml(game.away.score || (isPre ? '' : '0'))}</span>
             </div>
             <div class="score-team-row ${homeWon?'winner':''} ${isFinal&&!homeWon?'loser':''}">
-              ${game.home.logo ? `<img src="${game.home.logo}" alt="">` : '<span style="width:24px"></span>'}
-              <span class="team-seed">${game.home.seed && game.home.seed <= 16 ? game.home.seed : ''}</span>
+              ${game.home.logo ? `<img src="${escapeHtml(game.home.logo)}" alt="">` : '<span style="width:24px"></span>'}
+              <span class="team-seed">${game.home.seed && game.home.seed <= 16 ? escapeHtml(game.home.seed) : ''}</span>
               <span class="team-name">${escapeHtml(game.home.name)}${homeOwner ? ` <span style="font-size:10px;color:var(--gold);font-weight:700">(${escapeHtml(homeOwner)})</span>` : ''}</span>
-              <span class="team-record">${game.home.record || ''}</span>
-              <span class="team-score">${game.home.score || (isPre ? '' : '0')}</span>
+              <span class="team-record">${escapeHtml(game.home.record || '')}</span>
+              <span class="team-score">${escapeHtml(game.home.score || (isPre ? '' : '0'))}</span>
             </div>
           </div>
           <div class="score-meta">
-            <div class="score-status" style="${isFinal?'color:var(--red)':isLive?'color:var(--green)':'color:var(--g500)'}">${isLive ? game.shortDetail : isFinal ? 'FINAL' : timeStr}</div>
+            <div class="score-status" style="${isFinal?'color:var(--red)':isLive?'color:var(--green)':'color:var(--g500)'}">${isLive ? escapeHtml(game.shortDetail) : isFinal ? 'FINAL' : timeStr}</div>
             ${game.note ? `<div class="score-note">${escapeHtml(game.note.replace("Men's Basketball Championship - ",''))}</div>` : ''}
             ${game.broadcast ? `<div class="score-broadcast">${escapeHtml(game.broadcast)}</div>` : ''}
             ${game.venue ? `<div class="score-broadcast">${escapeHtml(game.venue)}</div>` : ''}
