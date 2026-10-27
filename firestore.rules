@@ -31,11 +31,31 @@ service cloud.firestore {
           || request.resource.data.source == resource.data.source;
     }
 
+    // True when `field` isn't part of this write's changes.
+    function untouched(field) {
+      return !(field in request.resource.data.diff(resource.data).affectedKeys());
+    }
+
+    // Server-maintained fields: a client may only clear them (null), never set them.
+    function clearedOrUntouched(field) {
+      return untouched(field) || request.resource.data.get(field, null) == null;
+    }
+
+    // Activity types the app writes. `type` is rendered in the admin panel,
+    // so free-form strings (markup) are rejected outright.
+    function validActivityType() {
+      return request.resource.data.type in
+        ['note', 'call', 'email', 'sms', 'showing', 'file_share', 'meeting', 'other'];
+    }
+
 
     match /users/{userId} {
       allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
 
-      // Users can only update their own doc, and only safe fields
+      // Users can only update their own doc, and only safe fields.
+      // The showingTime sync fields are written by Cloud Functions (they drive
+      // the 15-minute sync throttle); the client may only clear them on
+      // disconnect. termsAcceptedAt must be the server time (no backdating).
       allow update: if isAuthenticated() && request.auth.uid == userId
                     && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
                          'fullName', 'phone', 'company', 'emailSignature',
@@ -43,7 +63,13 @@ service cloud.firestore {
                          'termsAcceptedAt', 'lastLogin', 'fcmTokens',
                          'showingTimeFeedUrl', 'showingTimeLastSyncedAt', 'showingTimeSyncCount',
                          'showingTimeSyncError', 'timezone'
-                       ]);
+                       ])
+                    && clearedOrUntouched('showingTimeLastSyncedAt')
+                    && clearedOrUntouched('showingTimeSyncCount')
+                    && clearedOrUntouched('showingTimeSyncError')
+                    && (untouched('termsAcceptedAt') || request.resource.data.termsAcceptedAt == request.time)
+                    && (untouched('fullName') || (request.resource.data.fullName is string
+                                                  && request.resource.data.fullName.size() < 100));
 
       // Admins can do anything
       allow create, delete: if isAuthenticated() && isAdmin();
@@ -73,7 +99,9 @@ service cloud.firestore {
         && request.resource.data.fullName is string
         && request.resource.data.fullName.size() > 0
         && request.resource.data.fullName.size() < 200;
-      allow update: if isAuthenticated() && (isOwner(resource.data.realtorId) || isAdmin()) && realtorIdUnchanged();
+      allow update: if isAuthenticated() && (isOwner(resource.data.realtorId) || isAdmin()) && realtorIdUnchanged()
+        && (untouched('fullName') || (request.resource.data.fullName is string
+                                      && request.resource.data.fullName.size() < 200));
       allow delete: if isAuthenticated() && (isOwner(resource.data.realtorId) || isAdmin());
 
       // Closing Checklist subcollection
@@ -91,15 +119,29 @@ service cloud.firestore {
 
     match /activities/{activityId} {
       allow read: if isAuthenticated() && (isOwner(resource.data.realtorId) || isAdmin());
-      allow create: if isAuthenticated() && incomingRealtorIdMatchesAuth();
-      allow update: if isAuthenticated() && (isOwner(resource.data.realtorId) || isAdmin()) && realtorIdUnchanged();
+      allow create: if isAuthenticated() && incomingRealtorIdMatchesAuth() && validActivityType();
+      allow update: if isAuthenticated() && (isOwner(resource.data.realtorId) || isAdmin()) && realtorIdUnchanged()
+        && (untouched('type') || validActivityType());
       allow delete: if isAuthenticated() && (isOwner(resource.data.realtorId) || isAdmin());
     }
 
+    // storagePath feeds getFileSignedUrl and offboarding deletes, so a client
+    // may only point it inside its own files/{uid}/ area, and never change it.
+    // (Signed closing documents under clients/{id}/ are written by Functions.)
     match /files/{fileId} {
       allow read: if isAuthenticated() && (isOwner(resource.data.realtorId) || isAdmin());
-      allow create: if isAuthenticated() && incomingRealtorIdMatchesAuth();
-      allow update: if isAuthenticated() && (isOwner(resource.data.realtorId) || isAdmin()) && realtorIdUnchanged();
+      allow create: if isAuthenticated() && incomingRealtorIdMatchesAuth()
+        && (request.resource.data.get('storagePath', null) == null
+            || (request.resource.data.storagePath is string
+                && request.resource.data.storagePath.matches('files/' + request.auth.uid + '/.+')))
+        && (request.resource.data.get('downloadUrl', null) == null
+            || (request.resource.data.downloadUrl is string
+                && request.resource.data.downloadUrl.matches('https://.+')));
+      allow update: if isAuthenticated() && (isOwner(resource.data.realtorId) || isAdmin()) && realtorIdUnchanged()
+        && untouched('storagePath')
+        && (untouched('downloadUrl')
+            || (request.resource.data.downloadUrl is string
+                && request.resource.data.downloadUrl.matches('https://.+')));
       allow delete: if isAuthenticated() && (isOwner(resource.data.realtorId) || isAdmin());
     }
 
@@ -251,11 +293,18 @@ service cloud.firestore {
     match /emailTemplates/{templateId} {
       allow read: if isAuthenticated() && (resource.data.createdBy == "system" || resource.data.createdBy == request.auth.uid || isAdmin());
       allow create: if isAuthenticated() && request.resource.data.createdBy == request.auth.uid;
-      allow update, delete: if isAuthenticated() && (resource.data.createdBy == request.auth.uid || isAdmin());
+      // createdBy is frozen: re-labelling a template "system" would push it
+      // into every realtor's template picker.
+      allow update: if isAuthenticated() && (resource.data.createdBy == request.auth.uid || isAdmin())
+        && request.resource.data.createdBy == resource.data.createdBy;
+      allow delete: if isAuthenticated() && (resource.data.createdBy == request.auth.uid || isAdmin());
     }
 
+    // Daily LLM/email/SMS quotas. Written only by Cloud Functions (admin SDK);
+    // a client-writable doc would let anyone reset their own limits.
     match /rateLimits/{userId} {
-      allow read, write: if isAuthenticated() && request.auth.uid == userId;
+      allow read: if isAuthenticated() && request.auth.uid == userId;
+      allow write: if false;
     }
 
     match /adminAuditLog/{logId} {
