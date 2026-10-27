@@ -221,7 +221,7 @@ function renderJoinScreen(){
           <h3>Returning Player?</h3>
           <p>Tap your name and enter your PIN to rejoin.</p>
           <div style="display:flex;flex-direction:column;gap:6px">
-            ${players.map(p => `<button class="btn btn-secondary" style="width:100%;justify-content:center" onclick="claimPlayer('${p.id}')">${escapeHtml(p.name)}</button>`).join('')}
+            ${players.map(p => `<button class="btn btn-secondary" style="width:100%;justify-content:center" data-player-id="${escapeHtml(p.id)}" onclick="claimPlayer(this.dataset.playerId)">${escapeHtml(p.name)}</button>`).join('')}
           </div>
         </div>
       ` : ''}
