@@ -88,7 +88,8 @@ Firebase Analytics is disabled in this app, no ads, no tracking SDKs — so
 **App Review Information**
 - Sign-in required: **Yes**
   - Username: `uitest@stoekmedia.com`
-  - Password: `GdUiTest!2026`
+  - Password: stored in the password manager and in App Store Connect → App Review
+    Information. Never write it in this repo (it is public and served on stoekmedia.com).
 - Notes:
   ```
   GreenDoor is a CRM for real estate agents. The demo account is preloaded

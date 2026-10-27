@@ -47,5 +47,5 @@ delete your account anytime.
 **Screenshots:** appstore-1..5.png (1320x2868, 6.9-inch)
 
 **App Review notes (demo account):**
-- Email: uitest@stoekmedia.com · Password: GdUiTest!2026
+- Email: uitest@stoekmedia.com · Password: see the password manager / App Store Connect (never commit it)
 - Preloaded with sample clients, listings, and calendar events.
