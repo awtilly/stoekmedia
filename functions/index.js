@@ -1,6 +1,6 @@
 const { onCall, onRequest, HttpsError } = require("firebase-functions/v2/https");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
-const { onDocumentCreated } = require("firebase-functions/v2/firestore");
+const { onDocumentCreated, onDocumentDeleted } = require("firebase-functions/v2/firestore");
 const { defineSecret } = require("firebase-functions/params");
 const { initializeApp } = require("firebase-admin/app");
 const { getFirestore, FieldValue, FieldPath } = require("firebase-admin/firestore");
@@ -8,6 +8,7 @@ const { getMessaging } = require("firebase-admin/messaging");
 const { getStorage } = require("firebase-admin/storage");
 const { getAuth } = require("firebase-admin/auth");
 const crypto = require("crypto");
+const net = require("net");
 
 const ANTHROPIC_API_KEY = defineSecret("ANTHROPIC_API_KEY");
 const SENDGRID_API_KEY = defineSecret("SENDGRID_API_KEY");
@@ -32,19 +33,66 @@ function isLiveSecret(value) {
 initializeApp();
 const db = getFirestore();
 
+// Addresses a server-side fetch must never reach: loopback, RFC 1918,
+// link-local (incl. the 169.254.169.254 metadata server), CGNAT, multicast,
+// reserved, and the IPv6 equivalents. BlockList also matches IPv4-mapped IPv6
+// (http://[::ffff:169.254.169.254]/), which the old regex list let through.
+const PRIVATE_NETS = new net.BlockList();
+for (const [addr, prefix] of [
+  ["0.0.0.0", 8], ["10.0.0.0", 8], ["100.64.0.0", 10], ["127.0.0.0", 8],
+  ["169.254.0.0", 16], ["172.16.0.0", 12], ["192.0.0.0", 24], ["192.168.0.0", 16],
+  ["198.18.0.0", 15], ["224.0.0.0", 4], ["240.0.0.0", 4]
+]) PRIVATE_NETS.addSubnet(addr, prefix, "ipv4");
+for (const [addr, prefix] of [
+  ["::", 128], ["::1", 128], ["64:ff9b::", 96], ["fc00::", 7], ["fe80::", 10], ["ff00::", 8]
+]) PRIVATE_NETS.addSubnet(addr, prefix, "ipv6");
+
 function isPrivateHost(host) {
-  return (
-    host === "localhost" ||
-    host === "0.0.0.0" ||
-    /^127\./.test(host) ||
-    /^10\./.test(host) ||
-    /^192\.168\./.test(host) ||
-    /^172\.(1[6-9]|2\d|3[01])\./.test(host) ||
-    /^169\.254\./.test(host) ||
-    /^::1$/.test(host) ||
-    /^fe80:/i.test(host) ||
-    /^f[cd][0-9a-f]{2}:/i.test(host)
-  );
+  const h = String(host || "").toLowerCase().replace(/^\[|\]$/g, "").replace(/\.$/, "");
+  if (h === "localhost" || h.endsWith(".localhost") || h.endsWith(".internal")) return true;
+  const family = net.isIP(h);
+  if (family === 4) return PRIVATE_NETS.check(h, "ipv4");
+  if (family === 6) return PRIVATE_NETS.check(h, "ipv6");
+  return false; // a hostname: assertPublicUrl resolves it and checks every address
+}
+
+/**
+ * SSRF guard for server-side fetches of user-supplied URLs. Allows only the
+ * given protocols and default ports, rejects private/internal hosts, and
+ * resolves hostnames so a public name pointing at a private address is
+ * rejected too. Returns the parsed URL. Residual gap: fetch() resolves again,
+ * so a DNS-rebinding server could still race this check; closing that needs
+ * an undici dispatcher pinned to the vetted address.
+ */
+async function assertPublicUrl(rawUrl, protocols = ["https:"]) {
+  let parsed;
+  try {
+    parsed = new URL(String(rawUrl));
+  } catch {
+    throw new HttpsError("invalid-argument", "Invalid URL.");
+  }
+  if (!protocols.includes(parsed.protocol)) {
+    throw new HttpsError("invalid-argument", `Only ${protocols.map(p => p.replace(":", "")).join("/")} URLs are allowed.`);
+  }
+  if (parsed.username || parsed.password || (parsed.port && parsed.port !== "443" && parsed.port !== "80")) {
+    throw new HttpsError("invalid-argument", "URL is not allowed.");
+  }
+  const host = parsed.hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  if (!host || isPrivateHost(host)) {
+    throw new HttpsError("invalid-argument", "URL host is not allowed.");
+  }
+  if (!net.isIP(host)) {
+    let addrs;
+    try {
+      addrs = await require("dns").promises.lookup(host, { all: true, verbatim: true });
+    } catch {
+      throw new HttpsError("invalid-argument", "Could not resolve URL host.");
+    }
+    if (!addrs.length || addrs.some(a => isPrivateHost(a.address))) {
+      throw new HttpsError("invalid-argument", "URL host resolves to a private network.");
+    }
+  }
+  return parsed;
 }
 
 function escapeHtml(s) {
@@ -78,17 +126,96 @@ async function enforceRateLimit(uid, key, maxPerDay) {
   });
 }
 
+/* ------------------------------------------------------------------ */
+/*  Caller authorization                                               */
+/*                                                                     */
+/*  Every callable starts with requireActiveUser() (or requireAdmin()) */
+/*  and runs assertOwns() on every document id it takes from the       */
+/*  client. Accounts are provisioned by inviteRealtor, so an Auth user */
+/*  with no users/{uid} profile (e.g. a sign-up made directly against  */
+/*  the public API key) is rejected, and the admin "Active" toggle and */
+/*  offboarding (isActive: false) actually cut off server access.      */
+/* ------------------------------------------------------------------ */
+
+// App Check. Keep false until EVERY client sends a token, or those clients
+// break: the web build needs the reCAPTCHA Enterprise site key in
+// greendoor/js/firebase-config.js, and the iOS shell needs App Attest.
+// While false, callers without a valid token are logged as "appcheck-missing"
+// so you can watch coverage before flipping this to true and redeploying.
+const ENFORCE_APP_CHECK = false;
+
+function requireSignedIn(request) {
+  if (!request.auth) throw new HttpsError("unauthenticated", "You must be signed in.");
+  if (!request.app) {
+    if (ENFORCE_APP_CHECK) {
+      throw new HttpsError("unauthenticated", "This app couldn't be verified. Update the app and try again.");
+    }
+    console.warn(JSON.stringify({ severity: "WARNING", message: "appcheck-missing", uid: request.auth.uid }));
+  }
+  return request.auth.uid;
+}
+
+async function requireActiveUser(request) {
+  const uid = requireSignedIn(request);
+  const userSnap = await db.doc(`users/${uid}`).get();
+  if (!userSnap.exists) {
+    throw new HttpsError("permission-denied", "This account isn't set up for GreenDoor. Ask your administrator for an invite.");
+  }
+  const profile = userSnap.data() || {};
+  if (profile.isActive === false) {
+    throw new HttpsError("permission-denied", "This account has been deactivated.");
+  }
+  return { uid, profile, userSnap };
+}
+
+/** Loads {collection}/{id} and requires doc[field] === uid. */
+async function assertOwns(collection, id, uid, field = "realtorId") {
+  if (typeof id !== "string" || !id || id.length > 200 || id.includes("/")) {
+    throw new HttpsError("invalid-argument", "Invalid id.");
+  }
+  const snap = await db.collection(collection).doc(id).get();
+  if (!snap.exists || snap.get(field) !== uid) {
+    // Same answer for "missing" and "not yours", so ids can't be probed.
+    throw new HttpsError("not-found", "Not found.");
+  }
+  return snap;
+}
+
+// Anything that lands in an email header: no CR/LF (header injection).
+function headerSafe(s, max = 200) {
+  return String(s == null ? "" : s).replace(/[\r\n]+/g, " ").trim().slice(0, max);
+}
+// Display names also lose the characters that could smuggle extra
+// recipients into a `Name <address>` header.
+function displayNameSafe(s) {
+  return headerSafe(s, 100).replace(/[<>",;\\]/g, "");
+}
+const EMAIL_RE = /^[^\s@<>()",;:\\[\]]+@[^\s@<>()",;:\\[\]]+\.[^\s@<>()",;:\\[\]]+$/;
+function assertEmail(addr) {
+  const a = String(addr || "").trim();
+  if (a.length > 254 || !EMAIL_RE.test(a)) {
+    throw new HttpsError("invalid-argument", "Enter a single valid email address.");
+  }
+  return a;
+}
+function assertText(value, name, max) {
+  if (typeof value !== "string") throw new HttpsError("invalid-argument", `${name} must be text.`);
+  if (value.length > max) throw new HttpsError("invalid-argument", `${name} is too long (max ${max} characters).`);
+  return value;
+}
+
 exports.sendForSignatureV2 = onCall(
   { region: "us-central1", secrets: [DOCUSEAL_API_KEY, DOCUSEAL_BASE_URL] },
   async (request) => {
-    if (!request.auth) throw new HttpsError("unauthenticated", "You must be signed in.");
+    const { uid } = await requireActiveUser(request);
     const { clientId, files, signers, title, message, expiryDays } = request.data || {};
     if (!files || !signers || !signers.length) {
       throw new HttpsError("invalid-argument", "files and signers are required.");
     }
+    if (clientId) await assertOwns("clients", clientId, uid);
     return sendViaDocuSeal({
       clientId, files, signers, title, message, expiryDays,
-      realtorId: request.auth.uid
+      realtorId: uid
     });
   }
 );
@@ -151,10 +278,7 @@ function resolveDocuSealFieldValues(template, clientData, listingData, agentProf
 exports.sendComplianceDocV2 = onCall(
   { region: "us-central1", secrets: [DOCUSEAL_API_KEY, DOCUSEAL_BASE_URL] },
   async (request) => {
-    if (!request.auth) {
-      throw new HttpsError("unauthenticated", "You must be signed in to send compliance documents.");
-    }
-    const uid = request.auth.uid;
+    const { uid } = await requireActiveUser(request);
     const { templateId, clientId, listingId } = request.data || {};
     if (!templateId || !clientId) {
       throw new HttpsError("invalid-argument", "templateId and clientId are required.");
@@ -180,8 +304,7 @@ exports.sendComplianceDocV2 = onCall(
       throw new HttpsError("permission-denied", "You don't have access to this template.");
     }
 
-    const clientSnap = await db.doc(`clients/${clientId}`).get();
-    if (!clientSnap.exists) throw new HttpsError("not-found", "Client not found.");
+    const clientSnap = await assertOwns("clients", clientId, uid);
     const clientDataDoc = clientSnap.data();
     if (!clientDataDoc.email) {
       throw new HttpsError("failed-precondition", "Client email required for signature request.");
@@ -189,8 +312,7 @@ exports.sendComplianceDocV2 = onCall(
 
     let listingData = null;
     if (listingId) {
-      const listingSnap = await db.doc(`listings/${listingId}`).get();
-      if (listingSnap.exists) listingData = listingSnap.data();
+      listingData = (await assertOwns("listings", listingId, uid, "addedBy")).data();
     }
 
     const userSnap = await db.doc(`users/${uid}`).get();
@@ -264,13 +386,10 @@ exports.sendComplianceDocV2 = onCall(
 exports.sendBulkComplianceDocsV2 = onCall(
   { region: "us-central1", secrets: [DOCUSEAL_API_KEY, DOCUSEAL_BASE_URL] },
   async (request) => {
-    if (!request.auth) {
-      throw new HttpsError("unauthenticated", "You must be signed in to send compliance documents.");
-    }
-    const uid = request.auth.uid;
+    const { uid } = await requireActiveUser(request);
     const { templateIds, clientId, listingId } = request.data || {};
-    if (!templateIds || !Array.isArray(templateIds) || templateIds.length === 0 || !clientId) {
-      throw new HttpsError("invalid-argument", "templateIds (non-empty array) and clientId are required.");
+    if (!templateIds || !Array.isArray(templateIds) || templateIds.length === 0 || templateIds.length > 25 || !clientId) {
+      throw new HttpsError("invalid-argument", "templateIds (1-25) and clientId are required.");
     }
 
     const apiKey = DOCUSEAL_API_KEY.value();
@@ -284,8 +403,7 @@ exports.sendBulkComplianceDocsV2 = onCall(
     const agentProfile = userSnap.data();
     const senderEmail = agentProfile.email || request.auth.token.email;
 
-    const clientSnap = await db.doc(`clients/${clientId}`).get();
-    if (!clientSnap.exists) throw new HttpsError("not-found", "Client not found.");
+    const clientSnap = await assertOwns("clients", clientId, uid);
     const clientDataDoc = clientSnap.data();
     if (!clientDataDoc.email) {
       throw new HttpsError("failed-precondition", "Client email required for signature request.");
@@ -293,8 +411,7 @@ exports.sendBulkComplianceDocsV2 = onCall(
 
     let listingData = null;
     if (listingId) {
-      const listingSnap = await db.doc(`listings/${listingId}`).get();
-      if (listingSnap.exists) listingData = listingSnap.data();
+      listingData = (await assertOwns("listings", listingId, uid, "addedBy")).data();
     }
 
     const templateDocs = [];
@@ -425,10 +542,23 @@ exports.sendBulkComplianceDocsV2 = onCall(
 exports.checkSignatureStatusV2 = onCall(
   { region: "us-central1", secrets: [DOCUSEAL_API_KEY, DOCUSEAL_BASE_URL] },
   async (request) => {
-    if (!request.auth) throw new HttpsError("unauthenticated", "You must be signed in.");
-    const { submissionId, documentId } = request.data || {};
+    const { uid } = await requireActiveUser(request);
+    const { submissionId, documentId, clientId } = request.data || {};
     const id = submissionId || documentId;
     if (!id) throw new HttpsError("invalid-argument", "submissionId is required.");
+
+    // Submission ids are sequential, so prove the caller sent this one: either
+    // their own ad-hoc envelope, or a complianceDocs record under a client
+    // they own (pass clientId for compliance docs).
+    const envSnap = await db.collection("envelopes").doc(String(id)).get();
+    let owned = envSnap.exists && envSnap.get("realtorId") === uid;
+    if (!owned && clientId) {
+      await assertOwns("clients", clientId, uid);
+      const docs = await db.collection(`clients/${clientId}/complianceDocs`)
+        .where("docusealSubmissionId", "==", String(id)).limit(1).get();
+      owned = !docs.empty;
+    }
+    if (!owned) throw new HttpsError("not-found", "Submission not found.");
 
     const apiKey = DOCUSEAL_API_KEY.value();
     if (!isLiveSecret(apiKey)) {
@@ -501,17 +631,32 @@ function signHs256Jwt(payload, secret) {
 exports.createDocuSealBuilderToken = onCall(
   { region: "us-central1", secrets: [DOCUSEAL_API_KEY, DOCUSEAL_BASE_URL, DOCUSEAL_ACCOUNT_EMAIL] },
   async (request) => {
-    if (!request.auth) throw new HttpsError("unauthenticated", "You must be signed in.");
+    const { uid, profile: userData } = await requireActiveUser(request);
     const apiKey = DOCUSEAL_API_KEY.value();
     if (!isLiveSecret(apiKey)) {
       throw new HttpsError("failed-precondition", "DocuSeal is not yet configured.");
     }
 
-    const uid = request.auth.uid;
     const { templateName, documentUrls, templateId } = request.data || {};
 
-    const userSnap = await db.doc(`users/${uid}`).get();
-    const userData = userSnap.exists ? userSnap.data() : {};
+    // The JWT is signed as the DocuSeal account owner, so it opens ANY template
+    // id. Only mint one for a DocuSeal template the caller owns (admins may
+    // edit seeded templates).
+    if (templateId) {
+      const candidates = [String(templateId)];
+      if (Number.isFinite(Number(templateId))) candidates.push(Number(templateId));
+      const tSnap = await db.collection("documentTemplates")
+        .where("docusealTemplateId", "in", candidates).limit(10).get();
+      const allowed = tSnap.docs.some(d => {
+        const t = d.data();
+        return t.ownerId === uid || (t.visibility === "seeded" && userData.role === "admin");
+      });
+      if (!allowed) throw new HttpsError("permission-denied", "You don't have access to this template.");
+    }
+    if (documentUrls !== undefined && (!Array.isArray(documentUrls) || documentUrls.length > 10 ||
+        documentUrls.some(u => typeof u !== "string" || !/^https:\/\//i.test(u)))) {
+      throw new HttpsError("invalid-argument", "documentUrls must be up to 10 https URLs.");
+    }
 
     // DocuSeal's builder JWT requires `user_email` to match a registered
     // user on the DocuSeal account. We use the configured account-owner
@@ -571,14 +716,15 @@ const FIELD_MAPPING_SOURCES = [
 exports.suggestFieldMappings = onCall(
   { region: "us-central1", secrets: [ANTHROPIC_API_KEY] },
   async (request) => {
-    if (!request.auth) throw new HttpsError("unauthenticated", "You must be signed in.");
+    const { uid } = await requireActiveUser(request);
     const { fieldNames } = request.data || {};
-    if (!Array.isArray(fieldNames) || fieldNames.length === 0) {
-      throw new HttpsError("invalid-argument", "fieldNames (non-empty array) is required.");
+    if (!Array.isArray(fieldNames) || fieldNames.length === 0 || fieldNames.length > 200 ||
+        fieldNames.some(n => typeof n !== "string" || n.length > 200)) {
+      throw new HttpsError("invalid-argument", "fieldNames must be 1-200 strings of up to 200 characters.");
     }
 
     // Per-user daily cap protects against runaway costs from a stuck client.
-    await enforceRateLimit(request.auth.uid, "suggestFieldMappings", 200);
+    await enforceRateLimit(uid, "suggestFieldMappings", 200);
 
     const apiKey = ANTHROPIC_API_KEY.value();
     if (!apiKey) {
@@ -689,8 +835,13 @@ exports.docusealWebhook = onRequest(
   async (req, res) => {
     if (req.method !== "POST") return res.status(405).send("Method not allowed");
 
+    // Fail closed while the secret is the public "__pending__" placeholder:
+    // anyone could compute a valid HMAC with it.
+    const webhookSecret = DOCUSEAL_WEBHOOK_SECRET.value();
+    if (!isLiveSecret(webhookSecret)) return res.status(503).send("Webhook not configured");
+
     const sig = req.headers["x-docuseal-signature"];
-    if (!verifyDocuSealSignature(sig, req.rawBody, DOCUSEAL_WEBHOOK_SECRET.value())) {
+    if (!verifyDocuSealSignature(sig, req.rawBody, webhookSecret)) {
       console.error("docusealWebhook: signature verification failed");
       return res.status(401).send("Invalid signature");
     }
@@ -1206,16 +1357,19 @@ const SAGE_CLIENT_DETAIL_TOOLS = [
 ];
 
 exports.askAssistant = onCall({ region: "us-central1", secrets: [ANTHROPIC_API_KEY, VOYAGE_API_KEY] }, async (request) => {
-  if (!request.auth) {
-    throw new HttpsError("unauthenticated", "You must be signed in.");
-  }
+  const { uid } = await requireActiveUser(request);
 
   const { question, context, history, clientId, contextData } = request.data || {};
   if (!question) {
     throw new HttpsError("invalid-argument", "question is required.");
   }
+  // Size caps bound the per-call token spend (the daily count alone doesn't).
+  assertText(question, "question", 4000);
+  if (contextData !== undefined && JSON.stringify(contextData).length > 60000) {
+    throw new HttpsError("invalid-argument", "contextData is too large.");
+  }
 
-  await enforceRateLimit(request.auth.uid, "askAssistant", 100);
+  await enforceRateLimit(uid, "askAssistant", 100);
 
   const anthropicKey = ANTHROPIC_API_KEY.value();
   if (!anthropicKey) {
@@ -1312,8 +1466,11 @@ STYLE:
 - For general questions ("what should I do today?", "how do I…?"), reply briefly with no tool.`;
   } else if (context === "client_detail" && clientId) {
     // Read client data for generic client-detail context
-    const clientSnap = await db.doc(`clients/${clientId}`).get();
-    if (clientSnap.exists) {
+    const clientSnap = typeof clientId === "string" && !clientId.includes("/")
+      ? await db.doc(`clients/${clientId}`).get()
+      : null;
+    // Only the caller's own clients; anyone else's id gets the generic prompt.
+    if (clientSnap && clientSnap.exists && clientSnap.get("realtorId") === uid) {
       const c = clientSnap.data();
       systemPrompt = `You are a real estate assistant. The realtor is viewing client: ${c.fullName || 'Unknown'}. Status: ${c.status || 'unknown'}. Transaction type: ${c.transactionType || 'not set'}. Help with questions about this client.
 
@@ -1322,7 +1479,7 @@ When the realtor asks you to draft an email, create a follow-up, schedule a show
       // RAG: retrieve semantically-relevant past activities for this client using
       // Voyage embeddings + Firestore vector search. Surfaces context the model
       // would otherwise miss (older emails, call notes, prior showings).
-      const ragContext = await retrieveClientContext(clientId, request.auth.uid, question);
+      const ragContext = await retrieveClientContext(clientId, uid, question);
       if (ragContext) {
         systemPrompt += `\n\nRELEVANT PAST ACTIVITY (retrieved by semantic search; may be incomplete):\n${ragContext}`;
       }
@@ -1379,9 +1536,13 @@ RULES:
   }
 
   // Build messages array
+  // History comes from the browser: keep only plain {role, content} text turns
+  // so a caller can't smuggle tool_use blocks, images or huge payloads.
   const messages = [];
   if (history && Array.isArray(history)) {
-    const recentHistory = history.slice(-6);
+    const recentHistory = history.slice(-6)
+      .filter(m => m && (m.role === "user" || m.role === "assistant") && typeof m.content === "string")
+      .map(m => ({ role: m.role, content: m.content.slice(0, 8000) }));
     messages.push(...recentHistory);
   }
   messages.push({ role: "user", content: question });
@@ -1575,22 +1736,76 @@ exports.embedActivityOnCreate = onDocumentCreated(
  * @param {string} feedUrl - The iCal/webcal feed URL
  * @returns {{ synced: number, removed: number }}
  */
+/* sanitizeIcalUid: clean iCal UIDs for Firestore doc ID safety.
+   (Restored: it was deleted along with the BoldSign code in 343941d3, which
+   made every sync throw a ReferenceError.) */
+function sanitizeIcalUid(uid) {
+  return String(uid || "").replace(/[\/\.#\$\[\]]/g, "_");
+}
+
+/**
+ * GET a user-supplied URL as text, re-running the SSRF guard on every
+ * redirect hop, with a timeout and a streaming size cap.
+ */
+async function fetchPublicText(rawUrl, { protocols = ["https:"], maxBytes = 5 * 1024 * 1024, timeoutMs = 15000 } = {}) {
+  let url = rawUrl;
+  for (let hop = 0; hop < 4; hop++) {
+    const parsed = await assertPublicUrl(url, protocols);
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+    try {
+      const resp = await fetch(parsed.toString(), {
+        redirect: "manual",
+        signal: ctrl.signal,
+        headers: { "User-Agent": "Mozilla/5.0 (compatible; GreenDoorBot/1.0)" }
+      });
+      const location = resp.headers.get("location");
+      if (resp.status >= 300 && resp.status < 400 && location) {
+        url = new URL(location, parsed).toString();
+        continue;
+      }
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const reader = resp.body.getReader();
+      const chunks = [];
+      let total = 0;
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        total += value.length;
+        if (total > maxBytes) {
+          ctrl.abort();
+          throw new Error("Response too large.");
+        }
+        chunks.push(value);
+      }
+      return Buffer.concat(chunks).toString("utf8");
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  throw new Error("Too many redirects.");
+}
+
 async function syncFeedForUser(realtorId, feedUrl) {
   const admin = require("firebase-admin");
   const ical = require("node-ical");
   const FieldValue = require("firebase-admin/firestore").FieldValue;
 
   // Normalize webcal:// to https://
-  const url = feedUrl.replace(/^webcal:\/\//i, "https://");
+  const url = String(feedUrl).trim().replace(/^webcal:\/\//i, "https://");
 
   // Fetch and parse the iCal feed
   let data;
   try {
-    data = await ical.async.fromURL(url);
+    data = await ical.async.parseICS(await fetchPublicText(url));
   } catch (err) {
-    // Network/parse error: save error but do NOT delete existing showings
+    // Network/parse error: save error but do NOT delete existing showings.
+    // Only our own validation messages are stored; raw network errors would
+    // turn this user-readable field into a port-scan oracle.
     await db.doc(`users/${realtorId}`).update({
-      showingTimeSyncError: err.message || "Failed to fetch feed",
+      showingTimeSyncError: err instanceof HttpsError
+        ? err.message
+        : "Couldn't download or read the feed. Check the URL and try again.",
     });
     throw err;
   }
@@ -1682,19 +1897,8 @@ async function syncFeedForUser(realtorId, feedUrl) {
  * profile, enforces a 15-minute rate limit, and calls syncFeedForUser.
  */
 exports.syncShowingTime = onCall({ region: "us-central1" }, async (request) => {
-  if (!request.auth) {
-    throw new HttpsError("unauthenticated", "You must be signed in.");
-  }
-
-  const uid = request.auth.uid;
-
-  // Read user doc for feed URL and last sync time
-  const userSnap = await db.doc(`users/${uid}`).get();
-  if (!userSnap.exists) {
-    throw new HttpsError("not-found", "User profile not found.");
-  }
-
-  const userData = userSnap.data();
+  // Reads the user doc for feed URL and last sync time
+  const { uid, profile: userData } = await requireActiveUser(request);
   const feedUrl = userData.showingTimeFeedUrl;
 
   if (!feedUrl) {
@@ -1717,7 +1921,8 @@ exports.syncShowingTime = onCall({ region: "us-central1" }, async (request) => {
     return result;
   } catch (err) {
     console.error(`syncShowingTime error for user ${uid}:`, err.message);
-    throw new HttpsError("internal", `Sync failed: ${err.message}`);
+    if (err instanceof HttpsError) throw err;
+    throw new HttpsError("internal", "Sync failed. Check the feed URL and try again.");
   }
 });
 
@@ -1740,6 +1945,7 @@ exports.scheduledShowingTimeSync = onSchedule(
 
     for (const userDoc of usersSnap.docs) {
       const userData = userDoc.data();
+      if (userData.isActive === false) continue; // deactivated / offboarded
 
       // Rate limit: skip if synced within last 15 minutes
       const lastSync = userData.showingTimeLastSyncedAt?.toDate();
@@ -1765,11 +1971,8 @@ exports.scheduledShowingTimeSync = onSchedule(
    HELPER: verify caller is admin
    ================================================================ */
 async function requireAdmin(request) {
-  if (!request.auth) {
-    throw new HttpsError("unauthenticated", "You must be signed in.");
-  }
-  const userSnap = await db.doc(`users/${request.auth.uid}`).get();
-  if (!userSnap.exists || userSnap.data().role !== "admin") {
+  const { profile, userSnap } = await requireActiveUser(request);
+  if (profile.role !== "admin") {
     throw new HttpsError("permission-denied", "Admin access required.");
   }
   return userSnap;
@@ -1800,11 +2003,15 @@ async function sendViaEmail({ to, toName, subject, body, fromEmail, fromName, re
     ? `${fromName} via ${SYSTEM_FROM_NAME}`
     : SYSTEM_FROM_NAME;
 
+  const safeDisplayName = displayNameSafe(displayName) || SYSTEM_FROM_NAME;
+  const safeToName = displayNameSafe(toName);
+  subject = headerSafe(subject, 300);
+
   const resendKey = RESEND_API_KEY.value();
   if (isLiveSecret(resendKey)) {
     const payload = {
-      from: `${displayName} <${SYSTEM_FROM_EMAIL}>`,
-      to: toName ? [`${toName} <${to}>`] : [to],
+      from: `${safeDisplayName} <${SYSTEM_FROM_EMAIL}>`,
+      to: safeToName ? [`${safeToName} <${to}>`] : [to],
       subject,
       html: body
     };
@@ -1817,7 +2024,8 @@ async function sendViaEmail({ to, toName, subject, body, fromEmail, fromName, re
     });
     if (!resp.ok) {
       const text = await resp.text();
-      throw new HttpsError("internal", `Resend error ${resp.status}: ${text}`);
+      console.error(`Resend error ${resp.status}:`, text);
+      throw new HttpsError("internal", `Email provider error (${resp.status}). Please try again.`);
     }
     return;
   }
@@ -1829,8 +2037,8 @@ async function sendViaEmail({ to, toName, subject, body, fromEmail, fromName, re
   }
 
   const msg = {
-    personalizations: [{ to: [{ email: to, name: toName || undefined }] }],
-    from: { email: fromEmail || SYSTEM_FROM_EMAIL, name: fromName || SYSTEM_FROM_NAME },
+    personalizations: [{ to: [{ email: to, name: safeToName || undefined }] }],
+    from: { email: fromEmail || SYSTEM_FROM_EMAIL, name: displayNameSafe(fromName) || SYSTEM_FROM_NAME },
     subject,
     content: [{ type: "text/html", value: body }]
   };
@@ -1844,7 +2052,8 @@ async function sendViaEmail({ to, toName, subject, body, fromEmail, fromName, re
 
   if (!resp.ok) {
     const text = await resp.text();
-    throw new HttpsError("internal", `SendGrid error ${resp.status}: ${text}`);
+    console.error(`SendGrid error ${resp.status}:`, text);
+    throw new HttpsError("internal", `Email provider error (${resp.status}). Please try again.`);
   }
 }
 
@@ -1918,12 +2127,19 @@ async function getValidGmailAccessToken(uid) {
 }
 
 function buildRfc2822({ fromName, fromEmail, to, toName, subject, body, replyTo }) {
+  // Every header value is CR/LF-stripped: a newline in fullName or subject
+  // would otherwise inject headers (Bcc:, extra recipients) into the message.
+  fromName = displayNameSafe(fromName);
+  toName = displayNameSafe(toName);
+  fromEmail = headerSafe(fromEmail, 254);
+  to = headerSafe(to, 254);
+  replyTo = replyTo ? headerSafe(replyTo, 254) : replyTo;
   const fromHeader = fromName ? `${fromName} <${fromEmail}>` : fromEmail;
   const toHeader = toName ? `${toName} <${to}>` : to;
   const headers = [
     `From: ${fromHeader}`,
     `To: ${toHeader}`,
-    `Subject: ${subject}`,
+    `Subject: ${headerSafe(subject, 300)}`,
     "MIME-Version: 1.0",
     'Content-Type: text/html; charset="UTF-8"'
   ];
@@ -1969,9 +2185,7 @@ async function sendViaGmail({ uid, to, toName, subject, body, fromName, replyTo 
 exports.getGoogleOAuthConfig = onCall(
   { region: "us-central1", secrets: [GOOGLE_OAUTH_CLIENT_ID] },
   async (request) => {
-    if (!request.auth) {
-      throw new HttpsError("unauthenticated", "You must be signed in.");
-    }
+    await requireActiveUser(request);
     const clientId = GOOGLE_OAUTH_CLIENT_ID.value();
     if (!isLiveSecret(clientId)) {
       return { configured: false };
@@ -1984,9 +2198,7 @@ exports.getGoogleOAuthConfig = onCall(
 exports.exchangeGoogleAuthCode = onCall(
   { region: "us-central1", secrets: [GOOGLE_OAUTH_CLIENT_ID, GOOGLE_OAUTH_CLIENT_SECRET] },
   async (request) => {
-    if (!request.auth) {
-      throw new HttpsError("unauthenticated", "You must be signed in.");
-    }
+    const { uid } = await requireActiveUser(request);
     const { code, redirectUri } = request.data || {};
     if (!code || !redirectUri) {
       throw new HttpsError("invalid-argument", "code and redirectUri are required.");
@@ -2011,7 +2223,8 @@ exports.exchangeGoogleAuthCode = onCall(
     });
     if (!tokenResp.ok) {
       const text = await tokenResp.text();
-      throw new HttpsError("internal", `Google token exchange failed (${tokenResp.status}): ${text}`);
+      console.error(`exchangeGoogleAuthCode: token exchange failed (${tokenResp.status}):`, text);
+      throw new HttpsError("internal", `Google token exchange failed (${tokenResp.status}). Please try connecting again.`);
     }
     const tokens = await tokenResp.json();
     // tokens: { access_token, expires_in, refresh_token, scope, token_type, id_token }
@@ -2048,7 +2261,6 @@ exports.exchangeGoogleAuthCode = onCall(
 
     const now = Date.now();
     const expiresAt = new Date(now + (tokens.expires_in - 30) * 1000);
-    const uid = request.auth.uid;
     // Public bits (frontend-readable) on the user doc.
     // Sensitive tokens (CF-only via Firestore rules) in oauthTokens/{uid}.
     await Promise.all([
@@ -2077,10 +2289,9 @@ exports.exchangeGoogleAuthCode = onCall(
 exports.disconnectGmail = onCall(
   { region: "us-central1", secrets: [GOOGLE_OAUTH_CLIENT_ID, GOOGLE_OAUTH_CLIENT_SECRET] },
   async (request) => {
-    if (!request.auth) {
-      throw new HttpsError("unauthenticated", "You must be signed in.");
-    }
-    const uid = request.auth.uid;
+    // Signed-in is enough: a deactivated user must still be able to cut
+    // GreenDoor's access to their mailbox.
+    const uid = requireSignedIn(request);
     const tokenRef = db.doc(`oauthTokens/${uid}`);
     const userRef = db.doc(`users/${uid}`);
     const tokenSnap = await tokenRef.get();
@@ -2108,24 +2319,43 @@ exports.disconnectGmail = onCall(
   }
 );
 
+/** Offboarding / account deletion: revoke the Google grant (best effort)
+ *  and delete the stored refresh token, so a removed user's mailbox can't
+ *  keep being used. */
+async function revokeGmailAndDeleteTokens(uid) {
+  const tokenRef = db.doc(`oauthTokens/${uid}`);
+  const snap = await tokenRef.get();
+  const refreshToken = snap.exists ? snap.data()?.gmail?.refreshToken : null;
+  if (refreshToken) {
+    try {
+      await fetch(`${GOOGLE_REVOKE_URL}?token=${encodeURIComponent(refreshToken)}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" }
+      });
+    } catch (e) {
+      console.warn("revokeGmailAndDeleteTokens: revoke call failed —", e.message);
+    }
+  }
+  if (snap.exists) await tokenRef.delete();
+}
+
 /* ================================================================
    sendEmail
    ================================================================ */
 exports.sendEmail = onCall(
   { region: "us-central1", secrets: [SENDGRID_API_KEY, RESEND_API_KEY, GOOGLE_OAUTH_CLIENT_ID, GOOGLE_OAUTH_CLIENT_SECRET] },
   async (request) => {
-  if (!request.auth) {
-    throw new HttpsError("unauthenticated", "You must be signed in.");
-  }
+  const { uid, profile: userData } = await requireActiveUser(request);
 
-  const { to, toName, subject, body, clientId } = request.data || {};
-  if (!to || !subject || !body) {
+  const { to: rawTo, toName, subject, body, clientId } = request.data || {};
+  if (!rawTo || !subject || !body) {
     throw new HttpsError("invalid-argument", "to, subject, and body are required.");
   }
-
-  const uid = request.auth.uid;
-  const userSnap = await db.doc(`users/${uid}`).get();
-  const userData = userSnap.exists ? userSnap.data() : {};
+  const to = assertEmail(rawTo);
+  assertText(subject, "subject", 300);
+  assertText(body, "body", 100000);
+  if (clientId) await assertOwns("clients", clientId, uid);
+  await enforceRateLimit(uid, "outboundEmail", 200);
 
   const fromName = userData.fullName || "GreenDoor CRM";
   const replyTo = userData.email || null;
@@ -2180,9 +2410,11 @@ exports.sendEmail = onCall(
 exports.revokeEnvelope = onCall(
   { region: "us-central1", secrets: [DOCUSEAL_API_KEY, DOCUSEAL_BASE_URL] },
   async (request) => {
-    if (!request.auth) throw new HttpsError("unauthenticated", "You must be signed in.");
+    const { uid } = await requireActiveUser(request);
     const { documentId } = request.data || {};
-    if (!documentId) throw new HttpsError("invalid-argument", "documentId is required.");
+    if (!documentId || typeof documentId !== "string" || documentId.includes("/")) {
+      throw new HttpsError("invalid-argument", "documentId is required.");
+    }
 
     const envSnap = await db.collection("envelopes").doc(documentId).get();
     if (!envSnap.exists) {
@@ -2190,7 +2422,7 @@ exports.revokeEnvelope = onCall(
       return { revoked: false, reason: "no-local-record" };
     }
     const env = envSnap.data();
-    if (env.realtorId !== request.auth.uid) {
+    if (env.realtorId !== uid) {
       throw new HttpsError("permission-denied", "Not your envelope.");
     }
     if (env.status === "completed" || env.status === "signed") {
@@ -2228,14 +2460,12 @@ exports.revokeEnvelope = onCall(
 exports.resendEnvelope = onCall(
   { region: "us-central1", secrets: [DOCUSEAL_API_KEY, DOCUSEAL_BASE_URL] },
   async (request) => {
-    if (!request.auth) throw new HttpsError("unauthenticated", "You must be signed in.");
+    const { uid } = await requireActiveUser(request);
     const { documentId } = request.data || {};
     if (!documentId) throw new HttpsError("invalid-argument", "documentId is required.");
 
-    const envSnap = await db.collection("envelopes").doc(documentId).get();
-    if (!envSnap.exists) throw new HttpsError("not-found", "Envelope not found.");
+    const envSnap = await assertOwns("envelopes", documentId, uid);
     const env = envSnap.data();
-    if (env.realtorId !== request.auth.uid) throw new HttpsError("permission-denied", "Not your envelope.");
     if (env.status === "completed" || env.status === "signed") {
       throw new HttpsError("failed-precondition", "Envelope already complete — nothing to resend.");
     }
@@ -2263,29 +2493,41 @@ exports.resendEnvelope = onCall(
 exports.shareDocument = onCall(
   { region: "us-central1", secrets: [SENDGRID_API_KEY, RESEND_API_KEY, GOOGLE_OAUTH_CLIENT_ID, GOOGLE_OAUTH_CLIENT_SECRET] },
   async (request) => {
-  if (!request.auth) {
-    throw new HttpsError("unauthenticated", "You must be signed in.");
-  }
+  const { uid, profile: userData } = await requireActiveUser(request);
 
-  const { clientId, files, to, cc, subject, message } = request.data || {};
-  if (!to || !files || !files.length) {
+  const { clientId, files: rawFiles, to: rawTo, cc, subject, message } = request.data || {};
+  if (!rawTo || !Array.isArray(rawFiles) || !rawFiles.length) {
     throw new HttpsError("invalid-argument", "to and files are required.");
   }
+  const to = assertEmail(rawTo);
+  if (rawFiles.length > 25) throw new HttpsError("invalid-argument", "Share at most 25 files at a time.");
+  if (subject) assertText(subject, "subject", 300);
+  if (message) assertText(message, "message", 20000);
+  if (clientId) await assertOwns("clients", clientId, uid);
+  await enforceRateLimit(uid, "outboundEmail", 200);
 
-  const uid = request.auth.uid;
-  const userSnap = await db.doc(`users/${uid}`).get();
-  const userData = userSnap.exists ? userSnap.data() : {};
+  // Links must point at our Storage bucket, so this can't send phishing links
+  // from greendoor@stoekmedia.com.
+  const STORAGE_HOSTS = ["firebasestorage.googleapis.com", "storage.googleapis.com"];
+  const files = rawFiles.map(f => {
+    let u;
+    try { u = new URL(String(f?.downloadUrl || "")); } catch { u = null; }
+    if (!u || u.protocol !== "https:" || !STORAGE_HOSTS.includes(u.hostname)) {
+      throw new HttpsError("invalid-argument", "Only GreenDoor file links can be shared.");
+    }
+    return { downloadUrl: u.toString(), fileName: String(f.fileName || "Document").slice(0, 200) };
+  });
 
   const fromName = userData.fullName || "GreenDoor CRM";
   const replyTo = userData.email || null;
 
   // Build HTML body with file links
   const fileLinks = files.map(f =>
-    `<p><a href="${f.downloadUrl}">${f.fileName}</a></p>`
+    `<p><a href="${escapeHtml(f.downloadUrl)}">${escapeHtml(f.fileName)}</a></p>`
   ).join("");
 
   const htmlBody = `
-    <p>${(message || "").replace(/\n/g, "<br>")}</p>
+    <p>${escapeHtml(message || "").replace(/\n/g, "<br>")}</p>
     <hr>
     <p><strong>Shared documents:</strong></p>
     ${fileLinks}
@@ -2336,48 +2578,64 @@ exports.shareDocument = onCall(
    to that path, so the client-side deleteClient flow calls this to finish
    the job (admin SDK bypasses rules).
    ================================================================ */
+// The callable used to delete clients/{anyId}/ for any signed-in caller (the
+// ownership hint was optional and caller-supplied). The sweep now runs in the
+// cleanupClientStorageOnDelete trigger below, which only fires after rules
+// allowed the owner (or an admin) to delete the client doc. The callable stays
+// as a no-op so the deployed web/iOS clients that still call it don't error.
 exports.cleanupClientStorage = onCall({ region: "us-central1" }, async (request) => {
-  if (!request.auth) throw new HttpsError("unauthenticated", "You must be signed in.");
-  const { clientId, expectedRealtorId } = request.data || {};
-  if (!clientId) throw new HttpsError("invalid-argument", "clientId is required.");
-
-  // The caller asserts they used to own this client. We can't verify against a
-  // deleted doc, so we trust the request only if the caller's uid matches the
-  // expectedRealtorId they pass in. The caller is the deleter; this is the
-  // best we can do once the client doc is gone.
-  if (expectedRealtorId && expectedRealtorId !== request.auth.uid) {
-    throw new HttpsError("permission-denied", "Realtor mismatch.");
+  const { uid } = await requireActiveUser(request);
+  const { clientId } = request.data || {};
+  if (!clientId || typeof clientId !== "string" || clientId.includes("/")) {
+    throw new HttpsError("invalid-argument", "clientId is required.");
   }
-
-  const bucket = getStorage().bucket();
-  try {
-    await bucket.deleteFiles({ prefix: `clients/${clientId}/` });
-  } catch (err) {
-    console.error("cleanupClientStorage failed:", err);
-    throw new HttpsError("internal", "Cleanup failed.");
+  const snap = await db.doc(`clients/${clientId}`).get();
+  if (snap.exists) {
+    if (snap.get("realtorId") !== uid) throw new HttpsError("not-found", "Not found.");
+    throw new HttpsError("failed-precondition", "Delete the client first.");
   }
-
-  return { success: true };
+  return { success: true, handledBy: "cleanupClientStorageOnDelete" };
 });
+
+exports.cleanupClientStorageOnDelete = onDocumentDeleted(
+  { document: "clients/{clientId}", region: "us-central1" },
+  async (event) => {
+    const { clientId } = event.params;
+    try {
+      await getStorage().bucket().deleteFiles({ prefix: `clients/${clientId}/` });
+    } catch (err) {
+      console.error(`cleanupClientStorageOnDelete failed for ${clientId}:`, err);
+    }
+  }
+);
 
 /* ================================================================
    getFileSignedUrl — mint fresh short-lived URL for a file record.
    Used for closing-doc downloads so we can keep stored URLs short.
    ================================================================ */
 exports.getFileSignedUrl = onCall({ region: "us-central1" }, async (request) => {
-  if (!request.auth) throw new HttpsError("unauthenticated", "You must be signed in.");
+  const { uid } = await requireActiveUser(request);
   const { fileId } = request.data || {};
   if (!fileId) throw new HttpsError("invalid-argument", "fileId is required.");
 
-  const snap = await db.doc(`files/${fileId}`).get();
-  if (!snap.exists) throw new HttpsError("not-found", "File not found.");
-  const data = snap.data();
-  if (data.realtorId !== request.auth.uid) {
-    throw new HttpsError("permission-denied", "You can only access your own files.");
-  }
-  if (!data.storagePath) throw new HttpsError("failed-precondition", "File has no storage path.");
+  const data = (await assertOwns("files", fileId, uid)).data();
+  const storagePath = String(data.storagePath || "");
+  if (!storagePath) throw new HttpsError("failed-precondition", "File has no storage path.");
 
-  const [url] = await getStorage().bucket().file(data.storagePath).getSignedUrl({
+  // files.storagePath is client-written, so it must point inside the caller's
+  // own Storage area: files/{uid}/..., or clients/{clientId}/... for a client
+  // they own (signed closing documents). Otherwise this would mint a signed
+  // URL for any object in the bucket, bypassing storage.rules. (GCS object
+  // names are literal; "../" is never resolved, so a prefix check suffices.)
+  const segments = storagePath.split("/");
+  let allowed = segments[0] === "files" && segments[1] === uid;
+  if (!allowed && segments[0] === "clients" && segments.length > 2) {
+    const clientSnap = await db.doc(`clients/${segments[1]}`).get();
+    allowed = clientSnap.exists && clientSnap.get("realtorId") === uid;
+  }
+  if (!allowed) throw new HttpsError("permission-denied", "You can only access your own files.");
+
+  const [url] = await getStorage().bucket().file(storagePath).getSignedUrl({
     action: "read",
     expires: Date.now() + 15 * 60 * 1000 // 15 minutes
   });
@@ -2388,48 +2646,19 @@ exports.getFileSignedUrl = onCall({ region: "us-central1" }, async (request) => 
    parseListingUrl
    ================================================================ */
 exports.parseListingUrl = onCall({ region: "us-central1", secrets: [ANTHROPIC_API_KEY, GROQ_API_KEY] }, async (request) => {
-  if (!request.auth) {
-    throw new HttpsError("unauthenticated", "You must be signed in.");
-  }
+  const { uid } = await requireActiveUser(request);
 
   const { url } = request.data || {};
   if (!url) {
     throw new HttpsError("invalid-argument", "url is required.");
   }
 
-  await enforceRateLimit(request.auth.uid, "parseListingUrl", 50);
+  await enforceRateLimit(uid, "parseListingUrl", 50);
 
-  // SSRF guard: only http(s), reject loopback / link-local / private IPs
-  let parsed;
-  try {
-    parsed = new URL(url);
-  } catch {
-    throw new HttpsError("invalid-argument", "Invalid URL.");
-  }
-  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-    throw new HttpsError("invalid-argument", "Only http(s) URLs are allowed.");
-  }
-  const host = parsed.hostname.toLowerCase();
-  if (isPrivateHost(host)) {
-    throw new HttpsError("invalid-argument", "URL host is not allowed.");
-  }
-
-  // DNS-rebinding defense: resolve hostname, reject if any returned IP is private.
-  // (The literal-IP regex above only catches IPs typed directly into the URL.)
-  if (!/^\d+\.\d+\.\d+\.\d+$/.test(host) && host !== "::1" && !host.includes(":")) {
-    try {
-      const dns = require("dns").promises;
-      const addrs = await dns.lookup(host, { all: true });
-      for (const a of addrs) {
-        if (isPrivateHost(a.address.toLowerCase())) {
-          throw new HttpsError("invalid-argument", "URL host resolves to a private network.");
-        }
-      }
-    } catch (err) {
-      if (err instanceof HttpsError) throw err;
-      throw new HttpsError("invalid-argument", "Could not resolve URL host.");
-    }
-  }
+  // SSRF guard: only http(s) on default ports; rejects private/link-local
+  // hosts (incl. IPv4-mapped IPv6 literals) and names that resolve to them.
+  // The fetch below uses redirect: "error", so no hop can escape the check.
+  const parsed = await assertPublicUrl(url, ["http:", "https:"]);
 
   // Fetch the listing page (10s timeout, 2 MB cap)
   let html;
@@ -2535,11 +2764,7 @@ exports.parseListingUrl = onCall({ region: "us-central1", secrets: [ANTHROPIC_AP
    seedEmailTemplates
    ================================================================ */
 exports.seedEmailTemplates = onCall({ region: "us-central1" }, async (request) => {
-  if (!request.auth) {
-    throw new HttpsError("unauthenticated", "You must be signed in.");
-  }
-
-  const uid = request.auth.uid;
+  const { uid } = await requireActiveUser(request);
 
   // Check if templates already exist for this user
   const existing = await db.collection("emailTemplates")
@@ -2577,17 +2802,7 @@ exports.seedEmailTemplates = onCall({ region: "us-central1" }, async (request) =
 });
 
 exports.requestSenderVerification = onCall({ region: "us-central1", secrets: [SENDGRID_API_KEY, RESEND_API_KEY] }, async (request) => {
-  if (!request.auth) {
-    throw new HttpsError("unauthenticated", "You must be signed in.");
-  }
-
-  const uid = request.auth.uid;
-  const userSnap = await db.doc(`users/${uid}`).get();
-  if (!userSnap.exists) {
-    throw new HttpsError("not-found", "User profile not found.");
-  }
-
-  const userData = userSnap.data();
+  const { uid, profile: userData } = await requireActiveUser(request);
   if (userData.senderVerified) {
     return { alreadyVerified: true };
   }
@@ -2649,17 +2864,7 @@ exports.requestSenderVerification = onCall({ region: "us-central1", secrets: [SE
    checkSenderVerification
    ================================================================ */
 exports.checkSenderVerification = onCall({ region: "us-central1", secrets: [SENDGRID_API_KEY, RESEND_API_KEY] }, async (request) => {
-  if (!request.auth) {
-    throw new HttpsError("unauthenticated", "You must be signed in.");
-  }
-
-  const uid = request.auth.uid;
-  const userSnap = await db.doc(`users/${uid}`).get();
-  if (!userSnap.exists) {
-    throw new HttpsError("not-found", "User profile not found.");
-  }
-
-  const userData = userSnap.data();
+  const { uid, profile: userData } = await requireActiveUser(request);
   if (userData.senderVerified) {
     return { verified: true };
   }
@@ -2700,17 +2905,7 @@ exports.checkSenderVerification = onCall({ region: "us-central1", secrets: [SEND
    removeSenderVerification
    ================================================================ */
 exports.removeSenderVerification = onCall({ region: "us-central1", secrets: [SENDGRID_API_KEY, RESEND_API_KEY] }, async (request) => {
-  if (!request.auth) {
-    throw new HttpsError("unauthenticated", "You must be signed in.");
-  }
-
-  const uid = request.auth.uid;
-  const userSnap = await db.doc(`users/${uid}`).get();
-  if (!userSnap.exists) {
-    throw new HttpsError("not-found", "User profile not found.");
-  }
-
-  const userData = userSnap.data();
+  const { uid, profile: userData } = await requireActiveUser(request);
   const senderId = userData.sendgridSenderId;
 
   if (senderId) {
@@ -2908,15 +3103,26 @@ exports.offboardRealtor = onCall({ region: "us-central1", timeoutSeconds: 540, m
   if (options?.disableAuth) {
     try {
       await getAuth().updateUser(targetUid, { disabled: true });
+      // Disabling alone leaves existing sessions' refresh tokens usable
+      // until they next refresh; revoke them now.
+      await getAuth().revokeRefreshTokens(targetUid);
     } catch (err) {
       console.error("Failed to disable auth:", err);
     }
   }
 
+  // An offboarded realtor's Gmail must stop being reachable through GreenDoor.
+  try {
+    await revokeGmailAndDeleteTokens(targetUid);
+  } catch (err) {
+    console.error("Failed to revoke Gmail tokens:", err);
+  }
+
   // Mark user as offboarded
   await db.doc(`users/${targetUid}`).update({
     isActive: false,
-    offboardedAt: FieldValue.serverTimestamp()
+    offboardedAt: FieldValue.serverTimestamp(),
+    gmailOAuth: FieldValue.delete()
   });
 
   return { success: true };
@@ -2930,13 +3136,18 @@ exports.offboardRealtor = onCall({ region: "us-central1", timeoutSeconds: 540, m
  * createSequence — create a new follow-up sequence template
  */
 exports.createSequence = onCall({ region: "us-central1" }, async (request) => {
-  if (!request.auth) throw new HttpsError("unauthenticated", "You must be signed in.");
-  const { name, steps } = request.data || {};
-  if (!name || !steps || !steps.length) {
-    throw new HttpsError("invalid-argument", "name and steps[] are required.");
+  const { uid } = await requireActiveUser(request);
+  const { name, steps: rawSteps } = request.data || {};
+  if (!name || !Array.isArray(rawSteps) || !rawSteps.length || rawSteps.length > 20) {
+    throw new HttpsError("invalid-argument", "name and 1-20 steps are required.");
   }
+  assertText(name, "name", 200);
+  const steps = rawSteps.map(s => ({
+    delayDays: Math.max(0, Math.min(365, Math.floor(Number(s?.delayDays) || 0))),
+    subject: assertText(s?.subject ?? "", "step subject", 300),
+    body: assertText(s?.body ?? "", "step body", 20000)
+  }));
 
-  const uid = request.auth.uid;
   const ref = await db.collection("followUpSequences").add({
     realtorId: uid,
     name,
@@ -2952,19 +3163,16 @@ exports.createSequence = onCall({ region: "us-central1" }, async (request) => {
  * enrollClientInSequence — start a client on a drip sequence
  */
 exports.enrollClientInSequence = onCall({ region: "us-central1" }, async (request) => {
-  if (!request.auth) throw new HttpsError("unauthenticated", "You must be signed in.");
+  const { uid } = await requireActiveUser(request);
   const { clientId, sequenceId } = request.data || {};
   if (!clientId || !sequenceId) {
     throw new HttpsError("invalid-argument", "clientId and sequenceId are required.");
   }
 
-  const uid = request.auth.uid;
-
-  // Verify sequence belongs to user
-  const seqSnap = await db.doc(`followUpSequences/${sequenceId}`).get();
-  if (!seqSnap.exists || seqSnap.data().realtorId !== uid) {
-    throw new HttpsError("not-found", "Sequence not found.");
-  }
+  // Both the sequence AND the client must belong to the caller; otherwise
+  // processSequences would email another realtor's client.
+  const seqSnap = await assertOwns("followUpSequences", sequenceId, uid);
+  await assertOwns("clients", clientId, uid);
 
   // Check if client already enrolled in this sequence
   const existing = await db.collection("sequenceEnrollments")
@@ -2998,16 +3206,11 @@ exports.enrollClientInSequence = onCall({ region: "us-central1" }, async (reques
  * cancelSequenceEnrollment — stop a client's drip sequence
  */
 exports.cancelSequenceEnrollment = onCall({ region: "us-central1" }, async (request) => {
-  if (!request.auth) throw new HttpsError("unauthenticated", "You must be signed in.");
+  const { uid } = await requireActiveUser(request);
   const { enrollmentId } = request.data || {};
   if (!enrollmentId) throw new HttpsError("invalid-argument", "enrollmentId is required.");
 
-  const enrollmentRef = db.doc(`sequenceEnrollments/${enrollmentId}`);
-  const snap = await enrollmentRef.get();
-  if (!snap.exists) throw new HttpsError("not-found", "Enrollment not found.");
-  if (snap.data().realtorId !== request.auth.uid) {
-    throw new HttpsError("permission-denied", "You can only cancel your own enrollments.");
-  }
+  const { ref: enrollmentRef } = await assertOwns("sequenceEnrollments", enrollmentId, uid);
 
   await enrollmentRef.update({
     status: "cancelled",
@@ -3082,7 +3285,13 @@ exports.processSequences = onSchedule(
         // Load client + realtor data
         const clientSnap = await db.doc(`clients/${clientId}`).get();
         const userSnap = await db.doc(`users/${realtorId}`).get();
-        if (!clientSnap.exists || !userSnap.exists) {
+        // Re-check ownership at send time: enrollments created before
+        // enrollClientInSequence verified the client (or a client reassigned
+        // since) must not email someone else's client. Deactivated realtors'
+        // drips stop too.
+        if (!clientSnap.exists || !userSnap.exists ||
+            clientSnap.get("realtorId") !== realtorId || seqSnap.get("realtorId") !== realtorId ||
+            userSnap.get("isActive") === false) {
           await enrollDoc.ref.update({ status: "cancelled" });
           continue;
         }
@@ -3091,9 +3300,10 @@ exports.processSequences = onSchedule(
         const user = userSnap.data();
         const step = steps[currentStep];
 
-        // Resolve merge tags
-        const subject = resolveMergeTags(step.subject, client, user);
-        const body = resolveMergeTags(step.body, client, user);
+        // Resolve merge tags (escaped for the HTML body)
+        const subject = resolveMergeTags(step.subject || "", client, user);
+        const body = resolveMergeTags(step.body || "", client, user);
+        const htmlBody = resolveMergeTags(escapeHtml(step.body || ""), client, user, escapeHtml);
 
         // Send email
         const fromEmail = user.senderVerified ? user.email : "greendoor@stoekmedia.com";
@@ -3104,7 +3314,7 @@ exports.processSequences = onSchedule(
           to: client.email,
           toName: client.fullName,
           subject,
-          body: body.replace(/\n/g, "<br>"),
+          body: htmlBody.replace(/\n/g, "<br>"),
           fromEmail,
           fromName,
           replyTo
@@ -3149,17 +3359,22 @@ exports.processSequences = onSchedule(
   }
 );
 
-/** Resolve {{clientName}}, {{realtorName}}, etc. in templates */
-function resolveMergeTags(text, client, user) {
-  return text
-    .replace(/\{\{clientName\}\}/g, client.fullName || "there")
-    .replace(/\{\{clientFirstName\}\}/g, (client.fullName || "").split(" ")[0] || "there")
-    .replace(/\{\{clientEmail\}\}/g, client.email || "")
-    .replace(/\{\{clientPhone\}\}/g, client.phone || "")
-    .replace(/\{\{realtorName\}\}/g, user.fullName || "Your Agent")
-    .replace(/\{\{realtorEmail\}\}/g, user.email || "")
-    .replace(/\{\{realtorPhone\}\}/g, user.phone || "")
-    .replace(/\{\{realtorCompany\}\}/g, user.company || "");
+/** Resolve {{clientName}}, {{realtorName}}, etc. in templates.
+ *  `encode` is applied to each value (escapeHtml for HTML bodies). Function
+ *  replacements keep "$&"-style patterns in names from expanding. */
+function resolveMergeTags(text, client, user, encode = (v) => v) {
+  const tags = {
+    clientName: client.fullName || "there",
+    clientFirstName: (client.fullName || "").split(" ")[0] || "there",
+    clientEmail: client.email || "",
+    clientPhone: client.phone || "",
+    realtorName: user.fullName || "Your Agent",
+    realtorEmail: user.email || "",
+    realtorPhone: user.phone || "",
+    realtorCompany: user.company || ""
+  };
+  return String(text).replace(/\{\{(\w+)\}\}/g, (m, key) =>
+    Object.prototype.hasOwnProperty.call(tags, key) ? encode(String(tags[key])) : m);
 }
 
 /* ================================================================
@@ -3173,8 +3388,8 @@ function resolveMergeTags(text, client, user) {
  */
 exports.calendarFeed = onRequest({ region: "us-central1" }, async (req, res) => {
   const token = req.query.token;
-  if (!token) {
-    res.status(400).send("Missing token parameter.");
+  if (typeof token !== "string" || !/^[0-9a-f]{48}$/.test(token)) {
+    res.status(400).send("Missing or malformed token parameter.");
     return;
   }
 
@@ -3188,6 +3403,10 @@ exports.calendarFeed = onRequest({ region: "us-central1" }, async (req, res) => 
   const userDoc = usersSnap.docs[0];
   const uid = userDoc.id;
   const userData = userDoc.data();
+  if (userData.isActive === false) {
+    res.status(404).send("Invalid feed token.");
+    return;
+  }
 
   // Load events
   const eventsSnap = await db.collection("events").where("realtorId", "==", uid).get();
@@ -3201,7 +3420,7 @@ exports.calendarFeed = onRequest({ region: "us-central1" }, async (req, res) => 
     "PRODID:-//GreenDoor CRM//Calendar Feed//EN",
     "CALSCALE:GREGORIAN",
     "METHOD:PUBLISH",
-    `X-WR-CALNAME:GreenDoor - ${userData.fullName || "Agent"}`,
+    `X-WR-CALNAME:GreenDoor - ${escapeICal(userData.fullName || "Agent")}`,
     "X-WR-TIMEZONE:America/Chicago"
   ];
 
@@ -3253,18 +3472,18 @@ exports.calendarFeed = onRequest({ region: "us-central1" }, async (req, res) => 
 
   res.set("Content-Type", "text/calendar; charset=utf-8");
   res.set("Content-Disposition", "inline; filename=greendoor-calendar.ics");
-  res.set("Cache-Control", "public, max-age=300"); // 5-min cache
+  // Client PII: never let a shared cache/CDN keep a copy.
+  res.set("Cache-Control", "private, no-store");
   res.send(lines.join("\r\n"));
 });
 
 /** Generate or get the user's calendar feed token */
 exports.getCalendarFeedUrl = onCall({ region: "us-central1" }, async (request) => {
-  if (!request.auth) throw new HttpsError("unauthenticated", "You must be signed in.");
-  const uid = request.auth.uid;
+  const { uid, profile } = await requireActiveUser(request);
   const userRef = db.doc(`users/${uid}`);
-  const userSnap = await userRef.get();
 
-  let token = userSnap.data()?.calendarFeedToken;
+  // { rotate: true } issues a new token, killing any leaked subscription URL.
+  let token = request.data?.rotate === true ? null : profile.calendarFeedToken;
   if (!token) {
     token = crypto.randomBytes(24).toString("hex");
     await userRef.update({ calendarFeedToken: token });
@@ -3279,7 +3498,7 @@ function formatICalDate(date) {
 }
 
 function escapeICal(str) {
-  return (str || "").replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\n/g, "\\n");
+  return String(str || "").replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\r?\n|\r/g, "\\n");
 }
 
 /* ================================================================
@@ -3295,10 +3514,22 @@ const TWILIO_PHONE_NUMBER = defineSecret("TWILIO_PHONE_NUMBER");
 exports.sendSMS = onCall(
   { region: "us-central1", secrets: [TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER] },
   async (request) => {
-    if (!request.auth) throw new HttpsError("unauthenticated", "You must be signed in.");
+    const { uid } = await requireActiveUser(request);
 
+    // The recipient is never taken from the browser: it's the phone number on
+    // a client the caller owns. US/Canada (+1) only, to block SMS-pumping
+    // toll fraud; Twilio Geo Permissions should say the same.
     const { to, body, clientId } = request.data || {};
-    if (!to || !body) throw new HttpsError("invalid-argument", "to and body are required.");
+    if (!clientId || !body) throw new HttpsError("invalid-argument", "clientId and body are required.");
+    assertText(body, "body", 1000);
+    const clientSnap = await assertOwns("clients", clientId, uid);
+    const digits = String(clientSnap.get("phone") || "").replace(/\D/g, "");
+    const phone = digits.length === 10 ? `+1${digits}` : (digits.length === 11 && digits[0] === "1" ? `+${digits}` : null);
+    if (!phone) throw new HttpsError("failed-precondition", "This client has no valid US phone number.");
+    if (to && String(to).replace(/\D/g, "").slice(-10) !== phone.slice(-10)) {
+      throw new HttpsError("invalid-argument", "SMS can only be sent to the client's phone number on file.");
+    }
+    await enforceRateLimit(uid, "sendSMS", 50);
 
     const sid = TWILIO_ACCOUNT_SID.value();
     const token = TWILIO_AUTH_TOKEN.value();
@@ -3307,10 +3538,6 @@ exports.sendSMS = onCall(
     if (!sid || !token || !from) {
       throw new HttpsError("failed-precondition", "Twilio is not configured. Add TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_PHONE_NUMBER to Firebase secrets.");
     }
-
-    // Clean phone number
-    let phone = to.replace(/[^0-9+]/g, "");
-    if (!phone.startsWith("+")) phone = "+1" + phone;
 
     try {
       const resp = await fetch(
@@ -3331,12 +3558,11 @@ exports.sendSMS = onCall(
       }
 
       // Log activity
-      const uid = request.auth.uid;
       await db.collection("activities").add({
         type: "sms",
-        subject: `SMS to ${to}`,
+        subject: `SMS to ${phone}`,
         body,
-        clientId: clientId || null,
+        clientId,
         realtorId: uid,
         twilioSid: result.sid,
         timestamp: FieldValue.serverTimestamp()
@@ -3356,8 +3582,9 @@ exports.sendSMS = onCall(
    their storage files, their user record, and the auth account.
    ============================================================ */
 exports.deleteAccount = onCall(async (request) => {
-  if (!request.auth) throw new HttpsError("unauthenticated", "You must be signed in.");
-  const uid = request.auth.uid;
+  // Signed-in only (no profile/active check): deleting your own account must
+  // always work, and every query below is scoped to the caller's uid.
+  const uid = requireSignedIn(request);
   const db = getFirestore();
 
   const COLLECTIONS = [
@@ -3383,14 +3610,24 @@ exports.deleteAccount = onCall(async (request) => {
     }
   }
 
+  // Gmail grant + stored refresh token, and the server-side quota doc.
+  try {
+    await revokeGmailAndDeleteTokens(uid);
+  } catch (e) {
+    console.error("oauth token cleanup:", e.message);
+  }
+  await db.doc(`rateLimits/${uid}`).delete().catch(() => {});
+
   // User record incl. any subcollections
   await db.recursiveDelete(db.collection("users").doc(uid));
 
-  // Uploaded files
-  try {
-    await getStorage().bucket().deleteFiles({ prefix: `files/${uid}/` });
-  } catch (e) {
-    console.error("storage cleanup:", e.message);
+  // Uploaded files: documents, templates, Studio/signature images
+  for (const prefix of [`files/${uid}/`, `templates/${uid}/`, `users/${uid}/`]) {
+    try {
+      await getStorage().bucket().deleteFiles({ prefix });
+    } catch (e) {
+      console.error(`storage cleanup (${prefix}):`, e.message);
+    }
   }
 
   // Auth account last — after this the client session is dead.
