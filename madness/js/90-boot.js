@@ -1,10 +1,10 @@
 /* ── Boot ── */
 const params = new URLSearchParams(window.location.search);
-const urlRoom = params.get("room");
+const urlRoom = parseRoomCode(params.get("room")); // null for anything createRoom() could not have made => lobby
 const tabParam = params.get("tab");
 
 if(urlRoom){
-  roomId = urlRoom.toUpperCase();
+  roomId = urlRoom;
   loadState();
   if(!S.bracket) S.bracket = {South:Array(15).fill(null), East:Array(15).fill(null), Midwest:Array(15).fill(null), West:Array(15).fill(null), ff:Array(3).fill(null)};
   if(!S.bracketRegion) S.bracketRegion = "South";

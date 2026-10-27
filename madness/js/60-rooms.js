@@ -64,8 +64,10 @@ async function createRoom(){
 }
 
 function joinRoom(){
-  const code = document.getElementById("room-code").value.trim().toUpperCase();
-  if(!code) return;
+  const raw = document.getElementById("room-code").value.trim();
+  if(!raw) return;
+  const code = roomCodeFromInput(raw);
+  if(!code){ showToast('Room code must be 2-20 letters or numbers'); return; }
   roomId = code;
   const url = new URL(window.location);
   url.searchParams.set("room", code);
@@ -114,20 +116,23 @@ function _applyRoomSnapshot(doc){
 function getRecentRooms(){
   try {
     const rooms = JSON.parse(localStorage.getItem('mm4_rooms') || '[]');
-    return rooms.filter(r => r && r.code).slice(0, 5);
+    return rooms.filter(r => r && isValidRoomCode(r.code)).slice(0, 5);
   } catch(e){ return []; }
 }
 
 function saveRecentRoom(code){
+  if(!isValidRoomCode(code)) return;
   try {
     let rooms = JSON.parse(localStorage.getItem('mm4_rooms') || '[]');
-    rooms = rooms.filter(r => r.code !== code);
+    rooms = rooms.filter(r => r && isValidRoomCode(r.code) && r.code !== code);
     rooms.unshift({ code, ts: Date.now() });
     localStorage.setItem('mm4_rooms', JSON.stringify(rooms.slice(0, 10)));
   } catch(e){}
 }
 
 function rejoinRoom(code){
+  code = parseRoomCode(code);
+  if(!code) return;
   roomId = code;
   const url = new URL(window.location);
   url.searchParams.set("room", code);
@@ -148,7 +153,7 @@ function renderLobby(){
         <h3>Your Tournaments</h3>
         <p>Rejoin a tournament you've been in.</p>
         <div style="display:flex;flex-direction:column;gap:6px">
-          ${recent.map(r => `<button class="btn btn-primary" style="width:100%;justify-content:center" onclick="rejoinRoom('${escapeHtml(r.code)}')">${escapeHtml(r.code)}</button>`).join('')}
+          ${recent.map(r => `<button class="btn btn-primary" style="width:100%;justify-content:center" data-room="${escapeHtml(r.code)}" onclick="rejoinRoom(this.dataset.room)">${escapeHtml(r.code)}</button>`).join('')}
         </div>
       </div>
       <div class="lobby-or">\u2014 or \u2014</div>` : ''}

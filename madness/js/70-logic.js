@@ -2,6 +2,16 @@
 function seedClass(s){ return s <= 4 ? "seed-top" : s <= 8 ? "seed-mid" : "seed-low"; }
 function seedBadge(s){ return `<span class="seed-badge ${seedClass(s)}">${escapeHtml(s == null ? '' : s)}</span>`; }
 function escapeHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+/* Room codes are Firestore doc ids that end up in HTML, URLs and localStorage keys, and they arrive
+ * from outside: ?room=, the Join box, the recent-rooms list in localStorage. createRoom() has only
+ * ever made 2-20 upper-case letters/digits (the very first codes were 6 random base-36 chars), so
+ * anything else is refused. Upper-casing alone is not enough: ?room=&#X3C;... survives it. */
+const ROOM_CODE_RE = /^[A-Z0-9]{2,20}$/;
+function isValidRoomCode(code){ return typeof code === 'string' && ROOM_CODE_RE.test(code); }
+// ?room= and localStorage: upper-cased as before, then the code itself or null.
+function parseRoomCode(raw){ const c = typeof raw === 'string' ? raw.trim().toUpperCase() : ''; return isValidRoomCode(c) ? c : null; }
+// Join box: the same normalisation createRoom() applies to a typed name, so "My Pool 2027" finds MYPOOL2027.
+function roomCodeFromInput(raw){ return parseRoomCode(String(raw == null ? '' : raw).toUpperCase().replace(/[^A-Z0-9]/g,'')); }
 function owner(tid){ const pl = S.players.find(p => p.teamIds.includes(tid)); return pl ? pl.name : ""; }
 
 function teamDisplayName(t) {
