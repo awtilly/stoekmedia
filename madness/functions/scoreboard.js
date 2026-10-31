@@ -13,7 +13,7 @@
 const { onSchedule } = require('firebase-functions/v2/scheduler');
 const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 const { parseScoreboardEvents } = require('./espn-parse');
-const { TZ, shouldPoll, datesToPoll, scoreboardUrl, buildDoc } = require('./scoreboard-logic');
+const { TZ, FETCH_HEADERS, shouldPoll, datesToPoll, scoreboardUrl, buildDoc } = require('./scoreboard-logic');
 
 exports.pollScoreboard = onSchedule({
   schedule: 'every 1 minutes',
@@ -31,9 +31,7 @@ exports.pollScoreboard = onSchedule({
   for (const ymd of datesToPoll(now)) {
     let data;
     try {
-      const r = await fetch(scoreboardUrl(ymd), {
-        headers: { 'User-Agent': 'madness-scoreboard-cache/1 (+https://stoekmedia.com/madness)' }
-      });
+      const r = await fetch(scoreboardUrl(ymd), { headers: FETCH_HEADERS });
       if (!r.ok) { console.warn(`ESPN ${ymd} responded ${r.status}`); continue; }
       data = await r.json();
     } catch (err) {

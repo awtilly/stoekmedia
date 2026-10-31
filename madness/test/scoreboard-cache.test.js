@@ -151,6 +151,10 @@ test('scoreboard-logic: document shape and ESPN URL', () => {
   assert.equal(doc.eventCount, 1);
   assert.equal(doc.fetchedAt, 'SERVER_TS');
   assert.equal(logic.scoreboardUrl('20270318'), 'https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/scoreboard?dates=20270318&limit=200');
+  // ESPN's edge returns 403 to a User-Agent that carries a URL or comment, so the header must stay a bare product token.
+  const ua = logic.FETCH_HEADERS['User-Agent'];
+  assert.equal(typeof ua, 'string');
+  assert.ok(ua.length > 0 && !/[ (+;]/.test(ua) && !ua.includes('http'), `User-Agent must be a bare token, got ${ua}`);
 });
 
 test('scoreboard-logic: buildDoc strips the undefined fields pre-game ESPN events produce (Firestore rejects them)', () => {

@@ -1,10 +1,22 @@
 /* ── Boot ── */
 const params = new URLSearchParams(window.location.search);
-const urlRoom = params.get("room");
 const tabParam = params.get("tab");
+let urlRoom = sanitizeRoomCode(params.get("room")); // "" (falsy) for junk => lobby
+
+// Home-screen shortcuts (manifest.json) open ./?tab=... with no room param.
+// Fall back to the most recently used room so they land in the right tournament.
+if(!urlRoom && tabParam){
+  const recent = getRecentRooms()[0];
+  if(recent) urlRoom = sanitizeRoomCode(recent.code);
+}
 
 if(urlRoom){
-  roomId = urlRoom.toUpperCase();
+  roomId = urlRoom;
+  if(!params.get("room")){
+    const url = new URL(window.location);
+    url.searchParams.set("room", roomId);
+    window.history.replaceState({}, "", url);
+  }
   loadState();
   if(!S.bracket) S.bracket = {South:Array(15).fill(null), East:Array(15).fill(null), Midwest:Array(15).fill(null), West:Array(15).fill(null), ff:Array(3).fill(null)};
   if(!S.bracketRegion) S.bracketRegion = "South";
@@ -18,7 +30,11 @@ if(urlRoom){
   render();
 } else {
   if (tabParam === 'live') {
+    // No room known at all: render the app shell first, otherwise refreshLiveScores()
+    // finds no #c element and the page stays blank.
+    loadState();
     S.phase = 'live';
+    render();
     startLiveRefresh();
   } else {
     renderLobby();
