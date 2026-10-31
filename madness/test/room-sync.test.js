@@ -70,9 +70,9 @@ test('existing room with no state field is ignored', () => {
 
 test('forgetRecentRoom tolerates garbage in storage and keeps the others', () => {
   const app = roomApp();
-  app.localStorage.setItem('mm4_rooms', '[{"code":"A"},null,{"code":"B"}]');
-  app.forgetRecentRoom('A');
-  assert.deepEqual(app.getRecentRooms().map(r => r.code), ['B']);
+  app.localStorage.setItem('mm4_rooms', '[{"code":"ABCD"},null,{"code":"EFGH"}]');
+  app.forgetRecentRoom('ABCD');
+  assert.deepEqual(app.getRecentRooms().map(r => r.code), ['EFGH']); // real-shaped codes: sanitize-room-code drops 1-char ones
   app.localStorage.setItem('mm4_rooms', 'not json');
-  app.forgetRecentRoom('B'); // must not throw
+  app.forgetRecentRoom('EFGH'); // must not throw
 });
