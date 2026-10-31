@@ -3,14 +3,20 @@ const VIEW_LOCAL = ['phase','bracketRegion','fr','fs','liveScoresDate','liveScor
 
 let _isRemoteUpdate = false;
 let _firestoreWriteTimer = null;
+// Serialized shared state as last written to, or applied from, Firestore. A snapshot carrying the
+// same string has nothing new (it is the echo of our own write, or a metadata-only change), so
+// _applyRoomSnapshot skips the JSON.parse + full render for it.
+let _lastSyncedState = null;
 function _debouncedFirestoreWrite(){
   clearTimeout(_firestoreWriteTimer);
   _firestoreWriteTimer = setTimeout(() => {
     if(!roomId || _isRemoteUpdate) return;
     const shared = {};
     for(const k in S){ if(!VIEW_LOCAL.includes(k)) shared[k] = S[k]; }
+    const json = JSON.stringify(shared);
+    _lastSyncedState = json;
     db.collection("rooms").doc(roomId).set({
-      state: JSON.stringify(shared),
+      state: json,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     }, {merge: true}).catch(e => {
       console.warn("Firestore write error:", e);
@@ -102,6 +108,7 @@ function connectToRoom(code){
   if(unsubRoom) unsubRoom();
   saveRecentRoom(code);
   const gen = ++_roomGeneration;
+  _lastSyncedState = null; // never let the previous room's string suppress this room's first snapshot
   unsubRoom = db.collection("rooms").doc(code).onSnapshot(doc => {
     if(gen !== _roomGeneration) return; // stale listener
     // A pick transaction is currently writing — drop this snapshot.
@@ -128,6 +135,10 @@ function _applyRoomSnapshot(doc){
   }
   const data = doc.data();
   if(!data || !data.state) return;
+  // Firestore delivers our own write back twice (latency-compensated, then server-acked with the
+  // real updatedAt). Both carry the exact string we wrote, so neither needs a parse or a redraw.
+  if(data.state === _lastSyncedState) return;
+  _lastSyncedState = data.state;
   _isRemoteUpdate = true;
   const local = {};
   for(const k of VIEW_LOCAL) local[k] = S[k];
