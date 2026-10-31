@@ -98,7 +98,26 @@ async function requireAdmin(){
     const pin = await appPrompt("This room has no admin PIN yet.\nSet a 4-digit PIN to protect editing:", { title: 'Set Admin PIN', placeholder: '4-digit PIN' });
     if(!pin || !/^\d{4}$/.test(pin.trim())){ await appAlert("PIN must be exactly 4 digits."); return false; }
     const hashed = await hashPin(pin.trim());
-    await db.collection("rooms").doc(roomId).set({ adminPin: hashed, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+    // Two devices can both see "no PIN yet". The first PIN written wins; the other device is told and asked for it,
+    // instead of silently replacing the commissioner's PIN with its own.
+    const ref = db.collection("rooms").doc(roomId);
+    let alreadySet = false;
+    try {
+      await db.runTransaction(async (tx) => {
+        const cur = await tx.get(ref);
+        const d = cur.exists ? cur.data() : null;
+        if(d && d.adminPin){ alreadySet = true; return; }
+        tx.set(ref, { adminPin: hashed, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+      });
+    } catch(e){
+      console.warn('requireAdmin: could not save the PIN', e);
+      showToast("Couldn't save the PIN. Check your connection and try again.");
+      return false;
+    }
+    if(alreadySet){
+      await appAlert("Someone else just set this room's admin PIN. Enter that PIN to continue.");
+      return requireAdmin();
+    }
     unlockAdmin();
     return true;
   }
