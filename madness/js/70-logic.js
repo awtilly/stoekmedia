@@ -8,6 +8,17 @@ function teamDisplayName(t) {
   if (t.playIn && !t.playInResolved) return t.playInTeams.map(pt => pt.name).join(' / ');
   return t.name;
 }
+/* Picks and bracket winners store team ids, so replacing or clearing the team list while any exist
+ * leaves every one of them dangling (blank draft rows, bracket slots that never resolve). Returns the
+ * reason to show the admin, or '' when the team list may be edited freely. */
+function teamEditBlockedReason(){
+  const picks = (S.players || []).reduce((n, p) => n + ((p.teamIds || []).length), 0);
+  const winners = Object.values(S.bracket || {}).reduce((n, arr) => n + (Array.isArray(arr) ? arr.filter(Boolean).length : 0), 0);
+  const started = !!(S.ds && S.ds.started);
+  if(!picks && !winners && !started) return '';
+  const what = [picks ? picks + ' pick' + (picks === 1 ? '' : 's') : '', winners ? winners + ' bracket result' + (winners === 1 ? '' : 's') : ''].filter(Boolean).join(' and ');
+  return 'Teams are locked: ' + (what || 'the draft has started') + (what ? ' point at them' : '') + '. Reset the draft or start a new tournament first.';
+}
 function teamLogoHTML(t, size) {
   if (t.playIn && !t.playInResolved) {
     return t.playInTeams.map(pt =>
