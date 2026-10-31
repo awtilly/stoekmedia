@@ -11,20 +11,39 @@ let _lastSyncedState = null;
 let _droppedDuringPick = null;
 function _debouncedFirestoreWrite(){
   clearTimeout(_firestoreWriteTimer);
+  const target = roomId; // the room this change was made in
   _firestoreWriteTimer = setTimeout(() => {
-    if(!roomId || _isRemoteUpdate) return;
-    const shared = {};
-    for(const k in S){ if(!VIEW_LOCAL.includes(k)) shared[k] = S[k]; }
-    const json = JSON.stringify(shared);
-    _lastSyncedState = json;
-    db.collection("rooms").doc(roomId).set({
-      state: json,
-      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-    }, {merge: true}).catch(e => {
-      console.warn("Firestore write error:", e);
-      showToast("Sync error \u2014 changes saved locally");
-    });
+    _firestoreWriteTimer = null;
+    // Only write into the room the change belongs to. roomId is read again here because goHome +
+    // rejoin inside the 800 ms window used to push the previous room's (or a stale cached) state
+    // into the newly entered room.
+    if(!roomId || roomId !== target || _isRemoteUpdate) return;
+    _writeSharedState();
   }, 800);
+}
+
+/* Write the shared (non-view) part of S to the current room's document now. */
+function _writeSharedState(){
+  const shared = {};
+  for(const k in S){ if(!VIEW_LOCAL.includes(k)) shared[k] = S[k]; }
+  const json = JSON.stringify(shared);
+  _lastSyncedState = json;
+  db.collection("rooms").doc(roomId).set({
+    state: json,
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+  }, {merge: true}).catch(e => {
+    console.warn("Firestore write error:", e);
+    showToast("Sync error \u2014 changes saved locally");
+  });
+}
+
+/* Send a pending debounced write right away. Call BEFORE roomId or S change (goHome), so the last
+ * edit made in a room reaches that room instead of being dropped or landing in the next one. */
+function flushFirestoreWrite(){
+  if(_firestoreWriteTimer === null) return;
+  clearTimeout(_firestoreWriteTimer);
+  _firestoreWriteTimer = null;
+  if(roomId && !_isRemoteUpdate) _writeSharedState();
 }
 
 function saveState(){

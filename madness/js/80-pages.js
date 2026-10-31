@@ -14,6 +14,7 @@ function bottomNavHTML(_, canT) {
 /* ── Go Home (back to lobby) ── */
 function goHome() {
   stopLiveRefresh();
+  flushFirestoreWrite(); // last edit in this room goes to this room, before roomId is cleared
   if(unsubRoom) { unsubRoom(); unsubRoom = null; }
   roomId = null;
   loadState(); // drop the room's state from memory so nothing from it can reach the offline cache
