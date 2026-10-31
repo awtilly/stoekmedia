@@ -213,7 +213,9 @@ and never reloads a live draft; the Firestore pass-through test; the `response.o
 
 ## 8. functions/package.json + firebase.json: move off the nodejs20 runtime before 2026-10-30 (found Shift 36, 2026-10-26)
 
-**Time-critical.** Google's Cloud Functions runtime table lists `nodejs20` as deprecated 2026-04-30 and
+> **DONE 2026-10-30.** Applied by PR #49 (`madness/node22-runtime`, merged 2026-10-30) and deployed; `firebase functions:list` showed both `notifyDraftTurn` and `notifyGameFinal` on `nodejs22` the same night. Kept below for the record; nothing left to do here. `pollScoreboard` (from #3, now on `main`) is **not** deployed yet: run the deploy command below once more from `main` after applying section 1, and enable the Cloud Scheduler API if the deploy asks for it.
+
+**(Was time-critical.)** Google's Cloud Functions runtime table lists `nodejs20` as deprecated 2026-04-30 and
 **decommissioned 2026-10-30**. After that date you cannot create or update a function on that runtime, and
 workloads still on it "may be disabled". Both live functions (`notifyDraftTurn`, `notifyGameFinal`, checked with
 `firebase functions:list` on 2026-10-26) run on `nodejs20`, and PR #3 (`espn-cache`) pins the same runtime, so its
