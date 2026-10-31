@@ -60,8 +60,10 @@ function render(){
     ${bottomNavHTML(canD, canT)}`;
   const c = document.getElementById("c");
   ({draft:renderDraft, bracket:renderBracket, leaderboard:renderLeaderboard, live:renderLive, settings:renderSettings})[S.phase]?.(c);
-  // Start/stop draft clock based on current view
-  if(S.phase === 'draft' && S.ds.started && !S.ds.complete && S.ds.pickDeadline && !S.ds.timerPaused){
+  // Start/stop the draft clock. It runs on EVERY tab, not just Draft: the commissioner's device is the
+  // autopick fallback for an absent drafter and is usually on Live or Leaderboard while others pick.
+  // updateDraftClock() only writes #draft-timer when that element exists.
+  if(draftClockShouldRun(S.ds)){
     startDraftClock();
   } else if(_draftClockInterval){
     stopDraftClock();
@@ -811,6 +813,11 @@ function triggerHaptic(){
 }
 
 /* -- Draft Clock -- */
+// A started, unfinished draft with a live (unpaused) deadline needs the clock, whatever tab is showing.
+function draftClockShouldRun(ds){
+  return !!(ds && ds.started && !ds.complete && ds.pickDeadline && !ds.timerPaused);
+}
+
 let _draftClockInterval = null;
 
 function startDraftClock(){
