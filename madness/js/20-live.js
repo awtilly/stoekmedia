@@ -3,16 +3,16 @@ let liveScores = [];
 // liveScoresDate and liveScoresFilter are on S (persisted via VIEW_LOCAL)
 let liveRefreshTimer = null;
 let liveLastRefresh = 0;
-let liveLastError = false; // the last direct ESPN poll failed (offline, blocked, HTTP error); the Live tab says so instead of 'No games found'
+let liveLastError = false; // the last direct scoreboard poll failed (offline, blocked, HTTP error); the Live tab says so instead of 'No games found'
 
 /* ── Cached scoreboard ──
- * The pollScoreboard Cloud Function (functions/scoreboard.js) writes the parsed ESPN
+ * The pollScoreboard Cloud Function (functions/scoreboard.js) writes the parsed NCAA.com
  * scoreboard to Firestore doc scoreboard/{YYYYMMDD} once a minute during the tournament.
- * Clients listen to that doc instead of each polling ESPN every 30s. If the doc is
+ * Clients listen to that doc instead of each polling every 30s. If the doc is
  * missing, stale, or unreadable (function not deployed, off-season, rules not updated),
- * we fall back to the original direct ESPN polling, so nothing breaks either way. */
+ * we fall back to polling through the ncaa proxy function (js/10-ncaa.js), so nothing breaks either way. */
 const SCOREBOARD_COLLECTION = 'scoreboard';
-const SCOREBOARD_MAX_AGE_MS = 3 * 60 * 1000; // doc older than this => poll ESPN directly
+const SCOREBOARD_MAX_AGE_MS = 3 * 60 * 1000; // doc older than this => poll the scoreboard directly
 let _scoreboardUnsub = null;
 let _scoreboardFresh = false; // true while the cached doc is current; direct polling pauses
 let _scoreboardSeenAt = 0;    // local clock when the last usable snapshot arrived (freshness is measured from here, so a wrong phone clock cannot defeat the cache)
@@ -61,7 +61,7 @@ function subscribeScoreboard(dateStr) {
       refreshLiveScores();
     }
   }, err => {
-    console.warn('Scoreboard cache unavailable, polling ESPN directly:', err && err.code || err);
+    console.warn('Scoreboard cache unavailable, polling the scoreboard directly:', err && err.code || err);
     _scoreboardFresh = false;
     refreshLiveScores();
   });
@@ -79,12 +79,12 @@ async function refreshLiveScores() {
   _scoreboardFresh = false;
   const dateStr = S.liveScoresDate || localDateStr();
   // "Today" rolled over while the tab stayed open: the function stops writing yesterday's doc, so without this
-  // the device would sit on direct ESPN polling for the rest of the day. Move the listener to the new day's doc.
+  // the device would sit on direct polling for the rest of the day. Move the listener to the new day's doc.
   if (_scoreboardUnsub && dateStr !== _scoreboardDate) subscribeScoreboard(dateStr);
-  const data = await espn.fetchScoreboard(dateStr);
+  const data = await ncaa.fetchScoreboard(dateStr);
   liveLastError = !data; // fetchScoreboard returns null on any failure
   if (data) {
-    liveScores = espn.parseScoreboardEvents(data);
+    liveScores = ncaa.parseScoreboard(data);
     liveLastRefresh = Date.now();
     checkGameFinals();
   }
@@ -152,8 +152,8 @@ function retryPendingAdvances() {
 async function checkGameFinals() {
   if (!S.teams || S.teams.length === 0) return;
 
-  // Build a set of ESPN IDs for teams in this room
-  const roomEspnIds = new Set(S.teams.map(t => t.espnId).filter(Boolean));
+  // Build a set of NCAA.com team slugs (ncaaId) for teams in this room
+  const roomNcaaIds = new Set(S.teams.map(t => t.ncaaId).filter(Boolean));
   let advanced = false;
   let shouldSync = false;
 
@@ -162,15 +162,15 @@ async function checkGameFinals() {
 
   for (const game of liveScores) {
     if (game.state !== 'post' || !game.completed) continue;
-    // Only NCAA tournament games count. ESPN labels every tournament game "NCAA Men's Basketball Championship - ..."
-    // and every conference-tournament game with its own name; a conference final between two bracket teams on
-    // Selection Sunday must not become a gameResult (push alert, upset flag). A game with no note at all still passes.
-    if (game.note && !/NCAA/.test(game.note)) continue;
+    // Only NCAA tournament games count: ncaa.com tags those (and only those) with a bracketId, which the parser
+    // turns into `tournament`. A conference final between two bracket teams on Selection Sunday, or an NIT game,
+    // must not become a gameResult (push alert, upset flag, bracket advance).
+    if (!game.tournament) continue;
     if (_reportedFinals.has(game.id)) continue;
 
     // Check if either team in this game belongs to this room
-    const awayInRoom = roomEspnIds.has(game.away.espnId);
-    const homeInRoom = roomEspnIds.has(game.home.espnId);
+    const awayInRoom = roomNcaaIds.has(game.away.ncaaId);
+    const homeInRoom = roomNcaaIds.has(game.home.ncaaId);
     if (!awayInRoom && !homeInRoom) continue;
 
     // Determine winner/loser
@@ -229,7 +229,7 @@ async function checkGameFinals() {
       _advancedFinals.add(game.id);
       if (isFirstReporter) shouldSync = true;
       else if (roomId && reported) {
-        const winnerTeam = S.teams.find(t => t.espnId === winner.espnId);
+        const winnerTeam = S.teams.find(t => t.ncaaId === winner.ncaaId);
         _unsyncedAdvances.set(game.id, { game, teamId: winnerTeam && winnerTeam.id, since: Date.now() });
       }
     } else if (reported && awayInRoom && homeInRoom && !_advancedFinals.has(game.id)) {
@@ -255,7 +255,7 @@ async function checkGameFinals() {
 
 function autoAdvanceBracket(game) {
   const winner = game.away.winner ? game.away : game.home;
-  const winnerTeam = S.teams.find(t => t.espnId === winner.espnId);
+  const winnerTeam = S.teams.find(t => t.ncaaId === winner.ncaaId);
   if (!winnerTeam) return false;
 
   // Check regional bracket slots (indices 0-14 per region)
@@ -265,8 +265,8 @@ function autoAdvanceBracket(game) {
       const t0 = getTeamForSlot(region, gi, 0);
       const t1 = getTeamForSlot(region, gi, 1);
       if (!t0 || !t1) continue;
-      if ((t0.espnId === game.away.espnId && t1.espnId === game.home.espnId) ||
-          (t0.espnId === game.home.espnId && t1.espnId === game.away.espnId)) {
+      if ((t0.ncaaId === game.away.ncaaId && t1.ncaaId === game.home.ncaaId) ||
+          (t0.ncaaId === game.home.ncaaId && t1.ncaaId === game.away.ncaaId)) {
         S.bracket[region][gi] = winnerTeam.id;
         return true;
       }
@@ -283,8 +283,8 @@ function autoAdvanceBracket(game) {
     const t0 = S.teams.find(t => t.id === t0id);
     const t1 = S.teams.find(t => t.id === t1id);
     if (!t0 || !t1) continue;
-    if ((t0.espnId === game.away.espnId && t1.espnId === game.home.espnId) ||
-        (t0.espnId === game.home.espnId && t1.espnId === game.away.espnId)) {
+    if ((t0.ncaaId === game.away.ncaaId && t1.ncaaId === game.home.ncaaId) ||
+        (t0.ncaaId === game.home.ncaaId && t1.ncaaId === game.away.ncaaId)) {
       S.bracket.ff[fi] = winnerTeam.id;
       return true;
     }
@@ -295,8 +295,8 @@ function autoAdvanceBracket(game) {
     const t0 = S.teams.find(t => t.id === S.bracket.ff[0]);
     const t1 = S.teams.find(t => t.id === S.bracket.ff[1]);
     if (t0 && t1 &&
-        ((t0.espnId === game.away.espnId && t1.espnId === game.home.espnId) ||
-         (t0.espnId === game.home.espnId && t1.espnId === game.away.espnId))) {
+        ((t0.ncaaId === game.away.ncaaId && t1.ncaaId === game.home.ncaaId) ||
+         (t0.ncaaId === game.home.ncaaId && t1.ncaaId === game.away.ncaaId))) {
       S.bracket.ff[2] = winnerTeam.id;
       return true;
     }
@@ -309,7 +309,7 @@ function startLiveRefresh() {
   stopLiveRefresh();
   autoResolvePlayIns();
   subscribeScoreboard(S.liveScoresDate || localDateStr());
-  // Give the cached doc a moment to arrive; if it hasn't, poll ESPN directly.
+  // Give the cached doc a moment to arrive; if it hasn't, poll the scoreboard directly.
   _liveFallbackTimer = setTimeout(() => { _liveFallbackTimer = null; if (!_scoreboardFresh) refreshLiveScores(); }, 1500);
   liveRefreshTimer = setInterval(refreshLiveScores, 30000); // every 30s (no-op while cache is fresh)
   requestWakeLock();
@@ -320,7 +320,7 @@ function stopLiveRefresh() {
     clearInterval(liveRefreshTimer);
     liveRefreshTimer = null;
   }
-  if (_liveFallbackTimer) { clearTimeout(_liveFallbackTimer); _liveFallbackTimer = null; } // leaving Live within 1.5 s no longer fires a stray ESPN poll
+  if (_liveFallbackTimer) { clearTimeout(_liveFallbackTimer); _liveFallbackTimer = null; } // leaving Live within 1.5 s no longer fires a stray poll
   unsubscribeScoreboard();
   releaseWakeLock();
 }

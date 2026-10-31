@@ -1,6 +1,6 @@
 {
   "name": "madness-functions",
-  "description": "Cloud Functions for March Madness Snake Draft",
+  "description": "Cloud Functions for Madness Draft: push notifications, NCAA.com scoreboard cache and proxy",
   "engines": { "node": "22" },
   "main": "index.js",
   "dependencies": {

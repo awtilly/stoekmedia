@@ -6,8 +6,9 @@ const { initializeApp } = require('firebase-admin/app');
 initializeApp();
 const db = getFirestore();
 
-// Scheduled ESPN scoreboard cache (see scoreboard.js)
+// Scheduled NCAA.com scoreboard cache (see scoreboard.js) and the ncaa-api proxy the clients call (see ncaa.js)
 exports.pollScoreboard = require('./scoreboard').pollScoreboard;
+exports.ncaa = require('./ncaa').ncaa;
 
 /* ── Helpers ── */
 

@@ -163,7 +163,7 @@ test('autoAdvanceBracket: handles Final Four semifinals and the championship', (
 
 test('autoAdvanceBracket: returns false for teams not in the room', () => {
   const app = createApp();
-  const stranger = { id: 'x', name: 'Nobody', seed: 1, region: 'South', espnId: 'e-nobody', abbr: 'NB' };
+  const stranger = { id: 'x', name: 'Nobody', seed: 1, region: 'South', ncaaId: 'e-nobody', abbr: 'NB' };
   const g = finalGame(stranger, team(app, 'South-16'), stranger);
   assert.equal(app.autoAdvanceBracket(g), false);
 });

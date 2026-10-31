@@ -1,14 +1,19 @@
 /*
- * Pure helpers for the pollScoreboard scheduled function. No Firebase imports
- * so they can be unit tested from ../test without installing functions deps.
+ * Pure helpers for the pollScoreboard scheduled function and the `ncaa` proxy. No Firebase
+ * imports so they can be unit tested from ../test without installing functions deps.
+ *
+ * Upstream is ncaa-api (https://github.com/henrygd/ncaa-api, MIT), a JSON mirror of ncaa.com.
+ * The public instance is rate-limited (3 req/s per IP) and meant for light use; set NCAA_API_BASE
+ * (and NCAA_API_KEY, sent as x-ncaa-key) in functions/.env to point at a self-hosted container.
  */
-const ESPN_BASE = 'https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball';
+const NCAA_API_BASE = (process.env.NCAA_API_BASE || 'https://ncaa-api.henrygd.me').replace(/\/+$/, '');
 const TZ = 'America/New_York';
 
-// Identify ourselves with a bare product token. ESPN's edge (Akamai) answers 403 "Access Denied"
-// to any User-Agent that carries a URL such as "(+https://...)"; plain tokens, the Node default
-// and browser strings all get JSON. Verified against the live endpoint 2026-10-23.
-const FETCH_HEADERS = { 'User-Agent': 'madness-scoreboard-cache/1' };
+// Identify ourselves with a bare product token (no URL or comment: some edges 403 those).
+const FETCH_HEADERS = Object.assign(
+  { 'User-Agent': 'madness-scoreboard-cache/2' },
+  process.env.NCAA_API_KEY ? { 'x-ncaa-key': process.env.NCAA_API_KEY } : {}
+);
 
 // Poll window when no scoreboard/_config override exists: March 10 through April 10.
 // First Four is ~March 17 and the title game is the first Monday of April.
@@ -25,7 +30,7 @@ function dateParts(date, tz = TZ) {
 }
 
 /**
- * Decide whether this tick should hit ESPN.
+ * Decide whether this tick should hit the scoreboard.
  *   cfg.enabled === true  -> always poll (manual override from the Firestore console)
  *   cfg.enabled === false -> never poll
  *   otherwise             -> only inside the March/April tournament window
@@ -50,26 +55,44 @@ function datesToPoll(now, tz = TZ) {
   return dates;
 }
 
+/** The ncaa-api route for one day's men's D1 scoreboard: YYYYMMDD -> /scoreboard/basketball-men/d1/YYYY/MM/DD */
+function scoreboardPath(ymd) {
+  const d = String(ymd);
+  return `/scoreboard/basketball-men/d1/${d.slice(0, 4)}/${d.slice(4, 6)}/${d.slice(6, 8)}`;
+}
+
 function scoreboardUrl(ymd) {
-  return `${ESPN_BASE}/scoreboard?dates=${ymd}&limit=200`;
+  return NCAA_API_BASE + scoreboardPath(ymd);
+}
+
+/**
+ * The only upstream routes the `ncaa` proxy forwards: one day's men's D1 scoreboard and one year's
+ * men's D1 bracket. Anything else (other sports, stats, logos, play-by-play) is refused so the
+ * function cannot be used as an open proxy.
+ */
+const ALLOWED_PATHS = [
+  /^\/scoreboard\/basketball-men\/d1\/\d{4}\/\d{2}\/\d{2}$/,
+  /^\/brackets\/basketball-men\/d1\/\d{4}$/
+];
+function allowedPath(p) {
+  return ALLOWED_PATHS.some(re => re.test(String(p || '')));
 }
 
 /**
  * Shape of the Firestore document written to scoreboard/{ymd}.
- * Events are passed through JSON so every `undefined` disappears: before tip-off ESPN
- * omits `competitors[].winner`, so the parser yields `winner: undefined`, and the Admin SDK
- * rejects a document containing undefined ("Cannot use undefined as a Firestore value").
- * Verified against the real 2026-11-03 scoreboard: 29 pre-game events, 58 undefined fields.
+ * Events are passed through JSON so every `undefined` disappears: before tip-off the parser
+ * leaves `winner` undefined, and the Admin SDK rejects a document containing undefined
+ * ("Cannot use undefined as a Firestore value").
  */
 function buildDoc(ymd, events, serverTimestamp) {
   const clean = JSON.parse(JSON.stringify(events));
   return {
     date: ymd,
-    source: 'espn',
+    source: 'ncaa',
     fetchedAt: serverTimestamp,
     eventCount: clean.length,
     events: clean
   };
 }
 
-module.exports = { ESPN_BASE, TZ, FETCH_HEADERS, dateParts, shouldPoll, datesToPoll, scoreboardUrl, buildDoc };
+module.exports = { NCAA_API_BASE, TZ, FETCH_HEADERS, dateParts, shouldPoll, datesToPoll, scoreboardPath, scoreboardUrl, allowedPath, buildDoc };

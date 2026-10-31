@@ -56,7 +56,7 @@ test('the fallback poll runs when the cached doc has not arrived, and polls noth
     const d = fakeDb();
     app.db = d.db;
     let fetches = 0;
-    app.fetch = async () => { fetches++; return { ok: true, json: async () => ({ events: [] }) }; };
+    app.fetch = async () => { fetches++; return { ok: true, json: async () => ({ games: [] }) }; };
     app.startLiveRefresh();
     d.listener({ exists: true, metadata: { fromCache: false }, data: () => ({ events: [], fetchedAt: ts(Date.now()) }) });
     t.timeouts.find(x => x.ms === 1500).fn();
@@ -76,7 +76,7 @@ test('refreshLiveScores moves the listener to the new day when the selected date
   const d = fakeDb();
   app.db = d.db;
   let fetches = 0;
-  app.fetch = async () => { fetches++; return { ok: true, json: async () => ({ events: [] }) }; };
+  app.fetch = async () => { fetches++; return { ok: true, json: async () => ({ games: [] }) }; };
   app.S.liveScoresDate = '20270318';
   app.subscribeScoreboard('20270318');
   assert.deepEqual(d.paths, ['scoreboard/20270318']);

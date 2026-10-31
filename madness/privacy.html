@@ -131,7 +131,7 @@
           </thead>
           <tbody>
             <tr><td>Google Firebase (Firestore, Cloud Messaging, Cloud Functions)</td><td>Stores rooms and syncs them between players; delivers notifications</td><td>Display names, PIN hashes, picks, room settings, push tokens. Stored in the United States, encrypted at rest and in transit.</td></tr>
-            <tr><td>ESPN (site.api.espn.com)</td><td>Live scores and the tournament team list</td><td>Your IP address and browser details, as with any website you visit. The app sends ESPN nothing about you or your room. During the tournament we may fetch scores once on our servers and relay them, so your device never contacts ESPN at all.</td></tr>
+            <tr><td>NCAA.com (through our own relay on Google Cloud)</td><td>Live scores and the tournament bracket</td><td>Nothing about you or your room. Your device asks our relay for the day's scores or the bracket; the relay fetches them from NCAA.com's public feed and passes them back, so NCAA.com never sees your device. During the tournament we fetch scores once a minute on our servers and share that copy with everyone.</td></tr>
             <tr><td>Google (gstatic.com)</td><td>Loads the Firebase client library on the web version</td><td>Your IP address and browser details when the page loads.</td></tr>
           </tbody>
         </table>
