@@ -4,6 +4,8 @@ Night shift never edits these. Each block below is ready to paste; apply in the 
 
 ## 1. firestore.rules: scoreboard cache read access (needed by PR #3)
 
+> **DONE 2026-10-31.** Joe applied an equivalent rule directly on `main` (commit 86e46c6a, `match /scoreboard/{doc}`) and deployed it, and deployed `pollScoreboard` the same night (`firebase functions:list` shows it scheduled on nodejs22). The scheduler fires every minute and exits without writing until the March/April window opens or `scoreboard/_config.enabled` is `true`, so an empty `scoreboard` collection in the off-season is expected. Kept below for the record.
+
 Inside `match /databases/{database}/documents {`, after the `rooms` block:
 
 ```
@@ -213,7 +215,7 @@ and never reloads a live draft; the Firestore pass-through test; the `response.o
 
 ## 8. functions/package.json + firebase.json: move off the nodejs20 runtime before 2026-10-30 (found Shift 36, 2026-10-26)
 
-> **DONE 2026-10-30.** Applied by PR #49 (`madness/node22-runtime`, merged 2026-10-30) and deployed; `firebase functions:list` showed both `notifyDraftTurn` and `notifyGameFinal` on `nodejs22` the same night. Kept below for the record; nothing left to do here. `pollScoreboard` (from #3, now on `main`) is **not** deployed yet: run the deploy command below once more from `main` after applying section 1, and enable the Cloud Scheduler API if the deploy asks for it.
+> **DONE 2026-10-30.** Applied by PR #49 (`madness/node22-runtime`, merged 2026-10-30) and deployed; `firebase functions:list` showed both `notifyDraftTurn` and `notifyGameFinal` on `nodejs22` the same night. Kept below for the record; nothing left to do here. `pollScoreboard` was deployed 2026-10-31 as well (see section 1).
 
 **(Was time-critical.)** Google's Cloud Functions runtime table lists `nodejs20` as deprecated 2026-04-30 and
 **decommissioned 2026-10-30**. After that date you cannot create or update a function on that runtime, and
