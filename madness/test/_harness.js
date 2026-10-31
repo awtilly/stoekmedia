@@ -74,17 +74,20 @@ function freshState(overrides) {
 
 let loaded = false;
 let lexicals = null; // top-level const/let bindings are not globalThis properties; capture them once
+let real = null;     // functions createApp() replaces with stubs; tests of those functions use app.__real
 
 function loadOnce() {
   if (loaded) return;
   globalThis.document = { addEventListener() {}, getElementById() { return null; }, querySelector() { return null; } };
   globalThis.window = globalThis.window || {};
   globalThis.localStorage = { getItem() { return null; }, setItem() {}, removeItem() {} };
+  globalThis.defaultState = () => freshState();
   for (const f of LOGIC_FILES) {
     const code = fs.readFileSync(path.join(JS_DIR, f), 'utf8');
     vm.runInThisContext(code, { filename: f });
   }
-  lexicals = vm.runInThisContext('({ espn, RN, REGIONS, SEEDS, R1_SEEDS, FEEDERS, generateId })');
+  lexicals = vm.runInThisContext('({ espn, RN, REGIONS, SEEDS, R1_SEEDS, FEEDERS, generateId, stateKey })');
+  real = { requireAdmin: globalThis.requireAdmin, saveState: globalThis.saveState };
   loaded = true;
 }
 
@@ -114,6 +117,7 @@ function createApp(stateOverrides) {
     get(_, key) {
       if (key === 'eval') return (expr) => vm.runInThisContext(expr); // read top-level let/const live, e.g. app.eval('liveScores')
       if (key === '__calls') return calls;
+      if (key === '__real') return real;
       if (key in lexicals) return lexicals[key];
       return globalThis[key];
     },
