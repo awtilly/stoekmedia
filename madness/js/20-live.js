@@ -16,6 +16,8 @@ const SCOREBOARD_MAX_AGE_MS = 3 * 60 * 1000; // doc older than this => poll ESPN
 let _scoreboardUnsub = null;
 let _scoreboardFresh = false; // true while the cached doc is current; direct polling pauses
 let _scoreboardSeenAt = 0;    // local clock when the last usable snapshot arrived (freshness is measured from here, so a wrong phone clock cannot defeat the cache)
+let _scoreboardDate = null;   // the scoreboard/{date} doc the listener is on (null = not listening)
+let _liveFallbackTimer = null; // startLiveRefresh's one-shot "cached doc did not arrive" poll
 
 function localDateStr(d) {
   const n = d || new Date();
@@ -52,6 +54,7 @@ function applyCachedScoreboard(data, fromCache) {
 function subscribeScoreboard(dateStr) {
   unsubscribeScoreboard();
   if (typeof db === 'undefined' || !db) return;
+  _scoreboardDate = dateStr;
   _scoreboardUnsub = db.collection(SCOREBOARD_COLLECTION).doc(dateStr).onSnapshot(doc => {
     if (!doc.exists || !applyCachedScoreboard(doc.data(), !!(doc.metadata && doc.metadata.fromCache))) {
       _scoreboardFresh = false;
@@ -66,6 +69,7 @@ function subscribeScoreboard(dateStr) {
 
 function unsubscribeScoreboard() {
   if (_scoreboardUnsub) { _scoreboardUnsub(); _scoreboardUnsub = null; }
+  _scoreboardDate = null;
   _scoreboardFresh = false;
 }
 
@@ -74,6 +78,9 @@ async function refreshLiveScores() {
   if (_scoreboardFresh && (Date.now() - _scoreboardSeenAt) < SCOREBOARD_MAX_AGE_MS) return;
   _scoreboardFresh = false;
   const dateStr = S.liveScoresDate || localDateStr();
+  // "Today" rolled over while the tab stayed open: the function stops writing yesterday's doc, so without this
+  // the device would sit on direct ESPN polling for the rest of the day. Move the listener to the new day's doc.
+  if (_scoreboardUnsub && dateStr !== _scoreboardDate) subscribeScoreboard(dateStr);
   const data = await espn.fetchScoreboard(dateStr);
   liveLastError = !data; // fetchScoreboard returns null on any failure
   if (data) {
@@ -303,7 +310,7 @@ function startLiveRefresh() {
   autoResolvePlayIns();
   subscribeScoreboard(S.liveScoresDate || localDateStr());
   // Give the cached doc a moment to arrive; if it hasn't, poll ESPN directly.
-  setTimeout(() => { if (!_scoreboardFresh) refreshLiveScores(); }, 1500);
+  _liveFallbackTimer = setTimeout(() => { _liveFallbackTimer = null; if (!_scoreboardFresh) refreshLiveScores(); }, 1500);
   liveRefreshTimer = setInterval(refreshLiveScores, 30000); // every 30s (no-op while cache is fresh)
   requestWakeLock();
 }
@@ -313,6 +320,7 @@ function stopLiveRefresh() {
     clearInterval(liveRefreshTimer);
     liveRefreshTimer = null;
   }
+  if (_liveFallbackTimer) { clearTimeout(_liveFallbackTimer); _liveFallbackTimer = null; } // leaving Live within 1.5 s no longer fires a stray ESPN poll
   unsubscribeScoreboard();
   releaseWakeLock();
 }
