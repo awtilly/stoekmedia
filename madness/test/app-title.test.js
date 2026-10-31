@@ -10,8 +10,8 @@ const { createApp } = require('./_harness');
 
 test('appTitleHTML: renders APP_NAME with the accent part in a span, exactly like the old hard-coded <h1>', () => {
   const app = createApp();
-  assert.equal(app.eval('APP_NAME'), 'March Madness Draft');
-  assert.equal(app.appTitleHTML(), '<h1><span>March Madness</span> Draft</h1>');
+  assert.equal(app.eval('APP_NAME'), 'Madness Draft');
+  assert.equal(app.appTitleHTML(), '<h1><span>Madness</span> Draft</h1>');
 });
 
 test('appTitleHTML: a name that does not start with the accent is shown whole inside the span', () => {
