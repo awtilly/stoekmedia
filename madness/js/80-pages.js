@@ -131,7 +131,7 @@ async function shareRoomLink() {
   const shareUrl = url.toString();
   const shareData = {
     title: APP_NAME,
-    text: 'Join my March Madness bracket pool! Room: ' + roomId,
+    text: 'Join my Madness Draft bracket pool! Room: ' + roomId,
     url: shareUrl
   };
   if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
@@ -158,7 +158,7 @@ async function shareLeaderboard() {
     const prefix = medals[i] || (i + 1) + '.';
     text += prefix + ' ' + s.name + ' - ' + s.tot + ' pts\n';
   });
-  const shareData = { title: 'March Madness Leaderboard', text: text };
+  const shareData = { title: 'Madness Draft Leaderboard', text: text };
   if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
     try {
       await navigator.share(shareData);
