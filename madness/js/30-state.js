@@ -96,7 +96,7 @@ function showNotificationPrompt(){
   if (localStorage.getItem('mm4_notif_dismissed')) return;
   if (document.querySelector('.notif-banner, .notif-overlay')) return;
 
-  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  const isIOS = isIOSDevice();
   const isStandalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
 
   if (isIOS && !isStandalone){
