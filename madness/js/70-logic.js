@@ -103,38 +103,8 @@ async function advanceTeam(region, gameIdx, teamId){
   const oldWinner = b[gameIdx];
   if(oldWinner === teamId) return; // no-op, skip Firestore write
   b[gameIdx] = teamId;
-  if(oldWinner && oldWinner !== teamId){
-    for(let gi = gameIdx+1; gi < 15; gi++){
-      if(FEEDERS[gi]){
-        const feeders = FEEDERS[gi];
-        if(feeders.includes(gameIdx)){
-          const t0 = getTeamForSlot(region, gi, 0);
-          const t1 = getTeamForSlot(region, gi, 1);
-          if(b[gi] && (!t0 || t0.id !== b[gi]) && (!t1 || t1.id !== b[gi])){
-            b[gi] = null;
-          }
-        }
-      }
-    }
-    clearDownstream(region, gameIdx);
-  }
-  const regionIdx = REGIONS.indexOf(region);
-  if(gameIdx === 14 || oldWinner !== teamId){
-    const ffPairs = [[0,1],[2,3]];
-    for(let fi = 0; fi < 2; fi++){
-      if(ffPairs[fi].includes(regionIdx)){
-        const ffWinner = S.bracket.ff[fi];
-        if(ffWinner){
-          const rw0 = S.bracket[REGIONS[ffPairs[fi][0]]][14];
-          const rw1 = S.bracket[REGIONS[ffPairs[fi][1]]][14];
-          if(ffWinner !== rw0 && ffWinner !== rw1){ S.bracket.ff[fi] = null; S.bracket.ff[2] = null; }
-        }
-      }
-    }
-    if(S.bracket.ff[2]){
-      if(S.bracket.ff[2] !== S.bracket.ff[0] && S.bracket.ff[2] !== S.bracket.ff[1]) S.bracket.ff[2] = null;
-    }
-  }
+  if(oldWinner) clearDownstream(region, gameIdx);
+  cascadeFF();
   syncGames();
   saveState();
   render();
@@ -214,6 +184,7 @@ function cascadeFF(){
     const ffWinner = S.bracket.ff[fi];
     if(ffWinner && ffWinner !== rw0 && ffWinner !== rw1){
       S.bracket.ff[fi] = null;
+      S.bracket.ff[2] = null; // semifinal undecided again, so the title game is too
     }
   }
   if(S.bracket.ff[2]){
