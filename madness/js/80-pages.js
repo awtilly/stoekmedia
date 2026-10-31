@@ -630,6 +630,7 @@ async function pickTeam(tid){
     else { console.warn('Pick transaction failed:', err); showToast('Pick failed — try again'); }
   } finally {
     _pickInFlight = false;
+    replayDroppedSnapshot();
   }
 }
 

@@ -7,6 +7,8 @@ let _firestoreWriteTimer = null;
 // same string has nothing new (it is the echo of our own write, or a metadata-only change), so
 // _applyRoomSnapshot skips the JSON.parse + full render for it.
 let _lastSyncedState = null;
+// Newest snapshot that arrived while a pick transaction was in flight ({gen, doc}); see replayDroppedSnapshot.
+let _droppedDuringPick = null;
 function _debouncedFirestoreWrite(){
   clearTimeout(_firestoreWriteTimer);
   _firestoreWriteTimer = setTimeout(() => {
@@ -109,16 +111,29 @@ function connectToRoom(code){
   saveRecentRoom(code);
   const gen = ++_roomGeneration;
   _lastSyncedState = null; // never let the previous room's string suppress this room's first snapshot
+  _droppedDuringPick = null;
   unsubRoom = db.collection("rooms").doc(code).onSnapshot(doc => {
     if(gen !== _roomGeneration) return; // stale listener
     // A pick transaction is currently writing — drop this snapshot.
     // Our transaction commit will deliver its own snapshot with the post-pick state shortly.
-    if(_pickInFlight) return;
+    if(_pickInFlight){ _droppedDuringPick = { gen, doc }; return; }
     _applyRoomSnapshot(doc);
   }, err => {
     console.warn("Firestore listen error:", err);
     showToast("Connection error \u2014 working offline");
   });
+}
+
+/* Apply the newest snapshot dropped while a pick transaction was in flight. pickTeam calls this once the
+ * transaction settles. Without it, a failed pick (team just taken, turn moved on) left the UI on the
+ * pre-snapshot state until someone else changed the room, and a commit whose watch update arrived before
+ * the transaction promise resolved was dropped the same way. The _lastSyncedState guard makes replaying
+ * a snapshot we have since applied free. */
+function replayDroppedSnapshot(){
+  const d = _droppedDuringPick;
+  _droppedDuringPick = null;
+  if(!d || d.gen !== _roomGeneration || _pickInFlight) return;
+  _applyRoomSnapshot(d.doc);
 }
 
 function _applyRoomSnapshot(doc){
