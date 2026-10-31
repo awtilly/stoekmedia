@@ -120,6 +120,14 @@ async function checkGameFinals() {
     // Compute current leaderboard rankings BEFORE this result
     const rankingsBefore = scores().map(s => s.pid);
 
+    // Advance the bracket locally FIRST so the report below can carry the post-game rankings. The
+    // notifyGameFinal Cloud Function used to recompute them from the room document, but that document
+    // only changes when the debounced saveState() write lands (800 ms after this report), so it always
+    // saw the pre-game state and the "Leaderboard Shake-up" push never fired.
+    const didAdvance = autoAdvanceBracket(game);
+    if (didAdvance) { advanced = true; syncGames(); }
+    const rankingsAfter = scores().map(s => s.pid);
+
     // Write to gameResults subcollection -- Cloud Function will trigger
     // Check-before-write: only the first client to report triggers Firestore sync
     let isFirstReporter = false;
@@ -143,6 +151,7 @@ async function checkGameFinals() {
             loserSeed: loser.seed || null,
             isUpset,
             rankingsBefore,
+            rankingsAfter,
             reportedAt: firebase.firestore.FieldValue.serverTimestamp(),
             reportedBy: getMyPlayerId() || 'unknown'
           });
@@ -155,12 +164,7 @@ async function checkGameFinals() {
       }
     }
     if (reported) _reportedFinals.add(game.id);
-
-    // Auto-advance bracket locally for all clients (instant feedback)
-    if (autoAdvanceBracket(game)) {
-      advanced = true;
-      if (isFirstReporter) shouldSync = true;
-    }
+    if (didAdvance && isFirstReporter) shouldSync = true;
   }
 
   if (advanced) {
