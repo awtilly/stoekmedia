@@ -42,7 +42,11 @@ if(urlRoom){
 }
 
 /* ── Service Worker & Install Banner ── */
-if('serviceWorker' in navigator){
+// Inside a Capacitor shell (see docs/ios-app-store-plan.md) the web code is bundled in the app:
+// WKWebView has no service worker for the capacitor:// scheme and "install" makes no sense.
+const isNativeShell = !!(window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform());
+
+if('serviceWorker' in navigator && !isNativeShell){
   navigator.serviceWorker.register('sw.js').then(reg => {
     reg.addEventListener('updatefound', () => {
       const newSW = reg.installing;
@@ -77,7 +81,8 @@ function installBannerDismissed(){
 }
 
 function isStandalone(){
-  return window.matchMedia('(display-mode: standalone)').matches
+  return isNativeShell
+    || window.matchMedia('(display-mode: standalone)').matches
     || window.navigator.standalone === true;
 }
 
