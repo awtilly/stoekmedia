@@ -133,6 +133,18 @@ const espn = {
       // Put away team first (top), home team second (bottom) for display
       const away = teams.find(t => t.homeAway === 'away') || teams[0];
       const home = teams.find(t => t.homeAway === 'home') || teams[1];
+      if (!away || !home || away === home) return null; // fewer than two competitors: nothing to show or score
+
+      // ESPN flags exactly one winner on a final. If the flag is missing, fall back to the score; if that
+      // is tied or absent (postponed, canceled, no-contest) the game stays a 'post' event for display but
+      // is NOT a completed final, so checkGameFinals never crowns the home team by default.
+      let completed = statusType.completed || false;
+      if (completed && !!away.winner === !!home.winner) {
+        const a = parseInt(away.score, 10), h = parseInt(home.score, 10);
+        if (a > h) { away.winner = true; home.winner = false; }
+        else if (h > a) { home.winner = true; away.winner = false; }
+        else completed = false;
+      }
 
       return {
         id: ev.id,
@@ -144,7 +156,7 @@ const espn = {
         shortDetail: statusType.shortDetail || '',
         clock: status.displayClock || '',
         period: status.period || 0,
-        completed: statusType.completed || false,
+        completed,
         note,
         broadcast,
         venue: comp.venue?.fullName || '',
