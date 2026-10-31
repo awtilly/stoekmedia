@@ -20,13 +20,15 @@ function _debouncedFirestoreWrite(){
 }
 
 function saveState(){
-  try { localStorage.setItem("mm4", JSON.stringify(S)); } catch(e){}
+  try { localStorage.setItem(stateKey(), JSON.stringify(S)); } catch(e){}
   if(roomId && !_isRemoteUpdate) _debouncedFirestoreWrite();
 }
 
+/* Replace S with the defaults plus whatever this room (or offline play) last cached locally. */
 function loadState(){
+  S = defaultState();
   try {
-    const s = localStorage.getItem("mm4");
+    const s = localStorage.getItem(stateKey());
     if(s) Object.assign(S, JSON.parse(s));
     sanitizeSharedState(S);
     // Reconstruct Firestore Timestamp from serialized JSON
@@ -70,6 +72,7 @@ function joinRoom(){
   const url = new URL(window.location);
   url.searchParams.set("room", code);
   window.history.replaceState({}, "", url);
+  loadState();
   checkAdminSession();
   connectToRoom(code);
   render();
@@ -92,7 +95,17 @@ function connectToRoom(code){
 }
 
 function _applyRoomSnapshot(doc){
-  if(!doc.exists){ saveState(); return; }
+  if(!doc.exists){
+    // Offline with nothing cached: wait for the server instead of deciding the room is gone.
+    if(doc.metadata && doc.metadata.fromCache) return;
+    // Unknown code (typo or deleted room). Never create it from here: that used to upload whatever
+    // state was in memory (usually the previous room's players and picks) under the new code.
+    const code = roomId;
+    forgetRecentRoom(code);
+    goHome();
+    showToast('Room ' + code + ' not found');
+    return;
+  }
   const data = doc.data();
   if(!data || !data.state) return;
   _isRemoteUpdate = true;
@@ -104,7 +117,7 @@ function _applyRoomSnapshot(doc){
   if(S.ds && S.ds.pickDeadline && typeof S.ds.pickDeadline === 'object' && S.ds.pickDeadline.seconds){
     S.ds.pickDeadline = new firebase.firestore.Timestamp(S.ds.pickDeadline.seconds, S.ds.pickDeadline.nanoseconds || 0);
   }
-  localStorage.setItem("mm4", JSON.stringify(S));
+  localStorage.setItem(stateKey(), JSON.stringify(S));
   render();
   updateAppBadge();
   if('Notification' in window && Notification.permission === 'granted') initFCM().catch(() => {});
@@ -127,11 +140,38 @@ function saveRecentRoom(code){
   } catch(e){}
 }
 
+/* One-time migration from the single "mm4" key. Before per-room keys, "mm4" held the cached copy of
+ * whichever room was open last. Move it under that room's key so the user keeps their cache and
+ * Play Offline does not open on the old room's players and picks. Leave it alone when there is no
+ * recent room (then it really is offline state). */
+function migrateLegacyStateKey(){
+  try {
+    if(localStorage.getItem('mm4_state_migrated')) return;
+    const legacy = localStorage.getItem('mm4');
+    const rooms = JSON.parse(localStorage.getItem('mm4_rooms') || '[]');
+    const last = rooms[0] && rooms[0].code;
+    if(legacy && last){
+      if(!localStorage.getItem('mm4_state_' + last)) localStorage.setItem('mm4_state_' + last, legacy);
+      localStorage.removeItem('mm4');
+    }
+    localStorage.setItem('mm4_state_migrated', '1');
+  } catch(e){}
+}
+migrateLegacyStateKey(); // runs once at load, before boot reads any cache
+
+function forgetRecentRoom(code){
+  try {
+    const rooms = JSON.parse(localStorage.getItem('mm4_rooms') || '[]').filter(r => r && r.code !== code);
+    localStorage.setItem('mm4_rooms', JSON.stringify(rooms));
+  } catch(e){}
+}
+
 function rejoinRoom(code){
   roomId = code;
   const url = new URL(window.location);
   url.searchParams.set("room", code);
   window.history.replaceState({}, "", url);
+  loadState();
   checkAdminSession();
   connectToRoom(code);
   render();

@@ -105,12 +105,6 @@ function navigate(p){
   });
 }
 
-function copyRoomLink(){
-  const url = new URL(window.location);
-  url.searchParams.set("room", roomId);
-  navigator.clipboard.writeText(url.toString()).then(() => showToast("Room link copied!")).catch(() => showToast("Link: " + url.toString()));
-}
-
 async function shareRoomLink() {
   const url = new URL(window.location);
   url.searchParams.set('room', roomId);
@@ -182,7 +176,7 @@ async function resetAll(){
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     }).catch(() => {});
   }
-  localStorage.removeItem("mm4");
+  localStorage.removeItem(stateKey());
   if(roomId) localStorage.removeItem('mm4_me_' + roomId);
   location.reload();
 }
@@ -220,15 +214,6 @@ async function movePlayer(i, d){
   [S.players[i], S.players[s]] = [S.players[s], S.players[i]];
   saveState();
   render();
-}
-
-/* ── Teams Page ── */
-function renderTeams(c){
-  const br = REGIONS.map(r => ({r, t: S.teams.filter(t => t.region === r).sort((a,b) => a.seed - b.seed)}));
-  c.innerHTML = `<div class="section-title">Teams <span style="color:var(--gold);font-size:16px">${S.teams.length}/64</span></div>
-  <p class="section-desc">All 64 tournament teams.</p>
-  ${S.teams.length === 0 ? `<div class="card" style="text-align:center;padding:32px 20px;color:var(--g400)"><p style="font-size:15px;margin-bottom:4px">No teams loaded.</p><p style="font-size:13px">The commissioner can import teams from Settings.</p></div>` : `
-  <div class="grid-2">${br.map(({r,t}) => `<div class="card" style="padding:14px"><h3 style="font-size:15px;font-weight:800;margin-bottom:8px;color:var(--gold)">${r} <span style="color:var(--g400);font-size:12px">(${t.length}/16)</span></h3>${t.length === 0 ? '<p style="color:var(--g300);font-size:13px">No teams</p>' : t.map(t => `<div class="team-item">${teamLogoHTML(t, 20)}${seedBadge(t.seed)}<span style="flex:1">${escapeHtml(teamDisplayName(t))}${teamRecordDisplay(t) ? ` <span style="font-size:11px;color:var(--g400)">(${escapeHtml(teamRecordDisplay(t))})</span>` : ''}</span>${t.playIn && !t.playInResolved ? `<button class="btn btn-sm btn-secondary" style="padding:2px 8px;font-size:11px;min-height:0" onclick="event.stopPropagation();showResolvePlayIn('${t.id}')">Resolve</button>` : ''}${adminUnlocked ? `<button class="icon-btn icon-btn-danger" onclick="deleteTeam('${t.id}')">\u2715</button>` : ''}</div>`).join('')}</div>`).join('')}</div>`}`;
 }
 
 async function addTeam(){
