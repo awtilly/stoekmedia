@@ -45,6 +45,10 @@ code (which is nearly all in `30-state.js` and `90-boot.js`) depends on order.
 
 ## Tests
 
+`test/browser/*.html` are zero-dependency browser checks for DOM behaviour (currently the
+Live tab's per-card diff). Serve the repo root and open one in headless Chrome; every line
+of `#out` must start with `ok`. The command is in each file's header comment.
+
 ```
 node --test "test/*.test.js"
 ```
