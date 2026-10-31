@@ -814,13 +814,13 @@ function updateDraftClock(){
     stopDraftClock();
     const myId = getMyPlayerId();
     if(myId === ds.order[ds.cp] || adminUnlocked){
-      autoPickHighestSeed();
+      autoPickHighestSeed(ds.pickDeadline && ds.pickDeadline.seconds != null ? ds.pickDeadline.seconds : null);
     }
     // Other clients will receive the pick via Firestore listener
   }
 }
 
-async function autoPickHighestSeed(){
+async function autoPickHighestSeed(expiredDeadlineSeconds){
   _beeped = false;
   const myId = getMyPlayerId();
   // Transactional path for multiplayer: computes highest-available against server state
@@ -834,6 +834,8 @@ async function autoPickHighestSeed(){
         const remote = JSON.parse(snap.data().state || '{}');
         const ds = remote.ds || {};
         if(ds.complete || !ds.started) return;
+        // Another client's auto-pick already landed and reset the clock: stand down.
+        if(pickDeadlineMoved(expiredDeadlineSeconds, ds.pickDeadline)) return;
         // Only the active drafter (or admin) drives the auto-pick to avoid duplicate fires
         if(!adminUnlocked && myId !== ds.order[ds.cp]) return;
         const taken = new Set((remote.players || []).flatMap(p => p.teamIds || []));
