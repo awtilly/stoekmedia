@@ -43,5 +43,11 @@ service cloud.firestore {
         allow delete: if false;
       }
     }
+    // Cached ESPN scoreboard written by the pollScoreboard Cloud Function (functions/scoreboard.js).
+    // Clients only read it; the function writes with admin privileges, so no client writes.
+    match /scoreboard/{doc} {
+      allow read: if true;
+      allow write: if false;
+    }
   }
 }
