@@ -68,7 +68,7 @@ try {
   if ('Notification' in window) {
     firebase.messaging().onMessage((payload) => {
       const data = payload.data || {};
-      const title = data.title || 'March Madness Draft';
+      const title = data.title || APP_NAME;
       const body = data.body || '';
       showToast(title + ': ' + body);
     });

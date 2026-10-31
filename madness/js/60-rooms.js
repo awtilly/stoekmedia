@@ -255,7 +255,7 @@ function renderLobby(){
   const recent = getRecentRooms();
   document.getElementById("app").innerHTML = `
     <div class="lobby">
-      <h1><span>March Madness</span> Draft</h1>
+      ${appTitleHTML()}
       <p class="lobby-sub">Create or join a room to sync brackets with friends in real time.</p>
       ${recent.length > 0 ? `
       <div class="lobby-card">
