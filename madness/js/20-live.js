@@ -97,6 +97,43 @@ const _reportedFinals = new Set();
 const _pendingAdvance = new Map(); // game.id -> parsed game
 const _advancedFinals = new Set(); // game ids that already filled a slot (autoAdvanceBracket is false for those too)
 
+/* Advances this device made as a NON-first reporter. Only the first reporter saves the bracket to Firestore; if its
+ * save never lands (tab closed inside the debounce, or before its own pending retry) the next room snapshot wipes our
+ * local advance and, with the gameResult already written, no device is ever "first" again. Each poll re-applies
+ * these locally; 30 s after the final this device reads the room document once and, if the winner is missing from
+ * the remote bracket, saves the slot itself (the same idempotent saveState() every edit uses). */
+const _unsyncedAdvances = new Map(); // game.id -> { game, teamId, since }
+const UNSYNCED_ADVANCE_GRACE_MS = 30000;
+
+function bracketCount(bracket, teamId) {
+  let n = 0;
+  for (const arr of Object.values(bracket || {})) for (const v of arr) if (v === teamId) n++;
+  return n;
+}
+
+async function retryUnsyncedAdvances(verify) {
+  let r = 0; // 0 nothing, 1 re-applied locally, 2 save to Firestore
+  const now = Date.now();
+  const unverified = []; // re-added after the loop: a key set during Map iteration is visited again
+  for (const [id, entry] of _unsyncedAdvances) {
+    if (!roomId) { _unsyncedAdvances.delete(id); continue; } // left the room: nothing to sync
+    if (autoAdvanceBracket(entry.game)) r = Math.max(r, 1); // a snapshot without the slot wiped our local copy
+    if (!verify || now - entry.since < UNSYNCED_ADVANCE_GRACE_MS) continue;
+    _unsyncedAdvances.delete(id);
+    try {
+      const doc = await db.collection('rooms').doc(roomId).get();
+      const data = doc.exists ? doc.data() : null;
+      const remote = data && data.state ? JSON.parse(data.state) : null;
+      if (!remote || bracketCount(remote.bracket, entry.teamId) < bracketCount(S.bracket, entry.teamId)) r = 2;
+    } catch (err) {
+      unverified.push([id, entry]); // could not read the room: check again next poll
+      console.warn('Could not verify bracket advance:', id, err);
+    }
+  }
+  for (const [id, entry] of unverified) _unsyncedAdvances.set(id, entry);
+  return r;
+}
+
 function retryPendingAdvances() {
   let any = false;
   for (const [id, g] of _pendingAdvance) {
@@ -114,6 +151,7 @@ async function checkGameFinals() {
   let shouldSync = false;
 
   if (retryPendingAdvances()) { advanced = true; shouldSync = true; }
+  { const r = await retryUnsyncedAdvances(true); if (r) advanced = true; if (r === 2) shouldSync = true; }
 
   for (const game of liveScores) {
     if (game.state !== 'post' || !game.completed) continue;
@@ -147,7 +185,7 @@ async function checkGameFinals() {
     // Write to gameResults subcollection -- Cloud Function will trigger
     // Check-before-write: only the first client to report triggers Firestore sync
     let isFirstReporter = false;
-    let reported = !roomId; // solo/offline rooms have nowhere to report; they still auto-advance below
+    let reported = !roomId; // solo/offline rooms have nowhere to report; they already auto-advanced above
     if (roomId) {
       try {
         const resultRef = db.collection('rooms').doc(roomId)
@@ -175,7 +213,7 @@ async function checkGameFinals() {
         }
         reported = true;
       } catch (err) {
-        // Left out of _reportedFinals so the next poll retries the report (the bracket advance below is idempotent).
+        // Left out of _reportedFinals so the next poll retries the report (the bracket advance above re-runs then; it is idempotent).
         console.warn('Failed to report game final:', game.id, err);
       }
     }
@@ -183,12 +221,17 @@ async function checkGameFinals() {
     if (didAdvance) {
       _advancedFinals.add(game.id);
       if (isFirstReporter) shouldSync = true;
+      else if (roomId && reported) {
+        const winnerTeam = S.teams.find(t => t.espnId === winner.espnId);
+        _unsyncedAdvances.set(game.id, { game, teamId: winnerTeam && winnerTeam.id, since: Date.now() });
+      }
     } else if (reported && awayInRoom && homeInRoom && !_advancedFinals.has(game.id)) {
       // Both teams are ours but no slot matched: a feeder is still undecided. Keep it for the next poll.
       _pendingAdvance.set(game.id, game);
     }
   }
   if (retryPendingAdvances()) { advanced = true; shouldSync = true; }
+  { const r = await retryUnsyncedAdvances(false); if (r) advanced = true; } // re-apply only: the room read happens once per poll
 
   if (advanced) {
     syncGames();
