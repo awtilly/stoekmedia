@@ -101,6 +101,10 @@ async function checkGameFinals() {
 
   for (const game of liveScores) {
     if (game.state !== 'post' || !game.completed) continue;
+    // Only NCAA tournament games count. ESPN labels every tournament game "NCAA Men's Basketball Championship - ..."
+    // and every conference-tournament game with its own name; a conference final between two bracket teams on
+    // Selection Sunday must not become a gameResult (push alert, upset flag). A game with no note at all still passes.
+    if (game.note && !/NCAA/.test(game.note)) continue;
     if (_reportedFinals.has(game.id)) continue;
 
     // Check if either team in this game belongs to this room
