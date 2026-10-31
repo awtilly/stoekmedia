@@ -69,10 +69,30 @@ function lockAdmin(){
 
 let _pinFailCount = 0;
 
+/* True only when a stored session exists and is older than the 4 h window. */
+function adminSessionExpired(){
+  const k = adminSessionKey();
+  if(!k) return false;
+  try {
+    const raw = localStorage.getItem(k);
+    if(!raw) return false;
+    return Date.now() - Number(raw) > ADMIN_SESSION_HOURS * 3600 * 1000;
+  } catch(e){ return false; }
+}
+
 async function requireAdmin(){
   if(!roomId) return true;
+  // A tab left open past the 4 h window stays unlocked in memory; drop it so the PIN is asked again.
+  if(adminUnlocked && adminSessionExpired()) checkAdminSession();
   if(adminUnlocked) return true;
-  const doc = await db.collection("rooms").doc(roomId).get();
+  let doc;
+  try {
+    doc = await db.collection("rooms").doc(roomId).get();
+  } catch(e){
+    console.warn('requireAdmin: could not read the room', e);
+    showToast("Can't verify the PIN right now. Check your connection and try again.");
+    return false;
+  }
   const data = doc.exists ? doc.data() : null;
   if(!data || !data.adminPin){
     const pin = await appPrompt("This room has no admin PIN yet.\nSet a 4-digit PIN to protect editing:", { title: 'Set Admin PIN', placeholder: '4-digit PIN' });
@@ -159,12 +179,21 @@ async function claimPlayer(id){
       delete player.passphraseHash;
       saveState();
     }
+  } else {
+    // No credential at all (a 2026 room from before PINs, or a state edited by hand). Every
+    // creation path sets a PIN, so instead of letting any tap take the seat, lock it now.
+    const newPin = await appPrompt('This seat has no PIN yet. Set a 4-digit PIN to claim it:', { title: 'Set your PIN', placeholder: '4-digit PIN' });
+    if(!newPin || !/^\d{4}$/.test(newPin.trim())){ showToast('PIN must be 4 digits'); return; }
+    player.pinHash = await hashPin(newPin.trim());
+    saveState();
   }
   setMyPlayerId(id);
   render();
 }
 
 async function selfRegister(){
+  // ds.order was fixed when the draft started; a player added now has no turn and no teams (removePlayer has the same guard).
+  if(S.ds && S.ds.started){ showToast('The draft has started. Ask the commissioner to reset it before new players join.'); return; }
   const name = document.getElementById('join-name').value.trim();
   const pin = document.getElementById('join-pin').value.trim();
   if(!name){ showToast('Enter your name'); return; }
