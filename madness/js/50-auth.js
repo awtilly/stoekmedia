@@ -172,6 +172,8 @@ async function claimPlayer(id){
 }
 
 async function selfRegister(){
+  // ds.order was fixed when the draft started; a player added now has no turn and no teams (removePlayer has the same guard).
+  if(S.ds && S.ds.started){ showToast('The draft has started. Ask the commissioner to reset it before new players join.'); return; }
   const name = document.getElementById('join-name').value.trim();
   const pin = document.getElementById('join-pin').value.trim();
   if(!name){ showToast('Enter your name'); return; }
