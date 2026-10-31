@@ -3,6 +3,7 @@ let liveScores = [];
 // liveScoresDate and liveScoresFilter are on S (persisted via VIEW_LOCAL)
 let liveRefreshTimer = null;
 let liveLastRefresh = 0;
+let liveLastError = false; // the last direct ESPN poll failed (offline, blocked, HTTP error); the Live tab says so instead of 'No games found'
 
 /* ── Cached scoreboard ──
  * The pollScoreboard Cloud Function (functions/scoreboard.js) writes the parsed ESPN
@@ -37,6 +38,7 @@ function applyCachedScoreboard(data, fromCache) {
   if (!usable) { _scoreboardFresh = false; return false; }
   _scoreboardFresh = true;
   _scoreboardSeenAt = Date.now();
+  liveLastError = false;
   liveScores = data.events;
   liveLastRefresh = data.fetchedAt.toMillis();
   checkGameFinals();
@@ -73,15 +75,16 @@ async function refreshLiveScores() {
   _scoreboardFresh = false;
   const dateStr = S.liveScoresDate || localDateStr();
   const data = await espn.fetchScoreboard(dateStr);
+  liveLastError = !data; // fetchScoreboard returns null on any failure
   if (data) {
     liveScores = espn.parseScoreboardEvents(data);
     liveLastRefresh = Date.now();
     checkGameFinals();
-    // Only re-render if we're on the live tab
-    if (S.phase === 'live') {
-      const c = document.getElementById('c');
-      if (c) renderLive(c);
-    }
+  }
+  // Only re-render if we're on the live tab (on failure too, so the "unavailable" notice shows)
+  if (S.phase === 'live') {
+    const c = document.getElementById('c');
+    if (c) renderLive(c);
   }
 }
 
