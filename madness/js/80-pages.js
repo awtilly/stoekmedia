@@ -159,6 +159,8 @@ async function shareLeaderboard() {
   }
 }
 
+const RESET_WRITE_TIMEOUT_MS = 5000;
+
 async function resetAll(){
   if(!await requireAdmin()) return;
   if(!await appConfirm("Start a new tournament? This will delete all data.", { title: 'New Tournament', danger: true, confirmLabel: 'Start Fresh' })) return;
@@ -175,10 +177,16 @@ async function resetAll(){
     });
     const shared = {};
     for(const k in freshState){ if(!VIEW_LOCAL.includes(k)) shared[k] = freshState[k]; }
-    db.collection("rooms").doc(roomId).update({
+    // Wait for the reset to reach Firestore before reloading: an unawaited write followed by an
+    // immediate reload can be lost, leaving every other device in the old tournament. Bounded so a
+    // dead network still reloads (the SDK queues the write and flushes it on reconnect).
+    const write = db.collection("rooms").doc(roomId).update({
       state: JSON.stringify(shared),
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     }).catch(() => {});
+    let timer;
+    await Promise.race([write, new Promise(r => { timer = setTimeout(r, RESET_WRITE_TIMEOUT_MS); })]);
+    clearTimeout(timer);
   }
   localStorage.removeItem(stateKey());
   if(roomId) localStorage.removeItem('mm4_me_' + roomId);
