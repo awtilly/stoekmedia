@@ -154,20 +154,23 @@ function _applyRoomSnapshot(doc){
   // real updatedAt). Both carry the exact string we wrote, so neither needs a parse or a redraw.
   if(data.state === _lastSyncedState) return;
   _lastSyncedState = data.state;
-  _isRemoteUpdate = true;
-  const local = {};
-  for(const k of VIEW_LOCAL) local[k] = S[k];
-  const remote = JSON.parse(data.state);
-  Object.assign(S, remote, local);
-  sanitizeSharedState(S);
-  if(S.ds && S.ds.pickDeadline && typeof S.ds.pickDeadline === 'object' && S.ds.pickDeadline.seconds){
-    S.ds.pickDeadline = new firebase.firestore.Timestamp(S.ds.pickDeadline.seconds, S.ds.pickDeadline.nanoseconds || 0);
+  _isRemoteUpdate = true; // gates saveState's Firestore write; MUST clear even if the parse or render throws
+  try {
+    const local = {};
+    for(const k of VIEW_LOCAL) local[k] = S[k];
+    const remote = JSON.parse(data.state);
+    Object.assign(S, remote, local);
+    sanitizeSharedState(S);
+    if(S.ds && S.ds.pickDeadline && typeof S.ds.pickDeadline === 'object' && S.ds.pickDeadline.seconds){
+      S.ds.pickDeadline = new firebase.firestore.Timestamp(S.ds.pickDeadline.seconds, S.ds.pickDeadline.nanoseconds || 0);
+    }
+    localStorage.setItem(stateKey(), JSON.stringify(S));
+    render();
+    updateAppBadge();
+    if('Notification' in window && Notification.permission === 'granted') initFCM().catch(() => {});
+  } finally {
+    _isRemoteUpdate = false;
   }
-  localStorage.setItem(stateKey(), JSON.stringify(S));
-  render();
-  updateAppBadge();
-  if('Notification' in window && Notification.permission === 'granted') initFCM().catch(() => {});
-  _isRemoteUpdate = false;
 }
 
 function getRecentRooms(){

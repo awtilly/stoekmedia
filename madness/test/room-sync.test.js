@@ -1,3 +1,4 @@
+const vm = require('node:vm');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { createApp } = require('./_harness');
@@ -75,4 +76,14 @@ test('forgetRecentRoom tolerates garbage in storage and keeps the others', () =>
   assert.deepEqual(app.getRecentRooms().map(r => r.code), ['EFGH']); // real-shaped codes: sanitize-room-code drops 1-char ones
   app.localStorage.setItem('mm4_rooms', 'not json');
   app.forgetRecentRoom('EFGH'); // must not throw
+});
+
+test('a snapshot whose state string is corrupt or whose render throws does not leave the Firestore write gate stuck', () => {
+  const app = roomApp();
+  const flag = () => vm.runInThisContext('_isRemoteUpdate');
+  assert.throws(() => app._applyRoomSnapshot({ exists: true, metadata: { fromCache: false }, data: () => ({ state: '{not json' }) }));
+  assert.equal(flag(), false, 'cleared after a parse failure');
+  app.render = () => { throw new Error('render bug'); };
+  assert.throws(() => app._applyRoomSnapshot({ exists: true, metadata: { fromCache: false }, data: () => ({ state: JSON.stringify({ players: [], teams: [] }) }) }));
+  assert.equal(flag(), false, 'cleared after a render failure');
 });
