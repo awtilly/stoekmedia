@@ -1,4 +1,4 @@
-let S = {
+function defaultState(){ return {
   phase: "draft",
   year: new Date().getFullYear(),
   players: [],
@@ -18,7 +18,8 @@ let S = {
   fs: "All",
   liveScoresDate: '',
   liveScoresFilter: 'all'
-};
+}; }
+let S = defaultState();
 
 /* ── Firebase Setup ── */
 const firebaseConfig = {
