@@ -253,7 +253,7 @@ function renderJoinScreen(){
   document.getElementById("app").innerHTML = `
     <div class="lobby">
       <h1><span>March Madness</span> Draft</h1>
-      <p class="lobby-sub">Welcome to room <strong>${roomId}</strong></p>
+      <p class="lobby-sub">Welcome to room <strong>${escapeHtml(roomId)}</strong></p>
       <div class="lobby-card">
         <h3>Join as New Player</h3>
         <p>Enter your name and a 4-digit PIN to join the draft.</p>

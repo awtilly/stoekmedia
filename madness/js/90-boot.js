@@ -1,17 +1,17 @@
 /* ── Boot ── */
 const params = new URLSearchParams(window.location.search);
 const tabParam = params.get("tab");
-let urlRoom = params.get("room");
+let urlRoom = sanitizeRoomCode(params.get("room")); // "" (falsy) for junk => lobby
 
 // Home-screen shortcuts (manifest.json) open ./?tab=... with no room param.
 // Fall back to the most recently used room so they land in the right tournament.
 if(!urlRoom && tabParam){
   const recent = getRecentRooms()[0];
-  if(recent) urlRoom = recent.code;
+  if(recent) urlRoom = sanitizeRoomCode(recent.code);
 }
 
 if(urlRoom){
-  roomId = urlRoom.toUpperCase();
+  roomId = urlRoom;
   if(!params.get("room")){
     const url = new URL(window.location);
     url.searchParams.set("room", roomId);
