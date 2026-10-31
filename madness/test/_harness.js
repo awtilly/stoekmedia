@@ -2,7 +2,7 @@
  * Loads the pure-logic subset of js/ into this Node process so the functions
  * can be unit tested without a browser or Firebase.
  *
- * Files loaded: 00-constants, 10-espn, 20-live, 70-logic. They are classic
+ * Files loaded: 00-constants, 10-espn, 20-live, 60-rooms, 70-logic. They are classic
  * scripts, so they are evaluated once with vm.runInThisContext (top-level
  * function declarations land on globalThis, exactly like a browser). Everything
  * they reach for at call time (S, requireAdmin, saveState, render, showToast,
@@ -19,7 +19,7 @@ const path = require('path');
 const vm = require('vm');
 
 const JS_DIR = path.resolve(__dirname, '..', 'js');
-const LOGIC_FILES = ['00-constants.js', '10-espn.js', '20-live.js', '70-logic.js'];
+const LOGIC_FILES = ['00-constants.js', '10-espn.js', '20-live.js', '60-rooms.js', '70-logic.js'];
 
 const REGIONS = ['South', 'East', 'Midwest', 'West'];
 
@@ -95,7 +95,7 @@ function loadOnce() {
  */
 function createApp(stateOverrides) {
   loadOnce();
-  const calls = { saveState: 0, render: 0, toasts: [], requireAdmin: 0 };
+  const calls = { saveState: 0, render: 0, toasts: [], requireAdmin: 0, goHome: 0 };
   globalThis.S = freshState(stateOverrides);
   globalThis.roomId = null;
   globalThis.db = null;
@@ -105,6 +105,9 @@ function createApp(stateOverrides) {
   globalThis.render = () => { calls.render++; };
   globalThis.showToast = (m) => { calls.toasts.push(m); };
   globalThis.appChoice = async () => null;
+  globalThis.goHome = () => { calls.goHome++; globalThis.roomId = null; };
+  globalThis.updateAppBadge = () => {};
+  globalThis.initFCM = async () => {};
   globalThis.fetch = async () => { throw new Error('fetch not stubbed for this test'); };
 
   const app = new Proxy({}, {
