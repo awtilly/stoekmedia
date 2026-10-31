@@ -66,19 +66,6 @@ function appConfirm(message, { title = '', confirmLabel = 'Confirm', danger = fa
   return _showModal(html);
 }
 
-function appChoice(message, choices, { title = '' } = {}) {
-  const html = `
-    ${title ? `<div class="modal-title">${escapeHtml(title)}</div>` : ''}
-    <div class="modal-msg">${escapeHtml(message)}</div>
-    <div class="modal-choices">
-      ${choices.map((ch, i) => `<button class="modal-choice-btn" onclick="this.closest('.modal-overlay')._close(${i})">${escapeHtml(ch)}</button>`).join('')}
-    </div>
-    <div class="modal-actions">
-      <button class="btn btn-secondary" onclick="this.closest('.modal-overlay')._close(null)">Cancel</button>
-    </div>`;
-  return _showModal(html);
-}
-
 function appAlert(message, { title = '' } = {}) {
   const html = `
     ${title ? `<div class="modal-title">${escapeHtml(title)}</div>` : ''}
