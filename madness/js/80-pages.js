@@ -901,6 +901,23 @@ function updateDraftClock(){
   }
 }
 
+/* -- Auto-pick retry --
+   updateDraftClock() stops the clock the moment a pick expires and hands off to autoPickHighestSeed(). When that
+   transaction throws (phone briefly offline, Firestore contention), nothing on this device ran again until a
+   snapshot or a tab change called render(), and no snapshot comes while the pick is unmade: the room stalled.
+   Restart the clock after a pause instead. Its next tick sees the deadline still expired and tries the pick
+   again; if another device's pick landed meanwhile, render() already moved the deadline and the clock just runs. */
+const AUTOPICK_RETRY_MS = 5000;
+let _autoPickRetry = null;
+
+function scheduleAutoPickRetry(){
+  if(_autoPickRetry) return;
+  _autoPickRetry = setTimeout(() => {
+    _autoPickRetry = null;
+    if(draftClockShouldRun(S.ds)) startDraftClock();
+  }, AUTOPICK_RETRY_MS);
+}
+
 async function autoPickHighestSeed(expiredDeadlineSeconds){
   _beeped = false;
   const myId = getMyPlayerId();
@@ -944,7 +961,10 @@ async function autoPickHighestSeed(expiredDeadlineSeconds){
       });
       if(pickedName) showToast('Auto-picked: ' + pickedName);
       updateAppBadge();
-    } catch(err){ console.warn('Auto-pick failed:', err); }
+    } catch(err){
+      console.warn('Auto-pick failed:', err);
+      scheduleAutoPickRetry();
+    }
     return;
   }
   // Local-only fallback
