@@ -1,4 +1,4 @@
-let S = {
+function defaultState(){ return {
   phase: "draft",
   year: new Date().getFullYear(),
   players: [],
@@ -18,7 +18,8 @@ let S = {
   fs: "All",
   liveScoresDate: '',
   liveScoresFilter: 'all'
-};
+}; }
+let S = defaultState();
 
 /* ── Firebase Setup ── */
 const firebaseConfig = {
@@ -67,7 +68,7 @@ try {
   if ('Notification' in window) {
     firebase.messaging().onMessage((payload) => {
       const data = payload.data || {};
-      const title = data.title || 'March Madness Draft';
+      const title = data.title || APP_NAME;
       const body = data.body || '';
       showToast(title + ': ' + body);
     });
@@ -95,7 +96,7 @@ function showNotificationPrompt(){
   if (localStorage.getItem('mm4_notif_dismissed')) return;
   if (document.querySelector('.notif-banner, .notif-overlay')) return;
 
-  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  const isIOS = isIOSDevice();
   const isStandalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
 
   if (isIOS && !isStandalone){
