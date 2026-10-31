@@ -17,6 +17,7 @@ function goHome() {
   flushFirestoreWrite(); // last edit in this room goes to this room, before roomId is cleared
   if(unsubRoom) { unsubRoom(); unsubRoom = null; }
   roomId = null;
+  loadState(); // drop the room's state from memory so nothing from it can reach the offline cache
   const url = new URL(window.location);
   url.searchParams.delete("room");
   window.history.replaceState({}, "", url);
@@ -282,7 +283,7 @@ async function importFromESPN(){
 
     // Sanity check: 4 regions × 16 slots = 64 bracket slots. With play-ins, total team
     // entries should be 64-68. Anything outside that means ESPN data is partial/stale.
-    const slotCount = new Set(teams.map(t => `${t.seed}_${t.region}`)).size;
+    const slotCount = new Set(teams.map(t => `${escapeHtml(t.seed)}_${escapeHtml(t.region)}`)).size;
     const regionCounts = teams.reduce((acc, t) => { acc[t.region] = (acc[t.region]||0)+1; return acc; }, {});
     const incomplete = slotCount < 64 || Object.values(regionCounts).some(n => n < 16) || REGIONS.some(r => !regionCounts[r]);
     if(incomplete){
@@ -399,6 +400,7 @@ function renderLive(c){
           ${displayDate}
           ${hasLive ? ' <span class="live-pulse"><span class="dot"></span>LIVE</span>' : ''}
           ${liveLastRefresh ? ` <span style="font-size:11px;color:var(--g400)">Updated ${new Date(liveLastRefresh).toLocaleTimeString()}</span>` : ''}
+          ${liveLastError ? ` <span class="live-error" style="font-size:11px;color:var(--red)">Scores unavailable, retrying</span>` : ''}
         </p>
       </div>
       <div class="row" style="gap:8px">
@@ -414,7 +416,9 @@ function renderLive(c){
       <button class="live-filter-btn ${S.liveScoresFilter==='upcoming'?'active':''}" onclick="S.liveScoresFilter='upcoming';renderLiveInPlace()">Upcoming (${liveScores.filter(g=>g.state==='pre').length})</button>
       <button class="live-filter-btn ${S.liveScoresFilter==='final'?'active':''}" onclick="S.liveScoresFilter='final';renderLiveInPlace()">Final (${liveScores.filter(g=>g.state==='post').length})</button>
     </div>
-    ${filtered.length === 0 ? '<div class="card" style="text-align:center;padding:40px;color:var(--g400)"><p style="font-size:16px;font-weight:700;margin-bottom:4px">No games found</p><p style="font-size:13px">Try a different date or check back later.</p></div>' : ''}
+    ${filtered.length === 0 ? (liveLastError && liveScores.length === 0
+      ? '<div class="card live-error" style="text-align:center;padding:40px;color:var(--g400)"><p style="font-size:16px;font-weight:700;margin-bottom:4px">Scores unavailable</p><p style="font-size:13px">Could not reach the scoreboard. Check your connection; this page retries automatically.</p></div>'
+      : '<div class="card" style="text-align:center;padding:40px;color:var(--g400)"><p style="font-size:16px;font-weight:700;margin-bottom:4px">No games found</p><p style="font-size:13px">Try a different date or check back later.</p></div>') : ''}
     <div class="scores-grid">
       ${filtered.map(game => {
         const awayOur = findOurTeam(game.away);
@@ -508,7 +512,7 @@ function renderDraft(c){
     const pt = myP ? S.teams.filter(t => myP.teamIds.includes(t.id)).sort((a,b) => a.seed - b.seed) : [];
     c.innerHTML = `<div class="section-title">Your Team</div>
     ${myP ? `<div class="card"><span class="label">Team ${escapeHtml(myP.name)} (${pt.length} teams)</span>
-      ${pt.map(t => { const w = (S.games||[]).filter(g => g.wid===t.id).length; const el = (S.games||[]).some(g => (g.t1===t.id||g.t2===t.id) && g.wid && g.wid!==t.id); return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--g100)">${teamLogoHTML(t, 24)}${seedBadge(t.seed)}<div style="flex:1"><div style="font-weight:600">${escapeHtml(teamDisplayName(t))}</div><div style="font-size:11px;color:var(--g400)">${t.region}</div></div><div style="text-align:right">${el ? '<span style="color:var(--red);font-weight:700">Eliminated</span>' : `<span style="color:var(--green);font-weight:700">${w > 0 ? w + 'W' : 'Alive'}</span>`}</div></div>`}).join('')}
+      ${pt.map(t => { const w = (S.games||[]).filter(g => g.wid===t.id).length; const el = (S.games||[]).some(g => (g.t1===t.id||g.t2===t.id) && g.wid && g.wid!==t.id); return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--g100)">${teamLogoHTML(t, 24)}${seedBadge(t.seed)}<div style="flex:1"><div style="font-weight:600">${escapeHtml(teamDisplayName(t))}</div><div style="font-size:11px;color:var(--g400)">${escapeHtml(t.region)}</div></div><div style="text-align:right">${el ? '<span style="color:var(--red);font-weight:700">Eliminated</span>' : `<span style="color:var(--green);font-weight:700">${w > 0 ? w + 'W' : 'Alive'}</span>`}</div></div>`}).join('')}
     </div>` : '<div class="card" style="text-align:center;padding:20px;color:var(--g400)">Join as a player to see your team.</div>'}
     ${adminUnlocked ? `<div style="margin-top:14px"><div class="row" style="gap:6px;justify-content:center"><button class="btn btn-secondary btn-sm" onclick="undoDraft()" ${ds.cp === 0 ? 'disabled' : ''}>Undo Last Pick</button><button class="btn btn-danger btn-sm" onclick="resetDraft()">Reset Draft</button></div></div>` : ''}`;
     return;
@@ -552,24 +556,55 @@ function renderDraft(c){
       <select onchange="S.fr=this.value;render()" style="width:130px"><option value="All" ${S.fr==='All'?'selected':''}>All Regions</option>${REGIONS.map(r => `<option value="${r}" ${S.fr===r?'selected':''}>${r}</option>`).join('')}</select>
       <select onchange="S.fs=this.value;render()" style="width:110px"><option value="All" ${S.fs==='All'?'selected':''}>All Seeds</option>${SEEDS.map(s => `<option value="${s}" ${String(S.fs)===String(s)?'selected':''}>Seed ${s}</option>`).join('')}</select>
       <span style="color:var(--g400);font-size:12px">${av.length} available</span></div>
-    <div class="draft-teams">${av.map(t => `<button class="pick-btn" onclick="pickTeam('${t.id}')" ${!isMyTurn ? 'disabled' : ''}>${teamLogoHTML(t, 20)}${seedBadge(t.seed)}<div><div style="font-weight:600">${escapeHtml(teamDisplayName(t))}</div><div style="font-size:11px;color:var(--g400)">${t.region}${teamRecordDisplay(t) ? ` · ${teamRecordDisplay(t)}` : ''}</div></div></button>`).join('')}</div></div>
+    <div class="draft-teams">${av.map(t => `<button class="pick-btn" onclick="pickTeam('${t.id}')" ${!isMyTurn ? 'disabled' : ''}>${teamLogoHTML(t, 20)}${seedBadge(t.seed)}<div><div style="font-weight:600">${escapeHtml(teamDisplayName(t))}</div><div style="font-size:11px;color:var(--g400)">${escapeHtml(t.region)}${teamRecordDisplay(t) ? ` · ${escapeHtml(teamRecordDisplay(t))}` : ''}</div></div></button>`).join('')}</div></div>
   <div><span class="label">Rosters</span>
     ${S.players.map(p => {const pt = S.teams.filter(t => p.teamIds.includes(t.id)).sort((a,b) => a.seed - b.seed); const act = p.id === cid; const _isMe = p.id === myId; return `<div class="roster-card ${act?'active':''}"><div class="row" style="justify-content:space-between;margin-bottom:4px"><span style="font-weight:700;font-size:13px;color:${act||_isMe?'var(--gold)':'var(--black)'}${_isMe?';font-weight:800':''}">${escapeHtml(p.name)}</span><span style="color:var(--g400);font-size:11px">${pt.length}</span></div>${pt.map(t => `<div style="display:flex;align-items:center;gap:5px;font-size:12px;padding:1px 0">${teamLogoHTML(t, 20)}${seedBadge(t.seed)} ${escapeHtml(teamDisplayName(t))}</div>`).join('')}</div>`}).join('')}
   </div></div>`;
 }
 
-async function startDraft(){
-  if(!await requireAdmin()) return;
-  _beeped = false;
-  const duration = S.draftClockDuration || 0;
-  S.ds = {
-    order: snakeOrder(S.players.map(p => p.id), S.teams.length),
+function _freshDraftState(players, teams, duration){
+  return {
+    order: snakeOrder(players.map(p => p.id), teams.length),
     cp: 0, started: true, complete: false,
     timerDuration: duration,
     pickDeadline: duration > 0 ? firebase.firestore.Timestamp.fromDate(new Date(Date.now() + duration * 1000)) : null,
     timerPaused: false,
     pausedRemaining: null
   };
+}
+
+async function startDraft(){
+  if(!await requireAdmin()) return;
+  if(S.ds && S.ds.started){ showToast('The draft has already started'); return; }
+  const duration = S.draftClockDuration || 0;
+  // Room: start transactionally against the server copy, like pickTeam(). A second admin device whose
+  // lobby is stale must not overwrite a draft that already has picks with a fresh order and empty rosters.
+  if(roomId){
+    try {
+      await db.runTransaction(async (tx) => {
+        const ref = db.collection("rooms").doc(roomId);
+        const snap = await tx.get(ref);
+        if(!snap.exists) throw { code: 'no-room', msg: 'Room not found' };
+        const remote = JSON.parse(snap.data().state || '{}');
+        if(remote.ds && remote.ds.started) throw { code: 'started', msg: 'The draft was already started on another device' };
+        const players = remote.players || [], teams = remote.teams || [];
+        if(players.length < 2 || teams.length < players.length) throw { code: 'not-ready', msg: 'Need 2+ players and at least one team per player' };
+        remote.ds = _freshDraftState(players, teams, duration);
+        players.forEach(p => p.teamIds = []);
+        tx.update(ref, {
+          state: JSON.stringify(remote),
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+      });
+      _beeped = false; // the snapshot listener applies the started draft and render() starts the clock
+    } catch(err){
+      if(err && err.msg) showToast(err.msg);
+      else { console.warn('Start draft failed:', err); showToast('Start failed — try again'); }
+    }
+    return;
+  }
+  _beeped = false;
+  S.ds = _freshDraftState(S.players, S.teams, duration);
   S.players.forEach(p => p.teamIds = []);
   if(duration > 0) startDraftClock();
   saveState();
@@ -814,13 +849,13 @@ function updateDraftClock(){
     stopDraftClock();
     const myId = getMyPlayerId();
     if(myId === ds.order[ds.cp] || adminUnlocked){
-      autoPickHighestSeed();
+      autoPickHighestSeed(ds.pickDeadline && ds.pickDeadline.seconds != null ? ds.pickDeadline.seconds : null);
     }
     // Other clients will receive the pick via Firestore listener
   }
 }
 
-async function autoPickHighestSeed(){
+async function autoPickHighestSeed(expiredDeadlineSeconds){
   _beeped = false;
   const myId = getMyPlayerId();
   // Transactional path for multiplayer: computes highest-available against server state
@@ -834,6 +869,8 @@ async function autoPickHighestSeed(){
         const remote = JSON.parse(snap.data().state || '{}');
         const ds = remote.ds || {};
         if(ds.complete || !ds.started) return;
+        // Another client's auto-pick already landed and reset the clock: stand down.
+        if(pickDeadlineMoved(expiredDeadlineSeconds, ds.pickDeadline)) return;
         // Only the active drafter (or admin) drives the auto-pick to avoid duplicate fires
         if(!adminUnlocked && myId !== ds.order[ds.cp]) return;
         const taken = new Set((remote.players || []).flatMap(p => p.teamIds || []));
@@ -981,7 +1018,7 @@ function renderRegionBracket(region){
   const _rwMine = rw && _rwMyP && _rwMyP.teamIds.includes(rw.id);
   html += `<div class="round" style="min-width:120px;justify-content:center"><div class="round-header">Region Winner</div>
     <div class="gw ${_rwMine?'region-winner mine':''}"><div style="text-align:center;padding:12px">
-      ${rw ? `${teamLogoHTML(rw, 28) ? `<div style="margin-bottom:4px">${teamLogoHTML(rw, 28)}</div>` : ''}<div style="font-size:11px;color:var(--gold);font-weight:800">${rw.seed}</div><div style="font-weight:800;font-size:14px">${escapeHtml(teamDisplayName(rw))}</div><div style="font-size:11px;color:var(--g400)">${owner(rw.id) || ''}</div>` : '<div style="color:var(--g300);font-size:13px">TBD</div>'}
+      ${rw ? `${teamLogoHTML(rw, 28) ? `<div style="margin-bottom:4px">${teamLogoHTML(rw, 28)}</div>` : ''}<div style="font-size:11px;color:var(--gold);font-weight:800">${escapeHtml(rw.seed)}</div><div style="font-weight:800;font-size:14px">${escapeHtml(teamDisplayName(rw))}</div><div style="font-size:11px;color:var(--g400)">${escapeHtml(owner(rw.id))}</div>` : '<div style="color:var(--g300);font-size:13px">TBD</div>'}
     </div></div></div>`;
   html += `</div></div>`;
   area.innerHTML = html;
@@ -1001,7 +1038,7 @@ function slotHTML(region, gi, team, winnerId){
     ontouchstart="startLongPress(()=>clearBracketGame('${region}',${gi}))"
     ontouchend="endLongPress(event)"
     ontouchmove="cancelLongPress()">
-    ${teamLogoHTML(team, 16)}<span class="sd">${team.seed}</span><span class="tn">${escapeHtml(teamDisplayName(team))}</span>${ow ? `<span class="ow">${escapeHtml(ow)}</span>` : ''}
+    ${teamLogoHTML(team, 16)}<span class="sd">${escapeHtml(team.seed)}</span><span class="tn">${escapeHtml(teamDisplayName(team))}</span>${ow ? `<span class="ow">${escapeHtml(ow)}</span>` : ''}
   </div>`;
 }
 
@@ -1031,7 +1068,7 @@ function renderFF(){
       ontouchstart="startLongPress(()=>clearFFGame(${ffIdx}))"
       ontouchend="endLongPress(event)"
       ontouchmove="cancelLongPress()">
-      ${teamLogoHTML(team, 20)}<span class="sd">${team.seed}</span>${escapeHtml(teamDisplayName(team))}<span style="margin-left:auto;font-size:10px;color:var(--g400)">${owner(team.id) || ''}</span></div>`;
+      ${teamLogoHTML(team, 20)}<span class="sd">${escapeHtml(team.seed)}</span>${escapeHtml(teamDisplayName(team))}<span style="margin-left:auto;font-size:10px;color:var(--g400)">${escapeHtml(owner(team.id))}</span></div>`;
   }
 
   const ff0t = ff0 ? S.teams.find(t => t.id === ff0) : null;
@@ -1067,7 +1104,7 @@ function renderFF(){
         </div>
         <div class="champ-box">
           <div class="champ-label">Champion</div>
-          ${champt ? `${teamLogoHTML(champt, 32) ? `<div style="margin-bottom:4px">${teamLogoHTML(champt, 32)}</div>` : ''}<div class="champ-team">${seedBadge(champt.seed)} ${escapeHtml(teamDisplayName(champt))}</div><div class="champ-owner">${owner(champt.id) || ''}</div>` : '<div class="champ-team" style="color:var(--g300)">TBD</div>'}
+          ${champt ? `${teamLogoHTML(champt, 32) ? `<div style="margin-bottom:4px">${teamLogoHTML(champt, 32)}</div>` : ''}<div class="champ-team">${seedBadge(champt.seed)} ${escapeHtml(teamDisplayName(champt))}</div><div class="champ-owner">${escapeHtml(owner(champt.id))}</div>` : '<div class="champ-team" style="color:var(--g300)">TBD</div>'}
         </div>
       </div>
     </div>

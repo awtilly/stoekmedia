@@ -57,6 +57,7 @@ function loadState(){
   try {
     const s = localStorage.getItem(stateKey());
     if(s) Object.assign(S, JSON.parse(s));
+    sanitizeSharedState(S);
     // Reconstruct Firestore Timestamp from serialized JSON
     if(S.ds && S.ds.pickDeadline && typeof S.ds.pickDeadline === 'object' && S.ds.pickDeadline.seconds){
       S.ds.pickDeadline = new firebase.firestore.Timestamp(S.ds.pickDeadline.seconds, S.ds.pickDeadline.nanoseconds || 0);
@@ -71,7 +72,8 @@ async function createRoom(){
   if(!raw){ await appAlert("Enter a room name."); return; }
   const code = raw.toUpperCase().replace(/[^A-Z0-9]/g,'');
   if(code.length < 2 || code.length > 20){ await appAlert("Room name must be 2-20 letters/numbers."); return; }
-  const existing = await db.collection("rooms").doc(code).get();
+  // Courtesy check only (offline with nothing cached it rejects; the transaction below is the real guard).
+  const existing = await db.collection("rooms").doc(code).get().catch(() => ({ exists: false }));
   if(existing.exists){ await appAlert("That room name is already taken. Try another."); return; }
   const pin = await appPrompt("Set a 4-digit admin PIN to protect editing:", { title: 'Set Admin PIN', placeholder: '4-digit PIN' });
   if(!pin || !/^\d{4}$/.test(pin.trim())){ await appAlert("PIN must be exactly 4 digits."); return; }
@@ -85,7 +87,26 @@ async function createRoom(){
   if(!S.bracketRegion) S.bracketRegion = "South";
   if(!S.games) S.games = [];
   syncGames();
-  await db.collection("rooms").doc(code).set({ adminPin: hashedPin, state: JSON.stringify(S), updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+  // Create inside a transaction: the get() above is only a courtesy check. If someone else grabbed the
+  // same code in the meantime, their room (and admin PIN) must not be overwritten.
+  const ref = db.collection("rooms").doc(code);
+  let created = false, failure = null;
+  try {
+    created = await db.runTransaction(async tx => {
+      const snap = await tx.get(ref);
+      if(snap.exists) return false;
+      tx.set(ref, { adminPin: hashedPin, state: JSON.stringify(S), updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+      return true;
+    });
+  } catch(e){ console.warn("Room create error:", e); failure = e; }
+  if(!created){
+    roomId = null;
+    loadState();
+    url.searchParams.delete("room");
+    window.history.replaceState({}, "", url);
+    await appAlert(failure ? "Couldn't create the room (offline?). Check your connection and try again." : "That room name was just taken. Try another.");
+    return;
+  }
   unlockAdmin();
   connectToRoom(code);
   render();
@@ -152,19 +173,23 @@ function _applyRoomSnapshot(doc){
   // real updatedAt). Both carry the exact string we wrote, so neither needs a parse or a redraw.
   if(data.state === _lastSyncedState) return;
   _lastSyncedState = data.state;
-  _isRemoteUpdate = true;
-  const local = {};
-  for(const k of VIEW_LOCAL) local[k] = S[k];
-  const remote = JSON.parse(data.state);
-  Object.assign(S, remote, local);
-  if(S.ds && S.ds.pickDeadline && typeof S.ds.pickDeadline === 'object' && S.ds.pickDeadline.seconds){
-    S.ds.pickDeadline = new firebase.firestore.Timestamp(S.ds.pickDeadline.seconds, S.ds.pickDeadline.nanoseconds || 0);
+  _isRemoteUpdate = true; // gates saveState's Firestore write; MUST clear even if the parse or render throws
+  try {
+    const local = {};
+    for(const k of VIEW_LOCAL) local[k] = S[k];
+    const remote = JSON.parse(data.state);
+    Object.assign(S, remote, local);
+    sanitizeSharedState(S);
+    if(S.ds && S.ds.pickDeadline && typeof S.ds.pickDeadline === 'object' && S.ds.pickDeadline.seconds){
+      S.ds.pickDeadline = new firebase.firestore.Timestamp(S.ds.pickDeadline.seconds, S.ds.pickDeadline.nanoseconds || 0);
+    }
+    localStorage.setItem(stateKey(), JSON.stringify(S));
+    render();
+    updateAppBadge();
+    if('Notification' in window && Notification.permission === 'granted') initFCM().catch(() => {});
+  } finally {
+    _isRemoteUpdate = false;
   }
-  localStorage.setItem(stateKey(), JSON.stringify(S));
-  render();
-  updateAppBadge();
-  if('Notification' in window && Notification.permission === 'granted') initFCM().catch(() => {});
-  _isRemoteUpdate = false;
 }
 
 function getRecentRooms(){

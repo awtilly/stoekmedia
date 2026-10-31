@@ -3,21 +3,88 @@ let liveScores = [];
 // liveScoresDate and liveScoresFilter are on S (persisted via VIEW_LOCAL)
 let liveRefreshTimer = null;
 let liveLastRefresh = 0;
+let liveLastError = false; // the last direct ESPN poll failed (offline, blocked, HTTP error); the Live tab says so instead of 'No games found'
+
+/* ── Cached scoreboard ──
+ * The pollScoreboard Cloud Function (functions/scoreboard.js) writes the parsed ESPN
+ * scoreboard to Firestore doc scoreboard/{YYYYMMDD} once a minute during the tournament.
+ * Clients listen to that doc instead of each polling ESPN every 30s. If the doc is
+ * missing, stale, or unreadable (function not deployed, off-season, rules not updated),
+ * we fall back to the original direct ESPN polling, so nothing breaks either way. */
+const SCOREBOARD_COLLECTION = 'scoreboard';
+const SCOREBOARD_MAX_AGE_MS = 3 * 60 * 1000; // doc older than this => poll ESPN directly
+let _scoreboardUnsub = null;
+let _scoreboardFresh = false; // true while the cached doc is current; direct polling pauses
+let _scoreboardSeenAt = 0;    // local clock when the last usable snapshot arrived (freshness is measured from here, so a wrong phone clock cannot defeat the cache)
+
+function localDateStr(d) {
+  const n = d || new Date();
+  return n.getFullYear() + String(n.getMonth()+1).padStart(2,'0') + String(n.getDate()).padStart(2,'0');
+}
+
+function scoreboardDocValid(data) {
+  return !!(data && Array.isArray(data.events) && data.fetchedAt && data.fetchedAt.toMillis && data.fetchedAt.toMillis() > 0);
+}
+
+function scoreboardIsFresh(data, now) {
+  if (!scoreboardDocValid(data)) return false;
+  return ((now || Date.now()) - data.fetchedAt.toMillis()) < SCOREBOARD_MAX_AGE_MS;
+}
+
+/* fromCache: the snapshot was replayed from Firestore's on-device persistence rather than delivered
+ * by the server. A server-delivered doc is current by definition; a replayed one is judged by fetchedAt. */
+function applyCachedScoreboard(data, fromCache) {
+  const usable = fromCache ? scoreboardIsFresh(data) : scoreboardDocValid(data);
+  if (!usable) { _scoreboardFresh = false; return false; }
+  _scoreboardFresh = true;
+  _scoreboardSeenAt = Date.now();
+  liveLastError = false;
+  liveScores = data.events;
+  liveLastRefresh = data.fetchedAt.toMillis();
+  checkGameFinals();
+  if (S.phase === 'live') {
+    const c = document.getElementById('c');
+    if (c) renderLive(c);
+  }
+  return true;
+}
+
+function subscribeScoreboard(dateStr) {
+  unsubscribeScoreboard();
+  if (typeof db === 'undefined' || !db) return;
+  _scoreboardUnsub = db.collection(SCOREBOARD_COLLECTION).doc(dateStr).onSnapshot(doc => {
+    if (!doc.exists || !applyCachedScoreboard(doc.data(), !!(doc.metadata && doc.metadata.fromCache))) {
+      _scoreboardFresh = false;
+      refreshLiveScores();
+    }
+  }, err => {
+    console.warn('Scoreboard cache unavailable, polling ESPN directly:', err && err.code || err);
+    _scoreboardFresh = false;
+    refreshLiveScores();
+  });
+}
+
+function unsubscribeScoreboard() {
+  if (_scoreboardUnsub) { _scoreboardUnsub(); _scoreboardUnsub = null; }
+  _scoreboardFresh = false;
+}
 
 async function refreshLiveScores() {
-  const now = new Date();
-  const localToday = now.getFullYear() + String(now.getMonth()+1).padStart(2,'0') + String(now.getDate()).padStart(2,'0');
-  const dateStr = S.liveScoresDate || localToday;
+  // Cached doc is current: the Cloud Function is doing the polling for everyone.
+  if (_scoreboardFresh && (Date.now() - _scoreboardSeenAt) < SCOREBOARD_MAX_AGE_MS) return;
+  _scoreboardFresh = false;
+  const dateStr = S.liveScoresDate || localDateStr();
   const data = await espn.fetchScoreboard(dateStr);
+  liveLastError = !data; // fetchScoreboard returns null on any failure
   if (data) {
     liveScores = espn.parseScoreboardEvents(data);
     liveLastRefresh = Date.now();
     checkGameFinals();
-    // Only re-render if we're on the live tab
-    if (S.phase === 'live') {
-      const c = document.getElementById('c');
-      if (c) renderLive(c);
-    }
+  }
+  // Only re-render if we're on the live tab (on failure too, so the "unavailable" notice shows)
+  if (S.phase === 'live') {
+    const c = document.getElementById('c');
+    if (c) renderLive(c);
   }
 }
 
@@ -156,8 +223,10 @@ function autoAdvanceBracket(game) {
 function startLiveRefresh() {
   stopLiveRefresh();
   autoResolvePlayIns();
-  refreshLiveScores();
-  liveRefreshTimer = setInterval(refreshLiveScores, 30000); // every 30s
+  subscribeScoreboard(S.liveScoresDate || localDateStr());
+  // Give the cached doc a moment to arrive; if it hasn't, poll ESPN directly.
+  setTimeout(() => { if (!_scoreboardFresh) refreshLiveScores(); }, 1500);
+  liveRefreshTimer = setInterval(refreshLiveScores, 30000); // every 30s (no-op while cache is fresh)
   requestWakeLock();
 }
 
@@ -166,6 +235,7 @@ function stopLiveRefresh() {
     clearInterval(liveRefreshTimer);
     liveRefreshTimer = null;
   }
+  unsubscribeScoreboard();
   releaseWakeLock();
 }
 
