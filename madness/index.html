@@ -1631,38 +1631,6 @@ button, a, .pick-btn, .preset-btn, .round-tab, .live-filter-btn, .icon-btn {
   border-radius: 10px;
 }
 
-.modal-choices {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-bottom: 16px;
-}
-
-.modal-choice-btn {
-  width: 100%;
-  padding: 14px 16px;
-  border: 1.5px solid var(--g200);
-  border-radius: 10px;
-  background: var(--white);
-  font-size: 15px;
-  font-weight: 600;
-  font-family: inherit;
-  color: var(--black);
-  cursor: pointer;
-  text-align: left;
-  transition: all .15s;
-  -webkit-tap-highlight-color: transparent;
-}
-
-.modal-choice-btn:hover {
-  border-color: var(--gold);
-  background: var(--gold-bg);
-}
-
-.modal-choice-btn:active {
-  transform: scale(.98);
-}
-
 @media (max-width: 700px) {
   .modal-overlay {
     align-items: flex-end;
@@ -2002,15 +1970,15 @@ button, a, .pick-btn, .preset-btn, .round-tab, .live-filter-btn, .icon-btn {
 <!-- App code lives in js/ as classic scripts sharing one global scope (not ES modules).
      Load order = filename prefix. ?v= is a content hash maintained by scripts/stamp.js
      (sw.js is cache-first for these files, so the URL must change when they do). -->
-<script src="js/00-constants.js?v=f4050119e7"></script>
-<script src="js/10-espn.js?v=f4050119e7"></script>
-<script src="js/20-live.js?v=f4050119e7"></script>
-<script src="js/30-state.js?v=f4050119e7"></script>
-<script src="js/40-ui.js?v=f4050119e7"></script>
-<script src="js/50-auth.js?v=f4050119e7"></script>
-<script src="js/60-rooms.js?v=f4050119e7"></script>
-<script src="js/70-logic.js?v=f4050119e7"></script>
-<script src="js/80-pages.js?v=f4050119e7"></script>
-<script src="js/90-boot.js?v=f4050119e7"></script>
+<script src="js/00-constants.js?v=e7d1d7f90e"></script>
+<script src="js/10-espn.js?v=e7d1d7f90e"></script>
+<script src="js/20-live.js?v=e7d1d7f90e"></script>
+<script src="js/30-state.js?v=e7d1d7f90e"></script>
+<script src="js/40-ui.js?v=e7d1d7f90e"></script>
+<script src="js/50-auth.js?v=e7d1d7f90e"></script>
+<script src="js/60-rooms.js?v=e7d1d7f90e"></script>
+<script src="js/70-logic.js?v=e7d1d7f90e"></script>
+<script src="js/80-pages.js?v=e7d1d7f90e"></script>
+<script src="js/90-boot.js?v=e7d1d7f90e"></script>
 </body>
 </html>
