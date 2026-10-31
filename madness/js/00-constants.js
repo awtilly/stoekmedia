@@ -6,3 +6,7 @@ const FEEDERS = {8:[0,1], 9:[2,3], 10:[4,5], 11:[6,7], 12:[8,9], 13:[10,11], 14:
 
 const generateId = () => crypto.randomUUID();
 
+// localStorage key for the cached copy of S. One key per room so entering room B never shows or
+// uploads room A's players and picks; "mm4" is kept for offline play (no room).
+const stateKey = () => roomId ? 'mm4_state_' + roomId : 'mm4';
+
