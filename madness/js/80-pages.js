@@ -14,8 +14,10 @@ function bottomNavHTML(_, canT) {
 /* ── Go Home (back to lobby) ── */
 function goHome() {
   stopLiveRefresh();
+  flushFirestoreWrite(); // last edit in this room goes to this room, before roomId is cleared
   if(unsubRoom) { unsubRoom(); unsubRoom = null; }
   roomId = null;
+  loadState(); // drop the room's state from memory so nothing from it can reach the offline cache
   const url = new URL(window.location);
   url.searchParams.delete("room");
   window.history.replaceState({}, "", url);
@@ -105,12 +107,6 @@ function navigate(p){
   });
 }
 
-function copyRoomLink(){
-  const url = new URL(window.location);
-  url.searchParams.set("room", roomId);
-  navigator.clipboard.writeText(url.toString()).then(() => showToast("Room link copied!")).catch(() => showToast("Link: " + url.toString()));
-}
-
 async function shareRoomLink() {
   const url = new URL(window.location);
   url.searchParams.set('room', roomId);
@@ -182,7 +178,7 @@ async function resetAll(){
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     }).catch(() => {});
   }
-  localStorage.removeItem("mm4");
+  localStorage.removeItem(stateKey());
   if(roomId) localStorage.removeItem('mm4_me_' + roomId);
   location.reload();
 }
@@ -220,15 +216,6 @@ async function movePlayer(i, d){
   [S.players[i], S.players[s]] = [S.players[s], S.players[i]];
   saveState();
   render();
-}
-
-/* ── Teams Page ── */
-function renderTeams(c){
-  const br = REGIONS.map(r => ({r, t: S.teams.filter(t => t.region === r).sort((a,b) => a.seed - b.seed)}));
-  c.innerHTML = `<div class="section-title">Teams <span style="color:var(--gold);font-size:16px">${S.teams.length}/64</span></div>
-  <p class="section-desc">All 64 tournament teams.</p>
-  ${S.teams.length === 0 ? `<div class="card" style="text-align:center;padding:32px 20px;color:var(--g400)"><p style="font-size:15px;margin-bottom:4px">No teams loaded.</p><p style="font-size:13px">The commissioner can import teams from Settings.</p></div>` : `
-  <div class="grid-2">${br.map(({r,t}) => `<div class="card" style="padding:14px"><h3 style="font-size:15px;font-weight:800;margin-bottom:8px;color:var(--gold)">${r} <span style="color:var(--g400);font-size:12px">(${t.length}/16)</span></h3>${t.length === 0 ? '<p style="color:var(--g300);font-size:13px">No teams</p>' : t.map(t => `<div class="team-item">${teamLogoHTML(t, 20)}${seedBadge(t.seed)}<span style="flex:1">${escapeHtml(teamDisplayName(t))}${teamRecordDisplay(t) ? ` <span style="font-size:11px;color:var(--g400)">(${escapeHtml(teamRecordDisplay(t))})</span>` : ''}</span>${t.playIn && !t.playInResolved ? `<button class="btn btn-sm btn-secondary" style="padding:2px 8px;font-size:11px;min-height:0" onclick="event.stopPropagation();showResolvePlayIn('${t.id}')">Resolve</button>` : ''}${adminUnlocked ? `<button class="icon-btn icon-btn-danger" onclick="deleteTeam('${t.id}')">\u2715</button>` : ''}</div>`).join('')}</div>`).join('')}</div>`}`;
 }
 
 async function addTeam(){
@@ -413,6 +400,7 @@ function renderLive(c){
           ${displayDate}
           ${hasLive ? ' <span class="live-pulse"><span class="dot"></span>LIVE</span>' : ''}
           ${liveLastRefresh ? ` <span style="font-size:11px;color:var(--g400)">Updated ${new Date(liveLastRefresh).toLocaleTimeString()}</span>` : ''}
+          ${liveLastError ? ` <span class="live-error" style="font-size:11px;color:var(--red)">Scores unavailable, retrying</span>` : ''}
         </p>
       </div>
       <div class="row" style="gap:8px">
@@ -428,7 +416,9 @@ function renderLive(c){
       <button class="live-filter-btn ${S.liveScoresFilter==='upcoming'?'active':''}" onclick="S.liveScoresFilter='upcoming';renderLiveInPlace()">Upcoming (${liveScores.filter(g=>g.state==='pre').length})</button>
       <button class="live-filter-btn ${S.liveScoresFilter==='final'?'active':''}" onclick="S.liveScoresFilter='final';renderLiveInPlace()">Final (${liveScores.filter(g=>g.state==='post').length})</button>
     </div>
-    ${filtered.length === 0 ? '<div class="card" style="text-align:center;padding:40px;color:var(--g400)"><p style="font-size:16px;font-weight:700;margin-bottom:4px">No games found</p><p style="font-size:13px">Try a different date or check back later.</p></div>' : ''}
+    ${filtered.length === 0 ? (liveLastError && liveScores.length === 0
+      ? '<div class="card live-error" style="text-align:center;padding:40px;color:var(--g400)"><p style="font-size:16px;font-weight:700;margin-bottom:4px">Scores unavailable</p><p style="font-size:13px">Could not reach the scoreboard. Check your connection; this page retries automatically.</p></div>'
+      : '<div class="card" style="text-align:center;padding:40px;color:var(--g400)"><p style="font-size:16px;font-weight:700;margin-bottom:4px">No games found</p><p style="font-size:13px">Try a different date or check back later.</p></div>') : ''}
     <div class="scores-grid">
       ${filtered.map(game => {
         const awayOur = findOurTeam(game.away);
@@ -572,18 +562,49 @@ function renderDraft(c){
   </div></div>`;
 }
 
-async function startDraft(){
-  if(!await requireAdmin()) return;
-  _beeped = false;
-  const duration = S.draftClockDuration || 0;
-  S.ds = {
-    order: snakeOrder(S.players.map(p => p.id), S.teams.length),
+function _freshDraftState(players, teams, duration){
+  return {
+    order: snakeOrder(players.map(p => p.id), teams.length),
     cp: 0, started: true, complete: false,
     timerDuration: duration,
     pickDeadline: duration > 0 ? firebase.firestore.Timestamp.fromDate(new Date(Date.now() + duration * 1000)) : null,
     timerPaused: false,
     pausedRemaining: null
   };
+}
+
+async function startDraft(){
+  if(!await requireAdmin()) return;
+  if(S.ds && S.ds.started){ showToast('The draft has already started'); return; }
+  const duration = S.draftClockDuration || 0;
+  // Room: start transactionally against the server copy, like pickTeam(). A second admin device whose
+  // lobby is stale must not overwrite a draft that already has picks with a fresh order and empty rosters.
+  if(roomId){
+    try {
+      await db.runTransaction(async (tx) => {
+        const ref = db.collection("rooms").doc(roomId);
+        const snap = await tx.get(ref);
+        if(!snap.exists) throw { code: 'no-room', msg: 'Room not found' };
+        const remote = JSON.parse(snap.data().state || '{}');
+        if(remote.ds && remote.ds.started) throw { code: 'started', msg: 'The draft was already started on another device' };
+        const players = remote.players || [], teams = remote.teams || [];
+        if(players.length < 2 || teams.length < players.length) throw { code: 'not-ready', msg: 'Need 2+ players and at least one team per player' };
+        remote.ds = _freshDraftState(players, teams, duration);
+        players.forEach(p => p.teamIds = []);
+        tx.update(ref, {
+          state: JSON.stringify(remote),
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+      });
+      _beeped = false; // the snapshot listener applies the started draft and render() starts the clock
+    } catch(err){
+      if(err && err.msg) showToast(err.msg);
+      else { console.warn('Start draft failed:', err); showToast('Start failed — try again'); }
+    }
+    return;
+  }
+  _beeped = false;
+  S.ds = _freshDraftState(S.players, S.teams, duration);
   S.players.forEach(p => p.teamIds = []);
   if(duration > 0) startDraftClock();
   saveState();
@@ -644,6 +665,7 @@ async function pickTeam(tid){
     else { console.warn('Pick transaction failed:', err); showToast('Pick failed — try again'); }
   } finally {
     _pickInFlight = false;
+    replayDroppedSnapshot();
   }
 }
 
@@ -827,13 +849,13 @@ function updateDraftClock(){
     stopDraftClock();
     const myId = getMyPlayerId();
     if(myId === ds.order[ds.cp] || adminUnlocked){
-      autoPickHighestSeed();
+      autoPickHighestSeed(ds.pickDeadline && ds.pickDeadline.seconds != null ? ds.pickDeadline.seconds : null);
     }
     // Other clients will receive the pick via Firestore listener
   }
 }
 
-async function autoPickHighestSeed(){
+async function autoPickHighestSeed(expiredDeadlineSeconds){
   _beeped = false;
   const myId = getMyPlayerId();
   // Transactional path for multiplayer: computes highest-available against server state
@@ -847,6 +869,8 @@ async function autoPickHighestSeed(){
         const remote = JSON.parse(snap.data().state || '{}');
         const ds = remote.ds || {};
         if(ds.complete || !ds.started) return;
+        // Another client's auto-pick already landed and reset the clock: stand down.
+        if(pickDeadlineMoved(expiredDeadlineSeconds, ds.pickDeadline)) return;
         // Only the active drafter (or admin) drives the auto-pick to avoid duplicate fires
         if(!adminUnlocked && myId !== ds.order[ds.cp]) return;
         const taken = new Set((remote.players || []).flatMap(p => p.teamIds || []));
