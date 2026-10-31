@@ -42,9 +42,9 @@ test('teamEditBlockedReason copes with missing players/teamIds/bracket', () => {
   assert.equal(app.teamEditBlockedReason(), '');
 });
 
-test('importFromESPN and clearAllTeams consult the guard right after the admin check', () => {
+test('importFromNCAA and clearAllTeams consult the guard right after the admin check', () => {
   const src = fs.readFileSync(path.join(__dirname, '..', 'js', '80-pages.js'), 'utf8');
-  for (const fn of ['importFromESPN', 'clearAllTeams']) {
+  for (const fn of ['importFromNCAA', 'clearAllTeams']) {
     const body = src.slice(src.indexOf('async function ' + fn + '('));
     const admin = body.indexOf('if(!await requireAdmin()) return;');
     const guard = body.indexOf('const locked = teamEditBlockedReason();');
@@ -52,7 +52,7 @@ test('importFromESPN and clearAllTeams consult the guard right after the admin c
     assert.ok(admin >= 0 && guard > admin && bail > guard, fn + ' guards after requireAdmin');
     assert.ok(guard < body.indexOf('S.teams'), fn + ' guards before touching S.teams');
   }
-  assert.doesNotMatch(src.slice(src.indexOf('async function parseBulkImport(')).split('async function importFromESPN')[0], /teamEditBlockedReason/, 'bulk import only appends teams: not guarded');
+  assert.doesNotMatch(src.slice(src.indexOf('async function parseBulkImport(')).split('async function importFromNCAA')[0], /teamEditBlockedReason/, 'bulk import only appends teams: not guarded');
 });
 
 test('removePlayer refuses once the draft has started, before touching S.players', () => {

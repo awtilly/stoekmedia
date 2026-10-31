@@ -1,0 +1,234 @@
+{
+ "updated_at": "2026-10-31 15:02:06",
+ "games": [
+  {
+   "game": {
+    "gameID": "6534640",
+    "title": "Saint Louis Michigan",
+    "url": "/game/6534640",
+    "network": "CBS",
+    "startTime": "12:10 PM ET",
+    "startTimeEpoch": "1774109400",
+    "gameState": "final",
+    "startDate": "03/21/2026",
+    "currentPeriod": "FINAL",
+    "contestClock": "0:00",
+    "bracketId": 313,
+    "bracketRound": 3,
+    "championshipId": 6393,
+    "championshipGame": {
+     "round": {
+      "roundNumber": 3,
+      "title": "Second Round",
+      "subtitle": "3/21-3/22"
+     }
+    },
+    "finalMessage": "FINAL",
+    "away": {
+     "score": "72",
+     "names": {
+      "char6": "ST LOU",
+      "short": "Saint Louis",
+      "seo": "saint-louis",
+      "full": ""
+     },
+     "winner": false,
+     "seed": "9",
+     "rank": ""
+    },
+    "home": {
+     "score": "95",
+     "names": {
+      "char6": "MICH",
+      "short": "Michigan",
+      "seo": "michigan",
+      "full": ""
+     },
+     "winner": true,
+     "seed": "1",
+     "rank": ""
+    }
+   }
+  },
+  {
+   "game": {
+    "gameID": "6534630",
+    "title": "Louisville Michigan St.",
+    "url": "/game/6534630",
+    "network": "CBS",
+    "startTime": "2:48 PM ET",
+    "startTimeEpoch": "1774118880",
+    "gameState": "final",
+    "startDate": "03/21/2026",
+    "currentPeriod": "FINAL",
+    "contestClock": "0:00",
+    "bracketId": 303,
+    "bracketRound": 3,
+    "championshipId": 6393,
+    "championshipGame": {
+     "round": {
+      "roundNumber": 3,
+      "title": "Second Round",
+      "subtitle": "3/21-3/22"
+     }
+    },
+    "finalMessage": "FINAL",
+    "away": {
+     "score": "69",
+     "names": {
+      "char6": "LOUIS",
+      "short": "Louisville",
+      "seo": "louisville",
+      "full": ""
+     },
+     "winner": false,
+     "seed": "6",
+     "rank": ""
+    },
+    "home": {
+     "score": "77",
+     "names": {
+      "char6": "MICHST",
+      "short": "Michigan St.",
+      "seo": "michigan-st",
+      "full": ""
+     },
+     "winner": true,
+     "seed": "3",
+     "rank": ""
+    }
+   }
+  },
+  {
+   "game": {
+    "gameID": "6534628",
+    "title": "TCU Duke",
+    "url": "/game/6534628",
+    "network": "CBS",
+    "startTime": "5:25 PM ET",
+    "startTimeEpoch": "1774128300",
+    "gameState": "final",
+    "startDate": "03/21/2026",
+    "currentPeriod": "FINAL",
+    "contestClock": "0:00",
+    "bracketId": 301,
+    "bracketRound": 3,
+    "championshipId": 6393,
+    "championshipGame": {
+     "round": {
+      "roundNumber": 3,
+      "title": "Second Round",
+      "subtitle": "3/21-3/22"
+     }
+    },
+    "finalMessage": "FINAL",
+    "away": {
+     "score": "58",
+     "names": {
+      "char6": "TCU",
+      "short": "TCU",
+      "seo": "tcu",
+      "full": ""
+     },
+     "winner": false,
+     "seed": "9",
+     "rank": ""
+    },
+    "home": {
+     "score": "81",
+     "names": {
+      "char6": "DUKE",
+      "short": "Duke",
+      "seo": "duke",
+      "full": ""
+     },
+     "winner": true,
+     "seed": "1",
+     "rank": ""
+    }
+   }
+  },
+  {
+   "game": {
+    "gameID": "6501921",
+    "title": "Georgia Tech Notre Dame",
+    "url": "/game/6501921",
+    "network": "",
+    "startTime": "12:00 PM ET",
+    "startTimeEpoch": "1771088400",
+    "gameState": "final",
+    "startDate": "02/14/2026",
+    "currentPeriod": "FINAL",
+    "contestClock": "0:00",
+    "bracketId": "",
+    "bracketRound": "",
+    "finalMessage": "FINAL",
+    "away": {
+     "score": "74",
+     "names": {
+      "char6": "GATECH",
+      "short": "Georgia Tech",
+      "seo": "georgia-tech",
+      "full": ""
+     },
+     "winner": false,
+     "seed": "",
+     "rank": ""
+    },
+    "home": {
+     "score": "89",
+     "names": {
+      "char6": "N DAME",
+      "short": "Notre Dame",
+      "seo": "notre-dame",
+      "full": ""
+     },
+     "winner": true,
+     "seed": "",
+     "rank": ""
+    }
+   }
+  },
+  {
+   "game": {
+    "gameID": "6502956",
+    "title": "Navy Colgate",
+    "url": "/game/6502956",
+    "network": "",
+    "startTime": "12:00 PM ET",
+    "startTimeEpoch": "1771088400",
+    "gameState": "final",
+    "startDate": "02/14/2026",
+    "currentPeriod": "FINAL - OT",
+    "contestClock": "0:00",
+    "bracketId": "",
+    "bracketRound": "",
+    "finalMessage": "FINAL",
+    "away": {
+     "score": "84",
+     "names": {
+      "char6": "NAVY",
+      "short": "Navy",
+      "seo": "navy",
+      "full": ""
+     },
+     "winner": true,
+     "seed": "",
+     "rank": ""
+    },
+    "home": {
+     "score": "80",
+     "names": {
+      "char6": "COLGAT",
+      "short": "Colgate",
+      "seo": "colgate",
+      "full": ""
+     },
+     "winner": false,
+     "seed": "",
+     "rank": ""
+    }
+   }
+  }
+ ]
+}

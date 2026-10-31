@@ -1,7 +1,7 @@
 # Madness
 
 Snake-draft bracket pool PWA, live at stoekmedia.com/madness. Vanilla JS, zero runtime
-dependencies, Firebase Firestore for realtime sync, ESPN public scoreboard for scores.
+dependencies, Firebase Firestore for realtime sync, NCAA.com (via ncaa-api) for scores and the bracket.
 Deployed by GitHub Pages straight from `main`, so **merging to `main` is deploying**.
 
 ## Layout
@@ -10,7 +10,7 @@ Deployed by GitHub Pages straight from `main`, so **merging to `main` is deployi
 |------|------|
 | `index.html` | Markup + all CSS. Loads the `js/` files in order at the bottom of `<body>`. |
 | `js/00-constants.js` | Round names, regions, R1 seed pairings, feeder map. |
-| `js/10-espn.js` | ESPN adapter: scoreboard fetch, tournament team import, event parsing. |
+| `js/10-ncaa.js` | NCAA.com adapter (through the `ncaa` proxy function): scoreboard fetch, bracket import, event parsing. No team logos by design. |
 | `js/20-live.js` | Live score polling, game-final detection, bracket auto-advance, wake lock. |
 | `js/30-state.js` | The global `S` state object, Firebase init, FCM push, badge, notification prompt. |
 | `js/40-ui.js` | Toast and in-app modal primitives. |
@@ -56,7 +56,7 @@ node --test "test/*.test.js"
 `test/_harness.js` evaluates `00`, `10`, `20` and `70` in the Node process with stubs for
 `S`, `requireAdmin`, `saveState`, `render`, `fetch`, etc. Covered so far: snake-draft order,
 scoring (per round, upset bonus, custom values), bracket slot resolution, manual advance
-and cascade clearing through the Final Four, ESPN-driven auto-advance, ESPN scoreboard
+and cascade clearing through the Final Four, scoreboard-driven auto-advance, NCAA.com scoreboard
 parsing and tournament-team import filtering (the conference-tournament bug from 2026).
 
 Not covered: anything that touches Firestore transactions (`pickTeam`, `undoDraft`,
@@ -65,12 +65,14 @@ Not covered: anything that touches Firestore transactions (`pickTeam`, `undoDraf
 ## Scoreboard cache
 
 `functions/scoreboard.js` (`pollScoreboard`) runs every minute, March 10 to April 10
-Eastern, fetches the ESPN scoreboard for today (and yesterday before 4am), and writes the
+Eastern, fetches the NCAA.com scoreboard for today (and yesterday before 4am), and writes the
 parsed events to Firestore `scoreboard/{YYYYMMDD}`. Clients (`js/20-live.js`) listen to that
 document. If it is missing, older than 3 minutes, or unreadable, the client falls back to
-polling ESPN directly every 30 seconds, exactly as before. Force the function on or off
+polling through the `ncaa` proxy function every 30 seconds, exactly as before. Force the function on or off
 outside the window with a `scoreboard/_config` doc `{ enabled: true | false }`.
-`functions/espn-parse.js` is a copy of the client parser; a test keeps the two in sync.
+`functions/ncaa-parse.js` is a copy of the client parser; a test keeps the two in sync. `functions/ncaa.js` is the
+HTTPS proxy phones use (the public ncaa-api sends no CORS headers); it forwards only the scoreboard and bracket routes.
+Set `NCAA_API_BASE` / `NCAA_API_KEY` in `functions/.env` to point both at a self-hosted ncaa-api container.
 
 ## Rules of the road
 
