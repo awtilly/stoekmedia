@@ -44,6 +44,11 @@ db.enablePersistence({ synchronizeTabs: true }).catch(err => {
 /* ── FCM Push Notifications ── */
 const VAPID_KEY = 'BEXX7JkBZweOVvbMXeHVasxvxILeP44a0BOkf0FX9hRTudpCodwj9hBIby4KtmC1XJoZ966oGrd8Rvm6dghN_bM';
 
+// "room/player/token" already written this session. _applyRoomSnapshot() calls initFCM() on every
+// snapshot, and the token doc write below carries a serverTimestamp, so without this every room
+// change cost one Firestore write per connected client with notifications on.
+let _fcmRegistered = null;
+
 async function initFCM(){
   try {
     if (!('Notification' in window) || Notification.permission !== 'granted') return;
@@ -56,11 +61,13 @@ async function initFCM(){
     const token = await messaging.getToken({ vapidKey: VAPID_KEY, serviceWorkerRegistration: swReg });
     if (token && roomId) {
       const myId = getMyPlayerId();
-      if (myId) {
+      const key = roomId + '/' + myId + '/' + token;
+      if (myId && _fcmRegistered !== key) {
+        _fcmRegistered = key;
         db.collection('rooms').doc(roomId).collection('fcmTokens').doc(myId).set({
           tokens: firebase.firestore.FieldValue.arrayUnion(token),
           updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-        }, { merge: true });
+        }, { merge: true }).catch(err => { _fcmRegistered = null; console.warn('FCM token write failed:', err); });
       }
     }
   } catch(err) {
