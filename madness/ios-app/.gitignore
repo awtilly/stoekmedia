@@ -1,0 +1,5 @@
+node_modules/
+www/
+.vendor-cache/
+# Holds a Google API key and this repo is public: regenerate with `npm run firebase-config`.
+ios/App/App/GoogleService-Info.plist
