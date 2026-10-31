@@ -561,18 +561,49 @@ function renderDraft(c){
   </div></div>`;
 }
 
-async function startDraft(){
-  if(!await requireAdmin()) return;
-  _beeped = false;
-  const duration = S.draftClockDuration || 0;
-  S.ds = {
-    order: snakeOrder(S.players.map(p => p.id), S.teams.length),
+function _freshDraftState(players, teams, duration){
+  return {
+    order: snakeOrder(players.map(p => p.id), teams.length),
     cp: 0, started: true, complete: false,
     timerDuration: duration,
     pickDeadline: duration > 0 ? firebase.firestore.Timestamp.fromDate(new Date(Date.now() + duration * 1000)) : null,
     timerPaused: false,
     pausedRemaining: null
   };
+}
+
+async function startDraft(){
+  if(!await requireAdmin()) return;
+  if(S.ds && S.ds.started){ showToast('The draft has already started'); return; }
+  const duration = S.draftClockDuration || 0;
+  // Room: start transactionally against the server copy, like pickTeam(). A second admin device whose
+  // lobby is stale must not overwrite a draft that already has picks with a fresh order and empty rosters.
+  if(roomId){
+    try {
+      await db.runTransaction(async (tx) => {
+        const ref = db.collection("rooms").doc(roomId);
+        const snap = await tx.get(ref);
+        if(!snap.exists) throw { code: 'no-room', msg: 'Room not found' };
+        const remote = JSON.parse(snap.data().state || '{}');
+        if(remote.ds && remote.ds.started) throw { code: 'started', msg: 'The draft was already started on another device' };
+        const players = remote.players || [], teams = remote.teams || [];
+        if(players.length < 2 || teams.length < players.length) throw { code: 'not-ready', msg: 'Need 2+ players and at least one team per player' };
+        remote.ds = _freshDraftState(players, teams, duration);
+        players.forEach(p => p.teamIds = []);
+        tx.update(ref, {
+          state: JSON.stringify(remote),
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+      });
+      _beeped = false; // the snapshot listener applies the started draft and render() starts the clock
+    } catch(err){
+      if(err && err.msg) showToast(err.msg);
+      else { console.warn('Start draft failed:', err); showToast('Start failed — try again'); }
+    }
+    return;
+  }
+  _beeped = false;
+  S.ds = _freshDraftState(S.players, S.teams, duration);
   S.players.forEach(p => p.teamIds = []);
   if(duration > 0) startDraftClock();
   saveState();
