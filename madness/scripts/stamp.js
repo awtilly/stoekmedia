@@ -10,6 +10,9 @@
  *   node scripts/stamp.js          # rewrite index.html with the current hash
  *   node --test test/              # fails if index.html is out of date
  *
+ * After a merge that conflicts only on the stamped <script> tags, running it again
+ * resolves that conflict block (see resolveStampConflicts).
+ *
  * Zero dependencies by design.
  */
 const fs = require('fs');
@@ -47,15 +50,32 @@ function readIndexTags(html) {
   return out;
 }
 
+const TAG_LINE_RE = /^<script src="js\/[^"?]+\?v=[0-9a-f]+"><\/script>$/;
+// git conflict block; the optional middle part is the diff3 "base" section.
+const CONFLICT_RE = /<<<<<<< [^\n]*\r?\n([\s\S]*?)(?:\|\|\|\|\|\|\| [^\n]*\r?\n[\s\S]*?)?=======\r?\n([\s\S]*?)>>>>>>> [^\n]*\r?\n/g;
+
+/*
+ * Every branch that touches js/ restamps the same script tags, so merging two such branches
+ * leaves a conflict block around them and nothing else. If a conflict block holds only js/
+ * script tags (and blank lines) on both sides, replace it with freshly generated tags; any
+ * other conflict is left for a human.
+ */
+function resolveStampConflicts(html, stamp) {
+  const onlyTags = part => part.split(/\r?\n/).every(l => l.trim() === '' || TAG_LINE_RE.test(l.trim()));
+  return html.replace(CONFLICT_RE, (whole, ours, theirs) =>
+    onlyTags(ours) && onlyTags(theirs) ? scriptTags(stamp) + '\n' : whole);
+}
+
 function stampIndex() {
   const stamp = computeStamp();
   const html = fs.readFileSync(INDEX, 'utf8');
-  const next = html.replace(TAG_RE, (_, file) => `<script src="js/${file}?v=${stamp}"></script>`);
+  const next = resolveStampConflicts(html, stamp)
+    .replace(TAG_RE, (_, file) => `<script src="js/${file}?v=${stamp}"></script>`);
   if (next !== html) fs.writeFileSync(INDEX, next);
   return { stamp, changed: next !== html };
 }
 
-module.exports = { listJsFiles, computeStamp, scriptTags, readIndexTags, stampIndex, INDEX, JS_DIR };
+module.exports = { listJsFiles, computeStamp, scriptTags, readIndexTags, resolveStampConflicts, stampIndex, INDEX, JS_DIR };
 
 if (require.main === module) {
   const { stamp, changed } = stampIndex();
