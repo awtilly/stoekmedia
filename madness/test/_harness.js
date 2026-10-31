@@ -134,6 +134,7 @@ function createApp(stateOverrides) {
 
   const app = new Proxy({}, {
     get(_, key) {
+      if (key === 'eval') return (expr) => vm.runInThisContext(expr); // read top-level let/const live, e.g. app.eval('liveScores')
       if (key === '__calls') return calls;
       if (key === '__real') return real;
       // Live read of a top-level let/const (lexicals above is a one-time snapshot).
