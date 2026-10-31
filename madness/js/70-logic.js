@@ -1,6 +1,6 @@
 /* ── Utility Functions ── */
 function seedClass(s){ return s <= 4 ? "seed-top" : s <= 8 ? "seed-mid" : "seed-low"; }
-function seedBadge(s){ return `<span class="seed-badge ${seedClass(s)}">${s}</span>`; }
+function seedBadge(s){ return `<span class="seed-badge ${seedClass(s)}">${escapeHtml(s == null ? '' : s)}</span>`; }
 function escapeHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 function owner(tid){ const pl = S.players.find(p => p.teamIds.includes(tid)); return pl ? pl.name : ""; }
 
@@ -259,6 +259,27 @@ function syncGames(){
     if(t0 && t1) games.push({id:'champ', round:6, t1:t0, t2:t1, wid:S.bracket.ff[2]});
   }
   S.games = games;
+}
+
+/* ── Shared-state hardening ──
+ * Record ids are interpolated into inline onclick handlers (pickTeam('<id>') etc.). Every client can
+ * write the whole room state, so a hostile participant could plant an id that breaks out of that
+ * string and runs script in everyone else's browser. Legitimate ids are always generateId() UUIDs,
+ * so anything outside [A-Za-z0-9_-] is dropped at the data boundary (snapshot apply + local load). */
+const SAFE_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
+function isSafeId(id){ return typeof id === 'string' && SAFE_ID_RE.test(id); }
+function sanitizeSharedState(s){
+  if(!s || typeof s !== 'object') return s;
+  if(Array.isArray(s.players)) s.players = s.players.filter(p => p && isSafeId(p.id));
+  if(Array.isArray(s.teams)) s.teams = s.teams.filter(t => t && isSafeId(t.id));
+  for(const p of (s.players || [])) p.teamIds = (Array.isArray(p.teamIds) ? p.teamIds : []).filter(isSafeId);
+  if(s.ds && Array.isArray(s.ds.order)) s.ds.order = s.ds.order.filter(isSafeId);
+  if(s.bracket && typeof s.bracket === 'object'){
+    for(const k of Object.keys(s.bracket)){
+      if(Array.isArray(s.bracket[k])) s.bracket[k] = s.bracket[k].map(id => (id == null || isSafeId(id)) ? id : null);
+    }
+  }
+  return s;
 }
 
 function scores(){
