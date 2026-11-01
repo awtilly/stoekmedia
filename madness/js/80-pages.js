@@ -278,8 +278,8 @@ async function parseBulkImport(){
   render();
 }
 
-/* ── ESPN Import ── */
-async function importFromESPN(){
+/* ── NCAA.com bracket import ── */
+async function importFromNCAA(){
   if(!await requireAdmin()) return;
   const locked = teamEditBlockedReason();
   if(locked){ showToast(locked); return; }
@@ -291,13 +291,13 @@ async function importFromESPN(){
   }
   if(S.teams.length > 0 && !await appConfirm('This will replace all current teams. Continue?', { title: 'Replace Teams', confirmLabel: 'Replace' })) return;
 
-  const btn = document.getElementById('espn-import-btn');
+  const btn = document.getElementById('ncaa-import-btn');
   const origText = btn?.textContent;
   if(btn){ btn.textContent = 'Importing...'; btn.disabled = true; }
-  showToast('Fetching tournament teams from ESPN...');
+  showToast('Fetching the bracket from NCAA.com...');
 
   try {
-    const teams = await espn.fetchTournamentTeams();
+    const teams = await ncaa.fetchTournamentTeams();
     if(teams.length === 0){
       showToast('Tournament bracket not available yet. Try after Selection Sunday.');
       if(btn){ btn.textContent = origText; btn.disabled = false; }
@@ -305,13 +305,13 @@ async function importFromESPN(){
     }
 
     // Sanity check: 4 regions × 16 slots = 64 bracket slots. With play-ins, total team
-    // entries should be 64-68. Anything outside that means ESPN data is partial/stale.
+    // entries should be 64-68. Anything outside that means the bracket feed is partial/stale.
     const slotCount = new Set(teams.map(t => `${escapeHtml(t.seed)}_${escapeHtml(t.region)}`)).size;
     const regionCounts = teams.reduce((acc, t) => { acc[t.region] = (acc[t.region]||0)+1; return acc; }, {});
     const incomplete = slotCount < 64 || Object.values(regionCounts).some(n => n < 16) || REGIONS.some(r => !regionCounts[r]);
     if(incomplete){
       const detail = REGIONS.map(r => `${r}: ${regionCounts[r] || 0}/16`).join(', ');
-      const proceed = await appConfirm(`ESPN returned an incomplete bracket (${slotCount}/64 slots).\n\n${detail}\n\nImport partial data anyway? (Manual fixup will be needed in Settings.)`, { title: 'Incomplete Bracket', danger: true, confirmLabel: 'Import Anyway' });
+      const proceed = await appConfirm(`NCAA.com returned an incomplete bracket (${slotCount}/64 slots).\n\n${detail}\n\nImport partial data anyway? (Manual fixup will be needed in Settings.)`, { title: 'Incomplete Bracket', danger: true, confirmLabel: 'Import Anyway' });
       if(!proceed){
         if(btn){ btn.textContent = origText; btn.disabled = false; }
         return;
@@ -323,58 +323,37 @@ async function importFromESPN(){
       name: t.name,
       seed: t.seed,
       region: t.region,
-      logo: t.logo,
-      abbr: t.abbr,
-      espnId: t.espnId,
-      color: t.color,
-      record: t.record,
+      logo: '',
+      abbr: t.abbr || '',
+      ncaaId: t.ncaaId || '',
+      color: '',
+      record: t.record || '',
       ...(t.playIn ? { playIn: true, playInResolved: false, playInTeams: t.playInTeams } : {})
     }));
 
-    showToast(`Imported ${S.teams.length} teams from ESPN!`);
+    showToast(`Imported ${S.teams.length} teams from NCAA.com!`);
     saveState();
     render();
   } catch(e) {
-    console.error('ESPN import failed:', e);
+    console.error('NCAA.com import failed:', e);
     showToast('Import failed. Check your connection and try again.');
     if(btn){ btn.textContent = origText; btn.disabled = false; }
   }
 }
 
-async function refreshTeamData(){
+/* Settles any "A / B" play-in slot whose First Four game is final (also runs on its own once an hour from the Live tab). */
+async function checkPlayIns(){
   if(!await requireAdmin()) return;
-  showToast('Refreshing team data...');
+  const unresolved = S.teams.filter(t => t.playIn && !t.playInResolved).length;
+  if(!unresolved){ showToast('No play-in games left to settle.'); return; }
+  showToast('Checking First Four results...');
   try {
-    // Refresh from ESPN scoreboard for latest records
-    const data = await espn.fetchScoreboard();
-    const espnTeams = {};
-    if(data){
-      for(const ev of (data.events || [])){
-        const comp = ev.competitions?.[0];
-        if(!comp) continue;
-        for(const c of (comp.competitors || [])){
-          const t = c.team || {};
-          espnTeams[t.abbreviation] = {
-            logo: t.logo || '',
-            record: c.records?.[0]?.summary || ''
-          };
-        }
-      }
-    }
-
-    for(const team of S.teams){
-      const espnData = espnTeams[team.abbr];
-      if(espnData){
-        if(espnData.logo) team.logo = espnData.logo;
-        if(espnData.record) team.record = espnData.record;
-      }
-    }
+    _lastAutoResolve = 0; // the hourly throttle must not swallow an explicit check
     await autoResolvePlayIns();
-    showToast('Team data refreshed!');
-    saveState();
-    render();
+    const left = S.teams.filter(t => t.playIn && !t.playInResolved).length;
+    showToast(left ? `${left} play-in game${left === 1 ? '' : 's'} not final yet.` : 'Play-in slots settled!');
   } catch(e) {
-    showToast('Refresh failed.');
+    showToast('Check failed.');
   }
 }
 
@@ -398,20 +377,20 @@ function renderLive(c){
   });
 
   // Match live games to our drafted teams
-  const teamsByEspn = {};
+  const teamsByNcaa = {};
   const teamsByAbbr = {};
   const teamsByName = {};
   for(const t of S.teams){
-    if(t.espnId) teamsByEspn[t.espnId] = t;
+    if(t.ncaaId) teamsByNcaa[t.ncaaId] = t;
     if(t.abbr) teamsByAbbr[t.abbr] = t;
     teamsByName[t.name.toLowerCase()] = t;
   }
   function findOurTeam(scoreTeam){
-    const direct = teamsByEspn[scoreTeam.espnId] || teamsByAbbr[scoreTeam.abbr] || teamsByName[scoreTeam.name.toLowerCase()];
+    const direct = teamsByNcaa[scoreTeam.ncaaId] || teamsByAbbr[scoreTeam.abbr] || teamsByName[scoreTeam.name.toLowerCase()];
     if (direct) return direct;
     // Check unresolved play-in teams
     return S.teams.find(t => t.playIn && !t.playInResolved &&
-      t.playInTeams.some(pt => pt.espnId === scoreTeam.espnId || pt.abbr === scoreTeam.abbr)
+      t.playInTeams.some(pt => (pt.ncaaId && pt.ncaaId === scoreTeam.ncaaId) || (pt.abbr && pt.abbr === scoreTeam.abbr))
     ) || null;
   }
 
@@ -452,7 +431,7 @@ function renderLive(c){
     <div id="live-empty" class="card" style="display:none;text-align:center;padding:40px;color:var(--g400)"><p style="font-size:16px;font-weight:700;margin-bottom:4px">No games found</p><p style="font-size:13px">Try a different date or check back later.</p></div>
     <div id="live-grid" class="scores-grid"></div>
     <div style="margin-top:16px;text-align:center;font-size:11px;color:var(--g400)">
-      Scores refresh automatically every 30 seconds. Data from ESPN.
+      Scores refresh automatically every 30 seconds. Data from NCAA.com.
     </div>`;
   }
 
@@ -482,20 +461,18 @@ function renderLive(c){
         const awayWon = isFinal && game.away.winner;
         const homeWon = isFinal && game.home.winner;
 
-        const gameTime = new Date(game.date);
-        const timeStr = gameTime.toLocaleTimeString([], {hour:'numeric', minute:'2-digit'});
+        const gameTime = game.date ? new Date(game.date) : null;
+        const timeStr = gameTime && !isNaN(gameTime) ? gameTime.toLocaleTimeString([], {hour:'numeric', minute:'2-digit'}) : (game.startTime || 'TBD');
 
         return `<div class="score-card ${isLive?'live':''} ${isFinal?'final':''}" data-gid="${escapeHtml(game.id)}">
           <div class="score-teams">
             <div class="score-team-row ${awayWon?'winner':''} ${isFinal&&!awayWon?'loser':''}">
-              ${game.away.logo ? `<img src="${game.away.logo}" alt="">` : '<span style="width:24px"></span>'}
               <span class="team-seed">${game.away.seed && game.away.seed <= 16 ? game.away.seed : ''}</span>
               <span class="team-name">${escapeHtml(game.away.name)}${awayOwner ? ` <span style="font-size:10px;color:var(--gold);font-weight:700">(${escapeHtml(awayOwner)})</span>` : ''}</span>
               <span class="team-record">${game.away.record || ''}</span>
               <span class="team-score">${game.away.score || (isPre ? '' : '0')}</span>
             </div>
             <div class="score-team-row ${homeWon?'winner':''} ${isFinal&&!homeWon?'loser':''}">
-              ${game.home.logo ? `<img src="${game.home.logo}" alt="">` : '<span style="width:24px"></span>'}
               <span class="team-seed">${game.home.seed && game.home.seed <= 16 ? game.home.seed : ''}</span>
               <span class="team-name">${escapeHtml(game.home.name)}${homeOwner ? ` <span style="font-size:10px;color:var(--gold);font-weight:700">(${escapeHtml(homeOwner)})</span>` : ''}</span>
               <span class="team-record">${game.home.record || ''}</span>
@@ -504,7 +481,7 @@ function renderLive(c){
           </div>
           <div class="score-meta">
             <div class="score-status" style="${isFinal?'color:var(--red)':isLive?'color:var(--green)':'color:var(--g500)'}">${isLive ? game.shortDetail : isFinal ? 'FINAL' : timeStr}</div>
-            ${game.note ? `<div class="score-note">${escapeHtml(game.note.replace("Men's Basketball Championship - ",''))}</div>` : ''}
+            ${game.note ? `<div class="score-note">${escapeHtml(game.note)}</div>` : ''}
             ${game.broadcast ? `<div class="score-broadcast">${escapeHtml(game.broadcast)}</div>` : ''}
             ${game.venue ? `<div class="score-broadcast">${escapeHtml(game.venue)}</div>` : ''}
           </div>
@@ -1311,14 +1288,14 @@ function renderSettings(c){
   <div class="card" style="margin-bottom:14px"><span class="label">Team Management</span>
     <p style="font-size:13px;color:var(--g500);margin-bottom:12px">Import or add tournament teams (${S.teams.length}/64 loaded).</p>
     ${S.teams.length === 0 ? `
-      <div class="import-espn-card" onclick="importFromESPN()" id="espn-import">
-        <h3>Import from ESPN</h3>
-        <p>Auto-import all 64 tournament teams with seeds, regions, logos, and rankings from ESPN.</p>
-        <button class="btn btn-primary" id="espn-import-btn">Import ${S.year} Tournament Teams</button>
+      <div class="import-card" onclick="importFromNCAA()" id="ncaa-import">
+        <h3>Import from NCAA.com</h3>
+        <p>Auto-import all 64 tournament teams with seeds and regions from the official NCAA.com bracket.</p>
+        <button class="btn btn-primary" id="ncaa-import-btn">Import ${S.year} Tournament Teams</button>
       </div>` : `
       <div style="margin-bottom:14px;display:flex;gap:8px;flex-wrap:wrap">
-        <button class="btn btn-secondary btn-sm" id="espn-import-btn" onclick="importFromESPN()">Re-Import from ESPN</button>
-        <button class="btn btn-secondary btn-sm" onclick="refreshTeamData()">Refresh Logos & Rankings</button>
+        <button class="btn btn-secondary btn-sm" id="ncaa-import-btn" onclick="importFromNCAA()">Re-Import from NCAA.com</button>
+        <button class="btn btn-secondary btn-sm" onclick="checkPlayIns()">Check Play-in Results</button>
       </div>`}
     <div style="margin-bottom:14px"><span class="label">Bulk Import (Team, Seed, Region per line)</span>
       <textarea id="bt" rows="4" placeholder="Duke, 1, East\nAuburn, 1, South" style="width:100%"></textarea>

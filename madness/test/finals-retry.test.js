@@ -57,7 +57,7 @@ test('checkGameFinals: a pending final advances on a later poll even when the fe
 
 test('checkGameFinals: a final with only one room team is never kept pending', async () => {
   const { app, T, feed } = liveApp();
-  const outsider = { id: 'x', name: 'Outsider', seed: 3, abbr: 'OUT', espnId: 'e-outsider', region: 'None' };
+  const outsider = { id: 'x', name: 'Outsider', seed: 3, abbr: 'OUT', ncaaId: 'e-outsider', region: 'None' };
   await feed([withId(finalGame(T('Midwest-2'), outsider, outsider), 'odd')]);
   await feed([]);
   assert.equal(app.__calls.saveState, 0);
