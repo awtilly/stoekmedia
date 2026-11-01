@@ -1,0 +1,2559 @@
+{
+ "championships": [
+  {
+   "title": "2026 DI Men's Basketball Championship",
+   "year": 2026,
+   "season": 2025,
+   "regions": [
+    {
+     "sectionId": 1,
+     "title": "",
+     "regionCode": "TT"
+    },
+    {
+     "sectionId": 2,
+     "title": " EAST",
+     "regionCode": "TL"
+    },
+    {
+     "sectionId": 3,
+     "title": "WEST",
+     "regionCode": "TR"
+    },
+    {
+     "sectionId": 4,
+     "title": " SOUTH",
+     "regionCode": "BL"
+    },
+    {
+     "sectionId": 5,
+     "title": " MIDWEST",
+     "regionCode": "BR"
+    },
+    {
+     "sectionId": 6,
+     "title": "",
+     "regionCode": "CC"
+    }
+   ],
+   "rounds": [
+    {
+     "roundNumber": 1,
+     "label": "DAYTON",
+     "title": "First Four&#174;"
+    },
+    {
+     "roundNumber": 2,
+     "label": "FIRST ROUND",
+     "title": "First Round"
+    },
+    {
+     "roundNumber": 3,
+     "label": "SECOND ROUND",
+     "title": "Second Round"
+    },
+    {
+     "roundNumber": 4,
+     "label": "SWEET 16",
+     "title": "Sweet 16&#174;"
+    },
+    {
+     "roundNumber": 5,
+     "label": "ELITE EIGHT",
+     "title": "Elite Eight&#174;"
+    },
+    {
+     "roundNumber": 6,
+     "label": "FINAL FOUR",
+     "title": "FINAL FOUR&#174;"
+    },
+    {
+     "roundNumber": 7,
+     "label": "FINAL FOUR",
+     "title": "Championship"
+    }
+   ],
+   "games": [
+    {
+     "contestId": 6534592,
+     "bracketPositionId": 101,
+     "bracketId": 101,
+     "victorBracketPositionId": 225,
+     "contestClock": "",
+     "currentPeriod": "FINAL",
+     "gameState": "F",
+     "statusCodeDisplay": "final",
+     "startDate": "03/17/2026",
+     "startTime": "18:40",
+     "startTimeEpoch": 1773787200,
+     "sectionId": 1,
+     "title": "UMBC vs Howard",
+     "teams": [
+      {
+       "isHome": false,
+       "isTop": true,
+       "isWinner": false,
+       "score": 83,
+       "seed": 16,
+       "nameShort": "UMBC",
+       "seoname": "umbc",
+       "textOverride": null
+      },
+      {
+       "isHome": true,
+       "isTop": false,
+       "isWinner": true,
+       "score": 86,
+       "seed": 16,
+       "nameShort": "Howard",
+       "seoname": "howard",
+       "textOverride": null
+      }
+     ]
+    },
+    {
+     "contestId": 6534593,
+     "bracketPositionId": 102,
+     "bracketId": 102,
+     "victorBracketPositionId": 221,
+     "contestClock": "",
+     "currentPeriod": "FINAL",
+     "gameState": "F",
+     "statusCodeDisplay": "final",
+     "startDate": "03/17/2026",
+     "startTime": "21:29",
+     "startTimeEpoch": 1773797340,
+     "sectionId": 1,
+     "title": "Texas vs NC State",
+     "teams": [
+      {
+       "isHome": false,
+       "isTop": true,
+       "isWinner": true,
+       "score": 68,
+       "seed": 11,
+       "nameShort": "Texas",
+       "seoname": "texas",
+       "textOverride": null
+      },
+      {
+       "isHome": true,
+       "isTop": false,
+       "isWinner": false,
+       "score": 66,
+       "seed": 11,
+       "nameShort": "NC State",
+       "seoname": "north-carolina-st",
+       "textOverride": null
+      }
+     ]
+    },
+    {
+     "contestId": 6534594,
+     "bracketPositionId": 103,
+     "bracketId": 103,
+     "victorBracketPositionId": 209,
+     "contestClock": "",
+     "currentPeriod": "FINAL",
+     "gameState": "F",
+     "statusCodeDisplay": "final",
+     "startDate": "03/18/2026",
+     "startTime": "18:40",
+     "startTimeEpoch": 1773873600,
+     "sectionId": 1,
+     "title": "Prairie View A&M vs Lehigh",
+     "teams": [
+      {
+       "isHome": false,
+       "isTop": true,
+       "isWinner": true,
+       "score": 67,
+       "seed": 16,
+       "nameShort": "Prairie View A&M",
+       "seoname": "prairie-view",
+       "textOverride": null
+      },
+      {
+       "isHome": true,
+       "isTop": false,
+       "isWinner": false,
+       "score": 55,
+       "seed": 16,
+       "nameShort": "Lehigh",
+       "seoname": "lehigh",
+       "textOverride": null
+      }
+     ]
+    },
+    {
+     "contestId": 6534595,
+     "bracketPositionId": 104,
+     "bracketId": 104,
+     "victorBracketPositionId": 229,
+     "contestClock": "",
+     "currentPeriod": "FINAL",
+     "gameState": "F",
+     "statusCodeDisplay": "final",
+     "startDate": "03/18/2026",
+     "startTime": "21:15",
+     "startTimeEpoch": 1773882900,
+     "sectionId": 1,
+     "title": "Miami (Ohio) vs SMU",
+     "teams": [
+      {
+       "isHome": false,
+       "isTop": true,
+       "isWinner": true,
+       "score": 89,
+       "seed": 11,
+       "nameShort": "Miami (Ohio)",
+       "seoname": "miami-oh",
+       "textOverride": null
+      },
+      {
+       "isHome": true,
+       "isTop": false,
+       "isWinner": false,
+       "score": 79,
+       "seed": 11,
+       "nameShort": "SMU",
+       "seoname": "smu",
+       "textOverride": null
+      }
+     ]
+    },
+    {
+     "contestId": 6534596,
+     "bracketPositionId": 201,
+     "bracketId": 201,
+     "victorBracketPositionId": 301,
+     "contestClock": "",
+     "currentPeriod": "FINAL",
+     "gameState": "F",
+     "statusCodeDisplay": "final",
+     "startDate": "03/19/2026",
+     "startTime": "15:00",
+     "startTimeEpoch": 1773946800,
+     "sectionId": 2,
+     "title": "Siena vs Duke",
+     "teams": [
+      {
+       "isHome": true,
+       "isTop": true,
+       "isWinner": true,
+       "score": 71,
+       "seed": 1,
+       "nameShort": "Duke",
+       "seoname": "duke",
+       "textOverride": null
+      },
+      {
+       "isHome": false,
+       "isTop": false,
+       "isWinner": false,
+       "score": 65,
+       "seed": 16,
+       "nameShort": "Siena",
+       "seoname": "siena",
+       "textOverride": null
+      }
+     ]
+    },
+    {
+     "contestId": 6534597,
+     "bracketPositionId": 202,
+     "bracketId": 202,
+     "victorBracketPositionId": 301,
+     "contestClock": "",
+     "currentPeriod": "FINAL",
+     "gameState": "F",
+     "statusCodeDisplay": "final",
+     "startDate": "03/19/2026",
+     "startTime": "12:15",
+     "startTimeEpoch": 1773936900,
+     "sectionId": 2,
+     "title": "TCU vs Ohio St.",
+     "teams": [
+      {
+       "isHome": true,
+       "isTop": true,
+       "isWinner": false,
+       "score": 64,
+       "seed": 8,
+       "nameShort": "Ohio St.",
+       "seoname": "ohio-st",
+       "textOverride": null
+      },
+      {
+       "isHome": false,
+       "isTop": false,
+       "isWinner": true,
+       "score": 66,
+       "seed": 9,
+       "nameShort": "TCU",
+       "seoname": "tcu",
+       "textOverride": null
+      }
+     ]
+    },
+    {
+     "contestId": 6534598,
+     "bracketPositionId": 203,
+     "bracketId": 203,
+     "victorBracketPositionId": 302,
+     "contestClock": "",
+     "currentPeriod": "FINAL",
+     "gameState": "F",
+     "statusCodeDisplay": "final",
+     "startDate": "03/20/2026",
+     "startTime": "19:25",
+     "startTimeEpoch": 1774049100,
+     "sectionId": 2,
+     "title": "UNI vs St. John's (NY)",
+     "teams": [
+      {
+       "isHome": true,
+       "isTop": true,
+       "isWinner": true,
+       "score": 79,
+       "seed": 5,
+       "nameShort": "St. John's",
+       "seoname": "st-johns-ny",
+       "textOverride": null
+      },
+      {
+       "isHome": false,
+       "isTop": false,
+       "isWinner": false,
+       "score": 53,
+       "seed": 12,
+       "nameShort": "Northern Iowa",
+       "seoname": "uni",
+       "textOverride": null
+      }
+     ]
+    },
+    {
+     "contestId": 6534599,
+     "bracketPositionId": 204,
+     "bracketId": 204,
+     "victorBracketPositionId": 302,
+     "contestClock": "",
+     "currentPeriod": "FINAL",
+     "gameState": "F",
+     "statusCodeDisplay": "final",
+     "startDate": "03/20/2026",
+     "startTime": "22:07",
+     "startTimeEpoch": 1774058820,
+     "sectionId": 2,
+     "title": "California Baptist vs Kansas",
+     "teams": [
+      {
+       "isHome": true,
+       "isTop": true,
+       "isWinner": true,
+       "score": 68,
+       "seed": 4,
+       "nameShort": "Kansas",
+       "seoname": "kansas",
+       "textOverride": null
+      },
+      {
+       "isHome": false,
+       "isTop": false,
+       "isWinner": false,
+       "score": 60,
+       "seed": 13,
+       "nameShort": "Cal Baptist",
+       "seoname": "california-baptist",
+       "textOverride": null
+      }
+     ]
+    },
+    {
+     "contestId": 6534600,
+     "bracketPositionId": 205,
+     "bracketId": 205,
+     "victorBracketPositionId": 303,
+     "contestClock": "",
+     "currentPeriod": "FINAL",
+     "gameState": "F",
+     "statusCodeDisplay": "final",
+     "startDate": "03/19/2026",
+     "startTime": "13:30",
+     "startTimeEpoch": 1773941400,
+     "sectionId": 2,
+     "title": "South Fla. vs Louisville",
+     "teams": [
+      {
+       "isHome": true,
+       "isTop": true,
+       "isWinner": true,
+       "score": 83,
+       "seed": 6,
+       "nameShort": "Louisville",
+       "seoname": "louisville",
+       "textOverride": null
+      },
+      {
+       "isHome": false,
+       "isTop": false,
+       "isWinner": false,
+       "score": 79,
+       "seed": 11,
+       "nameShort": "South Florida",
+       "seoname": "south-fla",
+       "textOverride": null
+      }
+     ]
+    },
+    {
+     "contestId": 6534601,
+     "bracketPositionId": 206,
+     "bracketId": 206,
+     "victorBracketPositionId": 303,
+     "contestClock": "",
+     "currentPeriod": "FINAL",
+     "gameState": "F",
+     "statusCodeDisplay": "final",
+     "startDate": "03/19/2026",
+     "startTime": "16:27",
+     "startTimeEpoch": 1773952020,
+     "sectionId": 2,
+     "title": "North Dakota St. vs Michigan St.",
+     "teams": [
+      {
+       "isHome": true,
+       "isTop": true,
+       "isWinner": true,
+       "score": 92,
+       "seed": 3,
+       "nameShort": "Michigan St.",
+       "seoname": "michigan-st",
+       "textOverride": null
+      },
+      {
+       "isHome": false,
+       "isTop": false,
+       "isWinner": false,
+       "score": 67,
+       "seed": 14,
+       "nameShort": "North Dakota St.",
+       "seoname": "north-dakota-st",
+       "textOverride": null
+      }
+     ]
+    },
+    {
+     "contestId": 6534602,
+     "bracketPositionId": 207,
+     "bracketId": 207,
+     "victorBracketPositionId": 304,
+     "contestClock": "",
+     "currentPeriod": "FINAL",
+     "gameState": "F",
+     "statusCodeDisplay": "final",
+     "startDate": "03/20/2026",
+     "startTime": "19:31",
+     "startTimeEpoch": 1774049460,
+     "sectionId": 2,
+     "title": "UCF vs UCLA",
+     "teams": [
+      {
+       "isHome": true,
+       "isTop": true,
+       "isWinner": true,
+       "score": 75,
+       "seed": 7,
+       "nameShort": "UCLA",
+       "seoname": "ucla",
+       "textOverride": null
+      },
+      {
+       "isHome": false,
+       "isTop": false,
+       "isWinner": false,
+       "score": 71,
+       "seed": 10,
+       "nameShort": "UCF",
+       "seoname": "ucf",
+       "textOverride": null
+      }
+     ]
+    },
+    {
+     "contestId": 6534603,
+     "bracketPositionId": 208,
+     "bracketId": 208,
+     "victorBracketPositionId": 304,
+     "contestClock": "",
+     "currentPeriod": "FINAL",
+     "gameState": "F",
+     "statusCodeDisplay": "final",
+     "startDate": "03/20/2026",
+     "startTime": "22:31",
+     "startTimeEpoch": 1774060260,
+     "sectionId": 2,
+     "title": "Furman vs UConn",
+     "teams": [
+      {
+       "isHome": true,
+       "isTop": true,
+       "isWinner": true,
+       "score": 82,
+       "seed": 2,
+       "nameShort": "UConn",
+       "seoname": "uconn",
+       "textOverride": null
+      },
+      {
+       "isHome": false,
+       "isTop": false,
+       "isWinner": false,
+       "score": 71,
+       "seed": 15,
+       "nameShort": "Furman",
+       "seoname": "furman",
+       "textOverride": null
+      }
+     ]
+    },
+    {
+     "contestId": 6534604,
+     "bracketPositionId": 209,
+     "bracketId": 209,
+     "victorBracketPositionId": 305,
+     "contestClock": "",
+     "currentPeriod": "FINAL",
+     "gameState": "F",
+     "statusCodeDisplay": "final",
+     "startDate": "03/20/2026",
+     "startTime": "21:43",
+     "startTimeEpoch": 1774057380,
+     "sectionId": 4,
+     "title": "Prairie View vs Florida",
+     "teams": [
+      {
+       "isHome": true,
+       "isTop": true,
+       "isWinner": true,
+       "score": 114,
+       "seed": 1,
+       "nameShort": "Florida",
+       "seoname": "florida",
+       "textOverride": null
+      },
+      {
+       "isHome": false,
+       "isTop": false,
+       "isWinner": false,
+       "score": 55,
+       "seed": 16,
+       "nameShort": "Prairie View A&M",
+       "seoname": "prairie-view",
+       "textOverride": null
+      }
+     ]
+    },
+    {
+     "contestId": 6534605,
+     "bracketPositionId": 210,
+     "bracketId": 210,
+     "victorBracketPositionId": 305,
+     "contestClock": "",
+     "currentPeriod": "FINAL",
+     "gameState": "F",
+     "statusCodeDisplay": "final",
+     "startDate": "03/20/2026",
+     "startTime": "18:50",
+     "startTimeEpoch": 1774047000,
+     "sectionId": 4,
+     "title": "Iowa vs Clemson",
+     "teams": [
+      {
+       "isHome": true,
+       "isTop": true,
+       "isWinner": false,
+       "score": 61,
+       "seed": 8,
+       "nameShort": "Clemson",
+       "seoname": "clemson",
+       "textOverride": null
+      },
+      {
+       "isHome": false,
+       "isTop": false,
+       "isWinner": true,
+       "score": 67,
+       "seed": 9,
+       "nameShort": "Iowa",
+       "seoname": "iowa",
+       "textOverride": null
+      }
+     ]
+    },
+    {
+     "contestId": 6534606,
+     "bracketPositionId": 211,
+     "bracketId": 211,
+     "victorBracketPositionId": 306,
+     "contestClock": "",
+     "currentPeriod": "FINAL",
+     "gameState": "F",
+     "statusCodeDisplay": "final",
+     "startDate": "03/19/2026",
+     "startTime": "15:15",
+     "startTimeEpoch": 1773947700,
+     "sectionId": 4,
+     "title": "McNeese vs Vanderbilt",
+     "teams": [
+      {
+       "isHome": true,
+       "isTop": true,
+       "isWinner": true,
+       "score": 78,
+       "seed": 5,
+       "nameShort": "Vanderbilt",
+       "seoname": "vanderbilt",
+       "textOverride": null
+      },
+      {
+       "isHome": false,
+       "isTop": false,
+       "isWinner": false,
+       "score": 68,
+       "seed": 12,
+       "nameShort": "McNeese",
+       "seoname": "mcneese",
+       "textOverride": null
+      }
+     ]
+    },
+    {
+     "contestId": 6534607,
+     "bracketPositionId": 212,
+     "bracketId": 212,
+     "victorBracketPositionId": 306,
+     "contestClock": "",
+     "currentPeriod": "FINAL",
+     "gameState": "F",
+     "statusCodeDisplay": "final",
+     "startDate": "03/19/2026",
+     "startTime": "12:40",
+     "startTimeEpoch": 1773938400,
+     "sectionId": 4,
+     "title": "Troy vs Nebraska",
+     "teams": [
+      {
+       "isHome": true,
+       "isTop": true,
+       "isWinner": true,
+       "score": 76,
+       "seed": 4,
+       "nameShort": "Nebraska",
+       "seoname": "nebraska",
+       "textOverride": null
+      },
+      {
+       "isHome": false,
+       "isTop": false,
+       "isWinner": false,
+       "score": 47,
+       "seed": 13,
+       "nameShort": "Troy",
+       "seoname": "troy",
+       "textOverride": null
+      }
+     ]
+    },
+    {
+     "contestId": 6534608,
+     "bracketPositionId": 213,
+     "bracketId": 213,
+     "victorBracketPositionId": 307,
+     "contestClock": "",
+     "currentPeriod": "FINAL - OT",
+     "gameState": "F",
+     "statusCodeDisplay": "final",
+     "startDate": "03/19/2026",
+     "startTime": "18:50",
+     "startTimeEpoch": 1773960600,
+     "sectionId": 4,
+     "title": "VCU vs North Carolina",
+     "teams": [
+      {
+       "isHome": true,
+       "isTop": true,
+       "isWinner": false,
+       "score": 78,
+       "seed": 6,
+       "nameShort": "North Carolina",
+       "seoname": "north-carolina",
+       "textOverride": null
+      },
+      {
+       "isHome": false,
+       "isTop": false,
+       "isWinner": true,
+       "score": 82,
+       "seed": 11,
+       "nameShort": "VCU",
+       "seoname": "vcu",
+       "textOverride": null
+      }
+     ]
+    },
+    {
+     "contestId": 6534609,
+     "bracketPositionId": 214,
+     "bracketId": 214,
+     "victorBracketPositionId": 307,
+     "contestClock": "",
+     "currentPeriod": "FINAL",
+     "gameState": "F",
+     "statusCodeDisplay": "final",
+     "startDate": "03/19/2026",
+     "startTime": "21:55",
+     "startTimeEpoch": 1773971700,
+     "sectionId": 4,
+     "title": "Penn vs Illinois",
+     "teams": [
+      {
+       "isHome": true,
+       "isTop": true,
+       "isWinner": true,
+       "score": 105,
+       "seed": 3,
+       "nameShort": "Illinois",
+       "seoname": "illinois",
+       "textOverride": null
+      },
+      {
+       "isHome": false,
+       "isTop": false,
+       "isWinner": false,
+       "score": 70,
+       "seed": 14,
+       "nameShort": "Penn",
+       "seoname": "penn",
+       "textOverride": null
+      }
+     ]
+    },
+    {
+     "contestId": 6534610,
+     "bracketPositionId": 215,
+     "bracketId": 215,
+     "victorBracketPositionId": 308,
+     "contestClock": "",
+     "currentPeriod": "FINAL",
+     "gameState": "F",
+     "statusCodeDisplay": "final",
+     "startDate": "03/19/2026",
+     "startTime": "19:35",
+     "startTimeEpoch": 1773963300,
+     "sectionId": 4,
+     "title": "Texas A&M vs Saint Mary's (CA)",
+     "teams": [
+      {
+       "isHome": true,
+       "isTop": true,
+       "isWinner": false,
+       "score": 50,
+       "seed": 7,
+       "nameShort": "Saint Mary's",
+       "seoname": "st-marys-ca",
+       "textOverride": null
+      },
+      {
+       "isHome": false,
+       "isTop": false,
+       "isWinner": true,
+       "score": 63,
+       "seed": 10,
+       "nameShort": "Texas A&M",
+       "seoname": "texas-am",
+       "textOverride": null
+      }
+     ]
+    },
+    {
+     "contestId": 6534611,
+     "bracketPositionId": 216,
+     "bracketId": 216,
+     "victorBracketPositionId": 308,
+     "contestClock": "",
+     "currentPeriod": "FINAL",
+     "gameState": "F",
+     "statusCodeDisplay": "final",
+     "startDate": "03/19/2026",
+     "startTime": "22:15",
+     "startTimeEpoch": 1773972900,
+     "sectionId": 4,
+     "title": "Idaho vs Houston",
+     "teams": [
+      {
+       "isHome": true,
+       "isTop": true,
+       "isWinner": true,
+       "score": 78,
+       "seed": 2,
+       "nameShort": "Houston",
+       "seoname": "houston",
+       "textOverride": null
+      },
+      {
+       "isHome": false,
+       "isTop": false,
+       "isWinner": false,
+       "score": 47,
+       "seed": 15,
+       "nameShort": "Idaho",
+       "seoname": "idaho",
+       "textOverride": null
+      }
+     ]
+    },
+    {
+     "contestId": 6534612,
+     "bracketPositionId": 217,
+     "bracketId": 217,
+     "victorBracketPositionId": 309,
+     "contestClock": "",
+     "currentPeriod": "FINAL",
+     "gameState": "F",
+     "statusCodeDisplay": "final",
+     "startDate": "03/20/2026",
+     "startTime": "13:35",
+     "startTimeEpoch": 1774028100,
+     "sectionId": 3,
+     "title": "LIU vs Arizona",
+     "teams": [
+      {
+       "isHome": true,
+       "isTop": true,
+       "isWinner": true,
+       "score": 92,
+       "seed": 1,
+       "nameShort": "Arizona",
+       "seoname": "arizona",
+       "textOverride": null
+      },
+      {
+       "isHome": false,
+       "isTop": false,
+       "isWinner": false,
+       "score": 58,
+       "seed": 16,
+       "nameShort": "Long Island",
+       "seoname": "long-island",
+       "textOverride": null
+      }
+     ]
+    },
+    {
+     "contestId": 6534613,
+     "bracketPositionId": 218,
+     "bracketId": 218,
+     "victorBracketPositionId": 309,
+     "contestClock": "",
+     "currentPeriod": "FINAL",
+     "gameState": "F",
+     "statusCodeDisplay": "final",
+     "startDate": "03/20/2026",
+     "startTime": "16:14",
+     "startTimeEpoch": 1774037640,
+     "sectionId": 3,
+     "title": "Utah St. vs Villanova",
+     "teams": [
+      {
+       "isHome": true,
+       "isTop": true,
+       "isWinner": false,
+       "score": 76,
+       "seed": 8,
+       "nameShort": "Villanova",
+       "seoname": "villanova",
+       "textOverride": null
+      },
+      {
+       "isHome": false,
+       "isTop": false,
+       "isWinner": true,
+       "score": 86,
+       "seed": 9,
+       "nameShort": "Utah St.",
+       "seoname": "utah-st",
+       "textOverride": null
+      }
+     ]
+    },
+    {
+     "contestId": 6534614,
+     "bracketPositionId": 219,
+     "bracketId": 219,
+     "victorBracketPositionId": 310,
+     "contestClock": "",
+     "currentPeriod": "FINAL",
+     "gameState": "F",
+     "statusCodeDisplay": "final",
+     "startDate": "03/19/2026",
+     "startTime": "13:50",
+     "startTimeEpoch": 1773942600,
+     "sectionId": 3,
+     "title": "High Point vs Wisconsin",
+     "teams": [
+      {
+       "isHome": true,
+       "isTop": true,
+       "isWinner": false,
+       "score": 82,
+       "seed": 5,
+       "nameShort": "Wisconsin",
+       "seoname": "wisconsin",
+       "textOverride": null
+      },
+      {
+       "isHome": false,
+       "isTop": false,
+       "isWinner": true,
+       "score": 83,
+       "seed": 12,
+       "nameShort": "High Point",
+       "seoname": "high-point",
+       "textOverride": null
+      }
+     ]
+    },
+    {
+     "contestId": 6534615,
+     "bracketPositionId": 220,
+     "bracketId": 220,
+     "victorBracketPositionId": 310,
+     "contestClock": "",
+     "currentPeriod": "FINAL",
+     "gameState": "F",
+     "statusCodeDisplay": "final",
+     "startDate": "03/19/2026",
+     "startTime": "16:27",
+     "startTimeEpoch": 1773952020,
+     "sectionId": 3,
+     "title": "Hawaii vs Arkansas",
+     "teams": [
+      {
+       "isHome": true,
+       "isTop": true,
+       "isWinner": true,
+       "score": 97,
+       "seed": 4,
+       "nameShort": "Arkansas",
+       "seoname": "arkansas",
+       "textOverride": null
+      },
+      {
+       "isHome": false,
+       "isTop": false,
+       "isWinner": false,
+       "score": 78,
+       "seed": 13,
+       "nameShort": "Hawaii",
+       "seoname": "hawaii",
+       "textOverride": null
+      }
+     ]
+    },
+    {
+     "contestId": 6534616,
+     "bracketPositionId": 221,
+     "bracketId": 221,
+     "victorBracketPositionId": 311,
+     "contestClock": "",
+     "currentPeriod": "FINAL",
+     "gameState": "F",
+     "statusCodeDisplay": "final",
+     "startDate": "03/19/2026",
+     "startTime": "19:35",
+     "startTimeEpoch": 1773963300,
+     "sectionId": 3,
+     "title": "Texas vs BYU",
+     "teams": [
+      {
+       "isHome": true,
+       "isTop": true,
+       "isWinner": false,
+       "score": 71,
+       "seed": 6,
+       "nameShort": "BYU",
+       "seoname": "byu",
+       "textOverride": null
+      },
+      {
+       "isHome": false,
+       "isTop": false,
+       "isWinner": true,
+       "score": 79,
+       "seed": 11,
+       "nameShort": "Texas",
+       "seoname": "texas",
+       "textOverride": null
+      }
+     ]
+    },
+    {
+     "contestId": 6534617,
+     "bracketPositionId": 222,
+     "bracketId": 222,
+     "victorBracketPositionId": 311,
+     "contestClock": "",
+     "currentPeriod": "FINAL",
+     "gameState": "F",
+     "statusCodeDisplay": "final",
+     "startDate": "03/19/2026",
+     "startTime": "22:24",
+     "startTimeEpoch": 1773973440,
+     "sectionId": 3,
+     "title": "Kennesaw St. vs Gonzaga",
+     "teams": [
+      {
+       "isHome": true,
+       "isTop": true,
+       "isWinner": true,
+       "score": 73,
+       "seed": 3,
+       "nameShort": "Gonzaga",
+       "seoname": "gonzaga",
+       "textOverride": null
+      },
+      {
+       "isHome": false,
+       "isTop": false,
+       "isWinner": false,
+       "score": 64,
+       "seed": 14,
+       "nameShort": "Kennesaw St.",
+       "seoname": "kennesaw-st",
+       "textOverride": null
+      }
+     ]
+    },
+    {
+     "contestId": 6534618,
+     "bracketPositionId": 223,
+     "bracketId": 223,
+     "victorBracketPositionId": 312,
+     "contestClock": "",
+     "currentPeriod": "FINAL",
+     "gameState": "F",
+     "statusCodeDisplay": "final",
+     "startDate": "03/20/2026",
+     "startTime": "22:07",
+     "startTimeEpoch": 1774058820,
+     "sectionId": 3,
+     "title": "Missouri vs Miami (FL)",
+     "teams": [
+      {
+       "isHome": true,
+       "isTop": true,
+       "isWinner": true,
+       "score": 80,
+       "seed": 7,
+       "nameShort": "Miami (FL)",
+       "seoname": "miami-fl",
+       "textOverride": null
+      },
+      {
+       "isHome": false,
+       "isTop": false,
+       "isWinner": false,
+       "score": 66,
+       "seed": 10,
+       "nameShort": "Missouri",
+       "seoname": "missouri",
+       "textOverride": null
+      }
+     ]
+    },
+    {
+     "contestId": 6534619,
+     "bracketPositionId": 224,
+     "bracketId": 224,
+     "victorBracketPositionId": 312,
+     "contestClock": "",
+     "currentPeriod": "FINAL",
+     "gameState": "F",
+     "statusCodeDisplay": "final",
+     "startDate": "03/20/2026",
+     "startTime": "19:35",
+     "startTimeEpoch": 1774049700,
+     "sectionId": 3,
+     "title": "Queens (NC) vs Purdue",
+     "teams": [
+      {
+       "isHome": true,
+       "isTop": true,
+       "isWinner": true,
+       "score": 104,
+       "seed": 2,
+       "nameShort": "Purdue",
+       "seoname": "purdue",
+       "textOverride": null
+      },
+      {
+       "isHome": false,
+       "isTop": false,
+       "isWinner": false,
+       "score": 71,
+       "seed": 15,
+       "nameShort": "Queens (N.C.)",
+       "seoname": "queens-nc",
+       "textOverride": null
+      }
+     ]
+    },
+    {
+     "contestId": 6534620,
+     "bracketPositionId": 225,
+     "bracketId": 225,
+     "victorBracketPositionId": 313,
+     "contestClock": "",
+     "currentPeriod": "FINAL",
+     "gameState": "F",
+     "statusCodeDisplay": "final",
+     "startDate": "03/19/2026",
+     "startTime": "19:30",
+     "startTimeEpoch": 1773963000,
+     "sectionId": 5,
+     "title": "Howard vs Michigan",
+     "teams": [
+      {
+       "isHome": true,
+       "isTop": true,
+       "isWinner": true,
+       "score": 101,
+       "seed": 1,
+       "nameShort": "Michigan",
+       "seoname": "michigan",
+       "textOverride": null
+      },
+      {
+       "isHome": false,
+       "isTop": false,
+       "isWinner": false,
+       "score": 80,
+       "seed": 16,
+       "nameShort": "Howard",
+       "seoname": "howard",
+       "textOverride": null
+      }
+     ]
+    },
+    {
+     "contestId": 6534621,
+     "bracketPositionId": 226,
+     "bracketId": 226,
+     "victorBracketPositionId": 313,
+     "contestClock": "",
+     "currentPeriod": "FINAL",
+     "gameState": "F",
+     "statusCodeDisplay": "final",
+     "startDate": "03/19/2026",
+     "startTime": "22:10",
+     "startTimeEpoch": 1773972600,
+     "sectionId": 5,
+     "title": "Saint Louis vs Georgia",
+     "teams": [
+      {
+       "isHome": true,
+       "isTop": true,
+       "isWinner": false,
+       "score": 77,
+       "seed": 8,
+       "nameShort": "Georgia",
+       "seoname": "georgia",
+       "textOverride": null
+      },
+      {
+       "isHome": false,
+       "isTop": false,
+       "isWinner": true,
+       "score": 102,
+       "seed": 9,
+       "nameShort": "Saint Louis",
+       "seoname": "saint-louis",
+       "textOverride": null
+      }
+     ]
+    },
+    {
+     "contestId": 6534622,
+     "bracketPositionId": 227,
+     "bracketId": 227,
+     "victorBracketPositionId": 314,
+     "contestClock": "",
+     "currentPeriod": "FINAL",
+     "gameState": "F",
+     "statusCodeDisplay": "final",
+     "startDate": "03/20/2026",
+     "startTime": "12:40",
+     "startTimeEpoch": 1774024800,
+     "sectionId": 5,
+     "title": "Akron vs Texas Tech",
+     "teams": [
+      {
+       "isHome": true,
+       "isTop": true,
+       "isWinner": true,
+       "score": 91,
+       "seed": 5,
+       "nameShort": "Texas Tech",
+       "seoname": "texas-tech",
+       "textOverride": null
+      },
+      {
+       "isHome": false,
+       "isTop": false,
+       "isWinner": false,
+       "score": 71,
+       "seed": 12,
+       "nameShort": "Akron",
+       "seoname": "akron",
+       "textOverride": null
+      }
+     ]
+    },
+    {
+     "contestId": 6534623,
+     "bracketPositionId": 228,
+     "bracketId": 228,
+     "victorBracketPositionId": 314,
+     "contestClock": "",
+     "currentPeriod": "FINAL",
+     "gameState": "F",
+     "statusCodeDisplay": "final",
+     "startDate": "03/20/2026",
+     "startTime": "15:21",
+     "startTimeEpoch": 1774034460,
+     "sectionId": 5,
+     "title": "Hofstra vs Alabama",
+     "teams": [
+      {
+       "isHome": true,
+       "isTop": true,
+       "isWinner": true,
+       "score": 90,
+       "seed": 4,
+       "nameShort": "Alabama",
+       "seoname": "alabama",
+       "textOverride": null
+      },
+      {
+       "isHome": false,
+       "isTop": false,
+       "isWinner": false,
+       "score": 70,
+       "seed": 13,
+       "nameShort": "Hofstra",
+       "seoname": "hofstra",
+       "textOverride": null
+      }
+     ]
+    },
+    {
+     "contestId": 6534624,
+     "bracketPositionId": 229,
+     "bracketId": 229,
+     "victorBracketPositionId": 315,
+     "contestClock": "",
+     "currentPeriod": "FINAL",
+     "gameState": "F",
+     "statusCodeDisplay": "final",
+     "startDate": "03/20/2026",
+     "startTime": "16:32",
+     "startTimeEpoch": 1774038720,
+     "sectionId": 5,
+     "title": "Miami (OH) vs Tennessee",
+     "teams": [
+      {
+       "isHome": true,
+       "isTop": true,
+       "isWinner": true,
+       "score": 78,
+       "seed": 6,
+       "nameShort": "Tennessee",
+       "seoname": "tennessee",
+       "textOverride": null
+      },
+      {
+       "isHome": false,
+       "isTop": false,
+       "isWinner": false,
+       "score": 56,
+       "seed": 11,
+       "nameShort": "Miami (Ohio)",
+       "seoname": "miami-oh",
+       "textOverride": null
+      }
+     ]
+    },
+    {
+     "contestId": 6534625,
+     "bracketPositionId": 230,
+     "bracketId": 230,
+     "victorBracketPositionId": 315,
+     "contestClock": "",
+     "currentPeriod": "FINAL",
+     "gameState": "F",
+     "statusCodeDisplay": "final",
+     "startDate": "03/20/2026",
+     "startTime": "13:50",
+     "startTimeEpoch": 1774029000,
+     "sectionId": 5,
+     "title": "Wright St. vs Virginia",
+     "teams": [
+      {
+       "isHome": true,
+       "isTop": true,
+       "isWinner": true,
+       "score": 82,
+       "seed": 3,
+       "nameShort": "Virginia",
+       "seoname": "virginia",
+       "textOverride": null
+      },
+      {
+       "isHome": false,
+       "isTop": false,
+       "isWinner": false,
+       "score": 73,
+       "seed": 14,
+       "nameShort": "Wright St.",
+       "seoname": "wright-st",
+       "textOverride": null
+      }
+     ]
+    },
+    {
+     "contestId": 6534626,
+     "bracketPositionId": 231,
+     "bracketId": 231,
+     "victorBracketPositionId": 316,
+     "contestClock": "",
+     "currentPeriod": "FINAL - OT",
+     "gameState": "F",
+     "statusCodeDisplay": "final",
+     "startDate": "03/20/2026",
+     "startTime": "12:15",
+     "startTimeEpoch": 1774023300,
+     "sectionId": 5,
+     "title": "Santa Clara vs Kentucky",
+     "teams": [
+      {
+       "isHome": true,
+       "isTop": true,
+       "isWinner": true,
+       "score": 89,
+       "seed": 7,
+       "nameShort": "Kentucky",
+       "seoname": "kentucky",
+       "textOverride": null
+      },
+      {
+       "isHome": false,
+       "isTop": false,
+       "isWinner": false,
+       "score": 84,
+       "seed": 10,
+       "nameShort": "Santa Clara",
+       "seoname": "santa-clara",
+       "textOverride": null
+      }
+     ]
+    },
+    {
+     "contestId": 6534627,
+     "bracketPositionId": 232,
+     "bracketId": 232,
+     "victorBracketPositionId": 316,
+     "contestClock": "",
+     "currentPeriod": "FINAL",
+     "gameState": "F",
+     "statusCodeDisplay": "final",
+     "startDate": "03/20/2026",
+     "startTime": "15:07",
+     "startTimeEpoch": 1774033620,
+     "sectionId": 5,
+     "title": "Tennessee St. vs Iowa St.",
+     "teams": [
+      {
+       "isHome": true,
+       "isTop": true,
+       "isWinner": true,
+       "score": 108,
+       "seed": 2,
+       "nameShort": "Iowa St.",
+       "seoname": "iowa-st",
+       "textOverride": null
+      },
+      {
+       "isHome": false,
+       "isTop": false,
+       "isWinner": false,
+       "score": 74,
+       "seed": 15,
+       "nameShort": "Tennessee St.",
+       "seoname": "tennessee-st",
+       "textOverride": null
+      }
+     ]
+    },
+    {
+     "contestId": 6534628,
+     "bracketPositionId": 301,
+     "bracketId": 301,
+     "victorBracketPositionId": 401,
+     "contestClock": "",
+     "currentPeriod": "FINAL",
+     "gameState": "F",
+     "statusCodeDisplay": "final",
+     "startDate": "03/21/2026",
+     "startTime": "17:25",
+     "startTimeEpoch": 1774128300,
+     "sectionId": 2,
+     "title": "TCU vs Duke",
+     "teams": [
+      {
+       "isHome": true,
+       "isTop": true,
+       "isWinner": true,
+       "score": 81,
+       "seed": 1,
+       "nameShort": "Duke",
+       "seoname": "duke",
+       "textOverride": null
+      },
+      {
+       "isHome": false,
+       "isTop": false,
+       "isWinner": false,
+       "score": 58,
+       "seed": 9,
+       "nameShort": "TCU",
+       "seoname": "tcu",
+       "textOverride": null
+      }
+     ]
+    },
+    {
+     "contestId": 6534629,
+     "bracketPositionId": 302,
+     "bracketId": 302,
+     "victorBracketPositionId": 401,
+     "contestClock": "",
+     "currentPeriod": "FINAL",
+     "gameState": "F",
+     "statusCodeDisplay": "final",
+     "startDate": "03/22/2026",
+     "startTime": "17:25",
+     "startTimeEpoch": 1774214700,
+     "sectionId": 2,
+     "title": "St. John's vs Kansas",
+     "teams": [
+      {
+       "isHome": false,
+       "isTop": true,
+       "isWinner": true,
+       "score": 67,
+       "seed": 5,
+       "nameShort": "St. John's",
+       "seoname": "st-johns-ny",
+       "textOverride": null
+      },
+      {
+       "isHome": true,
+       "isTop": false,
+       "isWinner": false,
+       "score": 65,
+       "seed": 4,
+       "nameShort": "Kansas",
+       "seoname": "kansas",
+       "textOverride": null
+      }
+     ]
+    },
+    {
+     "contestId": 6534630,
+     "bracketPositionId": 303,
+     "bracketId": 303,
+     "victorBracketPositionId": 402,
+     "contestClock": "",
+     "currentPeriod": "FINAL",
+     "gameState": "F",
+     "statusCodeDisplay": "final",
+     "startDate": "03/21/2026",
+     "startTime": "14:48",
+     "startTimeEpoch": 1774118880,
+     "sectionId": 2,
+     "title": "Louisville vs Michigan St.",
+     "teams": [
+      {
+       "isHome": false,
+       "isTop": true,
+       "isWinner": false,
+       "score": 69,
+       "seed": 6,
+       "nameShort": "Louisville",
+       "seoname": "louisville",
+       "textOverride": null
+      },
+      {
+       "isHome": true,
+       "isTop": false,
+       "isWinner": true,
+       "score": 77,
+       "seed": 3,
+       "nameShort": "Michigan St.",
+       "seoname": "michigan-st",
+       "textOverride": null
+      }
+     ]
+    },
+    {
+     "contestId": 6534631,
+     "bracketPositionId": 304,
+     "bracketId": 304,
+     "victorBracketPositionId": 402,
+     "contestClock": "",
+     "currentPeriod": "FINAL",
+     "gameState": "F",
+     "statusCodeDisplay": "final",
+     "startDate": "03/22/2026",
+     "startTime": "21:10",
+     "startTimeEpoch": 1774228200,
+     "sectionId": 2,
+     "title": "UCLA vs UConn",
+     "teams": [
+      {
+       "isHome": false,
+       "isTop": true,
+       "isWinner": false,
+       "score": 57,
+       "seed": 7,
+       "nameShort": "UCLA",
+       "seoname": "ucla",
+       "textOverride": null
+      },
+      {
+       "isHome": true,
+       "isTop": false,
+       "isWinner": true,
+       "score": 73,
+       "seed": 2,
+       "nameShort": "UConn",
+       "seoname": "uconn",
+       "textOverride": null
+      }
+     ]
+    },
+    {
+     "contestId": 6534632,
+     "bracketPositionId": 305,
+     "bracketId": 305,
+     "victorBracketPositionId": 403,
+     "contestClock": "",
+     "currentPeriod": "FINAL",
+     "gameState": "F",
+     "statusCodeDisplay": "final",
+     "startDate": "03/22/2026",
+     "startTime": "19:10",
+     "startTimeEpoch": 1774221000,
+     "sectionId": 4,
+     "title": "Iowa vs Florida",
+     "teams": [
+      {
+       "isHome": true,
+       "isTop": true,
+       "isWinner": false,
+       "score": 72,
+       "seed": 1,
+       "nameShort": "Florida",
+       "seoname": "florida",
+       "textOverride": null
+      },
+      {
+       "isHome": false,
+       "isTop": false,
+       "isWinner": true,
+       "score": 73,
+       "seed": 9,
+       "nameShort": "Iowa",
+       "seoname": "iowa",
+       "textOverride": null
+      }
+     ]
+    },
+    {
+     "contestId": 6534633,
+     "bracketPositionId": 306,
+     "bracketId": 306,
+     "victorBracketPositionId": 403,
+     "contestClock": "",
+     "currentPeriod": "FINAL",
+     "gameState": "F",
+     "statusCodeDisplay": "final",
+     "startDate": "03/21/2026",
+     "startTime": "21:02",
+     "startTimeEpoch": 1774141320,
+     "sectionId": 4,
+     "title": "Vanderbilt vs Nebraska",
+     "teams": [
+      {
+       "isHome": false,
+       "isTop": true,
+       "isWinner": false,
+       "score": 72,
+       "seed": 5,
+       "nameShort": "Vanderbilt",
+       "seoname": "vanderbilt",
+       "textOverride": null
+      },
+      {
+       "isHome": true,
+       "isTop": false,
+       "isWinner": true,
+       "score": 74,
+       "seed": 4,
+       "nameShort": "Nebraska",
+       "seoname": "nebraska",
+       "textOverride": null
+      }
+     ]
+    },
+    {
+     "contestId": 6534634,
+     "bracketPositionId": 307,
+     "bracketId": 307,
+     "victorBracketPositionId": 404,
+     "contestClock": "",
+     "currentPeriod": "FINAL",
+     "gameState": "F",
+     "statusCodeDisplay": "final",
+     "startDate": "03/21/2026",
+     "startTime": "20:15",
+     "startTimeEpoch": 1774138500,
+     "sectionId": 4,
+     "title": "VCU vs Illinois",
+     "teams": [
+      {
+       "isHome": false,
+       "isTop": true,
+       "isWinner": false,
+       "score": 55,
+       "seed": 11,
+       "nameShort": "VCU",
+       "seoname": "vcu",
+       "textOverride": null
+      },
+      {
+       "isHome": true,
+       "isTop": false,
+       "isWinner": true,
+       "score": 76,
+       "seed": 3,
+       "nameShort": "Illinois",
+       "seoname": "illinois",
+       "textOverride": null
+      }
+     ]
+    },
+    {
+     "contestId": 6534635,
+     "bracketPositionId": 308,
+     "bracketId": 308,
+     "victorBracketPositionId": 404,
+     "contestClock": "",
+     "currentPeriod": "FINAL",
+     "gameState": "F",
+     "statusCodeDisplay": "final",
+     "startDate": "03/21/2026",
+     "startTime": "18:10",
+     "startTimeEpoch": 1774131000,
+     "sectionId": 4,
+     "title": "Texas A&M vs Houston",
+     "teams": [
+      {
+       "isHome": false,
+       "isTop": true,
+       "isWinner": false,
+       "score": 57,
+       "seed": 10,
+       "nameShort": "Texas A&M",
+       "seoname": "texas-am",
+       "textOverride": null
+      },
+      {
+       "isHome": true,
+       "isTop": false,
+       "isWinner": true,
+       "score": 88,
+       "seed": 2,
+       "nameShort": "Houston",
+       "seoname": "houston",
+       "textOverride": null
+      }
+     ]
+    },
+    {
+     "contestId": 6534636,
+     "bracketPositionId": 309,
+     "bracketId": 309,
+     "victorBracketPositionId": 405,
+     "contestClock": "",
+     "currentPeriod": "FINAL",
+     "gameState": "F",
+     "statusCodeDisplay": "final",
+     "startDate": "03/22/2026",
+     "startTime": "20:11",
+     "startTimeEpoch": 1774224660,
+     "sectionId": 3,
+     "title": "Utah St. vs Arizona",
+     "teams": [
+      {
+       "isHome": true,
+       "isTop": true,
+       "isWinner": true,
+       "score": 78,
+       "seed": 1,
+       "nameShort": "Arizona",
+       "seoname": "arizona",
+       "textOverride": null
+      },
+      {
+       "isHome": false,
+       "isTop": false,
+       "isWinner": false,
+       "score": 66,
+       "seed": 9,
+       "nameShort": "Utah St.",
+       "seoname": "utah-st",
+       "textOverride": null
+      }
+     ]
+    },
+    {
+     "contestId": 6534637,
+     "bracketPositionId": 310,
+     "bracketId": 310,
+     "victorBracketPositionId": 405,
+     "contestClock": "",
+     "currentPeriod": "FINAL",
+     "gameState": "F",
+     "statusCodeDisplay": "final",
+     "startDate": "03/21/2026",
+     "startTime": "21:45",
+     "startTimeEpoch": 1774143900,
+     "sectionId": 3,
+     "title": "High Point vs Arkansas",
+     "teams": [
+      {
+       "isHome": false,
+       "isTop": true,
+       "isWinner": false,
+       "score": 88,
+       "seed": 12,
+       "nameShort": "High Point",
+       "seoname": "high-point",
+       "textOverride": null
+      },
+      {
+       "isHome": true,
+       "isTop": false,
+       "isWinner": true,
+       "score": 94,
+       "seed": 4,
+       "nameShort": "Arkansas",
+       "seoname": "arkansas",
+       "textOverride": null
+      }
+     ]
+    },
+    {
+     "contestId": 6534638,
+     "bracketPositionId": 311,
+     "bracketId": 311,
+     "victorBracketPositionId": 406,
+     "contestClock": "",
+     "currentPeriod": "FINAL",
+     "gameState": "F",
+     "statusCodeDisplay": "final",
+     "startDate": "03/21/2026",
+     "startTime": "19:10",
+     "startTimeEpoch": 1774134600,
+     "sectionId": 3,
+     "title": "Texas vs Gonzaga",
+     "teams": [
+      {
+       "isHome": false,
+       "isTop": true,
+       "isWinner": true,
+       "score": 74,
+       "seed": 11,
+       "nameShort": "Texas",
+       "seoname": "texas",
+       "textOverride": null
+      },
+      {
+       "isHome": true,
+       "isTop": false,
+       "isWinner": false,
+       "score": 68,
+       "seed": 3,
+       "nameShort": "Gonzaga",
+       "seoname": "gonzaga",
+       "textOverride": null
+      }
+     ]
+    },
+    {
+     "contestId": 6534639,
+     "bracketPositionId": 312,
+     "bracketId": 312,
+     "victorBracketPositionId": 406,
+     "contestClock": "",
+     "currentPeriod": "FINAL",
+     "gameState": "F",
+     "statusCodeDisplay": "final",
+     "startDate": "03/22/2026",
+     "startTime": "12:10",
+     "startTimeEpoch": 1774195800,
+     "sectionId": 3,
+     "title": "Miami (FL) vs Purdue",
+     "teams": [
+      {
+       "isHome": false,
+       "isTop": true,
+       "isWinner": false,
+       "score": 69,
+       "seed": 7,
+       "nameShort": "Miami (FL)",
+       "seoname": "miami-fl",
+       "textOverride": null
+      },
+      {
+       "isHome": true,
+       "isTop": false,
+       "isWinner": true,
+       "score": 79,
+       "seed": 2,
+       "nameShort": "Purdue",
+       "seoname": "purdue",
+       "textOverride": null
+      }
+     ]
+    },
+    {
+     "contestId": 6534640,
+     "bracketPositionId": 313,
+     "bracketId": 313,
+     "victorBracketPositionId": 407,
+     "contestClock": "",
+     "currentPeriod": "FINAL",
+     "gameState": "F",
+     "statusCodeDisplay": "final",
+     "startDate": "03/21/2026",
+     "startTime": "12:10",
+     "startTimeEpoch": 1774109400,
+     "sectionId": 5,
+     "title": "Saint Louis vs Michigan",
+     "teams": [
+      {
+       "isHome": true,
+       "isTop": true,
+       "isWinner": true,
+       "score": 95,
+       "seed": 1,
+       "nameShort": "Michigan",
+       "seoname": "michigan",
+       "textOverride": null
+      },
+      {
+       "isHome": false,
+       "isTop": false,
+       "isWinner": false,
+       "score": 72,
+       "seed": 9,
+       "nameShort": "Saint Louis",
+       "seoname": "saint-louis",
+       "textOverride": null
+      }
+     ]
+    },
+    {
+     "contestId": 6534641,
+     "bracketPositionId": 314,
+     "bracketId": 314,
+     "victorBracketPositionId": 407,
+     "contestClock": "",
+     "currentPeriod": "FINAL",
+     "gameState": "F",
+     "statusCodeDisplay": "final",
+     "startDate": "03/22/2026",
+     "startTime": "22:08",
+     "startTimeEpoch": 1774231680,
+     "sectionId": 5,
+     "title": "Texas Tech vs Alabama",
+     "teams": [
+      {
+       "isHome": false,
+       "isTop": true,
+       "isWinner": false,
+       "score": 65,
+       "seed": 5,
+       "nameShort": "Texas Tech",
+       "seoname": "texas-tech",
+       "textOverride": null
+      },
+      {
+       "isHome": true,
+       "isTop": false,
+       "isWinner": true,
+       "score": 90,
+       "seed": 4,
+       "nameShort": "Alabama",
+       "seoname": "alabama",
+       "textOverride": null
+      }
+     ]
+    },
+    {
+     "contestId": 6534642,
+     "bracketPositionId": 315,
+     "bracketId": 315,
+     "victorBracketPositionId": 408,
+     "contestClock": "",
+     "currentPeriod": "FINAL",
+     "gameState": "F",
+     "statusCodeDisplay": "final",
+     "startDate": "03/22/2026",
+     "startTime": "18:10",
+     "startTimeEpoch": 1774217400,
+     "sectionId": 5,
+     "title": "Tennessee vs Virginia",
+     "teams": [
+      {
+       "isHome": false,
+       "isTop": true,
+       "isWinner": true,
+       "score": 79,
+       "seed": 6,
+       "nameShort": "Tennessee",
+       "seoname": "tennessee",
+       "textOverride": null
+      },
+      {
+       "isHome": true,
+       "isTop": false,
+       "isWinner": false,
+       "score": 72,
+       "seed": 3,
+       "nameShort": "Virginia",
+       "seoname": "virginia",
+       "textOverride": null
+      }
+     ]
+    },
+    {
+     "contestId": 6534643,
+     "bracketPositionId": 316,
+     "bracketId": 316,
+     "victorBracketPositionId": 408,
+     "contestClock": "",
+     "currentPeriod": "FINAL",
+     "gameState": "F",
+     "statusCodeDisplay": "final",
+     "startDate": "03/22/2026",
+     "startTime": "14:49",
+     "startTimeEpoch": 1774205340,
+     "sectionId": 5,
+     "title": "Kentucky vs Iowa St.",
+     "teams": [
+      {
+       "isHome": false,
+       "isTop": true,
+       "isWinner": false,
+       "score": 63,
+       "seed": 7,
+       "nameShort": "Kentucky",
+       "seoname": "kentucky",
+       "textOverride": null
+      },
+      {
+       "isHome": true,
+       "isTop": false,
+       "isWinner": true,
+       "score": 82,
+       "seed": 2,
+       "nameShort": "Iowa St.",
+       "seoname": "iowa-st",
+       "textOverride": null
+      }
+     ]
+    },
+    {
+     "contestId": 6534644,
+     "bracketPositionId": 401,
+     "bracketId": 401,
+     "victorBracketPositionId": 501,
+     "contestClock": "",
+     "currentPeriod": "FINAL",
+     "gameState": "F",
+     "statusCodeDisplay": "final",
+     "startDate": "03/27/2026",
+     "startTime": "19:10",
+     "startTimeEpoch": 1774653000,
+     "sectionId": 2,
+     "title": "St. John's vs Duke",
+     "teams": [
+      {
+       "isHome": true,
+       "isTop": true,
+       "isWinner": true,
+       "score": 80,
+       "seed": 1,
+       "nameShort": "Duke",
+       "seoname": "duke",
+       "textOverride": null
+      },
+      {
+       "isHome": false,
+       "isTop": false,
+       "isWinner": false,
+       "score": 75,
+       "seed": 5,
+       "nameShort": "St. John's",
+       "seoname": "st-johns-ny",
+       "textOverride": null
+      }
+     ]
+    },
+    {
+     "contestId": 6534645,
+     "bracketPositionId": 402,
+     "bracketId": 402,
+     "victorBracketPositionId": 501,
+     "contestClock": "",
+     "currentPeriod": "FINAL",
+     "gameState": "F",
+     "statusCodeDisplay": "final",
+     "startDate": "03/27/2026",
+     "startTime": "21:59",
+     "startTimeEpoch": 1774663140,
+     "sectionId": 2,
+     "title": "Michigan St. vs UConn",
+     "teams": [
+      {
+       "isHome": false,
+       "isTop": true,
+       "isWinner": false,
+       "score": 63,
+       "seed": 3,
+       "nameShort": "Michigan St.",
+       "seoname": "michigan-st",
+       "textOverride": null
+      },
+      {
+       "isHome": true,
+       "isTop": false,
+       "isWinner": true,
+       "score": 67,
+       "seed": 2,
+       "nameShort": "UConn",
+       "seoname": "uconn",
+       "textOverride": null
+      }
+     ]
+    },
+    {
+     "contestId": 6534646,
+     "bracketPositionId": 403,
+     "bracketId": 403,
+     "victorBracketPositionId": 502,
+     "contestClock": "",
+     "currentPeriod": "FINAL",
+     "gameState": "F",
+     "statusCodeDisplay": "final",
+     "startDate": "03/26/2026",
+     "startTime": "19:30",
+     "startTimeEpoch": 1774567800,
+     "sectionId": 4,
+     "title": "Iowa vs Nebraska",
+     "teams": [
+      {
+       "isHome": false,
+       "isTop": true,
+       "isWinner": true,
+       "score": 77,
+       "seed": 9,
+       "nameShort": "Iowa",
+       "seoname": "iowa",
+       "textOverride": null
+      },
+      {
+       "isHome": true,
+       "isTop": false,
+       "isWinner": false,
+       "score": 71,
+       "seed": 4,
+       "nameShort": "Nebraska",
+       "seoname": "nebraska",
+       "textOverride": null
+      }
+     ]
+    },
+    {
+     "contestId": 6534647,
+     "bracketPositionId": 404,
+     "bracketId": 404,
+     "victorBracketPositionId": 502,
+     "contestClock": "",
+     "currentPeriod": "FINAL",
+     "gameState": "F",
+     "statusCodeDisplay": "final",
+     "startDate": "03/26/2026",
+     "startTime": "22:05",
+     "startTimeEpoch": 1774577100,
+     "sectionId": 4,
+     "title": "Illinois vs Houston",
+     "teams": [
+      {
+       "isHome": false,
+       "isTop": true,
+       "isWinner": true,
+       "score": 65,
+       "seed": 3,
+       "nameShort": "Illinois",
+       "seoname": "illinois",
+       "textOverride": null
+      },
+      {
+       "isHome": true,
+       "isTop": false,
+       "isWinner": false,
+       "score": 55,
+       "seed": 2,
+       "nameShort": "Houston",
+       "seoname": "houston",
+       "textOverride": null
+      }
+     ]
+    },
+    {
+     "contestId": 6534648,
+     "bracketPositionId": 405,
+     "bracketId": 405,
+     "victorBracketPositionId": 503,
+     "contestClock": "",
+     "currentPeriod": "FINAL",
+     "gameState": "F",
+     "statusCodeDisplay": "final",
+     "startDate": "03/26/2026",
+     "startTime": "22:06",
+     "startTimeEpoch": 1774577160,
+     "sectionId": 3,
+     "title": "Arkansas vs Arizona",
+     "teams": [
+      {
+       "isHome": true,
+       "isTop": true,
+       "isWinner": true,
+       "score": 109,
+       "seed": 1,
+       "nameShort": "Arizona",
+       "seoname": "arizona",
+       "textOverride": null
+      },
+      {
+       "isHome": false,
+       "isTop": false,
+       "isWinner": false,
+       "score": 88,
+       "seed": 4,
+       "nameShort": "Arkansas",
+       "seoname": "arkansas",
+       "textOverride": null
+      }
+     ]
+    },
+    {
+     "contestId": 6534649,
+     "bracketPositionId": 406,
+     "bracketId": 406,
+     "victorBracketPositionId": 503,
+     "contestClock": "",
+     "currentPeriod": "FINAL",
+     "gameState": "F",
+     "statusCodeDisplay": "final",
+     "startDate": "03/26/2026",
+     "startTime": "19:10",
+     "startTimeEpoch": 1774566600,
+     "sectionId": 3,
+     "title": "Texas vs Purdue",
+     "teams": [
+      {
+       "isHome": false,
+       "isTop": true,
+       "isWinner": false,
+       "score": 77,
+       "seed": 11,
+       "nameShort": "Texas",
+       "seoname": "texas",
+       "textOverride": null
+      },
+      {
+       "isHome": true,
+       "isTop": false,
+       "isWinner": true,
+       "score": 79,
+       "seed": 2,
+       "nameShort": "Purdue",
+       "seoname": "purdue",
+       "textOverride": null
+      }
+     ]
+    },
+    {
+     "contestId": 6534650,
+     "bracketPositionId": 407,
+     "bracketId": 407,
+     "victorBracketPositionId": 504,
+     "contestClock": "",
+     "currentPeriod": "FINAL",
+     "gameState": "F",
+     "statusCodeDisplay": "final",
+     "startDate": "03/27/2026",
+     "startTime": "19:50",
+     "startTimeEpoch": 1774655400,
+     "sectionId": 5,
+     "title": "Alabama vs Michigan",
+     "teams": [
+      {
+       "isHome": true,
+       "isTop": true,
+       "isWinner": true,
+       "score": 90,
+       "seed": 1,
+       "nameShort": "Michigan",
+       "seoname": "michigan",
+       "textOverride": null
+      },
+      {
+       "isHome": false,
+       "isTop": false,
+       "isWinner": false,
+       "score": 77,
+       "seed": 4,
+       "nameShort": "Alabama",
+       "seoname": "alabama",
+       "textOverride": null
+      }
+     ]
+    },
+    {
+     "contestId": 6534651,
+     "bracketPositionId": 408,
+     "bracketId": 408,
+     "victorBracketPositionId": 504,
+     "contestClock": "",
+     "currentPeriod": "FINAL",
+     "gameState": "F",
+     "statusCodeDisplay": "final",
+     "startDate": "03/27/2026",
+     "startTime": "22:36",
+     "startTimeEpoch": 1774665360,
+     "sectionId": 5,
+     "title": "Tennessee vs Iowa St.",
+     "teams": [
+      {
+       "isHome": false,
+       "isTop": true,
+       "isWinner": true,
+       "score": 76,
+       "seed": 6,
+       "nameShort": "Tennessee",
+       "seoname": "tennessee",
+       "textOverride": null
+      },
+      {
+       "isHome": true,
+       "isTop": false,
+       "isWinner": false,
+       "score": 62,
+       "seed": 2,
+       "nameShort": "Iowa St.",
+       "seoname": "iowa-st",
+       "textOverride": null
+      }
+     ]
+    },
+    {
+     "contestId": 6534652,
+     "bracketPositionId": 501,
+     "bracketId": 501,
+     "victorBracketPositionId": 601,
+     "contestClock": "",
+     "currentPeriod": "FINAL",
+     "gameState": "F",
+     "statusCodeDisplay": "final",
+     "startDate": "03/29/2026",
+     "startTime": "17:05",
+     "startTimeEpoch": 1774818300,
+     "sectionId": 2,
+     "title": "UConn vs Duke",
+     "teams": [
+      {
+       "isHome": true,
+       "isTop": true,
+       "isWinner": false,
+       "score": 72,
+       "seed": 1,
+       "nameShort": "Duke",
+       "seoname": "duke",
+       "textOverride": null
+      },
+      {
+       "isHome": false,
+       "isTop": false,
+       "isWinner": true,
+       "score": 73,
+       "seed": 2,
+       "nameShort": "UConn",
+       "seoname": "uconn",
+       "textOverride": null
+      }
+     ]
+    },
+    {
+     "contestId": 6534653,
+     "bracketPositionId": 502,
+     "bracketId": 502,
+     "victorBracketPositionId": 601,
+     "contestClock": "",
+     "currentPeriod": "FINAL",
+     "gameState": "F",
+     "statusCodeDisplay": "final",
+     "startDate": "03/28/2026",
+     "startTime": "18:09",
+     "startTimeEpoch": 1774735740,
+     "sectionId": 4,
+     "title": "Iowa vs Illinois",
+     "teams": [
+      {
+       "isHome": false,
+       "isTop": true,
+       "isWinner": false,
+       "score": 59,
+       "seed": 9,
+       "nameShort": "Iowa",
+       "seoname": "iowa",
+       "textOverride": null
+      },
+      {
+       "isHome": true,
+       "isTop": false,
+       "isWinner": true,
+       "score": 71,
+       "seed": 3,
+       "nameShort": "Illinois",
+       "seoname": "illinois",
+       "textOverride": null
+      }
+     ]
+    },
+    {
+     "contestId": 6534654,
+     "bracketPositionId": 503,
+     "bracketId": 503,
+     "victorBracketPositionId": 602,
+     "contestClock": "",
+     "currentPeriod": "FINAL",
+     "gameState": "F",
+     "statusCodeDisplay": "final",
+     "startDate": "03/28/2026",
+     "startTime": "20:59",
+     "startTimeEpoch": 1774745940,
+     "sectionId": 3,
+     "title": "Purdue vs Arizona",
+     "teams": [
+      {
+       "isHome": true,
+       "isTop": true,
+       "isWinner": true,
+       "score": 79,
+       "seed": 1,
+       "nameShort": "Arizona",
+       "seoname": "arizona",
+       "textOverride": null
+      },
+      {
+       "isHome": false,
+       "isTop": false,
+       "isWinner": false,
+       "score": 64,
+       "seed": 2,
+       "nameShort": "Purdue",
+       "seoname": "purdue",
+       "textOverride": null
+      }
+     ]
+    },
+    {
+     "contestId": 6534655,
+     "bracketPositionId": 504,
+     "bracketId": 504,
+     "victorBracketPositionId": 602,
+     "contestClock": "",
+     "currentPeriod": "FINAL",
+     "gameState": "F",
+     "statusCodeDisplay": "final",
+     "startDate": "03/29/2026",
+     "startTime": "14:15",
+     "startTimeEpoch": 1774808100,
+     "sectionId": 5,
+     "title": "Tennessee vs Michigan",
+     "teams": [
+      {
+       "isHome": true,
+       "isTop": true,
+       "isWinner": true,
+       "score": 95,
+       "seed": 1,
+       "nameShort": "Michigan",
+       "seoname": "michigan",
+       "textOverride": null
+      },
+      {
+       "isHome": false,
+       "isTop": false,
+       "isWinner": false,
+       "score": 62,
+       "seed": 6,
+       "nameShort": "Tennessee",
+       "seoname": "tennessee",
+       "textOverride": null
+      }
+     ]
+    },
+    {
+     "contestId": 6534656,
+     "bracketPositionId": 601,
+     "bracketId": 601,
+     "victorBracketPositionId": 701,
+     "contestClock": "",
+     "currentPeriod": "FINAL",
+     "gameState": "F",
+     "statusCodeDisplay": "final",
+     "startDate": "04/04/2026",
+     "startTime": "18:09",
+     "startTimeEpoch": 1775340540,
+     "sectionId": 6,
+     "title": "Illinois vs UConn",
+     "teams": [
+      {
+       "isHome": true,
+       "isTop": true,
+       "isWinner": true,
+       "score": 71,
+       "seed": 2,
+       "nameShort": "UConn",
+       "seoname": "uconn",
+       "textOverride": null
+      },
+      {
+       "isHome": false,
+       "isTop": false,
+       "isWinner": false,
+       "score": 62,
+       "seed": 3,
+       "nameShort": "Illinois",
+       "seoname": "illinois",
+       "textOverride": null
+      }
+     ]
+    },
+    {
+     "contestId": 6534657,
+     "bracketPositionId": 602,
+     "bracketId": 602,
+     "victorBracketPositionId": 701,
+     "contestClock": "",
+     "currentPeriod": "FINAL",
+     "gameState": "F",
+     "statusCodeDisplay": "final",
+     "startDate": "04/04/2026",
+     "startTime": "21:19",
+     "startTimeEpoch": 1775351940,
+     "sectionId": 6,
+     "title": "Michigan vs Arizona",
+     "teams": [
+      {
+       "isHome": true,
+       "isTop": true,
+       "isWinner": false,
+       "score": 73,
+       "seed": 1,
+       "nameShort": "Arizona",
+       "seoname": "arizona",
+       "textOverride": null
+      },
+      {
+       "isHome": false,
+       "isTop": false,
+       "isWinner": true,
+       "score": 91,
+       "seed": 1,
+       "nameShort": "Michigan",
+       "seoname": "michigan",
+       "textOverride": null
+      }
+     ]
+    },
+    {
+     "contestId": 6534658,
+     "bracketPositionId": 701,
+     "bracketId": 701,
+     "victorBracketPositionId": null,
+     "contestClock": "",
+     "currentPeriod": "FINAL",
+     "gameState": "F",
+     "statusCodeDisplay": "final",
+     "startDate": "04/06/2026",
+     "startTime": "20:50",
+     "startTimeEpoch": 1775523000,
+     "sectionId": 6,
+     "title": "UConn vs Michigan",
+     "teams": [
+      {
+       "isHome": false,
+       "isTop": true,
+       "isWinner": false,
+       "score": 63,
+       "seed": 2,
+       "nameShort": "UConn",
+       "seoname": "uconn",
+       "textOverride": null
+      },
+      {
+       "isHome": true,
+       "isTop": false,
+       "isWinner": true,
+       "score": 69,
+       "seed": 1,
+       "nameShort": "Michigan",
+       "seoname": "michigan",
+       "textOverride": null
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

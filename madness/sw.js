@@ -15,7 +15,7 @@ const messaging = firebase.messaging();
 
 messaging.onBackgroundMessage((payload) => {
   const data = payload.data || {};
-  const title = data.title || 'March Madness Draft';
+  const title = data.title || 'Madness Draft';
   const body = data.body || '';
   const options = {
     body,
