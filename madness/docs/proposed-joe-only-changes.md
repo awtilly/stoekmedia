@@ -4,6 +4,8 @@ Night shift never edits these. Each block below is ready to paste; apply in the 
 
 ## 1. firestore.rules: scoreboard cache read access (needed by PR #3)
 
+> **DONE 2026-10-31.** Joe applied an equivalent rule directly on `main` (commit 86e46c6a, `match /scoreboard/{doc}`) and deployed it, and deployed `pollScoreboard` the same night (`firebase functions:list` shows it scheduled on nodejs22). The scheduler fires every minute and exits without writing until the March/April window opens or `scoreboard/_config.enabled` is `true`, so an empty `scoreboard` collection in the off-season is expected. Kept below for the record.
+
 Inside `match /databases/{database}/documents {`, after the `rooms` block:
 
 ```
@@ -213,7 +215,7 @@ and never reloads a live draft; the Firestore pass-through test; the `response.o
 
 ## 8. functions/package.json + firebase.json: move off the nodejs20 runtime before 2026-10-30 (found Shift 36, 2026-10-26)
 
-> **DONE 2026-10-30.** Applied by PR #49 (`madness/node22-runtime`, merged 2026-10-30) and deployed; `firebase functions:list` showed both `notifyDraftTurn` and `notifyGameFinal` on `nodejs22` the same night. Kept below for the record; nothing left to do here. `pollScoreboard` (from #3, now on `main`) is **not** deployed yet: run the deploy command below once more from `main` after applying section 1, and enable the Cloud Scheduler API if the deploy asks for it.
+> **DONE 2026-10-30.** Applied by PR #49 (`madness/node22-runtime`, merged 2026-10-30) and deployed; `firebase functions:list` showed both `notifyDraftTurn` and `notifyGameFinal` on `nodejs22` the same night. Kept below for the record; nothing left to do here. `pollScoreboard` was deployed 2026-10-31 as well (see section 1).
 
 **(Was time-critical.)** Google's Cloud Functions runtime table lists `nodejs20` as deprecated 2026-04-30 and
 **decommissioned 2026-10-30**. After that date you cannot create or update a function on that runtime, and
@@ -250,3 +252,68 @@ firebase functions:list --project march-madness-snake-draft   # both rows should
 Apply the same two-line change to PR #3's copy of `functions/package.json` when you merge it (its `firebase.json`
 is the same file). If you deploy after 2026-10-30 without this change the deploy fails with a runtime error rather
 than silently keeping the old version, so the risk is downtime of the push notifications, not corruption.
+## 9. functions/ncaa.js: the proxy has no cache in front of it (found Shift 48, 2026-11-01)
+
+Context: main ea7ce33d (merged #53, 2026-10-31) added the `ncaa` HTTPS function that forwards the two ncaa-api
+routes the clients use (one day's scoreboard for the Live tab's fallback poll, one year's bracket for the import).
+Its header comment and the response header say "cached at the edge for 30 s", but a plain
+`https://us-central1-….cloudfunctions.net/ncaa/...` URL has no CDN in front of it: Cloud Functions only honours
+`Cache-Control` when the function sits behind Firebase Hosting rewrites. Probed 2026-11-01 00:10 EDT: repeated GETs of
+the same scoreboard route each took ~2 s (a fresh upstream fetch every time) and no `Age` header ever came back.
+
+Why it matters: the public ncaa-api instance allows ~3 requests/s per IP. Normally the clients never reach this proxy
+during the tournament (they read the `scoreboard/{date}` document that `pollScoreboard` writes once a minute). But the
+moment that document is missing or more than 3 minutes old (function outage, Scheduler hiccup, or a date it does not
+cover), every open Live tab falls back to polling the proxy every 30 s, and all of those become separate upstream
+calls from the function's egress IP. A few dozen phones in fallback is enough to be rate-limited (429 → the proxy
+answers 502 → every Live tab shows "scores unavailable"), which is exactly the moment the fallback exists for.
+
+Fix (zero dependencies, functions/ only): a per-instance in-memory cache keyed by path, 30 s TTL, and serve the last
+good body when the upstream answers 429/5xx so a rate-limit never blanks the Live tab. With `maxInstances: 5` the
+worst case becomes 5 upstream calls per 30 s per route, independent of how many phones are polling.
+
+```diff
+--- madness/functions/ncaa.js
+ const { onRequest } = require('firebase-functions/v2/https');
+ const { NCAA_API_BASE, FETCH_HEADERS, allowedPath } = require('./scoreboard-logic');
++
++// Per-instance response cache. cloudfunctions.net URLs have no CDN, so the Cache-Control header below only helps
++// the browser; this keeps N phones in fallback from becoming N upstream calls (ncaa-api allows ~3 req/s per IP).
++const CACHE_TTL_MS = 30 * 1000;
++const _cache = new Map(); // path -> { body, at }
+@@
+   if (!allowedPath(p)) { res.status(404).json({ error: 'route not available' }); return; }
++  const hit = _cache.get(p);
++  if (hit && Date.now() - hit.at < CACHE_TTL_MS) {
++    res.set('Cache-Control', 'public, max-age=30');
++    res.set('X-Cache', 'hit');
++    res.type('application/json').status(200).send(hit.body);
++    return;
++  }
+   try {
+     const r = await fetch(NCAA_API_BASE + p, { headers: FETCH_HEADERS });
+     if (r.status === 404 || r.status === 403) {
+       ...unchanged...
+     }
+-    if (!r.ok) { res.status(502).json({ error: 'upstream ' + r.status }); return; }
++    if (!r.ok) {
++      // Rate-limited or upstream trouble: a slightly stale scoreboard beats an empty Live tab.
++      if (hit) { res.set('X-Cache', 'stale'); res.type('application/json').status(200).send(hit.body); return; }
++      res.status(502).json({ error: 'upstream ' + r.status }); return;
++    }
+     const body = await r.text();
++    _cache.set(p, { body, at: Date.now() });
+     res.set('Cache-Control', 'public, max-age=30');
+     res.type('application/json').status(200).send(body);
+   } catch (err) {
++    if (hit) { res.set('X-Cache', 'stale'); res.type('application/json').status(200).send(hit.body); return; }
+     res.status(502).json({ error: String(err && err.message || err) });
+   }
+```
+
+Then `firebase deploy --only functions:ncaa --project march-madness-snake-draft`, and `curl -sI` the scoreboard
+route twice within 30 s: the second answer should carry `X-Cache: hit` and return in well under a second.
+
+Optional, same spirit: the `pollScoreboard` scheduler is the only caller that *should* hit ncaa-api during the
+tournament, and it already does so at most twice a minute, so it needs no change. Cosmetic: `firestore.rules`
+line 46 still says "Cached ESPN scoreboard"; it is a comment, change it whenever the rules are next edited.
