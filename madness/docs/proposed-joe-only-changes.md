@@ -317,3 +317,44 @@ route twice within 30 s: the second answer should carry `X-Cache: hit` and retur
 Optional, same spirit: the `pollScoreboard` scheduler is the only caller that *should* hit ncaa-api during the
 tournament, and it already does so at most twice a minute, so it needs no change. Cosmetic: `firestore.rules`
 line 46 still says "Cached ESPN scoreboard"; it is a comment, change it whenever the rules are next edited.
+
+## 10. functions/ncaa-parse.js: conference tournament games are not NCAA tournament games (found Shift 49, 2026-11-01)
+
+`functions/ncaa-parse.js` is the server copy of `ncaa.parseScoreboard()` in `js/10-ncaa.js`, and during the tournament
+every phone reads ITS output from `scoreboard/{date}`. Replaying the real 2026 scoreboards (Selection Sunday eve through
+the title game, fetched through the `ncaa` proxy) through the app's own `checkGameFinals()` produced 90 gameResult writes
+instead of the expected 67 (63 tournament games + 4 First Four games). The 23 extras were the conference tournament
+semifinals and finals of 3/14-3/15: ncaa.com lists those with a `bracketRound` (their own bracket, 1-6) but an EMPTY
+`bracketId`, and the parser set `tournament` when any of `bracketId`, `bracketRound` or `championshipId` was truthy.
+Consequences on Selection Sunday 2027 as deployed: a "Game Final" / "UPSET!" push and a `gameResults` document for
+every conference game involving a room team, and 8 conference games between two bracket teams parked in
+`_pendingAdvance`, from where they would fill a later bracket slot with the *conference* result the moment the two
+teams were drawn to meet again (Houston-Arizona, Purdue-Michigan, UConn-St. John's, Virginia-Duke ... in 2026).
+
+Second, smaller: ncaa.com spells the round title `First Four&#174;`, and the Live tab escapes the note, so the four
+First Four cards read "NCAA Tournament - First Four&#174;" literally.
+
+The `madness/ncaa-conf-guard` branch makes both fixes in the client copy with a regression test on five untouched games
+from the real payloads (`test/fixtures/ncaa-scoreboard-selection-sunday.json`, `test/conf-tournament-flag.test.js`).
+The server copy needs the identical two lines. In `functions/ncaa-parse.js`:
+
+```diff
+-    const tournament = !!(g.bracketId || g.bracketRound || g.championshipId);
+-    const roundTitle = g.championshipGame && g.championshipGame.round && g.championshipGame.round.title || '';
++    const tournament = parseInt(g.bracketId, 10) > 0;
++    // ncaa.com writes "First Four&#174;"; the Live tab escapes the note, so strip the entity rather than print it.
++    const roundTitle = String(g.championshipGame && g.championshipGame.round && g.championshipGame.round.title || '').replace(/&#174;|&reg;|®/g, '').trim();
+```
+
+and in the header comment replace "Only NCAA tournament games carry bracketId/championshipId" with the wording now in
+`js/10-ncaa.js` (numeric `bracketId` only; conference games carry a `bracketRound` and no `bracketId`). Then remove the
+`{ todo: ... }` option from the last test in `test/conf-tournament-flag.test.js` (it asserts the server copy and is
+marked todo until this lands), run `node --test "test/*.test.js"`, and deploy:
+
+```sh
+firebase deploy --only functions:pollScoreboard --project march-madness-snake-draft
+```
+
+Nothing is urgent before March; `pollScoreboard` does not write outside the 3/10-4/10 window. The replay script that
+found this is `caddyshack/tools/night-shift/progress/madness-scripts/ncaa-tournament-replay.js` (`--harness` points it
+at any checkout); with the fix it reports 67 writes, 0 pending, champion Michigan, in order and out of order.
