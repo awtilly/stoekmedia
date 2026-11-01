@@ -27,8 +27,8 @@ const tag = (v, f = '00-constants.js') => '<script src="js/' + f + '?v=' + v + '
 const LF = '\n';
 
 test('resolveStampConflicts collapses a conflict block made only of stamped script tags', () => {
-  const ours = tag('aaaaaaaaaa') + LF + tag('aaaaaaaaaa', '10-espn.js') + LF;
-  const theirs = tag('bbbbbbbbbb') + LF + tag('bbbbbbbbbb', '10-espn.js') + LF;
+  const ours = tag('aaaaaaaaaa') + LF + tag('aaaaaaaaaa', '10-ncaa.js') + LF;
+  const theirs = tag('bbbbbbbbbb') + LF + tag('bbbbbbbbbb', '10-ncaa.js') + LF;
   const html = '<head>' + LF + '<<<<<<< HEAD' + LF + ours + '=======' + LF + theirs + '>>>>>>> madness/other' + LF + '</head>' + LF;
   const out = resolveStampConflicts(html, 'cafecafe00');
   assert.doesNotMatch(out, /<<<<<<<|=======|>>>>>>>/);
