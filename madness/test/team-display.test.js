@@ -3,9 +3,9 @@ const assert = require('node:assert/strict');
 const { createApp } = require('./_harness');
 
 // Pure render helpers in 70-logic.js that every team card, bracket slot and
-// Live row goes through. They were untested; the logo helper in particular is
-// the only place a team's logo URL (which comes from ESPN, not from us) is put
-// into markup, so its escaping is a security boundary.
+// Live row goes through. They were untested. Since the NCAA.com switch (#53) the app
+// renders no team logos at all: teamLogoHTML must return '' for every shape of team,
+// including rooms imported before the switch that still carry ESPN logo URLs in state.
 
 function playInTeam(overrides) {
   return Object.assign({
@@ -38,42 +38,17 @@ test('teamLogoHTML returns an empty string when the team has no logo', () => {
   assert.equal(app.teamLogoHTML({ name: 'No Logo' }, 24), '');
 });
 
-test('teamLogoHTML renders one lazy img at the requested size', () => {
+test('teamLogoHTML renders nothing for any team, even one that still carries a logo URL', () => {
   const app = createApp();
-  const html = app.teamLogoHTML({ name: 'Duke', logo: 'https://cdn.example/duke.png' }, 32);
-  assert.equal(html,
-    '<img src="https://cdn.example/duke.png" loading="lazy" style="width:32px;height:32px;object-fit:contain">');
+  assert.equal(app.teamLogoHTML({ name: 'Duke', logo: 'https://cdn.example/duke.png' }, 32), '');
+  // A hostile URL left in an old room's state never reaches the markup either.
+  assert.equal(app.teamLogoHTML({ name: 'X', logo: '" onerror="alert(1)' }, 20), '');
 });
 
-test('teamLogoHTML escapes the logo URL so a hostile ESPN payload cannot break out of the attribute', () => {
+test('teamLogoHTML renders nothing for play-in slots, unresolved or resolved', () => {
   const app = createApp();
-  const html = app.teamLogoHTML({ name: 'X', logo: '" onerror="alert(1)' }, 20);
-  assert.ok(!html.includes('onerror="alert'), 'raw attribute injected: ' + html);
-  assert.ok(html.includes('src="&quot; onerror=&quot;alert(1)"'));
-  // Exactly one img tag and one src attribute.
-  assert.equal((html.match(/<img /g) || []).length, 1);
-  assert.equal((html.match(/ src=/g) || []).length, 1);
-});
-
-test('teamLogoHTML for an unresolved play-in shows both teams logos and skips a missing one', () => {
-  const app = createApp();
-  const both = app.teamLogoHTML(playInTeam(), 16);
-  assert.equal((both.match(/<img /g) || []).length, 2);
-  assert.ok(both.includes('https://a.example/a.png') && both.includes('https://b.example/b.png'));
-
-  const t = playInTeam();
-  t.playInTeams[1].logo = '';
-  const one = app.teamLogoHTML(t, 16);
-  assert.equal((one.match(/<img /g) || []).length, 1);
-  assert.ok(one.includes('https://a.example/a.png'));
-});
-
-test('teamLogoHTML for a resolved play-in uses the single winner logo, not the pair', () => {
-  const app = createApp();
-  const t = playInTeam({ playInResolved: true, name: 'Alpha St', logo: 'https://a.example/a.png' });
-  const html = app.teamLogoHTML(t, 16);
-  assert.equal((html.match(/<img /g) || []).length, 1);
-  assert.ok(html.includes('https://a.example/a.png'));
+  assert.equal(app.teamLogoHTML(playInTeam(), 16), '');
+  assert.equal(app.teamLogoHTML(playInTeam({ playInResolved: true, name: 'Alpha St', logo: 'https://a.example/a.png' }), 16), '');
 });
 
 test('teamDisplayName joins the play-in pair until resolved, then shows the winner', () => {
