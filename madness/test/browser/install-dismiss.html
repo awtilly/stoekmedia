@@ -1,0 +1,26 @@
+<!doctype html>
+<!--
+  browser-check: ua=iphone
+  Browser check for the iOS install banner dismissal memory (js/90-boot.js).
+  Run with `node scripts/browser-check.js install-dismiss` (the runner picks up the ua line above), or by hand:
+  Needs a persistent profile and an iPhone user agent across three headless runs
+  (from repo root, server on :8787):
+    1. chrome --headless=new --dump-dom --user-data-dir=PROF --user-agent="iPhone UA" --virtual-time-budget=6000 http://127.0.0.1:8787/madness/   -> 1 install-banner
+    2. same flags, URL http://127.0.0.1:8787/madness/test/browser/install-dismiss.html                                                              -> #out "ok dismissed ..."
+    3. same as 1                                                                                                                                        -> 0 install-banner
+-->
+<meta charset="utf-8">
+<iframe id="f" src="../../index.html" style="width:400px;height:800px"></iframe>
+<pre id="out">pending</pre>
+<script>
+  const out = document.getElementById('out');
+  setTimeout(() => {
+    const w = document.getElementById('f').contentWindow;
+    const btn = w.document.querySelector('#install-banner .btn-dismiss');
+    if(!btn){ out.textContent = 'FAIL no banner to dismiss'; return; }
+    btn.click();
+    const gone = !w.document.getElementById('install-banner');
+    const stored = w.localStorage.getItem('mm4_install_dismissed');
+    out.textContent = (gone && stored ? 'ok ' : 'FAIL ') + 'dismissed gone=' + gone + ' stored=' + stored;
+  }, 4000);
+</script>

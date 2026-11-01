@@ -1,0 +1,110 @@
+<!doctype html>
+<!--
+  Browser check for renderLive's per-card diff (js/80-pages.js).
+  Run (from repo root):
+    python -m http.server 8787 --bind 127.0.0.1
+    chrome --headless=new --dump-dom --virtual-time-budget=5000 http://127.0.0.1:8787/madness/test/browser/live-diff.html | grep -A30 'id="out"'
+  Every line in #out must start with "ok".
+-->
+<meta charset="utf-8">
+<div id="c"></div>
+<pre id="out"></pre>
+<script>
+  // Stubs for things the page modules reach for at load/call time.
+  const fakeFirestore = () => ({ enablePersistence: () => Promise.resolve(), collection: () => ({ doc: () => ({}) }) });
+  fakeFirestore.FieldValue = { serverTimestamp: () => 0 };
+  window.firebase = { initializeApp() {}, firestore: fakeFirestore, messaging: () => ({}) };
+</script>
+<script src="../../js/00-constants.js"></script>
+<script src="../../js/10-espn.js"></script>
+<script src="../../js/20-live.js"></script>
+<script src="../../js/30-state.js"></script>
+<script src="../../js/40-ui.js"></script>
+<script src="../../js/50-auth.js"></script>
+<script src="../../js/60-rooms.js"></script>
+<script src="../../js/70-logic.js"></script>
+<script src="../../js/80-pages.js"></script>
+<script>
+  const out = [];
+  const check = (cond, label) => out.push((cond ? 'ok   ' : 'FAIL ') + label);
+
+  const mkTeam = (name, abbr, espnId, seed, score, winner) =>
+    ({ name, abbr, espnId, seed, score, winner, logo: '', record: '10-2', homeAway: 'away', color: '' });
+  const mkGame = (id, state, a, h) => ({
+    id, name: a.name + ' at ' + h.name, date: '2027-03-18T17:00Z', state, completed: state === 'post',
+    statusName: '', detail: '', shortDetail: state === 'in' ? '2nd 5:00' : '', clock: '', period: 2,
+    note: '', broadcast: 'CBS', venue: '', away: a, home: h
+  });
+
+  S = {
+    phase: 'live', players: [{ id: 'p1', name: 'Ann', teamIds: ['t1'] }],
+    teams: [{ id: 't1', name: 'Duke', seed: 1, region: 'East', espnId: '150', abbr: 'DUKE' }],
+    liveScoresFilter: 'all', liveScoresDate: '', rp: {}, ub: true, bracket: {}, games: [], ds: {}
+  };
+  roomId = 'TEST';
+  liveScores = [
+    mkGame('g1', 'in',   mkTeam('Duke', 'DUKE', '150', 1, '40'), mkTeam('Vermont', 'UVM', '261', 16, '30')),
+    mkGame('g2', 'pre',  mkTeam('Kansas', 'KU', '2305', 1, ''),  mkTeam('Howard', 'HOW', '47', 16, '')),
+    mkGame('g3', 'post', mkTeam('Gonzaga', 'GONZ', '2250', 3, '70', true), mkTeam('Yale', 'YALE', '43', 14, '60', false))
+  ];
+  liveLastRefresh = Date.now();
+  const c = document.getElementById('c');
+
+  renderLive(c);
+  const first = [...c.querySelectorAll('.score-card')];
+  check(first.length === 3, 'first paint renders 3 cards');
+  check(first.map(e => e.dataset.gid).join() === 'g1,g2,g3', 'cards sorted live, upcoming, final');
+  check(c.querySelector('#live-cnt-all').textContent === '3', 'All count = 3');
+  check(c.querySelector('#live-pulse').style.display === '', 'LIVE pulse shown while a game is in progress');
+  check(c.querySelector('.live-filter-btn[data-filter="all"]').classList.contains('active'), 'All filter active');
+  check(first[0].textContent.includes('(Ann)'), 'owner tag rendered for drafted team');
+  const updated1 = c.querySelector('#live-updated').textContent;
+
+  // Second poll: only g1's score changed.
+  liveScores[0].away.score = '55';
+  liveLastRefresh += 30000;
+  renderLive(c);
+  const second = [...c.querySelectorAll('.score-card')];
+  check(second.length === 3, 'second paint still 3 cards');
+  check(second[0] !== first[0], 'changed card (g1) was rebuilt');
+  check(second[0].querySelector('.team-score').textContent === '55', 'rebuilt card shows new score');
+  check(second[1] === first[1], 'unchanged card (g2) node reused');
+  check(second[2] === first[2], 'unchanged card (g3) node reused');
+  check(c.querySelector('#live-updated').textContent !== updated1, 'Updated timestamp refreshed in place');
+
+  // Filter to Final: the g3 node must be the same object, others removed.
+  S.liveScoresFilter = 'final';
+  renderLive(c);
+  const finals = [...c.querySelectorAll('.score-card')];
+  check(finals.length === 1 && finals[0] === second[2], 'Final filter keeps the existing g3 node');
+  check(c.querySelector('.live-filter-btn[data-filter="final"]').classList.contains('active'), 'Final filter active');
+  check(!c.querySelector('.live-filter-btn[data-filter="all"]').classList.contains('active'), 'All filter no longer active');
+
+  // Back to All: g1 and g2 were dropped from the DOM, so they are rebuilt; g3 reused.
+  S.liveScoresFilter = 'all';
+  renderLive(c);
+  const third = [...c.querySelectorAll('.score-card')];
+  check(third.length === 3 && third[2] === second[2], 'g3 reused after switching back to All');
+
+  // Game goes final: pulse hides.
+  liveScores[0].state = 'post'; liveScores[0].completed = true; liveScores[0].away.winner = true;
+  renderLive(c);
+  check(c.querySelector('#live-pulse').style.display === 'none', 'LIVE pulse hidden when nothing in progress');
+  check(c.querySelector('#live-cnt-final').textContent === '2', 'Final count = 2');
+
+  // Empty filter result shows the empty state.
+  S.liveScoresFilter = 'live';
+  renderLive(c);
+  check(c.querySelectorAll('.score-card').length === 0, 'Live filter with no live games renders 0 cards');
+  check(c.querySelector('#live-empty').style.display === '', 'empty state shown');
+  S.liveScoresFilter = 'all';
+  renderLive(c);
+  check(c.querySelector('#live-empty').style.display === 'none', 'empty state hidden again');
+
+  // A fresh container (new tab visit) paints the shell again.
+  const c2 = document.createElement('div');
+  renderLive(c2);
+  check(c2.querySelectorAll('.score-card').length === 3, 'fresh container gets a full paint');
+
+  document.getElementById('out').textContent = out.join('\n');
+</script>
