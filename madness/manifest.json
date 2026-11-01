@@ -1,7 +1,7 @@
 {
-  "name": "March Madness Draft",
+  "name": "Madness Draft",
   "short_name": "MM Draft",
-  "description": "March Madness bracket pool with snake draft",
+  "description": "Tournament bracket pool with a snake draft",
   "start_url": ".",
   "display": "standalone",
   "display_override": ["standalone"],
