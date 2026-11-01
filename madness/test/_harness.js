@@ -2,7 +2,7 @@
  * Loads the pure-logic subset of js/ into this Node process so the functions
  * can be unit tested without a browser or Firebase.
  *
- * Files loaded: 00-constants, 10-espn, 20-live, 60-rooms, 70-logic. They are classic
+ * Files loaded: 00-constants, 10-ncaa, 20-live, 50-auth, 60-rooms, 70-logic. They are classic
  * scripts, so they are evaluated once with vm.runInThisContext (top-level
  * function declarations land on globalThis, exactly like a browser). Everything
  * they reach for at call time (S, requireAdmin, saveState, render, showToast,
@@ -19,7 +19,7 @@ const path = require('path');
 const vm = require('vm');
 
 const JS_DIR = path.resolve(__dirname, '..', 'js');
-const LOGIC_FILES = ['00-constants.js', '10-espn.js', '20-live.js', '60-rooms.js', '70-logic.js'];
+const LOGIC_FILES = ['00-constants.js', '10-ncaa.js', '20-live.js', '50-auth.js', '60-rooms.js', '70-logic.js'];
 
 const REGIONS = ['South', 'East', 'Midwest', 'West'];
 
@@ -33,7 +33,7 @@ function emptyBracket() {
   };
 }
 
-/** 64 teams, ids like "South-1", espnIds like "e-South-1". */
+/** 64 teams, ids like "South-1", ncaaIds like "n-south-1". */
 function makeTeams() {
   const teams = [];
   for (const region of REGIONS) {
@@ -43,7 +43,7 @@ function makeTeams() {
         name: region + ' ' + seed,
         seed,
         region,
-        espnId: 'e-' + region + '-' + seed,
+        ncaaId: 'n-' + region.toLowerCase() + '-' + seed,
         abbr: region.slice(0, 2).toUpperCase() + seed,
         logo: '',
         record: ''
@@ -72,6 +72,18 @@ function freshState(overrides) {
   }, overrides || {});
 }
 
+/** Minimal in-memory localStorage. Reset per test by createApp(). */
+function memoryStorage() {
+  const m = new Map();
+  return {
+    getItem(k) { return m.has(k) ? m.get(k) : null; },
+    setItem(k, v) { m.set(k, String(v)); },
+    removeItem(k) { m.delete(k); },
+    clear() { m.clear(); },
+    get length() { return m.size; }
+  };
+}
+
 let loaded = false;
 let lexicals = null; // top-level const/let bindings are not globalThis properties; capture them once
 let real = null;     // functions createApp() replaces with stubs; tests of those functions use app.__real
@@ -80,13 +92,13 @@ function loadOnce() {
   if (loaded) return;
   globalThis.document = { addEventListener() {}, getElementById() { return null; }, querySelector() { return null; } };
   globalThis.window = globalThis.window || {};
-  globalThis.localStorage = { getItem() { return null; }, setItem() {}, removeItem() {} };
+  globalThis.localStorage = memoryStorage();
   globalThis.defaultState = () => freshState();
   for (const f of LOGIC_FILES) {
     const code = fs.readFileSync(path.join(JS_DIR, f), 'utf8');
     vm.runInThisContext(code, { filename: f });
   }
-  lexicals = vm.runInThisContext('({ espn, RN, REGIONS, SEEDS, R1_SEEDS, FEEDERS, generateId, stateKey })');
+  lexicals = vm.runInThisContext('({ ncaa, RN, REGIONS, SEEDS, R1_SEEDS, FEEDERS, generateId, stateKey })');
   real = { requireAdmin: globalThis.requireAdmin, saveState: globalThis.saveState };
   loaded = true;
 }
@@ -95,10 +107,12 @@ function loadOnce() {
  * Returns an "app" handle. Functions are reached as app.<name>; app.S is the
  * live state object the functions read; app.__calls records stub activity.
  * Assigning app.fetch / app.requireAdmin etc. overrides the stub for that test.
+ * app.eval('adminUnlocked') reads a top-level let at call time. app.__real holds the
+ * real implementations of functions createApp() stubs (currently requireAdmin).
  */
 function createApp(stateOverrides) {
   loadOnce();
-  const calls = { saveState: 0, render: 0, toasts: [], requireAdmin: 0, goHome: 0 };
+  const calls = { saveState: 0, render: 0, toasts: [], alerts: [], requireAdmin: 0, goHome: 0 };
   globalThis.S = freshState(stateOverrides);
   globalThis.roomId = null;
   globalThis.db = null;
@@ -111,12 +125,20 @@ function createApp(stateOverrides) {
   globalThis.goHome = () => { calls.goHome++; globalThis.roomId = null; };
   globalThis.updateAppBadge = () => {};
   globalThis.initFCM = async () => {};
+  globalThis.appPrompt = async () => null;
+  globalThis.appAlert = async (m) => { calls.alerts.push(m); return true; };
   globalThis.fetch = async () => { throw new Error('fetch not stubbed for this test'); };
+  globalThis.localStorage = memoryStorage();
+  // 50-auth.js keeps admin state in top-level lets; reset them so tests are independent.
+  vm.runInThisContext('adminUnlocked = false; _pinFailCount = 0;');
 
   const app = new Proxy({}, {
     get(_, key) {
+      if (key === 'eval') return (expr) => vm.runInThisContext(expr); // read top-level let/const live, e.g. app.eval('liveScores')
       if (key === '__calls') return calls;
       if (key === '__real') return real;
+      // Live read of a top-level let/const (lexicals above is a one-time snapshot).
+      if (key === 'eval') return (expr) => vm.runInThisContext(expr);
       if (key in lexicals) return lexicals[key];
       return globalThis[key];
     },
@@ -125,18 +147,18 @@ function createApp(stateOverrides) {
   return app;
 }
 
-/** Build a parsed-scoreboard-style final the way espn.parseScoreboardEvents would. */
+/** Build a parsed-scoreboard-style tournament final the way ncaa.parseScoreboard would. */
 function finalGame(awayTeam, homeTeam, winner) {
   const mk = (t, won) => ({
     name: t.name, abbr: t.abbr, logo: '', score: won ? '80' : '70', seed: t.seed, record: '',
-    homeAway: t === awayTeam ? 'away' : 'home', winner: won, espnId: t.espnId, color: ''
+    homeAway: t === awayTeam ? 'away' : 'home', winner: won, ncaaId: t.ncaaId, color: ''
   });
   return {
     id: 'g-' + awayTeam.id + '-' + homeTeam.id,
     name: awayTeam.name + ' at ' + homeTeam.name,
-    date: '2027-03-18T17:00Z',
-    state: 'post', completed: true, statusName: 'STATUS_FINAL', detail: 'Final', shortDetail: 'Final',
-    clock: '0:00', period: 2, note: '', broadcast: '', venue: '',
+    date: '2027-03-18T17:00Z', startTime: '1:00 PM ET',
+    state: 'post', completed: true, statusName: 'FINAL', detail: 'FINAL', shortDetail: 'FINAL',
+    clock: '0:00', period: 2, tournament: true, note: 'NCAA Tournament - First Round', broadcast: '', venue: '',
     away: mk(awayTeam, winner === awayTeam),
     home: mk(homeTeam, winner === homeTeam)
   };
