@@ -16,7 +16,7 @@
   window.firebase = { initializeApp() {}, firestore: fakeFirestore, messaging: () => ({}) };
 </script>
 <script src="../../js/00-constants.js"></script>
-<script src="../../js/10-espn.js"></script>
+<script src="../../js/10-ncaa.js"></script>
 <script src="../../js/20-live.js"></script>
 <script src="../../js/30-state.js"></script>
 <script src="../../js/40-ui.js"></script>
@@ -28,8 +28,8 @@
   const out = [];
   const check = (cond, label) => out.push((cond ? 'ok   ' : 'FAIL ') + label);
 
-  const mkTeam = (name, abbr, espnId, seed, score, winner) =>
-    ({ name, abbr, espnId, seed, score, winner, logo: '', record: '10-2', homeAway: 'away', color: '' });
+  const mkTeam = (name, abbr, ncaaId, seed, score, winner) =>
+    ({ name, abbr, ncaaId, seed, score, winner, logo: '', record: '10-2', homeAway: 'away', color: '' });
   const mkGame = (id, state, a, h) => ({
     id, name: a.name + ' at ' + h.name, date: '2027-03-18T17:00Z', state, completed: state === 'post',
     statusName: '', detail: '', shortDetail: state === 'in' ? '2nd 5:00' : '', clock: '', period: 2,
@@ -38,14 +38,14 @@
 
   S = {
     phase: 'live', players: [{ id: 'p1', name: 'Ann', teamIds: ['t1'] }],
-    teams: [{ id: 't1', name: 'Duke', seed: 1, region: 'East', espnId: '150', abbr: 'DUKE' }],
+    teams: [{ id: 't1', name: 'Duke', seed: 1, region: 'East', ncaaId: 'duke', abbr: 'DUKE' }],
     liveScoresFilter: 'all', liveScoresDate: '', rp: {}, ub: true, bracket: {}, games: [], ds: {}
   };
   roomId = 'TEST';
   liveScores = [
-    mkGame('g1', 'in',   mkTeam('Duke', 'DUKE', '150', 1, '40'), mkTeam('Vermont', 'UVM', '261', 16, '30')),
-    mkGame('g2', 'pre',  mkTeam('Kansas', 'KU', '2305', 1, ''),  mkTeam('Howard', 'HOW', '47', 16, '')),
-    mkGame('g3', 'post', mkTeam('Gonzaga', 'GONZ', '2250', 3, '70', true), mkTeam('Yale', 'YALE', '43', 14, '60', false))
+    mkGame('g1', 'in',   mkTeam('Duke', 'DUKE', 'duke', 1, '40'), mkTeam('Vermont', 'UVM', 'vermont', 16, '30')),
+    mkGame('g2', 'pre',  mkTeam('Kansas', 'KU', 'kansas', 1, ''),  mkTeam('Howard', 'HOW', 'howard', 16, '')),
+    mkGame('g3', 'post', mkTeam('Gonzaga', 'GONZ', 'gonzaga', 3, '70', true), mkTeam('Yale', 'YALE', 'yale', 14, '60', false))
   ];
   liveLastRefresh = Date.now();
   const c = document.getElementById('c');
