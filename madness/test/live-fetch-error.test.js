@@ -64,7 +64,7 @@ function liveApp() {
 
 const shown = (c, id) => c.el(id).style.display !== 'none';
 const ts = (ms) => ({ toMillis: () => ms });
-const oneLiveGame = () => [{ id: '401', name: 'A @ B', state: 'in', completed: false, away: { name: 'A', espnId: '1', winner: false }, home: { name: 'B', espnId: '2', winner: false } }];
+const oneLiveGame = () => [{ id: '401', name: 'A @ B', state: 'in', completed: false, away: { name: 'A', ncaaId: '1', winner: false }, home: { name: 'B', ncaaId: '2', winner: false } }];
 
 test('refreshLiveScores: a failed ESPN fetch sets liveLastError and still re-renders the Live tab', async () => {
   const { app, c } = liveApp();
@@ -85,7 +85,7 @@ test('refreshLiveScores: an HTTP error counts as a failure; the next good poll c
   await app.refreshLiveScores();
   assert.equal(app.eval('liveLastError'), true);
   assert.ok(shown(c, 'live-outage'));
-  app.fetch = async () => ({ ok: true, json: async () => ({ events: [] }) });
+  app.fetch = async () => ({ ok: true, json: async () => ({ games: [] }) });
   await app.refreshLiveScores();
   assert.equal(app.eval('liveLastError'), false);
   assert.ok(shown(c, 'live-empty'), 'a genuine empty day still says so');

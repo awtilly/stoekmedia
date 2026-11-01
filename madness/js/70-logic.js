@@ -22,13 +22,10 @@ function teamEditBlockedReason(){
   const what = [picks ? picks + ' pick' + (picks === 1 ? '' : 's') : '', winners ? winners + ' bracket result' + (winners === 1 ? '' : 's') : ''].filter(Boolean).join(' and ');
   return 'Teams are locked: ' + (what || 'the draft has started') + (what ? ' point at them' : '') + '. Reset the draft or start a new tournament first.';
 }
-function teamLogoHTML(t, size) {
-  if (t.playIn && !t.playInResolved) {
-    return t.playInTeams.map(pt =>
-      pt.logo ? `<img src="${escapeHtml(pt.logo)}" loading="lazy" style="width:${size}px;height:${size}px;object-fit:contain">` : ''
-    ).join('');
-  }
-  return t.logo ? `<img src="${escapeHtml(t.logo)}" loading="lazy" style="width:${size}px;height:${size}px;object-fit:contain">` : '';
+/* Team logos are the schools' marks, not ours to ship; the app renders none (seed badge + name instead).
+ * Rooms imported before the NCAA.com switch still carry ESPN logo URLs in state; they are ignored. */
+function teamLogoHTML(t, size) { // eslint-disable-line no-unused-vars
+  return '';
 }
 function teamRecordDisplay(t) {
   if (t.playIn && !t.playInResolved) return t.playInTeams.map(pt => pt.record).filter(Boolean).join(' / ');
@@ -40,11 +37,11 @@ async function resolvePlayIn(teamId, winnerIdx) {
   if (!team || !team.playIn) return;
   const winner = team.playInTeams[winnerIdx];
   team.name = winner.name;
-  team.logo = winner.logo;
-  team.abbr = winner.abbr;
-  team.espnId = winner.espnId;
-  team.color = winner.color;
-  team.record = winner.record;
+  team.logo = '';
+  team.abbr = winner.abbr || '';
+  team.ncaaId = winner.ncaaId;
+  team.color = '';
+  team.record = winner.record || '';
   team.playInResolved = true;
   saveState();
   render();
@@ -57,22 +54,15 @@ async function autoResolvePlayIns() {
   const unresolved = S.teams.filter(t => t.playIn && !t.playInResolved);
   if (unresolved.length === 0) return;
   _lastAutoResolve = now;
-  const dateCandidates = [];
-  for (let d = 14; d <= 21; d++) dateCandidates.push(`${S.year}03${String(d).padStart(2,'0')}`);
-  const results = await Promise.allSettled(dateCandidates.map(ds => espn.fetchScoreboard(ds)));
-  for (const r of results) {
-    if (r.status !== 'fulfilled' || !r.value) continue;
-    for (const ev of espn.parseScoreboardEvents(r.value)) {
-      if (ev.state !== 'post') continue;
-      for (const ut of unresolved) {
-        if (ut.playInResolved) continue;
-        const abbrs = ut.playInTeams.map(pt => pt.abbr);
-        if (abbrs.includes(ev.away.abbr) && abbrs.includes(ev.home.abbr)) {
-          const winnerAbbr = ev.away.winner ? ev.away.abbr : ev.home.abbr;
-          const winnerIdx = abbrs.indexOf(winnerAbbr);
-          if (winnerIdx >= 0) await resolvePlayIn(ut.id, winnerIdx);
-        }
-      }
+  // One bracket fetch: the First Four games there carry isWinner once they are final.
+  const decided = ncaa.firstFourWinners(await ncaa.fetchBracket(S.year));
+  for (const ff of decided) {
+    for (const ut of unresolved) {
+      if (ut.playInResolved) continue;
+      const ids = ut.playInTeams.map(pt => pt.ncaaId);
+      if (!ff.ncaaIds.every(id => ids.includes(id))) continue;
+      const winnerIdx = ids.indexOf(ff.winner);
+      if (winnerIdx >= 0) await resolvePlayIn(ut.id, winnerIdx);
     }
   }
 }
