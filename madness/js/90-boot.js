@@ -98,7 +98,7 @@ function showInstallBanner(){
   banner.innerHTML = `
     <img class="install-banner-icon" src="icons/icon-192.png" alt="App icon">
     <div class="install-banner-text">
-      Install March Madness Draft
+      Install Madness Draft
       <small>${isIOS ? 'Tap Share then "Add to Home Screen"' : 'Add to your home screen for quick access'}</small>
     </div>
     ${isIOS ? '' : '<button class="btn-install" onclick="installApp()">Install</button>'}

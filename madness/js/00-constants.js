@@ -1,7 +1,7 @@
-// App display name, used by the lobby/join/header <h1> and the share/notification titles. The store-facing
-// name is still an open decision (no "March Madness" in App Store listings): change it here, once.
-const APP_NAME = 'March Madness Draft';
-const APP_NAME_ACCENT = 'March Madness'; // the leading part of APP_NAME the <h1> highlights
+// App display name, used by the lobby/join/header <h1> and the share/notification titles.
+// Store name decided 2026-10-31: "Madness Draft" (never "March Madness", an NCAA mark). Change it here, once.
+const APP_NAME = 'Madness Draft';
+const APP_NAME_ACCENT = 'Madness'; // the leading part of APP_NAME the <h1> highlights
 function appTitleHTML(){
   const i = APP_NAME.startsWith(APP_NAME_ACCENT) ? APP_NAME_ACCENT.length : APP_NAME.length;
   return '<h1><span>' + escapeHtml(APP_NAME.slice(0, i)) + '</span>' + escapeHtml(APP_NAME.slice(i)) + '</h1>';
