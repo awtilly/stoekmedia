@@ -1,0 +1,90 @@
+<!doctype html>
+<!--
+  Browser check for the Final Four pairing (js/70-logic.js ffPairs/setFinalFourPairing, js/80-pages.js renderFF +
+  the Settings select). Run (from repo root):
+    python -m http.server 8787 --bind 127.0.0.1
+    chrome --headless=new --dump-dom --virtual-time-budget=5000 http://127.0.0.1:8787/madness/test/browser/final-four-pairing.html | grep -A20 'id="out"'
+  (or `node madness/scripts/browser-check.js final-four` where that runner exists). Every line in #out must start with "ok".
+-->
+<meta charset="utf-8">
+<div id="c"></div>
+<div id="bracket-area"></div>
+<pre id="out"></pre>
+<script>
+  const fakeFirestore = () => ({ enablePersistence: () => Promise.resolve(), collection: () => ({ doc: () => ({}) }) });
+  fakeFirestore.FieldValue = { serverTimestamp: () => 0 };
+  window.firebase = { initializeApp() {}, firestore: fakeFirestore, messaging: () => ({}) };
+</script>
+<script src="../../js/00-constants.js"></script>
+<script src="../../js/10-ncaa.js"></script>
+<script src="../../js/20-live.js"></script>
+<script src="../../js/30-state.js"></script>
+<script src="../../js/40-ui.js"></script>
+<script src="../../js/50-auth.js"></script>
+<script src="../../js/60-rooms.js"></script>
+<script src="../../js/70-logic.js"></script>
+<script src="../../js/80-pages.js"></script>
+<script>
+  const out = [];
+  const check = (cond, label) => out.push((cond ? 'ok   ' : 'FAIL ') + label);
+  const finish = () => { document.getElementById('out').textContent = out.join('\n'); };
+
+  (async () => {
+    try {
+      // The pairing control goes through the admin gate, saves and re-renders; none of that is under test here.
+      requireAdmin = async () => true;
+      saveState = () => {};
+      render = () => {};
+
+      S.players = [];
+      S.teams = REGIONS.map(r => ({ id: r + '-1', name: r + ' Champ', seed: 1, region: r }));
+      S.bracket = { ff: [null, null, null] };
+      for (const r of REGIONS) { S.bracket[r] = Array(15).fill(null); S.bracket[r][14] = r + '-1'; }
+      delete S.ffPairs;
+
+      const area = document.getElementById('bracket-area');
+      const labels = () => [...area.querySelectorAll('.ff-side > div > div:first-child')].map(e => e.textContent.trim());
+      const gameNames = i => [...area.querySelectorAll('.ff-side .ff-game')[i].querySelectorAll('.ff-slot')].map(e => e.textContent.replace(/\s+/g, ' ').trim());
+
+      // 1. A room without ffPairs draws the pairing the app always assumed.
+      renderFF();
+      check(labels().join('|') === 'South vs East|Midwest vs West', 'default pairing labels South vs East / Midwest vs West');
+      check(/South Champ/.test(gameNames(0)[0]) && /East Champ/.test(gameNames(0)[1]), 'semifinal 1 holds the South and East champions');
+      check(/Midwest Champ/.test(gameNames(1)[0]) && /West Champ/.test(gameNames(1)[1]), 'semifinal 2 holds the Midwest and West champions');
+
+      // 2. A 2025-style room (South-West / East-Midwest) draws its own pairing.
+      S.ffPairs = [['South', 'West'], ['East', 'Midwest']];
+      renderFF();
+      check(labels().join('|') === 'South vs West|East vs Midwest', '2025 pairing labels South vs West / East vs Midwest');
+      check(/South Champ/.test(gameNames(0)[0]) && /West Champ/.test(gameNames(0)[1]), 'semifinal 1 holds the South and West champions');
+      check(/East Champ/.test(gameNames(1)[0]) && /Midwest Champ/.test(gameNames(1)[1]), 'semifinal 2 holds the East and Midwest champions');
+
+      // 3. Settings: the select lists the three pairings and preselects the room's.
+      const c = document.getElementById('c');
+      renderSettings(c);
+      const sel = c.querySelector('select[onchange^="setFinalFourPairing"]');
+      check(!!sel, 'Settings shows the Final Four pairing select');
+      check(sel && sel.options.length === 3, 'select lists 3 pairings');
+      check(sel && sel.value === '1' && sel.options[1].selected, 'select preselects the 2025 pairing (index 1)');
+      check(sel && sel.options[1].textContent === 'South–West / East–Midwest', 'option text names both semifinals');
+
+      // 4. Switching the pairing clears a semifinal winner that no longer belongs to its pair, and the title game.
+      S.bracket.ff = ['West-1', 'East-1', 'East-1'];     // West won semi 1, East won semi 2 and the title (2025 shape)
+      await setFinalFourPairing('2');                   // South-Midwest / East-West
+      check(JSON.stringify(S.ffPairs) === JSON.stringify([['South', 'Midwest'], ['East', 'West']]), 'setFinalFourPairing stores pairing 2');
+      check(S.bracket.ff[0] === null && S.bracket.ff[1] === 'East-1' && S.bracket.ff[2] === null, 'semi 1 winner and the title game are cleared; East stays in semi 2');
+      renderFF();
+      check(labels().join('|') === 'South vs Midwest|East vs West', 'bracket redraws with South vs Midwest / East vs West');
+      check(area.querySelectorAll('.ff-center .ff-game .ff-slot.empty').length === 1, 'championship shows one TBD slot (semi 2 winner still set)');
+      check((area.querySelector('.champ-box .champ-team') || {}).textContent.trim() === 'TBD', 'champion is TBD again');
+
+      // 5. Picking the same pairing again is a no-op and does not touch the bracket.
+      S.bracket.ff = ['South-1', 'East-1', 'East-1'];
+      await setFinalFourPairing('2');
+      check(S.bracket.ff.join() === 'South-1,East-1,East-1', 're-selecting the current pairing leaves the bracket alone');
+    } catch (e) {
+      out.push('FAIL exception: ' + (e && e.stack || e));
+    }
+    finish();
+  })();
+</script>
