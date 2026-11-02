@@ -1,6 +1,6 @@
 # Madness on the App Store: Capacitor wrapper plan
 
-Status: DRAFT for Joe's review (night shift, 2026-10-14). No code written, nothing submitted.
+Status: DRAFT for Joe's review (night shift, 2026-10-14; refreshed 2026-11-02 for the NCAA.com data source, #53). Scaffold is on main (builds 1-4); nothing submitted.
 Target go/no-go: **2027-02-01**. Selection Sunday 2027 is **2027-03-14**. Feature freeze **2027-02-15**.
 
 ## 1. Scope and constraints
@@ -30,7 +30,7 @@ listing is exactly the kind of commercial use they send letters about.
 | Subtitle | "Snake-draft bracket pool with friends" |
 | Bundle ID | `com.stoekmedia.madness` |
 | Keywords | bracket, pool, draft, tournament, college basketball, friends |
-| Screenshots / description | No NCAA marks, no NCAA logos, no team logos from ESPN (those are the schools' marks; ESPN licenses them, we do not) |
+| Screenshots / description | No NCAA marks, no NCAA logos. Team logos are gone from the app since #53 (they were the schools' marks), so screenshots are clean by default. |
 | In-app header / `<title>` / manifest | Currently "March Madness Draft". Should become "Madness Draft" on the web too, since screenshots come from the real app. Small PR, **Joe's call on branding**. |
 | In-app round names (`RN` in `js/00-constants.js`) | "Sweet 16", "Elite 8", "Final Four" are descriptive use inside the product and lower risk. Cheap de-risk: "Round of 16", "Quarterfinals", "Semifinals". **Joe's call.** |
 
@@ -130,7 +130,7 @@ console, APNs auth key (.p8) uploaded to Firebase > Project settings > Cloud Mes
 | Guideline | Risk | Mitigation |
 |-----------|------|------------|
 | **4.2 Minimum functionality** ("just a website") | High for a wrapped PWA | Bundle locally; native push, haptics, share sheet, app badge, offline cache; splash + app icon; no "open in browser" links. Mention these in Review Notes. |
-| 4.2.2 web content | Medium | Do not use `server.url`. Everything in the bundle except Firestore/ESPN calls. |
+| 4.2.2 web content | Medium | Do not use `server.url`. Everything in the bundle except Firestore calls and the scores/bracket relay (the `ncaa` Cloud Function). |
 | **5.3 Gaming, gambling** | Medium: bracket pools read as betting | App moves no money, has no prizes, no entry fees, no payment links. Say so explicitly in Review Notes and the description ("for fun among friends"). Do not add any "buy-in" wording to the app. |
 | 5.1.1 Data collection | Low | Privacy policy URL (section 7). Only name, PIN hash, push token, room data. |
 | 2.1 App completeness | Medium: off-season there is no live tournament | Reviewer demo room (section 8) with a completed draft and partially filled bracket. |
@@ -138,7 +138,7 @@ console, APNs auth key (.p8) uploaded to Firebase > Project settings > Cloud Mes
 | 5.1.1 / privacy manifest (ITMS-91053) | Low (checked 2026-10-26) | The app's own Swift (`AppDelegate`, `SceneDelegate`) calls no required-reason APIs, and Capacitor 8 and the Firebase iOS SDK ship their own `PrivacyInfo.xcprivacy`, so no app-level manifest is required. If a plugin or Swift addition ever touches `UserDefaults`, file timestamps or disk space, add `App/PrivacyInfo.xcprivacy` in Xcode (project uses explicit file references, so it must be added through Xcode, not by dropping a file). Fill the App Store Connect **App Privacy** questionnaire before the first upload: Name, Other User Content (picks, room data), Device ID (push token); not used for tracking; linked to the user only by their own display name. |
 | 4.0 Design / iOS feel | Low-Medium | Bottom nav and tap states already exist. Check keyboard does not cover the PIN input. |
 | 3.1.1 In-app purchase | None | No purchases. |
-| Intellectual property (5.2) | Medium | ESPN team logos are rendered from ESPN CDN URLs. For the store listing, screenshots should use a room without logos or with logos cropped. In-app is lower risk but Joe should know. |
+| Intellectual property (5.2) | Low (was Medium) | The app shows no team logos since #53; only team names, seeds and records. Nothing to crop out of screenshots. |
 
 ## 7. Privacy policy (required, needs a public URL)
 
@@ -149,8 +149,9 @@ layout as `greendoor/privacy.html`; goes live when this PR merges to main). Revi
 
 - What we collect: display name you enter, a salted hash of your 4-digit PIN, your draft picks and
   bracket, and (if you opt in) a push notification token. No email, no account, no location.
-- Where it goes: Google Firebase (Firestore, Cloud Messaging) in the US. Live scores are fetched
-  from ESPN; ESPN sees your IP address like any website visit.
+- Where it goes: Google Firebase (Firestore, Cloud Messaging) in the US. Live scores and the bracket come
+  from NCAA.com through the app's own relay (the `ncaa` Cloud Function), so NCAA.com sees the relay's address,
+  not the phone's. `privacy.html` already says this (updated in #53).
 - No ads, no analytics SDKs, no selling of data.
 - Retention: room data stays until the commissioner starts a new tournament (`resetAll`). Push
   tokens are removed automatically when they expire.
@@ -165,8 +166,9 @@ App Functionality, linked: No). Tracking: **No**.
 Reviewers get a demo in the Review Notes, no account needed (good: no login = no demo-account rule).
 
 1. Create room **REVIEW27** (or similar) with the admin PIN of Joe's choosing.
-2. Off-season ESPN import returns nothing, so bulk-import 64 teams from the 2026 bracket via
-   Settings > Bulk Import (name, seed, region per line).
+2. Off-season the 2027 bracket is empty ("not available yet" until Selection Sunday), but the 2026 bracket is
+   still served: in Settings set Year to 2026, then Import from NCAA.com (64 real teams, seeds, regions and the
+   Final Four pairing). Bulk Import (name, seed, region per line) remains the fallback.
 3. Add 4 players, run the draft to completion (admin can pick for everyone), fill the bracket through
    the Sweet 16 so the leaderboard has points.
 4. Review Notes text: room code, one player name + PIN to log in as, admin PIN, and a sentence on
@@ -177,8 +179,8 @@ Reviewers get a demo in the Review Notes, no account needed (good: no login = no
 
 | When | Milestone | Owner |
 |------|-----------|-------|
-| Nov 2026 | Merge #2 (modularization) and #3 (ESPN cache). Decide names (section 2). | Joe |
-| Nov 2026 | Scaffold `madness/ios-app/`, `npx cap add ios`, build runs in simulator with bundled web code. | Night shift drafts, Joe runs Xcode |
+| Nov 2026 | DONE 10-30/31: #2 (modularization), #3 (score cache), #53 (NCAA.com data source) merged. Store name "Madness Draft" (section 2). | Joe |
+| Nov 2026 | DONE: `madness/ios-app/` scaffold on main, builds 1-4 on device, App Review screen recordings in progress (`ios-app/assets/review/`, gitignored). | Night shift drafts, Joe runs Xcode |
 | Dec 2026 | Web guards PR (section 4). Functions push payload change (section 5, Joe). APNs key in Firebase. | Both |
 | Dec 2026 | TestFlight build to Joe's phone. Test: push on draft turn, haptics, share, offline open. | Joe |
 | Jan 2027, by the 10th | Privacy page live, screenshots, description, demo room, App Store Connect record. | Both |
@@ -203,8 +205,9 @@ Reviewers get a demo in the Review Notes, no account needed (good: no login = no
 ## 11. Open questions
 
 - Android later? Capacitor makes it nearly free; Play Store has no 4.2 equivalent. Not in scope now.
-- Should the App Store build ship with the ESPN cache enabled by default (needs #3 deployed)?
-  Fewer direct ESPN calls from phones is also a privacy-policy simplification.
+- Scores path for the store build: decided by #3 + #53. Phones read the Firestore scoreboard document during
+  the tournament (the `pollScoreboard` function starts writing on 2027-03-10) and the `ncaa` relay otherwise;
+  no phone talks to NCAA.com directly.
 - Web Share availability in WKWebView: verify on the first simulator build before relying on it.
 
 ## Appendix A. Every place the "March Madness" name lives (inventory 2026-10-17)
