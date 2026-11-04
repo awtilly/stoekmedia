@@ -124,8 +124,9 @@ const ncaa = {
 
   /* Identical to functions/ncaa-parse.js (a test keeps them in sync). Input is the ncaa-api scoreboard payload;
    * output is one event per game in the shape the rest of the app has always consumed: state 'pre'|'in'|'post',
-   * completed, away/home with name/abbr/score/seed/winner/ncaaId. Only NCAA tournament games carry
-   * bracketId/championshipId; `tournament` is the flag checkGameFinals keys off. */
+   * completed, away/home with name/abbr/score/seed/winner/ncaaId. Only NCAA tournament games carry a numeric
+   * bracketId; `tournament` is the flag checkGameFinals keys off. Conference tournament games on Selection Sunday
+   * weekend come with a bracketRound (and no bracketId), so bracketRound/championshipId must not count. */
   parseScoreboard(data) {
     if (!data || !Array.isArray(data.games)) return [];
     return data.games.map(w => {
@@ -168,8 +169,9 @@ const ncaa = {
       }
       if (!completed) { away.winner = undefined; home.winner = undefined; }
 
-      const tournament = !!(g.bracketId || g.bracketRound || g.championshipId);
-      const roundTitle = g.championshipGame && g.championshipGame.round && g.championshipGame.round.title || '';
+      const tournament = parseInt(g.bracketId, 10) > 0;
+      // ncaa.com writes "First Four&#174;"; the Live tab escapes the note, so strip the entity rather than print it.
+      const roundTitle = String(g.championshipGame && g.championshipGame.round && g.championshipGame.round.title || '').replace(/&#174;|&reg;|\u00ae/g, '').trim();
       const periodNum = parseInt(String(g.currentPeriod || ''), 10);
       const epoch = parseInt(g.startTimeEpoch, 10);
       const liveDetail = [g.currentPeriod, g.contestClock].filter(Boolean).join(' ').trim();
