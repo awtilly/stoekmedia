@@ -125,10 +125,18 @@ function navigate(p){
   });
 }
 
+/* The link that lets someone else join this room. Inside the iOS shell the page lives at capacitor://localhost,
+ * an address that means nothing outside the app, so there the invite points at the public site instead. */
+const PUBLIC_APP_URL = 'https://stoekmedia.com/madness/';
+function roomShareUrl(loc, code) {
+  let url = new URL(String(loc));
+  if (!/^https?:$/.test(url.protocol)) url = new URL(PUBLIC_APP_URL);
+  url.searchParams.set('room', code);
+  return url.toString();
+}
+
 async function shareRoomLink() {
-  const url = new URL(window.location);
-  url.searchParams.set('room', roomId);
-  const shareUrl = url.toString();
+  const shareUrl = roomShareUrl(window.location, roomId);
   const shareData = {
     title: APP_NAME,
     text: 'Join my Madness Draft bracket pool! Room: ' + roomId,

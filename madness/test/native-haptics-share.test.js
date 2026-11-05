@@ -89,3 +89,25 @@ test('triggerHaptic: Haptics plugin impact in the shell; Vibration API still win
   assert.deepEqual(vib, [50]);
   assert.equal(impacts.length, 1);
 });
+
+test('roomShareUrl: a web page keeps its own address; the shell (capacitor://localhost) shares the public site', () => {
+  pagesApp();
+  assert.equal(roomShareUrl('https://stoekmedia.com/madness/', 'ROOM1'), 'https://stoekmedia.com/madness/?room=ROOM1');
+  assert.equal(roomShareUrl('https://stoekmedia.com/madness/?room=OLD&x=1', 'ROOM1'), 'https://stoekmedia.com/madness/?room=ROOM1&x=1', 'an existing room parameter is replaced');
+  assert.equal(roomShareUrl('http://localhost:8787/madness/', 'ROOM1'), 'http://localhost:8787/madness/?room=ROOM1', 'local and staging pages still share themselves');
+  assert.equal(roomShareUrl('capacitor://localhost/', 'ROOM1'), 'https://stoekmedia.com/madness/?room=ROOM1');
+  assert.equal(roomShareUrl('capacitor://localhost/index.html?room=OLD', 'ROOM1'), 'https://stoekmedia.com/madness/?room=ROOM1');
+  assert.equal(roomShareUrl({ toString: () => 'capacitor://localhost/' }, 'ROOM1'), 'https://stoekmedia.com/madness/?room=ROOM1', 'accepts a Location object');
+});
+
+test('shareRoomLink in the shell: the share sheet and the clipboard fallback both get the public link, never capacitor://', async () => {
+  const share = fakeShare();
+  let { app } = pagesApp({ share });
+  app.window.location = 'capacitor://localhost/?room=ROOM1';
+  await app.shareRoomLink();
+  assert.equal(share.calls[0].url, 'https://stoekmedia.com/madness/?room=ROOM1');
+  const failing = pagesApp({ share: fakeShare('fail') });
+  failing.app.window.location = 'capacitor://localhost/?room=ROOM1';
+  await failing.app.shareRoomLink();
+  assert.deepEqual(failing.clip, ['https://stoekmedia.com/madness/?room=ROOM1']);
+});
