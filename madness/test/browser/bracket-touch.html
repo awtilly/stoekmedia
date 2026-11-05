@@ -70,6 +70,17 @@
   await wait(600);
   check(adminAsks === 1, 'touchstart outside a slot does nothing');
 
+  // Two fingers: the second touchstart (touches.length 2) lands on another slot. Neither long press may fire.
+  const fireTouches = (el, n) => { const ev = new Event('touchstart', { bubbles: true, cancelable: true }); Object.defineProperty(ev, 'touches', { value: Array(n).fill({}) }); el.dispatchEvent(ev); };
+  fireTouches(inner, 1);
+  await wait(100);
+  fireTouches(slots[1], 2);
+  await wait(700);
+  check(adminAsks === 1, 'a second finger on another slot cancels the long press for both slots');
+  const endEv3 = new Event('touchend', { bubbles: true, cancelable: true });
+  inner.dispatchEvent(endEv3);
+  check(endEv3.defaultPrevented === false, 'touchend after a two-finger touch is not prevented');
+
   S.bracketRegion = 'ff';
   S.bracket.ff[0] = 'South-1'; S.bracket.ff[1] = 'Midwest-1';
   renderBracket(c);

@@ -105,3 +105,43 @@ test('touches outside a slot never start a timer, and a short tap is not prevent
     mock.timers.reset();
   }
 });
+
+test('a second finger landing on another slot cancels the long press: neither game is cleared', async () => {
+  mock.timers.enable({ apis: ['setTimeout'] });
+  try {
+    const app = createApp();
+    app.S.bracket.South[3] = 'South-4'; app.S.bracket.South[4] = 'South-5';
+    const first = touch(slotEl('r:South:3')); first.touches = [{}];
+    app.onBracketTouchStart(first);
+    mock.timers.tick(100);
+    const second = touch(slotEl('r:South:4')); second.touches = [{}, {}];
+    app.onBracketTouchStart(second);
+    mock.timers.tick(1000);
+    await flush();
+    assert.equal(app.__calls.requireAdmin, 0, 'no clear was attempted');
+    assert.equal(app.S.bracket.South[3], 'South-4', 'the first slot keeps its result');
+    assert.equal(app.S.bracket.South[4], 'South-5', 'the second slot keeps its result');
+  } finally {
+    mock.timers.reset();
+  }
+});
+
+test('two touchstarts in a row never leave an orphan timer: one cancel stops everything', async () => {
+  mock.timers.enable({ apis: ['setTimeout'] });
+  try {
+    const app = createApp();
+    app.S.bracket.South[3] = 'South-4'; app.S.bracket.South[4] = 'South-5';
+    app.onBracketTouchStart(touch(slotEl('r:South:3'))); // no touches list: e.g. a touchend that never arrived
+    mock.timers.tick(100);
+    app.onBracketTouchStart(touch(slotEl('r:South:4')));
+    mock.timers.tick(100);
+    app.cancelLongPress(); // the scroll that follows
+    mock.timers.tick(1000);
+    await flush();
+    assert.equal(app.__calls.requireAdmin, 0, 'the first timer did not survive the second touchstart');
+    assert.equal(app.S.bracket.South[3], 'South-4');
+    assert.equal(app.S.bracket.South[4], 'South-5');
+  } finally {
+    mock.timers.reset();
+  }
+});

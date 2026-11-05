@@ -144,6 +144,7 @@ let _longPressTimer = null;
 let _longPressTriggered = false;
 
 function startLongPress(fn){
+  clearTimeout(_longPressTimer); // never two timers: a second touchstart must not leave the first one running with nothing able to cancel it
   _longPressTriggered = false;
   _longPressTimer = setTimeout(() => { _longPressTriggered = true; fn(); }, 500);
 }
@@ -171,6 +172,8 @@ function longPressTarget(e){
   return t && typeof t.closest === 'function' ? t.closest('[data-lp]') : null;
 }
 function onBracketTouchStart(e){
+  // A second finger down is a gesture (two-finger scroll, a stray palm), not a long press: drop what the first finger started.
+  if(e && e.touches && e.touches.length > 1){ cancelLongPress(); return; }
   const el = longPressTarget(e);
   if(!el) return;
   const act = longPressAction(el.getAttribute('data-lp'));
