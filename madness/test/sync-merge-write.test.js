@@ -108,3 +108,49 @@ test('any other transaction error is reported, not papered over with a blind wri
   assert.equal(plain.length, 0);
   assert.equal(app.__calls.toasts.length, 1);
 });
+
+/* A fake server that keeps what the last committed transaction wrote. */
+function serverApp(code) {
+  const { app } = txApp(code, null);
+  const server = { state: null };
+  app.db.runTransaction = async (fn) => {
+    let next = null;
+    await fn({
+      get: async () => server.state ? { exists: true, data: () => ({ state: server.state }) } : { exists: false },
+      set: (ref, data) => { next = data.state; }
+    });
+    server.state = next;
+  };
+  const ids = () => JSON.parse(server.state).players.map(p => p.id);
+  return { app, ids };
+}
+
+test('a player added on this device and then removed on this device stays removed', async () => {
+  const { app, ids } = serverApp('AAAA');
+  vm.runInThisContext("_lastSnapshotPlayerIds = ['p1', 'p2']"); // the snapshot this device joined with
+  app._writeSharedState();
+  await settle();
+  app.S.players.push({ id: 'p3', name: 'Cy', teamIds: [] });
+  app._writeSharedState(); // the echo of this write is skipped, so no snapshot ever lists p3
+  await settle();
+  assert.deepEqual(ids(), ['p1', 'p2', 'p3']);
+  app.S.players = app.S.players.filter(p => p.id !== 'p3');
+  app._writeSharedState();
+  await settle();
+  assert.deepEqual(ids(), ['p1', 'p2'], 'p3 was removed here: the merge must not bring them back as a newcomer');
+});
+
+test('a player another device added since our last write is still kept by our next write', async () => {
+  const { app, ids } = serverApp('AAAA');
+  vm.runInThisContext("_lastSnapshotPlayerIds = ['p1', 'p2']");
+  app._writeSharedState();
+  await settle();
+  // Another device registers p9 directly on the server; this device has not seen a snapshot of it yet.
+  const s = JSON.parse(vm.runInThisContext('_lastSyncedState'));
+  s.players.push({ id: 'p9', name: 'Zed', teamIds: [] });
+  await app.db.runTransaction(async tx => { tx.set({}, { state: JSON.stringify(s) }); });
+  app.S.ub = false;
+  app._writeSharedState();
+  await settle();
+  assert.deepEqual(ids(), ['p1', 'p2', 'p9'], 'recording our own writes must not turn a real newcomer into a removal');
+});

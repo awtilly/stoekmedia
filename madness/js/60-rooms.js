@@ -49,11 +49,13 @@ function _writeSharedState(){
   // write at once, so the edit is already in Firestore's offline queue if the tab is closed a second later.
   if(typeof navigator !== 'undefined' && navigator.onLine === false){ _plainSharedWrite(ref, localJson); return; }
   // Transaction + mergeSharedState: never roll back a pick that landed since our last snapshot.
+  let writtenIds = null;
   db.runTransaction(async tx => {
     const snap = await tx.get(ref);
     const remote = snap.exists && snap.data().state ? JSON.parse(snap.data().state) : null;
     const merged = remote ? mergeSharedState(shared, remote, _lastSnapshotPlayerIds) : shared;
     const json = JSON.stringify(merged);
+    writtenIds = (merged.players || []).map(p => p.id);
     // The echo of this write is skipped by _applyRoomSnapshot only when it carries exactly what we
     // hold. If the merge took the server's draft progress, leave the echo to be applied so this
     // device catches up too.
@@ -62,6 +64,11 @@ function _writeSharedState(){
       state: json,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     }, {merge: true});
+  }).then(() => {
+    // The server now holds the roster we just wrote, and our own echo is skipped by _applyRoomSnapshot, so
+    // record it here. Otherwise a player added on this device and then removed on this device would look
+    // like "added elsewhere" to the next merge and come straight back.
+    if(writtenIds && roomId && ref.id === roomId) _lastSnapshotPlayerIds = Array.from(new Set((_lastSnapshotPlayerIds || []).concat(writtenIds)));
   }).catch(e => {
     // Transactions need the network. Offline, fall back to the plain merge write, which Firestore
     // queues and flushes on reconnect (the pre-transaction behaviour).
