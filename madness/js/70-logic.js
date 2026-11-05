@@ -205,7 +205,7 @@ function ffPairingIndex(){
   return i < 0 ? 0 : i;
 }
 async function setFinalFourPairing(v){
-  if(!await requireAdmin()) return;
+  if(!await requireAdmin()){ render(); return; } // redraw so the select shows the room's pairing again, not the refused choice
   const next = FF_PAIRINGS[Number(v)];
   if(!next || ffPairingIndex() === Number(v)) return;
   S.ffPairs = next;

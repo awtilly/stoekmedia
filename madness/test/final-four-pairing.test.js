@@ -110,12 +110,14 @@ test('setFinalFourPairing: admin-only; switching the pairing clears a semifinal 
   app.requireAdmin = async () => false;
   await app.setFinalFourPairing(1);
   assert.equal(app.S.ffPairs, undefined, 'refused without admin');
+  assert.equal(app.__calls.render, 1, 'a refused change redraws, so the select snaps back to the room\'s pairing');
+  assert.equal(app.__calls.saveState, 0);
   app.requireAdmin = async () => true;
   await app.setFinalFourPairing(1); // South-West / East-Midwest
   assert.deepEqual(app.S.ffPairs, [['South', 'West'], ['East', 'Midwest']]);
   assert.deepEqual(app.S.bracket.ff, [null, null, null], 'East-1 is not in South-West, West-1 is not in East-Midwest, so both semis and the final clear');
   assert.equal(app.__calls.saveState, 1);
-  assert.equal(app.__calls.render, 1);
+  assert.equal(app.__calls.render, 2);
   await app.setFinalFourPairing(1);
   assert.equal(app.__calls.saveState, 1, 'choosing the current pairing again is a no-op');
   await app.setFinalFourPairing(9);
