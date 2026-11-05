@@ -115,3 +115,18 @@ test('autoResolvePlayIns: an unfinished First Four game leaves its slot alone; n
   await app.autoResolvePlayIns();
   assert.equal(calls.length, 1, 'no slots left: no network call');
 });
+
+test('autoResolvePlayIns: two calls that overlap (tab switch + app coming to the front) share one bracket fetch', async () => {
+  const app = appWithPlayIn();
+  const calls = bracketFetch(app, bracket2026());
+  await Promise.all([app.autoResolvePlayIns(), app.autoResolvePlayIns()]);
+  assert.equal(calls.length, 1, 'the second call sees the fetch in flight and returns');
+  assert.equal(app.S.teams.find(x => x.id === 'West-16').name, 'Howard');
+  assert.equal(app.__calls.saveState, 1, 'the slot is resolved once, not twice');
+  resetThrottle();
+  await app.autoResolvePlayIns();
+  assert.equal(calls.length, 1, 'nothing left to resolve: no fetch, and the in-flight flag was cleared');
+  app.S.teams.find(x => x.id === 'West-16').playInResolved = false;
+  await app.autoResolvePlayIns();
+  assert.equal(calls.length, 2, 'a later call fetches again: the flag does not stick');
+});

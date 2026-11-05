@@ -49,13 +49,16 @@ async function resolvePlayIn(teamId, winnerIdx) {
 }
 
 let _lastAutoResolve = 0;
+let _autoResolveFetching = false; // a bracket fetch is in flight: a second call must not start another
 async function autoResolvePlayIns() {
   const now = Date.now();
-  if (now - _lastAutoResolve < 3600000) return; // once per hour max
+  if (now - _lastAutoResolve < 3600000 || _autoResolveFetching) return; // once per hour max, one fetch at a time
   const unresolved = S.teams.filter(t => t.playIn && !t.playInResolved);
   if (unresolved.length === 0) return;
   // One bracket fetch: the First Four games there carry isWinner once they are final.
-  const data = await ncaa.fetchBracket(S.year);
+  let data;
+  _autoResolveFetching = true;
+  try { data = await ncaa.fetchBracket(S.year); } finally { _autoResolveFetching = false; }
   // Only arm the hourly throttle once the bracket actually answered; a dead network on First Four
   // night must not lock auto-resolve out for an hour.
   if (!data) return;
