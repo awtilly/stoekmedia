@@ -82,6 +82,17 @@
       S.bracket.ff = ['South-1', 'East-1', 'East-1'];
       await setFinalFourPairing('2');
       check(S.bracket.ff.join() === 'South-1,East-1,East-1', 're-selecting the current pairing leaves the bracket alone');
+
+      // 6. A refused change (PIN prompt cancelled) redraws Settings: the select shows the room's pairing again.
+      requireAdmin = async () => false;
+      render = () => renderSettings(c);
+      renderSettings(c);
+      const sel2 = c.querySelector('select[onchange^="setFinalFourPairing"]');
+      sel2.value = '0';                                 // what the browser does before onchange fires
+      await setFinalFourPairing('0');
+      const sel3 = c.querySelector('select[onchange^="setFinalFourPairing"]');
+      check(JSON.stringify(S.ffPairs) === JSON.stringify([['South', 'Midwest'], ['East', 'West']]), 'a refused change leaves the pairing alone');
+      check(sel3 && sel3.value === '2', 'after a refused change the select still shows the pairing the room has, not the refused choice');
     } catch (e) {
       out.push('FAIL exception: ' + (e && e.stack || e));
     }
