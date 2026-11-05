@@ -297,7 +297,8 @@ async function importFromNCAA(){
   showToast('Fetching the bracket from NCAA.com...');
 
   try {
-    const teams = await ncaa.fetchTournamentTeams();
+    const bracketData = await ncaa.fetchBracket(S.year);
+    const teams = ncaa.tournamentTeams(bracketData);
     if(teams.length === 0){
       showToast('Tournament bracket not available yet. Try after Selection Sunday.');
       if(btn){ btn.textContent = origText; btn.disabled = false; }
@@ -330,6 +331,8 @@ async function importFromNCAA(){
       record: t.record || '',
       ...(t.playIn ? { playIn: true, playInResolved: false, playInTeams: t.playInTeams } : {})
     }));
+    // The feed says which regions meet in each national semifinal; it changes every year.
+    S.ffPairs = ncaa.finalFourPairs(bracketData) || FF_PAIRINGS[0];
 
     showToast(`Imported ${S.teams.length} teams from NCAA.com!`);
     saveState();
@@ -1158,11 +1161,11 @@ function slotHTML(region, gi, team, winnerId){
 
 function renderFF(){
   const area = document.getElementById("bracket-area");
-  const pairs = [[0,1],[2,3]];
-  const pairLabels = [`${REGIONS[0]} vs ${REGIONS[1]}`, `${REGIONS[2]} vs ${REGIONS[3]}`];
+  const pairs = ffPairs();
+  const pairLabels = pairs.map(p => `${p[0]} vs ${p[1]}`);
 
-  const s1t0id = S.bracket[REGIONS[0]][14], s1t1id = S.bracket[REGIONS[1]][14];
-  const s2t0id = S.bracket[REGIONS[2]][14], s2t1id = S.bracket[REGIONS[3]][14];
+  const s1t0id = S.bracket[pairs[0][0]][14], s1t1id = S.bracket[pairs[0][1]][14];
+  const s2t0id = S.bracket[pairs[1][0]][14], s2t1id = S.bracket[pairs[1][1]][14];
   const s1t0 = s1t0id ? S.teams.find(t => t.id === s1t0id) : null;
   const s1t1 = s1t1id ? S.teams.find(t => t.id === s1t1id) : null;
   const s2t0 = s2t0id ? S.teams.find(t => t.id === s2t0id) : null;
@@ -1296,6 +1299,10 @@ function renderSettings(c){
       <div style="margin-bottom:14px;display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-secondary btn-sm" id="ncaa-import-btn" onclick="importFromNCAA()">Re-Import from NCAA.com</button>
         <button class="btn btn-secondary btn-sm" onclick="checkPlayIns()">Check Play-in Results</button>
+      </div>
+      <div class="row" style="align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px">
+        <div style="flex:1;min-width:160px"><div style="font-weight:700;font-size:13px">Final Four pairing</div><div style="font-size:12px;color:var(--g500)">Set from the NCAA.com bracket on import; it changes every year.</div></div>
+        <select style="width:190px" onchange="setFinalFourPairing(this.value)">${FF_PAIRINGS.map((p, i) => `<option value="${i}" ${ffPairingIndex()===i?'selected':''}>${p[0][0]}–${p[0][1]} / ${p[1][0]}–${p[1][1]}</option>`).join('')}</select>
       </div>`}
     <div style="margin-bottom:14px"><span class="label">Bulk Import (Team, Seed, Region per line)</span>
       <textarea id="bt" rows="4" placeholder="Duke, 1, East\nAuburn, 1, South" style="width:100%"></textarea>
