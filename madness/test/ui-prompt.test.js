@@ -16,7 +16,6 @@ const has = (s, part, label) => assert.ok(s.includes(part), (label || '') + ' ex
 test('PIN prompts get the phone number pad, a 4-char cap and no autocorrect', () => {
   for (const msg of ['Enter 4-digit admin PIN:', 'Set a 4-digit PIN for Joe:', 'Enter your 4-digit PIN:', 'Set a 4-digit admin PIN to protect editing:']) {
     const attrs = attrsFor(msg, { placeholder: '4-digit PIN' });
-    has(attrs, 'type="password"', msg);
     has(attrs, 'inputmode="numeric"', msg);
     has(attrs, 'pattern="[0-9]*"', msg);
     has(attrs, 'maxlength="4"', msg);
@@ -50,4 +49,31 @@ test('appPrompt builds its <input> through promptInputAttrs (tripwire)', () => {
   const body = UI_SRC.slice(UI_SRC.indexOf('function appPrompt('), UI_SRC.indexOf('function appConfirm('));
   has(body, '<input class="modal-input" id="${id}" ${promptInputAttrs(message, { placeholder, defaultValue, inputmode })}>');
   has(body, "inputmode = ''", 'appPrompt accepts an inputmode option');
+});
+
+test('a PIN being typed in to unlock is masked; a PIN being chosen stays visible (no confirm step to catch a typo)', () => {
+  for (const msg of ['Enter 4-digit admin PIN:', 'Enter your 4-digit PIN:']) has(attrsFor(msg, {}), 'type="password" inputmode="numeric"', msg);
+  for (const msg of ['Set a 4-digit admin PIN to protect editing:', 'This room has no admin PIN yet.\nSet a 4-digit PIN to protect editing:',
+    'Set a 4-digit PIN to replace your passphrase:', 'This seat has no PIN yet. Set a 4-digit PIN to claim it:', 'Set a 4-digit PIN for Joe:']) {
+    const attrs = attrsFor(msg, { placeholder: '4-digit PIN' });
+    assert.ok(!/(^|\s)type=/.test(attrs), msg + ' must stay visible: ' + attrs);
+    has(attrs, 'inputmode="numeric"', msg);
+    has(attrs, 'maxlength="4"', msg);
+  }
+  has(attrsFor('Reset code, 4-digit:', {}), 'type="password"', 'only the whole word Set counts as choosing');
+});
+
+test('tripwire: every PIN prompt in js/ is either a masked "Enter" or a visible "Set"', () => {
+  const dir = path.join(__dirname, '..', 'js');
+  const masked = [], visible = [];
+  for (const f of fs.readdirSync(dir).filter(n => n.endsWith('.js'))) {
+    const src = fs.readFileSync(path.join(dir, f), 'utf8');
+    for (const m of src.matchAll(/appPrompt[(](['"])((?:(?!\1).)*)\1/g)) {
+      const msg = m[2].replace(/\\n/g, '\n');
+      if (!/4-digit/.test(msg)) continue;
+      (/(^|\s)type="password"/.test(attrsFor(msg, {})) ? masked : visible).push(msg);
+    }
+  }
+  assert.deepEqual(masked.sort(), ['Enter 4-digit admin PIN:', 'Enter your 4-digit PIN:']);
+  assert.ok(visible.length >= 5 && visible.every(m => /Set a 4-digit/.test(m)), 'visible PIN prompts are the ones that choose a PIN: ' + JSON.stringify(visible));
 });
