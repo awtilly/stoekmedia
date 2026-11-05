@@ -212,6 +212,8 @@ Reviewers get a demo in the Review Notes, no account needed (good: no login = no
 
 ## Appendix A. Every place the "March Madness" name lives (inventory 2026-10-17)
 
+> **Resolved 2026-10-31.** The name is "Madness Draft" (commit 86e46c6a on `main`, after the `APP_NAME` helper from PR #43). Every row below now reads "Madness Draft"; the only leftover is the `functions/package.json` description, which is not user-visible and is Joe-only. Kept as the historical inventory.
+
 Thirteen occurrences in nine shipped files. Once you pick the name (section 2), this is the whole rename; the
 `.planning/` notes also say it but do not ship. Store-facing and push-facing strings are marked **store**.
 
