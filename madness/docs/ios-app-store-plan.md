@@ -31,7 +31,7 @@ listing is exactly the kind of commercial use they send letters about.
 | Bundle ID | `com.stoekmedia.madness` |
 | Keywords | bracket, pool, draft, tournament, college basketball, friends |
 | Screenshots / description | No NCAA marks, no NCAA logos. Team logos are gone from the app since #53 (they were the schools' marks), so screenshots are clean by default. |
-| In-app header / `<title>` / manifest | Currently "March Madness Draft". Should become "Madness Draft" on the web too, since screenshots come from the real app. Small PR, **Joe's call on branding**. |
+| In-app header / `<title>` / manifest | **Done 2026-10-31**: "Madness Draft" everywhere on the web too (`APP_NAME` in `js/00-constants.js`, manifest, `<title>`, install banner, share texts, `sw.js` fallback title), so screenshots from the real app carry the store name. |
 | In-app round names (`RN` in `js/00-constants.js`) | "Sweet 16", "Elite 8", "Final Four" are descriptive use inside the product and lower risk. Cheap de-risk: "Round of 16", "Quarterfinals", "Semifinals". **Joe's call.** |
 
 Also check the App Store for existing "Madness Draft" apps before committing to the name.
