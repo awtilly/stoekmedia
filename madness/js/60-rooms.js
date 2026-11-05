@@ -5,6 +5,9 @@ let _lastSnapshotPlayerIds = null;
 // The shared part of S as this device last received it from, or sent it to, Firestore (taken from S itself, so
 // it compares cleanly against S). Baseline for _pendingLocalEdits().
 let _syncedShared = null;
+// The same moment as the server wrote it: the snapshot's JSON string, or the one we sent (a string, so nothing in S
+// can alias it). Parsed only when a pending edit has to be checked against a snapshot.
+let _syncedRaw = null;
 
 function _sharedCopyOfS(){
   const shared = {};
@@ -25,7 +28,15 @@ function _pendingLocalEdits(remote){
     if(VIEW_LOCAL.includes(k)) continue;
     if(JSON.stringify(S[k]) !== JSON.stringify(_syncedShared[k])){ edits[k] = S[k]; any = true; }
   }
-  if(!any) return null;
+  // A key the snapshot changed as well is a real conflict: the snapshot wins, as it always has (another phone
+  // may have advanced more of the bracket than this one). ds and players have a proper merge below instead.
+  let raw = null;
+  try { raw = _syncedRaw ? JSON.parse(_syncedRaw) : null; } catch(e){}
+  for(const k of Object.keys(edits)){
+    if(k === 'ds' || k === 'players') continue;
+    if(!raw || JSON.stringify(remote[k]) !== JSON.stringify(raw[k])) delete edits[k];
+  }
+  if(!Object.keys(edits).length) return null;
   if('ds' in edits || 'players' in edits){
     const merged = mergeSharedState({ ds: S.ds, players: S.players }, remote, _lastSnapshotPlayerIds);
     if('ds' in edits) edits.ds = merged.ds;
@@ -76,6 +87,7 @@ function _writeSharedState(){
   for(const k in S){ if(!VIEW_LOCAL.includes(k)) shared[k] = S[k]; }
   const localJson = JSON.stringify(shared);
   _syncedShared = JSON.parse(localJson); // nothing is pending any more: this is what the server is being sent
+  _syncedRaw = localJson;
   const ref = db.collection("rooms").doc(roomId);
   // A transaction needs the network and only gives up after several retries. Known offline: queue the plain
   // write at once, so the edit is already in Firestore's offline queue if the tab is closed a second later.
@@ -205,6 +217,7 @@ function connectToRoom(code){
   if(unsubRoom) unsubRoom();
   _lastSnapshotPlayerIds = null; // the previous room's roster says nothing about this one
   _syncedShared = null;
+  _syncedRaw = null;
   saveRecentRoom(code);
   const gen = ++_roomGeneration;
   _lastSyncedState = null; // never let the previous room's string suppress this room's first snapshot
@@ -268,7 +281,8 @@ function _applyRoomSnapshot(doc){
     // Baseline = what the server holds. Keys kept from a pending edit stay "edited" (the debounce is still
     // running and will send them), so a second snapshot in the same window does not wipe them either.
     _syncedShared = _sharedCopyOfS();
-    if(pending) for(const k in pending) _syncedShared[k] = remote[k];
+    if(pending) for(const k in pending) _syncedShared[k] = remote[k] === undefined ? undefined : JSON.parse(JSON.stringify(remote[k])); // a copy: S may hold the same object
+    _syncedRaw = data.state;
     localStorage.setItem(stateKey(), JSON.stringify(S));
     render();
     updateAppBadge();

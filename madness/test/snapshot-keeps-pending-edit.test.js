@@ -19,7 +19,7 @@ function roomApp() {
     }
   };
   app.roomId = 'AAAA';
-  vm.runInThisContext('_firestoreWriteTimer = null; _isRemoteUpdate = false; _lastSyncedState = null; _lastSnapshotPlayerIds = null; _syncedShared = null;');
+  vm.runInThisContext('_firestoreWriteTimer = null; _isRemoteUpdate = false; _lastSyncedState = null; _lastSnapshotPlayerIds = null; _syncedShared = null; _syncedRaw = null;');
   const first = {
     players: [{ id: 'p1', name: 'Ann', teamIds: [] }, { id: 'p2', name: 'Bob', teamIds: [] }],
     ds: { order: ['p1', 'p2'], cp: 0, started: true, complete: false, epoch: 1 },
@@ -107,4 +107,17 @@ test('the view-local keys are never touched by any of this', withTimers(async ()
   app._debouncedFirestoreWrite();
   elsewhere(r => { pick(r); r.phase = 'draft'; });
   assert.equal(app.S.phase, 'bracket');
+}));
+
+test('both sides changed the same key inside the window: the snapshot wins for that key, as before; other pending edits are kept', withTimers(async () => {
+  const { app, elsewhere, fire, server } = roomApp();
+  app.S.rp[3] = 9;      // edited here...
+  app.S.ub = false;     // ...and this too
+  app._debouncedFirestoreWrite();
+  elsewhere(r => { r.rp[3] = 7; }); // another admin changed the same round at the same moment
+  assert.equal(app.S.rp[3], 7, 'a real conflict on one key goes to the snapshot (unchanged behaviour)');
+  assert.equal(app.S.ub, false, 'the edit to a key the snapshot did not change survives');
+  await fire();
+  assert.equal(server().rp[3], 7);
+  assert.equal(server().ub, false);
 }));
