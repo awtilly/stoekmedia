@@ -24,12 +24,30 @@ function _debouncedFirestoreWrite(){
   }, 800);
 }
 
+/* The plain merge write (what every write was before the transaction): Firestore queues it offline and
+ * flushes it on reconnect. While still in that room it sends what the device holds NOW, so two fallbacks
+ * that finish out of order cannot put an older edit on top of a newer one; `json` is only used for a room
+ * that has been left in the meantime. */
+function _plainSharedWrite(ref, json){
+  if(roomId && ref.id === roomId){
+    const cur = {};
+    for(const k in S){ if(!VIEW_LOCAL.includes(k)) cur[k] = S[k]; }
+    json = JSON.stringify(cur);
+    _lastSyncedState = json;
+  }
+  ref.set({ state: json, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, {merge: true})
+    .catch(err => console.warn("Firestore offline write error:", err));
+}
+
 /* Write the shared (non-view) part of S to the current room's document now. */
 function _writeSharedState(){
   const shared = {};
   for(const k in S){ if(!VIEW_LOCAL.includes(k)) shared[k] = S[k]; }
   const localJson = JSON.stringify(shared);
   const ref = db.collection("rooms").doc(roomId);
+  // A transaction needs the network and only gives up after several retries. Known offline: queue the plain
+  // write at once, so the edit is already in Firestore's offline queue if the tab is closed a second later.
+  if(typeof navigator !== 'undefined' && navigator.onLine === false){ _plainSharedWrite(ref, localJson); return; }
   // Transaction + mergeSharedState: never roll back a pick that landed since our last snapshot.
   db.runTransaction(async tx => {
     const snap = await tx.get(ref);
@@ -48,9 +66,7 @@ function _writeSharedState(){
     // Transactions need the network. Offline, fall back to the plain merge write, which Firestore
     // queues and flushes on reconnect (the pre-transaction behaviour).
     if(e && (e.code === 'unavailable' || e.code === 'failed-precondition' || (typeof navigator !== 'undefined' && navigator.onLine === false))){
-      _lastSyncedState = localJson;
-      ref.set({ state: localJson, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, {merge: true})
-        .catch(err => console.warn("Firestore offline write error:", err));
+      _plainSharedWrite(ref, localJson);
       return;
     }
     console.warn("Firestore write error:", e);
