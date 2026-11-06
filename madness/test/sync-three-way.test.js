@@ -31,7 +31,7 @@ function room() {
     }
   };
   app.roomId = 'AAAA';
-  vm.runInThisContext('_firestoreWriteTimer = null; _isRemoteUpdate = false; _lastSyncedState = null; _syncBase = null;');
+  vm.runInThisContext('_firestoreWriteTimer = null; _isRemoteUpdate = false; _lastSyncedState = null; _syncBase = null; _sharedAtSync = null;');
   app.S.players = [{ id: 'p1', name: 'Ann', teamIds: [] }];
   app.S.ds = { order: ['p1'], cp: 0, started: true, complete: false, epoch: 1 };
   app.S.rp = { 1: 1, 2: 2, 3: 4, 4: 8, 5: 16, 6: 32 };
