@@ -79,8 +79,13 @@ function _debouncedFirestoreWrite(){
 /* The plain merge write (what every write was before the transaction): Firestore queues it offline and
  * flushes it on reconnect. While still in that room it sends what the device holds NOW, so two fallbacks
  * that finish out of order cannot put an older edit on top of a newer one; `json` is only used for a room
- * that has been left in the meantime. */
+ * that has been left in the meantime. set() resolves once the server has the write (it stays pending while
+ * offline), which is how _writeSharedState knows a queued write is still on its way. */
+let _queuedPlainWrites = {}; // room id -> plain writes handed to Firestore and not yet acknowledged by the server
 function _plainSharedWrite(ref, json){
+  const id = ref.id;
+  _queuedPlainWrites[id] = (_queuedPlainWrites[id] || 0) + 1;
+  const settled = () => { if(--_queuedPlainWrites[id] <= 0) delete _queuedPlainWrites[id]; };
   if(roomId && ref.id === roomId){
     const cur = {};
     for(const k in S){ if(!VIEW_LOCAL.includes(k)) cur[k] = S[k]; }
@@ -90,7 +95,7 @@ function _plainSharedWrite(ref, json){
     _sharedAtSync = json;
   }
   ref.set({ state: json, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, {merge: true})
-    .catch(err => console.warn("Firestore offline write error:", err));
+    .then(settled, err => { settled(); console.warn("Firestore offline write error:", err); });
 }
 
 /* Write the shared (non-view) part of S to the current room's document now. */
@@ -114,7 +119,10 @@ function _writeSharedState(){
   const ref = db.collection("rooms").doc(roomId);
   // A transaction needs the network and only gives up after several retries. Known offline: queue the plain
   // write at once, so the edit is already in Firestore's offline queue if the tab is closed a second later.
-  if(typeof navigator !== 'undefined' && navigator.onLine === false){ _plainSharedWrite(ref, localJson); return; }
+  // Same while an earlier plain write for this room is still waiting in that queue (the connection has only just
+  // come back): Firestore sends its queue in order, but a transaction does not wait for it. The transaction would
+  // commit first and the older queued copy of the room would then land on top of it, undoing this edit.
+  if((typeof navigator !== 'undefined' && navigator.onLine === false) || _queuedPlainWrites[roomId]){ _plainSharedWrite(ref, localJson); return; }
   // Transaction + mergeSharedState: never roll back a pick that landed since our last snapshot.
   let writtenIds = null;
   // The roster our copy was taken from. Read now, not inside the transaction: a snapshot that arrives while the
