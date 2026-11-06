@@ -51,6 +51,16 @@ let _lastSyncedState = null;
 // The shared state as this device last received it from, or handed it to, Firestore (a JSON string). What S
 // differs from it by is what this device has edited since: the base of the merge in _writeSharedState.
 let _syncBase = null;
+// The shared part of S, serialised from S itself, as of the last snapshot applied or write sent. A save that
+// finds it unchanged (a tab switch, a Live filter: view-only keys) has nothing to send. Writing anyway cost a
+// document write plus a snapshot on every phone in the room, and it sent this phone's whole copy of the room:
+// a phone that was behind (offline, just woken) rolled everyone back to its old copy by switching tabs.
+let _sharedAtSync = null;
+function _sharedJson(){
+  const shared = {};
+  for(const k in S){ if(!VIEW_LOCAL.includes(k)) shared[k] = S[k]; }
+  return JSON.stringify(shared);
+}
 // Newest snapshot that arrived while a pick transaction was in flight ({gen, doc}); see replayDroppedSnapshot.
 let _droppedDuringPick = null;
 function _debouncedFirestoreWrite(){
@@ -77,6 +87,7 @@ function _plainSharedWrite(ref, json){
     json = JSON.stringify(cur);
     _lastSyncedState = json;
     _syncBase = json;
+    _sharedAtSync = json;
   }
   ref.set({ state: json, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, {merge: true})
     .catch(err => console.warn("Firestore offline write error:", err));
@@ -84,9 +95,9 @@ function _plainSharedWrite(ref, json){
 
 /* Write the shared (non-view) part of S to the current room's document now. */
 function _writeSharedState(){
-  const live = {};
-  for(const k in S){ if(!VIEW_LOCAL.includes(k)) live[k] = S[k]; }
-  const localJson = JSON.stringify(live);
+  const localJson = _sharedJson();
+  if(localJson === _sharedAtSync) return; // nothing shared changed since the last sync
+  _sharedAtSync = localJson;
   // A private copy: S can move on (a snapshot, another edit) while the transaction below is retried.
   const shared = JSON.parse(localJson);
   // The server state this device last synced with. Only the keys edited since then are ours to send; every
@@ -143,6 +154,7 @@ function _writeSharedState(){
     }
     // Nothing was written: go back to the earlier base, so the next write still carries these edits.
     if(_syncBase === localJson) _syncBase = baseAtStart;
+    if(_sharedAtSync === localJson) _sharedAtSync = null;
     console.warn("Firestore write error:", e);
     showToast("Sync error \u2014 changes saved locally");
   });
@@ -244,6 +256,9 @@ function connectToRoom(code){
   const gen = ++_roomGeneration;
   _lastSyncedState = null; // never let the previous room's string suppress this room's first snapshot
   _syncBase = null;
+  // What this phone holds on entering a room is its cached copy of that room (or the state createRoom has just
+  // written), not an edit: with no snapshot yet (offline, nothing in Firestore's cache) a tab switch must not send it.
+  _sharedAtSync = _sharedJson();
   _droppedDuringPick = null;
   unsubRoom = db.collection("rooms").doc(code).onSnapshot(doc => {
     if(gen !== _roomGeneration) return; // stale listener
@@ -307,6 +322,9 @@ function _applyRoomSnapshot(doc){
     // running and will send them), so a second snapshot in the same window does not wipe them either.
     _syncedShared = _sharedCopyOfS();
     if(pending) for(const k in pending) _syncedShared[k] = remote[k] === undefined ? undefined : JSON.parse(JSON.stringify(remote[k])); // a copy: S may hold the same object
+    // The no-change baseline is the server's state in S's key order, not S itself: a pending edit kept above
+    // still has to count as a change when the debounce fires.
+    _sharedAtSync = JSON.stringify(_syncedShared);
     localStorage.setItem(stateKey(), JSON.stringify(S));
     render();
     updateAppBadge();
