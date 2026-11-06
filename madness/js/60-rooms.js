@@ -141,7 +141,9 @@ function connectToRoom(code){
   saveRecentRoom(code);
   const gen = ++_roomGeneration;
   _lastSyncedState = null; // never let the previous room's string suppress this room's first snapshot
-  _sharedAtSync = null;
+  // What this phone holds on entering a room is its cached copy of that room (or the state createRoom has just
+  // written), not an edit: with no snapshot yet (offline, nothing in Firestore's cache) a tab switch must not send it.
+  _sharedAtSync = _sharedJson();
   _droppedDuringPick = null;
   unsubRoom = db.collection("rooms").doc(code).onSnapshot(doc => {
     if(gen !== _roomGeneration) return; // stale listener

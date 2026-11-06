@@ -117,3 +117,27 @@ test('leaving a room with only a tab switch pending flushes nothing', () => {
     assert.equal(srv.writes, 0);
   } finally { mock.timers.reset(); }
 });
+
+test('entering a room with only this phone\'s cached copy: a tab switch before the first update arrives writes nothing, an edit does', () => {
+  mock.timers.enable({ apis: ['setTimeout'] });
+  try {
+    const app = createApp();
+    const writes = [];
+    app.firebase = { firestore: { FieldValue: { serverTimestamp: () => 'ts' } } };
+    app.db = { collection: () => ({ doc: () => ({
+      set: data => { writes.push(JSON.parse(data.state)); return Promise.resolve(); },
+      onSnapshot: () => () => {} // offline, nothing cached: no snapshot is delivered
+    }) }) };
+    vm.runInThisContext('_firestoreWriteTimer = null; _isRemoteUpdate = false; _lastSyncedState = null; _sharedAtSync = null;');
+    app.unsubRoom = null; app._roomGeneration = 0; app._pickInFlight = false; // 30-state.js / 80-pages.js globals the harness does not load
+    app.roomId = 'AAAA';
+    app.S.players = [{ id: 'p1', name: 'Ann', teamIds: [] }]; // the copy loadState() restored from this phone's cache
+    app.connectToRoom('AAAA');
+    app.S.phase = 'bracket';
+    save(app);
+    assert.equal(writes.length, 0, 'the old cached copy was not sent');
+    app.S.ub = !app.S.ub;
+    save(app);
+    assert.equal(writes.length, 1, 'a real edit still goes out');
+  } finally { mock.timers.reset(); }
+});
