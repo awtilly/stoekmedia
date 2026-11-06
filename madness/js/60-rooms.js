@@ -51,6 +51,9 @@ let _firestoreWriteTimer = null;
 // same string has nothing new (it is the echo of our own write, or a metadata-only change), so
 // _applyRoomSnapshot skips the JSON.parse + full render for it.
 let _lastSyncedState = null;
+// The shared state as this device last received it from, or handed it to, Firestore (a JSON string). What S
+// differs from it by is what this device has edited since: the base of the merge in _writeSharedState.
+let _syncBase = null;
 // Newest snapshot that arrived while a pick transaction was in flight ({gen, doc}); see replayDroppedSnapshot.
 let _droppedDuringPick = null;
 function _debouncedFirestoreWrite(){
@@ -76,6 +79,7 @@ function _plainSharedWrite(ref, json){
     for(const k in S){ if(!VIEW_LOCAL.includes(k)) cur[k] = S[k]; }
     json = JSON.stringify(cur);
     _lastSyncedState = json;
+    _syncBase = json;
   }
   ref.set({ state: json, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, {merge: true})
     .catch(err => console.warn("Firestore offline write error:", err));
@@ -83,11 +87,23 @@ function _plainSharedWrite(ref, json){
 
 /* Write the shared (non-view) part of S to the current room's document now. */
 function _writeSharedState(){
-  const shared = {};
-  for(const k in S){ if(!VIEW_LOCAL.includes(k)) shared[k] = S[k]; }
-  const localJson = JSON.stringify(shared);
+  const live = {};
+  for(const k in S){ if(!VIEW_LOCAL.includes(k)) live[k] = S[k]; }
+  const localJson = JSON.stringify(live);
+  // A private copy: S can move on (a snapshot, another edit) while the transaction below is retried.
+  const shared = JSON.parse(localJson);
+  // The server state this device last synced with. Only the keys edited since then are ours to send; every
+  // other key goes out as the server holds it at commit time, so a change another device made in the meantime
+  // (even one that lands while this write is in flight) is not overwritten with our older copy of it.
+  const baseAtStart = _syncBase;
+  let base = null;
+  try { base = baseAtStart ? JSON.parse(baseAtStart) : null; } catch(e){}
+  const mine = base && Object.keys(shared).filter(k => JSON.stringify(shared[k]) !== JSON.stringify(base[k]));
+  _syncBase = localJson; // these edits are now with this write; the next write sends only what changes after this
   _syncedShared = JSON.parse(localJson); // nothing is pending any more: this is what the server is being sent
   _syncedRaw = localJson;
+  let expectSynced = _lastSyncedState; // what _lastSyncedState holds unless a snapshot is applied during the write
+  let snapshotDuringWrite = false;
   const ref = db.collection("rooms").doc(roomId);
   // A transaction needs the network and only gives up after several retries. Known offline: queue the plain
   // write at once, so the edit is already in Firestore's offline queue if the tab is closed a second later.
@@ -97,13 +113,22 @@ function _writeSharedState(){
   db.runTransaction(async tx => {
     const snap = await tx.get(ref);
     const remote = snap.exists && snap.data().state ? JSON.parse(snap.data().state) : null;
-    const merged = remote ? mergeSharedState(shared, remote, _lastSnapshotPlayerIds) : shared;
+    let ours = shared;
+    if(remote && mine){
+      // Same key order as our own copy, so an untouched server gives back exactly localJson.
+      ours = {};
+      for(const k in shared) ours[k] = (mine.includes(k) || !(k in remote)) ? shared[k] : remote[k];
+      for(const k in remote){ if(!(k in ours) && !VIEW_LOCAL.includes(k)) ours[k] = remote[k]; }
+    }
+    const merged = remote ? mergeSharedState(ours, remote, _lastSnapshotPlayerIds) : ours;
     const json = JSON.stringify(merged);
     writtenIds = (merged.players || []).map(p => p.id);
     // The echo of this write is skipped by _applyRoomSnapshot only when it carries exactly what we
-    // hold. If the merge took the server's draft progress, leave the echo to be applied so this
-    // device catches up too.
-    _lastSyncedState = json === localJson ? json : null;
+    // sent from. If the merge took anything from the server (draft progress, another device's edit), or
+    // a snapshot replaced S while the write was in flight, leave the echo to be applied so this device
+    // ends up showing what the server holds.
+    if(_lastSyncedState !== expectSynced) snapshotDuringWrite = true;
+    _lastSyncedState = expectSynced = (json === localJson && !snapshotDuringWrite) ? json : null;
     tx.set(ref, {
       state: json,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -120,6 +145,8 @@ function _writeSharedState(){
       _plainSharedWrite(ref, localJson);
       return;
     }
+    // Nothing was written: go back to the earlier base, so the next write still carries these edits.
+    if(_syncBase === localJson) _syncBase = baseAtStart;
     console.warn("Firestore write error:", e);
     showToast("Sync error \u2014 changes saved locally");
   });
@@ -221,6 +248,7 @@ function connectToRoom(code){
   saveRecentRoom(code);
   const gen = ++_roomGeneration;
   _lastSyncedState = null; // never let the previous room's string suppress this room's first snapshot
+  _syncBase = null;
   _droppedDuringPick = null;
   unsubRoom = db.collection("rooms").doc(code).onSnapshot(doc => {
     if(gen !== _roomGeneration) return; // stale listener
@@ -266,6 +294,7 @@ function _applyRoomSnapshot(doc){
   // real updatedAt). Both carry the exact string we wrote, so neither needs a parse or a redraw.
   if(data.state === _lastSyncedState) return;
   _lastSyncedState = data.state;
+  _syncBase = data.state;
   _isRemoteUpdate = true; // gates saveState's Firestore write; MUST clear even if the parse or render throws
   try {
     const local = {};

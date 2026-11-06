@@ -140,7 +140,7 @@ test('mergeSharedState: with no snapshot history (knownIds null) nobody is dropp
 test('60-rooms.js records the snapshot roster and passes it to mergeSharedState', () => {
   const src = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'js', '60-rooms.js'), 'utf8');
   assert.match(src, /_lastSnapshotPlayerIds = \(remote\.players \|\| \[\]\)\.map\(p => p\.id\)/, 'set in _applyRoomSnapshot');
-  assert.match(src, /mergeSharedState\(shared, remote, _lastSnapshotPlayerIds\)/, 'passed to the write transaction');
+  assert.match(src, /mergeSharedState\(ours, remote, _lastSnapshotPlayerIds\)/, 'passed to the write transaction');
   assert.match(src, /_lastSnapshotPlayerIds = null;/, 'cleared when switching rooms');
 });
 
