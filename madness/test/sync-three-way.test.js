@@ -173,3 +173,16 @@ test('two of our writes overlap while another device\'s change is still unseen: 
   assert.deepEqual(server.futureSetting, { a: 1 }, 'the other device\'s change');
   assert.equal(JSON.stringify(sharedOf(app)), srv.state, 'device and server hold the same state');
 });
+
+test('a player another device adds while our roster edit is in flight is kept, even though their snapshot reached us first', async () => {
+  const { app, srv, snapshot } = room();
+  app.S.players.push({ id: 'p2', name: 'Bob', teamIds: [] }); // our roster edit
+  srv.beforeCommit = () => {
+    otherDevice(srv, r => { r.players.push({ id: 'p3', name: 'Cy', teamIds: [] }); });
+    snapshot(srv.state); // this device now "knows" p3, but the copy being written was taken before that
+  };
+  app._writeSharedState();
+  await settle();
+  assert.deepEqual(JSON.parse(srv.state).players.map(p => p.id).sort(), ['p1', 'p2', 'p3']);
+  assert.deepEqual(app.S.players.map(p => p.id).sort(), ['p1', 'p2', 'p3'], 'and this device shows all three');
+});

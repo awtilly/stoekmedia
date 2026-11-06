@@ -77,6 +77,9 @@ function _writeSharedState(){
   if(typeof navigator !== 'undefined' && navigator.onLine === false){ _plainSharedWrite(ref, localJson); return; }
   // Transaction + mergeSharedState: never roll back a pick that landed since our last snapshot.
   let writtenIds = null;
+  // The roster our copy was taken from. Read now, not inside the transaction: a snapshot that arrives while the
+  // write is being retried would otherwise make a player somebody else has just added look like one we removed.
+  const knownIds = _lastSnapshotPlayerIds;
   db.runTransaction(async tx => {
     const snap = await tx.get(ref);
     const remote = snap.exists && snap.data().state ? JSON.parse(snap.data().state) : null;
@@ -87,7 +90,7 @@ function _writeSharedState(){
       for(const k in shared) ours[k] = (mine.includes(k) || !(k in remote)) ? shared[k] : remote[k];
       for(const k in remote){ if(!(k in ours) && !VIEW_LOCAL.includes(k)) ours[k] = remote[k]; }
     }
-    const merged = remote ? mergeSharedState(ours, remote, _lastSnapshotPlayerIds) : ours;
+    const merged = remote ? mergeSharedState(ours, remote, knownIds) : ours;
     const json = JSON.stringify(merged);
     writtenIds = (merged.players || []).map(p => p.id);
     // The echo of this write is skipped by _applyRoomSnapshot only when it carries exactly what we
