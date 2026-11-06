@@ -1,0 +1,51 @@
+<!doctype html>
+<!--
+  Browser check: a room update while somebody is typing on the join screen leaves the form alone
+  (renderJoinScreen in js/50-auth.js): same input elements, same values, focus kept, and the list of
+  names refreshed and escaped.
+  Run (from repo root):
+    python -m http.server 8787 --bind 127.0.0.1
+    chrome --headless=new --dump-dom --virtual-time-budget=3000 http://127.0.0.1:8787/madness/test/browser/join-screen-typing.html | grep -A12 'id="out"'
+  Every line in #out must start with "ok".
+-->
+<meta charset="utf-8">
+<div id="app"></div>
+<pre id="out"></pre>
+<script>
+  var S = { players: [{ id: 'p1', name: 'Ann', pinHash: 'x:y', teamIds: [] }] };
+  var roomId = 'ROOM1';
+</script>
+<script src="../../js/00-constants.js"></script>
+<script src="../../js/70-logic.js"></script>
+<script src="../../js/50-auth.js"></script>
+<script>
+(() => {
+  const out = [];
+  const check = (cond, label) => out.push((cond ? 'ok   ' : 'FAIL ') + label);
+  const $ = id => document.getElementById(id);
+  renderJoinScreen();
+  const nameEl = $('join-name'), pinEl = $('join-pin');
+  check(nameEl !== null && pinEl !== null, 'join form rendered');
+  check($('join-returning').querySelectorAll('button').length === 1, 'one returning player listed');
+  nameEl.focus();
+  nameEl.value = 'Cat';
+  nameEl.setSelectionRange(2, 2);
+  pinEl.value = '12';
+  S.players.push({ id: 'p2', name: 'Bob <b>bold</b>', pinHash: 'x:y', teamIds: [] });
+  renderJoinScreen(); // what a room snapshot triggers through render()
+  check($('join-name') === nameEl && $('join-pin') === pinEl, 'the same input elements are still on the page');
+  check(nameEl.value === 'Cat' && pinEl.value === '12', 'typed name and PIN kept');
+  check(document.activeElement === nameEl, 'focus stayed in the name box');
+  check(nameEl.selectionStart === 2 && nameEl.selectionEnd === 2, 'cursor position kept');
+  const buttons = $('join-returning').querySelectorAll('button');
+  check(buttons.length === 2, 'the newcomer is listed');
+  check(buttons[1].textContent === 'Bob <b>bold</b>' && $('join-returning').querySelector('b') === null, 'newcomer name shown as text, not markup');
+  S.players = [];
+  renderJoinScreen();
+  check($('join-returning').children.length === 0 && nameEl.value === 'Cat', 'empty room: card gone, form untouched');
+  roomId = 'ROOM2';
+  renderJoinScreen();
+  check($('join-name') !== nameEl && $('join-name').value === '', 'another room: a fresh, empty form');
+  $('out').textContent = out.join(String.fromCharCode(10));
+})();
+</script>
