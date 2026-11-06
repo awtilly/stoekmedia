@@ -16,7 +16,7 @@ function roomApp(code) {
     collection: () => ({ doc: (id) => ({ id }) }),
     runTransaction: async (fn) => { await fn({ get: async () => ({ exists: false }), set: (ref, data) => { writes.push({ id: ref.id, state: JSON.parse(data.state) }); } }); }
   };
-  vm.runInThisContext('_firestoreWriteTimer = null; _isRemoteUpdate = false; _lastSyncedState = null; _syncBase = null');
+  vm.runInThisContext('_firestoreWriteTimer = null; _isRemoteUpdate = false; _lastSyncedState = null; _syncBase = null; _sharedAtSync = null');
   app.roomId = code;
   app.S.players = [{ id: 'p1', name: 'Ann', teamIds: [] }];
   return { app, writes };

@@ -20,7 +20,7 @@ function txApp(code, remoteState) {
       });
     }
   };
-  vm.runInThisContext('_firestoreWriteTimer = null; _isRemoteUpdate = false; _lastSyncedState = null; _syncBase = null');
+  vm.runInThisContext('_firestoreWriteTimer = null; _isRemoteUpdate = false; _lastSyncedState = null; _syncBase = null; _sharedAtSync = null');
   app.roomId = code;
   app.S.players = [{ id: 'p1', name: 'Ann', teamIds: [] }, { id: 'p2', name: 'Bob', teamIds: [] }];
   app.S.ds = { order: ['p1', 'p2'], cp: 0, started: true, complete: false, epoch: 1 };
