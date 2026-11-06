@@ -28,6 +28,10 @@ if(urlRoom){
     S.phase = tabParam;
   }
   render();
+  // Opened straight onto the Live tab: the tab is remembered per device, and the home-screen shortcut asks for it.
+  // navigate() is what normally starts the score updates and it has not run, so the tab sat empty until the
+  // person left it and came back. Only once the app shell is up (not behind the join screen).
+  if(S.phase === 'live' && document.getElementById('c')) startLiveRefresh();
 } else {
   if (tabParam === 'live') {
     // No room known at all: render the app shell first, otherwise refreshLiveScores()
