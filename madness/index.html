@@ -275,12 +275,6 @@ textarea {
   flex-wrap: wrap;
 }
 
-.grid-2 {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 12px;
-}
-
 .grid-3 {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
@@ -307,14 +301,6 @@ textarea {
   font-weight: 800;
   font-size: 13px;
   width: 28px;
-}
-
-.team-item {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  padding: 3px 0;
 }
 
 /* ── Draft ── */
@@ -599,12 +585,6 @@ td.val {
   text-align: center;
 }
 
-.score-time {
-  font-size: 11px;
-  color: var(--g500);
-  text-align: center;
-}
-
 .score-broadcast {
   font-size: 10px;
   color: var(--g400);
@@ -622,13 +602,6 @@ td.val {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
   gap: 8px;
-}
-
-.team-logo-sm {
-  width: 20px;
-  height: 20px;
-  object-fit: contain;
-  flex-shrink: 0;
 }
 
 .import-card {
@@ -927,18 +900,6 @@ td.val {
 .bracket .conn-bot {
   flex: 1;
   border-right: 1px solid var(--g300);
-  border-top: 1px solid var(--g300);
-}
-
-.bracket .conn-line {
-  display: flex;
-  flex: 1;
-  align-items: center;
-}
-
-.bracket .conn-line::after {
-  content: '';
-  width: 100%;
   border-top: 1px solid var(--g300);
 }
 
@@ -1372,10 +1333,6 @@ td.val {
   .pick-btn {
     padding: 10px 12px;
     min-height: 44px;
-  }
-
-  .grid-2 {
-    grid-template-columns: 1fr;
   }
 
   .grid-3 {
