@@ -19,7 +19,7 @@ function roomApp() {
     }
   };
   app.roomId = 'AAAA';
-  vm.runInThisContext('_firestoreWriteTimer = null; _isRemoteUpdate = false; _lastSyncedState = null; _syncBase = null; _lastSnapshotPlayerIds = null; _syncedShared = null; _syncedRaw = null;');
+  vm.runInThisContext('_firestoreWriteTimer = null; _isRemoteUpdate = false; _lastSyncedState = null; _syncBase = null; _lastSnapshotPlayerIds = null; _syncedShared = null;');
   const first = {
     players: [{ id: 'p1', name: 'Ann', teamIds: [] }, { id: 'p2', name: 'Bob', teamIds: [] }],
     ds: { order: ['p1', 'p2'], cp: 0, started: true, complete: false, epoch: 1 },

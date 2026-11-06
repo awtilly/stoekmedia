@@ -5,9 +5,6 @@ let _lastSnapshotPlayerIds = null;
 // The shared part of S as this device last received it from, or sent it to, Firestore (taken from S itself, so
 // it compares cleanly against S). Baseline for _pendingLocalEdits().
 let _syncedShared = null;
-// The same moment as the server wrote it: the snapshot's JSON string, or the one we sent (a string, so nothing in S
-// can alias it). Parsed only when a pending edit has to be checked against a snapshot.
-let _syncedRaw = null;
 
 function _sharedCopyOfS(){
   const shared = {};
@@ -20,7 +17,7 @@ function _sharedCopyOfS(){
  * the debounce then wrote the server's own state back, so it never reached anyone. Returns {key: value to keep}
  * or null. ds and players follow the same rules as the write (mergeSharedState): the server's draft progress
  * wins, local roster changes are kept. */
-function _pendingLocalEdits(remote){
+function _pendingLocalEdits(remote, baseRaw){
   if(!_firestoreWriteTimer || !_syncedShared) return null;
   const edits = {};
   let any = false;
@@ -31,7 +28,7 @@ function _pendingLocalEdits(remote){
   // A key the snapshot changed as well is a real conflict: the snapshot wins, as it always has (another phone
   // may have advanced more of the bracket than this one). ds and players have a proper merge below instead.
   let raw = null;
-  try { raw = _syncedRaw ? JSON.parse(_syncedRaw) : null; } catch(e){}
+  try { raw = baseRaw ? JSON.parse(baseRaw) : null; } catch(e){} // baseRaw: _syncBase as it was before this snapshot
   for(const k of Object.keys(edits)){
     if(k === 'ds' || k === 'players') continue;
     if(!raw || JSON.stringify(remote[k]) !== JSON.stringify(raw[k])) delete edits[k];
@@ -101,7 +98,6 @@ function _writeSharedState(){
   const mine = base && Object.keys(shared).filter(k => JSON.stringify(shared[k]) !== JSON.stringify(base[k]));
   _syncBase = localJson; // these edits are now with this write; the next write sends only what changes after this
   _syncedShared = JSON.parse(localJson); // nothing is pending any more: this is what the server is being sent
-  _syncedRaw = localJson;
   let expectSynced = _lastSyncedState; // what _lastSyncedState holds unless a snapshot is applied during the write
   let snapshotDuringWrite = false;
   const ref = db.collection("rooms").doc(roomId);
@@ -244,7 +240,6 @@ function connectToRoom(code){
   if(unsubRoom) unsubRoom();
   _lastSnapshotPlayerIds = null; // the previous room's roster says nothing about this one
   _syncedShared = null;
-  _syncedRaw = null;
   saveRecentRoom(code);
   const gen = ++_roomGeneration;
   _lastSyncedState = null; // never let the previous room's string suppress this room's first snapshot
@@ -294,13 +289,14 @@ function _applyRoomSnapshot(doc){
   // real updatedAt). Both carry the exact string we wrote, so neither needs a parse or a redraw.
   if(data.state === _lastSyncedState) return;
   _lastSyncedState = data.state;
+  const baseBefore = _syncBase; // what this device had synced before this snapshot (a string: nothing in S can alias it)
   _syncBase = data.state;
   _isRemoteUpdate = true; // gates saveState's Firestore write; MUST clear even if the parse or render throws
   try {
     const local = {};
     for(const k of VIEW_LOCAL) local[k] = S[k];
     const remote = JSON.parse(data.state);
-    const pending = _pendingLocalEdits(remote); // before the roster ids and S move on to this snapshot
+    const pending = _pendingLocalEdits(remote, baseBefore); // before the roster ids and S move on to this snapshot
     _lastSnapshotPlayerIds = (remote.players || []).map(p => p.id);
     Object.assign(S, remote, local, pending || {});
     sanitizeSharedState(S);
@@ -311,7 +307,6 @@ function _applyRoomSnapshot(doc){
     // running and will send them), so a second snapshot in the same window does not wipe them either.
     _syncedShared = _sharedCopyOfS();
     if(pending) for(const k in pending) _syncedShared[k] = remote[k] === undefined ? undefined : JSON.parse(JSON.stringify(remote[k])); // a copy: S may hold the same object
-    _syncedRaw = data.state;
     localStorage.setItem(stateKey(), JSON.stringify(S));
     render();
     updateAppBadge();
