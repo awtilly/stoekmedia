@@ -173,3 +173,26 @@ test('two of our writes overlap while another device\'s change is still unseen: 
   assert.deepEqual(server.futureSetting, { a: 1 }, 'the other device\'s change');
   assert.equal(JSON.stringify(sharedOf(app)), srv.state, 'device and server hold the same state');
 });
+
+test('an edit typed while a save is on its way survives that save\'s echo even when the echo has to be applied', async () => {
+  mock.timers.enable({ apis: ['setTimeout'] });
+  try {
+    const { app, srv } = room();
+    otherDevice(srv, r => { r.futureSetting = { a: 1 }; }); // unseen here: our save merges it, so its echo is applied, not skipped
+    app.S.rp[3] = 9;
+    srv.beforeCommit = () => { app.S.ub = false; app.__real.saveState(); }; // typed during the round trip
+    app._writeSharedState();
+    await settle();
+    assert.deepEqual(app.S.futureSetting, { a: 1 }, 'the echo was applied');
+    assert.equal(app.S.rp[3], 9);
+    assert.equal(app.S.ub, false, 'the edit still waiting in the save delay was kept');
+    mock.timers.tick(800);
+    await settle();
+    const server = JSON.parse(srv.state);
+    assert.equal(server.ub, false, 'and it reached the server with its own save');
+    assert.equal(server.rp[3], 9);
+    assert.deepEqual(server.futureSetting, { a: 1 });
+  } finally {
+    mock.timers.reset();
+  }
+});
