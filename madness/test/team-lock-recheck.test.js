@@ -25,8 +25,15 @@ function pagesApp() {
   app.S.teams = [{ id: 'old-1', name: 'Old Team', seed: 1, region: 'South', logo: '', abbr: '', ncaaId: '', color: '', record: '' }];
   app.S.players = [{ id: 'a', name: 'Ann', teamIds: [] }, { id: 'b', name: 'Bob', teamIds: [] }];
   app.appConfirm = async () => true;
-  app.ncaa.fetchTournamentTeams = async () => makeTeams();
+  stubBracket(app, async () => makeTeams());
   return { app, btn };
+}
+/* The import reaches the bracket through ncaa.fetchTournamentTeams() today and through ncaa.fetchBracket() +
+ * ncaa.tournamentTeams() once the Final Four pairing change is in; `fn` produces the team list for either path. */
+function stubBracket(app, fn) {
+  app.ncaa.fetchTournamentTeams = fn;
+  app.ncaa.fetchBracket = async () => ({ __teams: await fn() });
+  app.ncaa.tournamentTeams = (data) => data.__teams;
 }
 const lastToast = (app) => app.__calls.toasts[app.__calls.toasts.length - 1];
 
@@ -44,7 +51,7 @@ test('importFromNCAA: the draft starts on another phone while "Replace all teams
 
 test('importFromNCAA: a pick lands while the bracket is downloading -> nothing is replaced', async () => {
   const { app } = pagesApp();
-  app.ncaa.fetchTournamentTeams = async () => { app.S.players[0].teamIds = ['old-1']; return makeTeams(); };
+  stubBracket(app, async () => { app.S.players[0].teamIds = ['old-1']; return makeTeams(); });
   await app.importFromNCAA();
   assert.equal(app.S.teams.length, 1);
   assert.equal(app.__calls.saveState, 0);
