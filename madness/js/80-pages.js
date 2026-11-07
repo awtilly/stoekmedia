@@ -318,6 +318,14 @@ async function importFromNCAA(){
       }
     }
 
+    // The confirm dialogs above and the fetch can stay open for minutes; another admin phone may have started
+    // the draft or made picks meanwhile (the room snapshot keeps S current). Check the lock again before replacing.
+    const lockedNow = teamEditBlockedReason();
+    if(lockedNow){
+      showToast(lockedNow);
+      if(btn){ btn.textContent = origText; btn.disabled = false; }
+      return;
+    }
     S.teams = teams.map(t => ({
       id: generateId(),
       name: t.name,
@@ -1328,6 +1336,8 @@ async function clearAllTeams(){
   const locked = teamEditBlockedReason();
   if(locked){ showToast(locked); return; }
   if(!await appConfirm('Clear all teams?', { title: 'Clear Teams', danger: true, confirmLabel: 'Clear All' })) return;
+  const lockedNow = teamEditBlockedReason(); // the dialog may have sat open while the draft started elsewhere
+  if(lockedNow){ showToast(lockedNow); return; }
   S.teams = [];
   saveState();
   render();
