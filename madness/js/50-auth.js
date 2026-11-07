@@ -248,8 +248,33 @@ async function adminJoinAsPlayer(){
   render();
 }
 
+/* The "Returning Player?" card: the only part of the join screen that depends on who else has joined. */
+function _joinReturningHTML(players){
+  return players.length > 0 ? `
+        <div class="lobby-or">or</div>
+        <div class="lobby-card">
+          <h3>Returning Player?</h3>
+          <p>Tap your name and enter your PIN to rejoin.</p>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            ${players.map(p => `<button class="btn btn-secondary" style="width:100%;justify-content:center" onclick="claimPlayer('${p.id}')">${escapeHtml(p.name)}</button>`).join('')}
+          </div>
+        </div>
+      ` : '';
+}
+
+let _joinScreenRoom = null; // the room whose join form is on the page
+
 function renderJoinScreen(){
   const players = S.players || [];
+  // Every room update redraws this screen (somebody else has just joined). When this room's form is already on
+  // the page only the list of names is refreshed: rebuilding the form wiped the name and PIN being typed and
+  // closed the keyboard, and on join night an update arrives every few seconds.
+  const list = document.getElementById('join-returning');
+  if(list && _joinScreenRoom === roomId && document.getElementById('join-name')){
+    list.innerHTML = _joinReturningHTML(players);
+    return;
+  }
+  _joinScreenRoom = roomId;
   document.getElementById("app").innerHTML = `
     <div class="lobby">
       ${appTitleHTML()}
@@ -263,16 +288,7 @@ function renderJoinScreen(){
           <button class="btn btn-primary" style="width:100%;justify-content:center" onclick="selfRegister()">Join</button>
         </div>
       </div>
-      ${players.length > 0 ? `
-        <div class="lobby-or">or</div>
-        <div class="lobby-card">
-          <h3>Returning Player?</h3>
-          <p>Tap your name and enter your PIN to rejoin.</p>
-          <div style="display:flex;flex-direction:column;gap:6px">
-            ${players.map(p => `<button class="btn btn-secondary" style="width:100%;justify-content:center" onclick="claimPlayer('${p.id}')">${escapeHtml(p.name)}</button>`).join('')}
-          </div>
-        </div>
-      ` : ''}
+      <div id="join-returning">${_joinReturningHTML(players)}</div>
       <div style="margin-top:16px;display:flex;gap:8px;justify-content:center">
         <button class="btn btn-secondary btn-sm" onclick="goHome()">Switch Tournament</button>
       </div>
