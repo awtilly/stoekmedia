@@ -238,7 +238,12 @@ async function removePlayer(id){
 }
 
 async function movePlayer(i, d){
+  // The row index comes from the button that was tapped. requireAdmin() can be a PIN prompt, and a snapshot
+  // that lands meanwhile may reorder or remove players: find the tapped player again afterwards.
+  const tapped = S.players[i] && S.players[i].id;
   if(!await requireAdmin()) return;
+  i = S.players.findIndex(p => p.id === tapped);
+  if(i < 0) return;
   const s = i + d;
   if(s < 0 || s >= S.players.length) return;
   [S.players[i], S.players[s]] = [S.players[s], S.players[i]];
