@@ -360,9 +360,7 @@ async function checkPlayIns(){
 /* ── Live Scores Page ── */
 function renderLive(c){
   const hasLive = liveScores.some(g => g.state === 'in');
-  const now = new Date();
-  const todayStr = now.getFullYear() + String(now.getMonth()+1).padStart(2,'0') + String(now.getDate()).padStart(2,'0');
-  const currentDate = S.liveScoresDate || todayStr;
+  const currentDate = S.liveScoresDate || scoreboardDay();
   const displayDate = currentDate.replace(/(\d{4})(\d{2})(\d{2})/, '$2/$3/$1');
 
   let filtered = liveScores.slice(); // copy: the sort below must not reorder the shared liveScores array
@@ -514,8 +512,7 @@ function renderLiveInPlace(){
 }
 
 function changeLiveDate(delta){
-  const n = new Date();
-  const current = S.liveScoresDate || (n.getFullYear() + String(n.getMonth()+1).padStart(2,'0') + String(n.getDate()).padStart(2,'0'));
+  const current = S.liveScoresDate || scoreboardDay();
   const y = parseInt(current.slice(0,4));
   const m = parseInt(current.slice(4,6)) - 1;
   const d = parseInt(current.slice(6,8));

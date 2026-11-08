@@ -19,8 +19,22 @@ let _scoreboardSeenAt = 0;    // local clock when the last usable snapshot arriv
 let _scoreboardDate = null;   // the scoreboard/{date} doc the listener is on (null = not listening)
 let _liveFallbackTimer = null; // startLiveRefresh's one-shot "cached doc did not arrive" poll
 
-function localDateStr(d) {
-  const n = d || new Date();
+/* NCAA.com files every game under its Eastern-time date, and the pollScoreboard function writes the Eastern day
+ * (plus the day before until 4 am ET, see functions/scoreboard-logic.js datesToPoll). The phone's own calendar
+ * date is the wrong key: on an East-coast phone it turned over at midnight while the late West-coast game was
+ * still playing, so the Live tab went blank and that game's final was never seen by this device. */
+const SCOREBOARD_TZ = 'America/New_York';
+const SCOREBOARD_ROLLOVER_HOUR = 4; // the scoreboard day ends at 4 am ET, after the last final of the night
+
+/** YYYYMMDD of the scoreboard day the instant `d` (default now) belongs to. */
+function scoreboardDay(d) {
+  const n = new Date((d || new Date()).getTime() - SCOREBOARD_ROLLOVER_HOUR * 3600000);
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', { timeZone: SCOREBOARD_TZ, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(n);
+    const p = {};
+    for (const x of parts) p[x.type] = x.value;
+    if (/^\d{4}$/.test(p.year) && /^\d{2}$/.test(p.month) && /^\d{2}$/.test(p.day)) return p.year + p.month + p.day;
+  } catch (e) { /* no time-zone data: fall through to the device clock */ }
   return n.getFullYear() + String(n.getMonth()+1).padStart(2,'0') + String(n.getDate()).padStart(2,'0');
 }
 
@@ -77,7 +91,7 @@ async function refreshLiveScores() {
   // Cached doc is current: the Cloud Function is doing the polling for everyone.
   if (_scoreboardFresh && (Date.now() - _scoreboardSeenAt) < SCOREBOARD_MAX_AGE_MS) return;
   _scoreboardFresh = false;
-  const dateStr = S.liveScoresDate || localDateStr();
+  const dateStr = S.liveScoresDate || scoreboardDay();
   // "Today" rolled over while the tab stayed open: the function stops writing yesterday's doc, so without this
   // the device would sit on direct polling for the rest of the day. Move the listener to the new day's doc.
   if (_scoreboardUnsub && dateStr !== _scoreboardDate) subscribeScoreboard(dateStr);
@@ -308,7 +322,7 @@ function autoAdvanceBracket(game) {
 function startLiveRefresh() {
   stopLiveRefresh();
   autoResolvePlayIns();
-  subscribeScoreboard(S.liveScoresDate || localDateStr());
+  subscribeScoreboard(S.liveScoresDate || scoreboardDay());
   // Give the cached doc a moment to arrive; if it hasn't, poll the scoreboard directly.
   _liveFallbackTimer = setTimeout(() => { _liveFallbackTimer = null; if (!_scoreboardFresh) refreshLiveScores(); }, 1500);
   liveRefreshTimer = setInterval(refreshLiveScores, 30000); // every 30s (no-op while cache is fresh)
