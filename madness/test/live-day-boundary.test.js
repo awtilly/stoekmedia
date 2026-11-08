@@ -58,6 +58,7 @@ test('scoreboardDay: a West-coast evening is the same scoreboard day as in the E
 test('startLiveRefresh and refreshLiveScores subscribe to the scoreboard day, not the device date', async () => {
   const app = createApp();
   const realTimers = { setTimeout, setInterval };
+  const realDay = app.scoreboardDay; // restored below: the helper is a global the whole file shares
   globalThis.setTimeout = () => 1;
   globalThis.setInterval = () => 2;
   try {
@@ -78,6 +79,7 @@ test('startLiveRefresh and refreshLiveScores subscribe to the scoreboard day, no
     assert.deepEqual(d.paths, ['scoreboard/20270319'], 'same day: no re-subscribe');
   } finally {
     app.stopLiveRefresh();
+    app.scoreboardDay = realDay;
     Object.assign(globalThis, realTimers);
   }
 });
@@ -85,12 +87,32 @@ test('startLiveRefresh and refreshLiveScores subscribe to the scoreboard day, no
 test('changeLiveDate steps from the scoreboard day when no day is selected', () => {
   const app = createApp();
   loadPages(app);
-  app.scoreboardDay = () => '20270319';
-  app.startLiveRefresh = () => {};
-  app.S.liveScoresDate = '';
-  app.changeLiveDate(1);
-  assert.equal(app.S.liveScoresDate, '20270320', 'forward one day from the 19th, not from the device date');
-  app.S.liveScoresDate = '';
-  app.changeLiveDate(-1);
-  assert.equal(app.S.liveScoresDate, '20270318');
+  const realDay = app.scoreboardDay;
+  try {
+    app.scoreboardDay = () => '20270319';
+    app.startLiveRefresh = () => {};
+    app.S.liveScoresDate = '';
+    app.changeLiveDate(1);
+    assert.equal(app.S.liveScoresDate, '20270320', 'forward one day from the 19th, not from the device date');
+    app.S.liveScoresDate = '';
+    app.changeLiveDate(-1);
+    assert.equal(app.S.liveScoresDate, '20270318');
+  } finally { app.scoreboardDay = realDay; }
+});
+
+test('contract: at every half hour of the tournament the client day is one the Cloud Function is writing', () => {
+  // functions/scoreboard-logic.js datesToPoll(now) is the list of scoreboard/{day} docs pollScoreboard writes on a
+  // tick (the Eastern day, plus the day before until 4 am ET). If the client ever listens to a day outside that
+  // list it falls back to direct polling for the rest of the day, so the two rules must agree hour by hour.
+  const logic = require('../functions/scoreboard-logic');
+  const app = createApp();
+  const days = ['2027-03-10', '2027-03-14', '2027-03-20', '2027-04-05']; // EST, the clock-change Sunday, EDT, the final
+  for (const day of days) {
+    for (let half = 0; half < 48; half++) {
+      const now = new Date(Date.parse(day + 'T00:00:00Z') + half * 30 * 60000);
+      const client = app.scoreboardDay(now);
+      const server = logic.datesToPoll(now);
+      assert.ok(server.includes(client), now.toISOString() + ': client ' + client + ' not in ' + server.join(','));
+    }
+  }
 });

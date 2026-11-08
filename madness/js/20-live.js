@@ -26,15 +26,20 @@ let _liveFallbackTimer = null; // startLiveRefresh's one-shot "cached doc did no
 const SCOREBOARD_TZ = 'America/New_York';
 const SCOREBOARD_ROLLOVER_HOUR = 4; // the scoreboard day ends at 4 am ET, after the last final of the night
 
-/** YYYYMMDD of the scoreboard day the instant `d` (default now) belongs to. */
+/** YYYYMMDD of the scoreboard day the instant `d` (default now) belongs to. Same rule as the function's
+ * datesToPoll: the Eastern date, or the Eastern date of 24 h earlier while the Eastern hour is before 4. (Not
+ * "now minus four hours": on the March clock-change Sunday that day is 23 hours long and the two rules disagree
+ * for an hour.) */
 function scoreboardDay(d) {
-  const n = new Date((d || new Date()).getTime() - SCOREBOARD_ROLLOVER_HOUR * 3600000);
+  const now = d || new Date();
   try {
-    const parts = new Intl.DateTimeFormat('en-US', { timeZone: SCOREBOARD_TZ, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(n);
-    const p = {};
-    for (const x of parts) p[x.type] = x.value;
+    const fmt = new Intl.DateTimeFormat('en-US', { timeZone: SCOREBOARD_TZ, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', hour12: false });
+    const read = (t) => { const p = {}; for (const x of fmt.formatToParts(t)) p[x.type] = x.value; return p; };
+    let p = read(now);
+    if (Number(p.hour) % 24 < SCOREBOARD_ROLLOVER_HOUR) p = read(new Date(now.getTime() - 86400000)); // some engines print midnight as "24"
     if (/^\d{4}$/.test(p.year) && /^\d{2}$/.test(p.month) && /^\d{2}$/.test(p.day)) return p.year + p.month + p.day;
   } catch (e) { /* no time-zone data: fall through to the device clock */ }
+  const n = new Date(now.getTime() - SCOREBOARD_ROLLOVER_HOUR * 3600000);
   return n.getFullYear() + String(n.getMonth()+1).padStart(2,'0') + String(n.getDate()).padStart(2,'0');
 }
 
