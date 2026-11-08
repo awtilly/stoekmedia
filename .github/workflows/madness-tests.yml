@@ -1,0 +1,27 @@
+name: Madness tests
+
+# Runs the Madness unit suite (zero dependencies: node:test only) and checks that index.html carries the
+# current js/ stamp, on every pull request or push that touches madness/. Nothing is deployed from here.
+on:
+  pull_request:
+    paths: ['madness/**']
+  push:
+    branches: [main]
+    paths: ['madness/**']
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: madness
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Unit tests
+        run: node --test "test/*.test.js"
+      - name: index.html stamp is current
+        run: node scripts/stamp.js && git diff --exit-code index.html
