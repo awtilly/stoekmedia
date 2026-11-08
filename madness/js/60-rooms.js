@@ -82,6 +82,9 @@ function _debouncedFirestoreWrite(){
  * that has been left in the meantime. set() resolves once the server has the write (it stays pending while
  * offline), which is how _writeSharedState knows a queued write is still on its way. */
 let _queuedPlainWrites = {}; // room id -> plain writes handed to Firestore and not yet acknowledged by the server
+// Saves retried after a write failed outright (not offline: see the catch in _writeSharedState). Reset by a write
+// that gets through and on entering a room.
+let _writeRetries = 0;
 function _plainSharedWrite(ref, json){
   const id = ref.id;
   _queuedPlainWrites[id] = (_queuedPlainWrites[id] || 0) + 1;
@@ -156,6 +159,7 @@ function _writeSharedState(){
     // record it here. Otherwise a player added on this device and then removed on this device would look
     // like "added elsewhere" to the next merge and come straight back.
     if(writtenIds && roomId && ref.id === roomId) _lastSnapshotPlayerIds = Array.from(new Set((_lastSnapshotPlayerIds || []).concat(writtenIds)));
+    _writeRetries = 0;
   }).catch(e => {
     // Transactions need the network. Offline, fall back to the plain merge write, which Firestore
     // queues and flushes on reconnect (the pre-transaction behaviour).
@@ -163,11 +167,24 @@ function _writeSharedState(){
       _plainSharedWrite(ref, localJson);
       return;
     }
-    // Nothing was written: go back to the earlier base, so the next write still carries these edits.
-    if(_syncBase === localJson) _syncBase = baseAtStart;
+    // Nothing was written: go back to the earlier base, so the next write still carries these edits. The
+    // pending-edit baseline goes back too (unless a snapshot moved it on during the write): until the save is
+    // retried, a snapshot from another phone must keep these edits the way it keeps an edit in the debounce.
+    if(_syncBase === localJson){
+      _syncBase = baseAtStart;
+      try { _syncedShared = baseAtStart ? JSON.parse(baseAtStart) : null; } catch(err){}
+    }
     if(_sharedAtSync === localJson) _sharedAtSync = null;
     console.warn("Firestore write error:", e);
-    showToast("Sync error \u2014 changes saved locally");
+    // Try again shortly rather than waiting for the next save: the toast used to promise "saved locally", but
+    // the next snapshot replaced S and the local copy and nothing was armed to send the edit again. A few tries,
+    // then give up: a write the server refuses for good would otherwise loop every 800 ms while the tab is open.
+    if(roomId && ref.id === roomId && ++_writeRetries <= 5){
+      _debouncedFirestoreWrite();
+      showToast("Sync error \u2014 trying again");
+    } else {
+      showToast("Sync error \u2014 changes saved locally");
+    }
   });
 }
 
@@ -271,6 +288,7 @@ function connectToRoom(code){
   // written), not an edit: with no snapshot yet (offline, nothing in Firestore's cache) a tab switch must not send it.
   _sharedAtSync = _sharedJson();
   _droppedDuringPick = null;
+  _writeRetries = 0;
   unsubRoom = db.collection("rooms").doc(code).onSnapshot(doc => {
     if(gen !== _roomGeneration) return; // stale listener
     // Calibrate the draft clock against Firestore's clock (defined in 80-pages.js; unit tests load this file alone).
