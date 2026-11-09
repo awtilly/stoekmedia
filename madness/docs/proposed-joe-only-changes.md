@@ -269,46 +269,95 @@ calls from the function's egress IP. A few dozen phones in fallback is enough to
 answers 502 → every Live tab shows "scores unavailable"), which is exactly the moment the fallback exists for.
 
 Fix (zero dependencies, functions/ only): a per-instance in-memory cache keyed by path, 30 s TTL, and serve the last
-good body when the upstream answers 429/5xx so a rate-limit never blanks the Live tab. With `maxInstances: 5` the
+good body when the upstream is in trouble so a rate-limit never blanks the Live tab. With `maxInstances: 5` the
 worst case becomes 5 upstream calls per 30 s per route, independent of how many phones are polling.
 
+Revised Shift 60 (2026-11-09); this replaces the first version of the diff. Four things changed:
+
+- **The cache is bounded** (`CACHE_MAX = 64` routes, the oldest is dropped). The first version kept every route it
+  had ever answered for the life of the instance; phones only ask for today, yesterday and a picked day, so 64 never
+  drops a route in use, and the instance's memory no longer depends on how many different dates were requested.
+- **A failing upstream is asked once per 30 s per route, not once per phone.** The first version went back to the
+  upstream on every request once the 30 s had passed, also while it was answering 429, which is the one moment the
+  extra calls hurt. Now a stale answer also restarts the 30 s wait (`checked`).
+- **A 404/403 for a route that answered 200 a moment ago serves the last body** instead of an empty day. For
+  seasons after 2025 the upstream answers a day without games with 200 and an empty list, and 404 when its own
+  request to NCAA.com failed (§11 has the detail), so a 404 right after a 200 is an outage, not an off day.
+- **Stale has an age limit** (`STALE_MAX_MS`, 10 minutes). After that the relay answers what it answers today
+  (502, or the empty day with `upstreamStatus`), and the app shows its "Scores unavailable" line instead of a
+  scoreboard frozen at some earlier minute.
+
+The diff below is the real `git diff` of the change (it applies with `git apply` from the repo root). It was
+run against a copy of `functions/ncaa.js` as deployed on main 0354aeef with a stubbed `fetch` and clock, 7 checks:
+hit inside 30 s, refetch after, stale on 429 / 500 / network error / 404, no stale after 10 minutes, the plain 404
+answer unchanged when nothing is cached, never more than 64 entries with the most recent kept, a route that keeps
+being refreshed is never the one dropped, and 40 requests during a 429 make one upstream call. `functions/` itself
+was not touched.
+
 ```diff
---- madness/functions/ncaa.js
+--- a/madness/functions/ncaa.js
++++ b/madness/functions/ncaa.js
+@@ -12,6 +12,21 @@
  const { onRequest } = require('firebase-functions/v2/https');
  const { NCAA_API_BASE, FETCH_HEADERS, allowedPath } = require('./scoreboard-logic');
-+
+ 
 +// Per-instance response cache. cloudfunctions.net URLs have no CDN, so the Cache-Control header below only helps
 +// the browser; this keeps N phones in fallback from becoming N upstream calls (ncaa-api allows ~3 req/s per IP).
 +const CACHE_TTL_MS = 30 * 1000;
-+const _cache = new Map(); // path -> { body, at }
-@@
++const STALE_MAX_MS = 10 * 60 * 1000; // how old a body may be and still be served when the upstream is in trouble
++const CACHE_MAX = 64;                // entries; phones only ask for today, yesterday and a picked day
++const _cache = new Map(); // path -> { body, at, checked }, oldest first
++
++function sendStale(res, hit) {
++  if (!hit || Date.now() - hit.at > STALE_MAX_MS) return false;
++  hit.checked = Date.now();            // do not ask a struggling upstream again for this route for 30 s
++  res.set('X-Cache', 'stale');
++  res.type('application/json').status(200).send(hit.body);
++  return true;
++}
++
+ const ALLOWED_ORIGINS = [
+   /^https:\/\/([a-z0-9-]+\.)?stoekmedia\.com$/,
+   /^capacitor:\/\/localhost$/,
+@@ -30,19 +45,37 @@ exports.ncaa = onRequest({
+   if (req.method !== 'GET') { res.status(405).json({ error: 'GET only' }); return; }
+   const p = String(req.path || '').replace(/\/+$/, '');
    if (!allowedPath(p)) { res.status(404).json({ error: 'route not available' }); return; }
 +  const hit = _cache.get(p);
-+  if (hit && Date.now() - hit.at < CACHE_TTL_MS) {
++  if (hit && Date.now() - hit.checked < CACHE_TTL_MS) {
 +    res.set('Cache-Control', 'public, max-age=30');
-+    res.set('X-Cache', 'hit');
++    res.set('X-Cache', hit.checked === hit.at ? 'hit' : 'stale');
 +    res.type('application/json').status(200).send(hit.body);
 +    return;
 +  }
    try {
      const r = await fetch(NCAA_API_BASE + p, { headers: FETCH_HEADERS });
      if (r.status === 404 || r.status === 403) {
-       ...unchanged...
++      // This route answered 200 a moment ago, so this 404 is the upstream failing to reach NCAA.com, not an off day.
++      if (sendStale(res, hit)) return;
+       // ncaa.com: no page for that date/year yet (off day, or the bracket is not published). Empty, not an error.
+       res.set('Cache-Control', 'public, max-age=60');
+       res.status(200).json(p.startsWith('/brackets') ? { championships: [], upstreamStatus: r.status } : { games: [], upstreamStatus: r.status });
+       return;
      }
 -    if (!r.ok) { res.status(502).json({ error: 'upstream ' + r.status }); return; }
 +    if (!r.ok) {
 +      // Rate-limited or upstream trouble: a slightly stale scoreboard beats an empty Live tab.
-+      if (hit) { res.set('X-Cache', 'stale'); res.type('application/json').status(200).send(hit.body); return; }
++      if (sendStale(res, hit)) return;
 +      res.status(502).json({ error: 'upstream ' + r.status }); return;
 +    }
      const body = await r.text();
-+    _cache.set(p, { body, at: Date.now() });
++    _cache.delete(p);                                  // re-insert = most recent
++    const t = Date.now();
++    _cache.set(p, { body, at: t, checked: t });
++    if (_cache.size > CACHE_MAX) _cache.delete(_cache.keys().next().value); // drop the oldest; memory stays bounded
      res.set('Cache-Control', 'public, max-age=30');
      res.type('application/json').status(200).send(body);
    } catch (err) {
-+    if (hit) { res.set('X-Cache', 'stale'); res.type('application/json').status(200).send(hit.body); return; }
++    if (sendStale(res, hit)) return;
      res.status(502).json({ error: String(err && err.message || err) });
    }
+ });
 ```
 
 Then `firebase deploy --only functions:ncaa --project march-madness-snake-draft`, and `curl -sI` the scoreboard
