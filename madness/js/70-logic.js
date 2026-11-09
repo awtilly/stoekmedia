@@ -61,7 +61,7 @@ async function autoResolvePlayIns() {
   try { data = await ncaa.fetchBracket(S.year); } finally { _autoResolveFetching = false; }
   // Only arm the hourly throttle once the bracket actually answered; a dead network on First Four
   // night must not lock auto-resolve out for an hour.
-  if (!data) return;
+  if (!data) return false; // the request failed: the manual check says so instead of "not final yet"
   _lastAutoResolve = now;
   const decided = ncaa.firstFourWinners(data);
   for (const ff of decided) {
