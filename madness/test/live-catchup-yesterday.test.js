@@ -18,6 +18,7 @@ function setup(opts) {
   vm.runInThisContext('_unsyncedAdvances.clear(); _pendingAdvance.clear(); _reportedFinals.clear(); _advancedFinals.clear();' +
     ' _catchUpDone = null; _catchUpBusy = false; liveScores = []; _checkFinalsChain = Promise.resolve();');
   vm.runInThisContext('_lastSyncedState = ' + (o.snapshotArrived ? '"{}"' : 'null'));
+  vm.runInThisContext('_emptyDaysConfirmed.clear(); _emptyDaysConfirmed.add("20270320"); _emptyDayUnconfirmed = null;'); // today's empty doc is a known off day: only the catch-up's relay calls are counted
   const T = id => app.S.teams.find(t => t.id === id);
   const late = finalGame(T('South-16'), T('South-1'), T('South-1'));
   late.id = 'late-game-0030et';
@@ -58,7 +59,7 @@ function setup(opts) {
     Object.assign(globalThis, realTimers);
     app.scoreboardDay = t.realDay;
     app.ncaa.fetchScoreboard = t.realFetch;
-    vm.runInThisContext('_lastSyncedState = null; _catchUpDone = null; _unsyncedAdvances.clear(); _pendingAdvance.clear(); _reportedFinals.clear(); _advancedFinals.clear(); liveScores = [];');
+    vm.runInThisContext('_emptyDaysConfirmed.clear(); _lastSyncedState = null; _catchUpDone = null; _unsyncedAdvances.clear(); _pendingAdvance.clear(); _reportedFinals.clear(); _advancedFinals.clear(); liveScores = [];');
   };
   return t;
 }

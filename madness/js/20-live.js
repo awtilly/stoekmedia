@@ -73,18 +73,73 @@ function applyCachedScoreboard(data, fromCache) {
     }
     return true;
   }
+  const empty = data.events.length === 0;
   _scoreboardFresh = true;
   _scoreboardSeenAt = Date.now();
-  liveLastError = false;
+  if (!empty && _emptyDayUnconfirmed === _scoreboardDate) _emptyDayUnconfirmed = null;
+  liveLastError = empty && _emptyDayUnconfirmed === _scoreboardDate; // an empty day the relay could not confirm stays "unavailable"
   liveScores = data.events;
   _liveScoresDay = _scoreboardDate;
   liveLastRefresh = data.fetchedAt.toMillis();
   checkGameFinals();
+  if (empty) confirmEmptyDay(_scoreboardDate);
   if (S.phase === 'live') {
     const c = document.getElementById('c');
     if (c) renderLive(c);
   }
   return true;
+}
+
+/* ── Empty-day confirmation ──
+ * The guard above only protects a phone that already has the day's games. A phone that opens the Live tab while
+ * the source is failing gets the empty document FIRST and showed "No games found" in the middle of a game day.
+ * The first empty document for a day is therefore confirmed once through the relay:
+ *   - the relay says "no games" (a plain 200): a real off day, remembered for the session, nothing changes;
+ *   - the relay has games: they are shown (later empty documents then run into the guard above);
+ *   - the relay reports the upstream failing, or cannot be reached: "Scores unavailable" instead of "No games
+ *     found", and it is asked again at most every two minutes while empty documents keep arriving.
+ * Cost: one relay request per session for each real off day the Live tab is opened on. */
+const EMPTY_DAY_RECHECK_MS = 2 * 60 * 1000;
+const _emptyDaysConfirmed = new Set(); // days the relay confirmed as having no games
+let _emptyDayUnconfirmed = null;       // the day whose empty document the relay could not confirm
+let _emptyDayCheckedAt = 0;
+const _emptyDaysChecking = new Set(); // days with a relay request in flight
+
+async function confirmEmptyDay(day) {
+  if (!day || _emptyDaysChecking.has(day) || _emptyDaysConfirmed.has(day)) return;
+  if (_emptyDayUnconfirmed === day && Date.now() - _emptyDayCheckedAt < EMPTY_DAY_RECHECK_MS) return;
+  _emptyDaysChecking.add(day);
+  _emptyDayCheckedAt = Date.now();
+  let games = null;
+  try {
+    const data = await ncaa.fetchScoreboard(day); // null on any failure, incl. the relay's "upstream answered 404"
+    if (data) games = ncaa.parseScoreboard(data);
+  } catch (e) {
+    games = null;
+  } finally {
+    _emptyDaysChecking.delete(day);
+  }
+  if (games && games.length === 0) _emptyDaysConfirmed.add(day); // true whichever screen is showing by now
+  if (day !== _scoreboardDate) return;                            // left the Live tab or moved to another day meanwhile
+  if (liveScores.length > 0) return;                              // a good document landed while the request was out
+  if (games && games.length > 0) {
+    _emptyDayUnconfirmed = null;
+    liveLastError = false;
+    liveScores = games;
+    _liveScoresDay = day;
+    liveLastRefresh = Date.now();
+    checkGameFinals();
+  } else if (games) {
+    if (_emptyDayUnconfirmed === day) _emptyDayUnconfirmed = null;
+    liveLastError = false;
+  } else {
+    _emptyDayUnconfirmed = day;
+    liveLastError = true;
+  }
+  if (S.phase === 'live') {
+    const c = document.getElementById('c');
+    if (c) renderLive(c);
+  }
 }
 
 function subscribeScoreboard(dateStr) {
