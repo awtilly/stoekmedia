@@ -417,6 +417,7 @@ function autoAdvanceBracket(game) {
  * the Live tab now also reads the day before once per room and session and runs the same check over it. */
 let _catchUpDone = null;  // roomId + '|' + day already walked this session
 let _catchUpBusy = false;
+let _catchUpRelayAt = 0;  // when the relay was last asked to confirm an empty day-before document
 
 function dayBefore(dateStr) {
   const d = new Date(Date.UTC(Number(dateStr.slice(0, 4)), Number(dateStr.slice(4, 6)) - 1, Number(dateStr.slice(6, 8))) - 86400000);
@@ -444,9 +445,19 @@ async function catchUpYesterdaysFinals() {
         if (scoreboardDocValid(data)) { games = data.events; settled = !(doc.metadata && doc.metadata.fromCache); }
       }
     } catch (e) { /* unreadable (rules, offline): ask the relay below */ }
-    if (!games) {
+    // An empty document for the day before can be the function's last poll of that night having been told "nothing"
+    // by a failing upstream; nothing rewrites it afterwards. Like the Live tab's own day (confirmEmptyDay), it is
+    // confirmed once through the relay, and a relay that cannot say is asked again every two minutes at most.
+    const unconfirmedEmpty = !!games && games.length === 0 && !_emptyDaysConfirmed.has(day);
+    if (unconfirmedEmpty) {
+      if (Date.now() - _catchUpRelayAt < EMPTY_DAY_RECHECK_MS) return;
+      _catchUpRelayAt = Date.now();
+    }
+    if (!games || unconfirmedEmpty) {
       const data = await ncaa.fetchScoreboard(day);
-      if (data) games = ncaa.parseScoreboard(data);
+      games = data ? ncaa.parseScoreboard(data) : null;
+      if (games && games.length === 0) _emptyDaysConfirmed.add(day);
+      if (games && unconfirmedEmpty) settled = true;     // the relay's answer is current, whatever the document's age
     }
     if (!games) return;                                  // nothing readable: the next tick tries again
     if ((roomId || '') + '|' + day !== key) return;      // the room changed while the read was out
