@@ -344,11 +344,20 @@ function releaseWakeLock() {
   }
 }
 
-document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') {
+/* An installed app is rarely reloaded: it comes back from the background with its state intact, so a day picked
+ * on the Live tab last night would still be picked this morning. After this long away, show today again. */
+const LIVE_PICKED_DAY_MAX_AWAY_MS = 4 * 60 * 60 * 1000;
+let _liveHiddenAt = 0; // when the app last went to the background (0 = it has not)
+
+function liveVisibilityChanged(visible) {
+  if (visible) {
+    if (S.liveScoresDate && _liveHiddenAt && Date.now() - _liveHiddenAt > LIVE_PICKED_DAY_MAX_AWAY_MS) S.liveScoresDate = '';
     if (S.phase === 'live') startLiveRefresh();
   } else {
+    _liveHiddenAt = Date.now();
     stopLiveRefresh();
   }
-});
+}
+
+document.addEventListener('visibilitychange', () => liveVisibilityChanged(document.visibilityState === 'visible'));
 

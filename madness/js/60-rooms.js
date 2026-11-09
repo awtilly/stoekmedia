@@ -58,6 +58,10 @@ function loadState(){
     const s = localStorage.getItem(stateKey());
     if(s) Object.assign(S, JSON.parse(s));
     sanitizeSharedState(S);
+    // A day picked on the Live tab is a look back, not a setting. It is stored with the rest of the view state,
+    // and restoring it opened the Live tab on that old day in every later session (and this phone then never
+    // processed today's finals). A new session starts on today; the filter and the tab are still remembered.
+    S.liveScoresDate = '';
     // Reconstruct Firestore Timestamp from serialized JSON
     if(S.ds && S.ds.pickDeadline && typeof S.ds.pickDeadline === 'object' && S.ds.pickDeadline.seconds){
       S.ds.pickDeadline = new firebase.firestore.Timestamp(S.ds.pickDeadline.seconds, S.ds.pickDeadline.nanoseconds || 0);
