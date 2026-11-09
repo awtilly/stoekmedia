@@ -190,11 +190,46 @@ async function clearFFGame(ffIdx, event){
   render();
 }
 
+/* ── Final Four pairing ──
+ * Which two regional champions meet in each national semifinal changes every year (2025: South-West and
+ * East-Midwest; 2026: East-South and West-Midwest). S.ffPairs holds the room's pairing as [[r, r], [r, r]];
+ * importFromNCAA reads it from the bracket feed, Settings lets an admin pick it for a hand-built room, and rooms
+ * from before this field existed keep the pairing the app always assumed. bracket.ff[0] is the winner of pair 0. */
+const FF_PAIRINGS = [
+  [['South', 'East'], ['Midwest', 'West']],
+  [['South', 'West'], ['East', 'Midwest']],
+  [['South', 'Midwest'], ['East', 'West']]
+];
+function ffPairsValid(p){
+  return Array.isArray(p) && p.length === 2 && p.every(x => Array.isArray(x) && x.length === 2 && x.every(r => REGIONS.includes(r)))
+    && new Set(p.flat()).size === 4;
+}
+function ffPairs(){
+  return ffPairsValid(S.ffPairs) ? S.ffPairs : FF_PAIRINGS[0];
+}
+/** Index into FF_PAIRINGS of the room's pairing (pairs compared as sets), for the Settings control. */
+function ffPairingIndex(){
+  const key = p => p.map(x => x.slice().sort().join('+')).sort().join('|');
+  const cur = key(ffPairs());
+  const i = FF_PAIRINGS.findIndex(p => key(p) === cur);
+  return i < 0 ? 0 : i;
+}
+async function setFinalFourPairing(v){
+  if(!await requireAdmin()){ render(); return; } // redraw so the select shows the room's pairing again, not the refused choice
+  const next = FF_PAIRINGS[Number(v)];
+  if(!next || ffPairingIndex() === Number(v)) return;
+  S.ffPairs = next;
+  cascadeFF(); // a semifinal winner that no longer belongs to its pair is cleared, and the title game with it
+  syncGames();
+  saveState();
+  render();
+}
+
 function cascadeFF(){
-  const ffPairs = [[0,1],[2,3]];
+  const pairs = ffPairs();
   for(let fi = 0; fi < 2; fi++){
-    const rw0 = S.bracket[REGIONS[ffPairs[fi][0]]][14];
-    const rw1 = S.bracket[REGIONS[ffPairs[fi][1]]][14];
+    const rw0 = S.bracket[pairs[fi][0]][14];
+    const rw1 = S.bracket[pairs[fi][1]][14];
     const ffWinner = S.bracket.ff[fi];
     if(ffWinner && ffWinner !== rw0 && ffWinner !== rw1){
       S.bracket.ff[fi] = null;
@@ -222,12 +257,12 @@ function syncGames(){
       games.push({id:`${region}_${gi}`, round, t1:t0.id, t2:t1.id, wid});
     }
   }
-  const ffPairs = [[0,1],[2,3]];
+  const pairs = ffPairs();
   for(let fi = 0; fi < 2; fi++){
     const wid = S.bracket.ff[fi];
     if(!wid) continue;
-    const t0id = S.bracket[REGIONS[ffPairs[fi][0]]][14];
-    const t1id = S.bracket[REGIONS[ffPairs[fi][1]]][14];
+    const t0id = S.bracket[pairs[fi][0]][14];
+    const t1id = S.bracket[pairs[fi][1]][14];
     if(t0id && t1id) games.push({id:`ff_${fi}`, round:5, t1:t0id, t2:t1id, wid});
   }
   if(S.bracket.ff[2]){
