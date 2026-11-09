@@ -173,13 +173,15 @@ function retryPendingAdvances() {
  * (not yet in _reportedFinals when the second started) both wrote the gameResult, the second with the post-game
  * order as rankingsBefore, and whichever finished first could park the game in _pendingAdvance for good. */
 let _checkFinalsChain = Promise.resolve();
-function checkGameFinals() {
-  const run = _checkFinalsChain.then(_checkGameFinalsNow);
+function checkGameFinals(games, quiet) {
+  const run = _checkFinalsChain.then(() => _checkGameFinalsNow(games, quiet));
   _checkFinalsChain = run.catch(() => {}); // one failed run must not block the next
   return run;
 }
 
-async function _checkGameFinalsNow() {
+/* games: the list to walk (default: the day on screen). quiet: the overnight catch-up; a final nobody reported
+ * is advanced and saved like a first report but no gameResult is written, so no push goes out hours late. */
+async function _checkGameFinalsNow(games, quiet) {
   if (!S.teams || S.teams.length === 0) return;
 
   // Build a set of NCAA.com team slugs (ncaaId) for teams in this room
@@ -190,7 +192,7 @@ async function _checkGameFinalsNow() {
   if (retryPendingAdvances()) { advanced = true; shouldSync = true; }
   { const r = await retryUnsyncedAdvances(true); if (r) advanced = true; if (r === 2) shouldSync = true; }
 
-  for (const game of liveScores) {
+  for (const game of (games || liveScores)) {
     if (game.state !== 'post' || !game.completed) continue;
     // Only NCAA tournament games count: ncaa.com tags those (and only those) with a bracketId, which the parser
     // turns into `tournament`. A conference final between two bracket teams on Selection Sunday, or an NIT game,
@@ -229,7 +231,7 @@ async function _checkGameFinalsNow() {
           .collection('gameResults').doc(game.id);
         const existing = await resultRef.get();
         if (!existing.exists) {
-          await resultRef.set({
+          if (!quiet) await resultRef.set({
             awayName: game.away.name,
             awayScore: game.away.score,
             awaySeed: game.away.seed || null,
@@ -335,13 +337,64 @@ function autoAdvanceBracket(game) {
   return false;
 }
 
+/* ── Overnight catch-up ──
+ * checkGameFinals only walks the day on screen. A game that went final after every phone in the room was closed
+ * (the late West-coast game ends around 12:30 am ET) was therefore never processed: by morning the Live tab
+ * opens on the new day and the bracket slot stayed empty until somebody tapped back a day. With no day picked,
+ * the Live tab now also reads the day before once per room and session and runs the same check over it. */
+let _catchUpDone = null;  // roomId + '|' + day already walked this session
+let _catchUpBusy = false;
+
+function dayBefore(dateStr) {
+  const d = new Date(Date.UTC(Number(dateStr.slice(0, 4)), Number(dateStr.slice(4, 6)) - 1, Number(dateStr.slice(6, 8))) - 86400000);
+  return d.getUTCFullYear() + String(d.getUTCMonth() + 1).padStart(2, '0') + String(d.getUTCDate()).padStart(2, '0');
+}
+
+async function catchUpYesterdaysFinals() {
+  if (S.liveScoresDate) return;                         // a picked day is walked by the normal check
+  if (!S.teams || S.teams.length === 0) return;
+  if (S.bracket && S.bracket.ff && S.bracket.ff[2]) return; // champion crowned: nothing left to catch up
+  // The room document has not arrived yet: advancing and saving now would write this phone's stored copy of
+  // the room. The 30 s tick comes back.
+  if (roomId && typeof _lastSyncedState !== 'undefined' && _lastSyncedState === null) return;
+  const day = dayBefore(scoreboardDay());
+  const key = (roomId || '') + '|' + day;
+  if (_catchUpDone === key || _catchUpBusy) return;
+  _catchUpBusy = true;
+  try {
+    let games = null;
+    let settled = true; // false = read from the on-device copy, which may predate the final: look again later
+    try {
+      if (typeof db !== 'undefined' && db) {
+        const doc = await db.collection(SCOREBOARD_COLLECTION).doc(day).get();
+        const data = doc.exists ? doc.data() : null;
+        if (scoreboardDocValid(data)) { games = data.events; settled = !(doc.metadata && doc.metadata.fromCache); }
+      }
+    } catch (e) { /* unreadable (rules, offline): ask the relay below */ }
+    if (!games) {
+      const data = await ncaa.fetchScoreboard(day);
+      if (data) games = ncaa.parseScoreboard(data);
+    }
+    if (!games) return;                                  // nothing readable: the next tick tries again
+    if ((roomId || '') + '|' + day !== key) return;      // the room changed while the read was out
+    if (!liveRefreshTimer || S.liveScoresDate) return;   // left the Live tab, or picked a day, meanwhile: next visit
+    await checkGameFinals(games, true);
+    if (settled) _catchUpDone = key;
+  } catch (e) {
+    console.warn('Overnight catch-up failed:', e);
+  } finally {
+    _catchUpBusy = false;
+  }
+}
+
 function startLiveRefresh() {
   stopLiveRefresh();
   autoResolvePlayIns();
+  catchUpYesterdaysFinals();
   subscribeScoreboard(S.liveScoresDate || scoreboardDay());
   // Give the cached doc a moment to arrive; if it hasn't, poll the scoreboard directly.
   _liveFallbackTimer = setTimeout(() => { _liveFallbackTimer = null; if (!_scoreboardFresh) refreshLiveScores(); }, 1500);
-  liveRefreshTimer = setInterval(refreshLiveScores, 30000); // every 30s (no-op while cache is fresh)
+  liveRefreshTimer = setInterval(() => { refreshLiveScores(); catchUpYesterdaysFinals(); }, 30000); // every 30s (both are no-ops once current)
   requestWakeLock();
 }
 
