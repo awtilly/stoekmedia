@@ -210,6 +210,38 @@ Reviewers get a demo in the Review Notes, no account needed (good: no login = no
   no phone talks to NCAA.com directly.
 - Web Share availability in WKWebView: verify on the first simulator build before relying on it.
 
+## 12. Submission gate: what must be in the build before "Submit for Review" (added 2026-11-09)
+
+Builds 1-4 were bundled from `main` as it stands today (`npm run sync` copies `../index.html` and `../js` into
+`www/`). The web code on `main` only detects the shell (`isNativeShell` in `js/90-boot.js`); it makes no native
+call at all. The plugins are installed in `ios-app/`, but nothing uses them yet. So builds 1-4 have:
+
+- no push notifications (the web-push path is switched off inside the shell, the native one is in #54);
+- no haptics and no iOS share sheet (#58);
+- an invite link that nobody can open: sharing from the app sends `capacitor://localhost/?room=...` (fixed in #58).
+
+That is the "just a website" case from the 4.2 row in section 6, plus a visibly broken feature (2.1). A build
+submitted in this state is likely to come back rejected and costs one of the review rounds the timeline allows for.
+
+**Merged into `main`, and the build cut after that:**
+
+| Order | What | Why it gates the submission |
+|-------|------|------------------------------|
+| 1 | #51 `fcm-token-once`, then #54 `native-push` (stacked on #51) | Native push: permission prompt, token, "you're on the clock" |
+| 2 | #58 `native-haptics-share` | Share sheet, a link people can open, Taptic feedback |
+| 3 | `madness/ios-badge-reset` (Swift, staged) | Badge clears when the app opens |
+| 4 | Section 5 (push payload in `functions/`, APNs key in Firebase) | Without it iOS shows nothing while the app is in the background (data-only messages) |
+
+**Ten-second check on the Mac, after `npm run sync` and before archiving** (from `madness/ios-app/`):
+
+```sh
+grep -c "Plugins.PushNotifications" www/js/30-state.js              # 1 or more = #54 is in the bundle
+grep -cE "Plugins.(Share|Haptics)" www/js/80-pages.js         # 2 = #58 is in the bundle
+```
+
+Both print `0` for builds 1-4. Then the device pass from section 9 (push on draft turn, haptic at 10 s, share an
+invite and open it on a second phone), and only then the Review Notes, which should name those three features.
+
 ## Appendix A. Every place the "March Madness" name lives (inventory 2026-10-17)
 
 > **Resolved 2026-10-31.** The name is "Madness Draft" (commit 86e46c6a on `main`, after the `APP_NAME` helper from PR #43). Every row below now reads "Madness Draft"; the only leftover is the `functions/package.json` description, which is not user-visible and is Joe-only. Kept as the historical inventory.
