@@ -136,8 +136,24 @@ function clearDownstream(region, changedGame){
   }
 }
 
+/* The same check for the Final Four. A semifinal is between the champions of its two regions (the room's pairing,
+ * which an admin can also change), the title game between the two semifinal winners. Read after the admin check,
+ * so a regional final, a semifinal or the pairing changed by another admin meanwhile is seen. */
+function teamNoLongerInFFGame(ffIdx, teamId){
+  let a, b;
+  if(ffIdx < 2){
+    const pair = ffPairs()[ffIdx];
+    a = S.bracket[pair[0]][14]; b = S.bracket[pair[1]][14];
+  } else {
+    a = S.bracket.ff[0]; b = S.bracket.ff[1];
+  }
+  if(!a && !b) return false;
+  return a !== teamId && b !== teamId;
+}
+
 async function advanceFF(ffIdx, teamId){
   if(!await requireAdmin()) return;
+  if(teamNoLongerInFFGame(ffIdx, teamId)){ showToast('That game changed while the PIN prompt was open. Tap the winner again.'); return; }
   if(S.bracket.ff[ffIdx] === teamId) return;
   S.bracket.ff[ffIdx] = teamId;
   if(ffIdx < 2){
