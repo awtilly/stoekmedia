@@ -33,7 +33,7 @@ function setup() {
   return t;
 }
 
-test('an empty doc for the day on screen does not wipe the games; the direct poll is asked instead', async () => {
+test('an empty doc for the day on screen does not wipe the games, shows the notice and does not send the phone to the relay', async () => {
   const t = setup();
   try {
     t.app.S.liveScoresDate = '20270319';
@@ -44,26 +44,13 @@ test('an empty doc for the day on screen does not wipe the games; the direct pol
     t.doc([]);
     await tick();
     assert.equal(t.app.eval('liveScores.length'), 1, 'the last scores stay on screen');
-    assert.equal(t.fetches.length, 1, 'the relay is asked');
-    assert.equal(t.app.eval('liveLastError'), true, 'and its "upstream said 404" answer is shown as unavailable, not as an empty day');
-  } finally { t.done(); }
-});
-
-test('when the direct poll confirms the day really is empty, the empty day is shown', async () => {
-  const t = setup();
-  try {
-    t.app.S.liveScoresDate = '20270319';
-    t.app.startLiveRefresh();
-    t.doc([t.game]);
-    t.relay = { ok: true, json: async () => ({ games: [] }) }; // a plain 200 with no games: upstream answered
-    t.doc([]);
+    assert.equal(t.app.eval('liveLastError'), true, 'shown as unavailable, not as an empty day');
+    assert.equal(t.fetches.length, 0, 'the relay asks the same upstream: no direct poll');
+    t.doc([]); t.doc([]); // an outage lasting several minutes
+    await t.app.refreshLiveScores(); // the 30 s tick
     await tick();
-    assert.equal(t.app.eval('liveScores.length'), 0);
-    assert.equal(t.app.eval('liveLastError'), false);
-    const before = t.fetches.length;
-    t.doc([]); // the next minute's empty doc is now consistent with the screen: accepted, no poll
-    await tick();
-    assert.equal(t.fetches.length, before);
+    assert.equal(t.fetches.length, 0, 'still on the cache');
+    assert.equal(t.app.eval('liveScores.length'), 1);
   } finally { t.done(); }
 });
 

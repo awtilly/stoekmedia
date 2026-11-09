@@ -41,10 +41,18 @@ function applyCachedScoreboard(data, fromCache) {
   if (!usable) { _scoreboardFresh = false; return false; }
   // A day's games do not all vanish. An empty doc for the day already on screen is the function having been told
   // "nothing" by a failing upstream (ncaa-api answers 404 when its own fetch fails, and the function writes that
-  // as an empty day): keep the scores we have and let the direct poll decide.
+  // as an empty day): keep the scores we have and say so. The function is alive (this document just arrived) and
+  // the relay would ask the same upstream, so a direct poll could not do better and every phone polling it would
+  // only add load while the source is struggling: stay on the cache and wait for the next good document.
   if (data.events.length === 0 && liveScores.length > 0 && _liveScoresDay !== null && _liveScoresDay === _scoreboardDate) {
-    _scoreboardFresh = false;
-    return false;
+    _scoreboardFresh = true;
+    _scoreboardSeenAt = Date.now();
+    liveLastError = true;
+    if (S.phase === 'live') {
+      const c = document.getElementById('c');
+      if (c) renderLive(c);
+    }
+    return true;
   }
   _scoreboardFresh = true;
   _scoreboardSeenAt = Date.now();
