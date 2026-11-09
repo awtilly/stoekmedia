@@ -57,3 +57,33 @@ test('the source has no bracket for the year: says so without naming a day to wa
   assert.equal(btn.disabled, false);
   assert.equal(app.S.teams.length, 0);
 });
+
+/* The play-in check had the same shape. */
+function playInApp() {
+  const { app } = pagesApp();
+  app.S.teams = [{ id: 'pi', name: 'UMBC / Howard', seed: 16, region: 'South', playIn: true, playInResolved: false,
+    playInTeams: [{ name: 'UMBC', ncaaId: 'umbc' }, { name: 'Howard', ncaaId: 'howard' }] }];
+  vm.runInThisContext('_lastAutoResolve = 0');
+  return app;
+}
+
+test('checkPlayIns: a failed request says "could not reach", not "not final yet", and the next check is not throttled', async () => {
+  const app = playInApp();
+  let fetches = 0;
+  app.fetch = async () => { fetches++; return { ok: false, status: 502 }; };
+  await app.checkPlayIns();
+  assert.match(lastToast(app), /Could not reach NCAA\.com/);
+  await app.autoResolvePlayIns(); // the automatic check on the next Live open
+  assert.equal(fetches, 2, 'a failed request does not start the one-hour wait');
+});
+
+test('checkPlayIns: the bracket answers but the game is not decided: "not final yet", and the hourly wait applies', async () => {
+  const app = playInApp();
+  let fetches = 0;
+  app.fetch = async () => { fetches++; return { ok: true, json: async () => ({ championships: [{ games: [] }] }) }; };
+  await app.checkPlayIns();
+  assert.match(lastToast(app), /1 play-in game not final yet/);
+  await app.autoResolvePlayIns();
+  assert.equal(fetches, 1);
+  vm.runInThisContext('_lastAutoResolve = 0');
+});

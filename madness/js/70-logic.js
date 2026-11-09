@@ -55,7 +55,9 @@ async function autoResolvePlayIns() {
   if (unresolved.length === 0) return;
   _lastAutoResolve = now;
   // One bracket fetch: the First Four games there carry isWinner once they are final.
-  const decided = ncaa.firstFourWinners(await ncaa.fetchBracket(S.year));
+  const bracketData = await ncaa.fetchBracket(S.year);
+  if (!bracketData) { _lastAutoResolve = 0; return false; } // the request failed: say so, and do not make the next check wait an hour
+  const decided = ncaa.firstFourWinners(bracketData);
   for (const ff of decided) {
     for (const ut of unresolved) {
       if (ut.playInResolved) continue;
