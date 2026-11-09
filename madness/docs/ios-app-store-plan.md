@@ -75,7 +75,7 @@ so the PWA is untouched. Capacitor injects `window.Capacitor`; no import needed,
 | Area | File | Change |
 |------|------|--------|
 | Service worker | `js/90-boot.js` | Skip `serviceWorker.register` and the install banner when native. WKWebView does not run service workers for the `capacitor://` scheme; offline comes from the bundle instead. |
-| Haptics | `js/80-pages.js` `triggerHaptic()` | When native call `Capacitor.Plugins.Haptics.impact({ style: 'medium' })` instead of the checkbox trick. Also fire on pick, bracket advance, and "your turn". |
+| Haptics | `js/80-pages.js` `triggerHaptic()` | When native call `Capacitor.Plugins.Haptics.impact({ style: 'MEDIUM' })` instead of the checkbox trick. Also fire on pick, bracket advance, and "your turn". |
 | Share | `js/80-pages.js` `shareRoomLink/shareLeaderboard` | `navigator.share` works in WKWebView on iOS 15+; keep it, fall back to `Capacitor.Plugins.Share.share()` if `navigator.share` is undefined. |
 | Push token | `js/30-state.js` `initFCM()` | When native: `FirebaseMessaging.requestPermissions()` then `FirebaseMessaging.getToken()` and write the token to the **same** `rooms/{roomId}/fcmTokens/{playerId}` doc. Foreground messages via `FirebaseMessaging.addListener('notificationReceived')` -> `showToast`. Tap via `notificationActionPerformed` -> navigate using `data.url`. |
 | Badge | `js/30-state.js` `updateAppBadge()` | `navigator.setAppBadge` is unavailable in WKWebView; use the FCM `badge` field (section 5) and `FirebaseMessaging.removeAllDeliveredNotifications()` on open. |
