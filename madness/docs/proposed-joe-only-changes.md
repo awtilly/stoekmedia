@@ -358,3 +358,59 @@ firebase deploy --only functions:pollScoreboard --project march-madness-snake-dr
 Nothing is urgent before March; `pollScoreboard` does not write outside the 3/10-4/10 window. The replay script that
 found this is `caddyshack/tools/night-shift/progress/madness-scripts/ncaa-tournament-replay.js` (`--harness` points it
 at any checkout); with the fix it reports 67 writes, 0 pending, champion Michigan, in order and out of order.
+
+## 11. functions/scoreboard.js: a failing upstream must not be written as an empty day (found Shift 59, 2026-11-08)
+
+`pollScoreboard` treats a 403/404 from ncaa-api as "no scoreboard page for that date" and writes an empty day, so
+phones stay on the cache on an off day. That was true of the old ncaa.com feed. Today (checked 2026-11-08 against the
+live proxy and the ncaa-api source, `src/index.ts` scoreboard route):
+
+- a day without games is a plain **200** with `"games": []` (2026/07/15 and 2027/03/20 both answer that way);
+- a **404** is what ncaa-api returns for the current season when its own fetch of the NCAA feed fails: the new feed
+  throws, it falls through to the old endpoint logic, and that returns 404 for any year after 2025.
+
+So in March 2027 the 404 branch can only fire when the NCAA feed has a bad minute, and what it does then is replace
+`scoreboard/{today}` with zero events. Every phone gets that document from the server, treats it as current, shows
+"No games found" in the middle of a game and stays off the fallback poll. Nothing is logged, because the branch is
+silent. A longer outage reads as an empty day for as long as it lasts instead of "last known scores, unavailable". The
+sustained case is not far-fetched: ncaa-api reads the NCAA feed through a fixed persisted-query id, and when NCAA
+changes that id every scoreboard request fails this way until ncaa-api is updated and its public instance redeployed.
+
+The `madness/live-empty-day-guard` branch covers the phones (an empty document does not replace the same day's games,
+and the proxy's `upstreamStatus` answer counts as a failed poll). The function should stop writing the empty day over
+a good one. In `functions/scoreboard.js`:
+
+```diff
+       const r = await fetch(scoreboardUrl(ymd), { headers: FETCH_HEADERS });
+       if (r.status === 404 || r.status === 403) {
+-        // ncaa.com answers 403/404 for a date with no scoreboard page (an off day between rounds):
+-        // write an empty day so phones stay on the cache instead of falling back to direct polling.
++        // A day without games is a 200 with an empty list. 403/404 is ncaa-api failing to reach the NCAA feed
++        // (or, on the old feed, a date with no page): never let it replace games that are already cached.
++        const prev = await db.doc(`scoreboard/${ymd}`).get();
++        if (prev.exists && (prev.data().eventCount || 0) > 0) {
++          console.warn(`NCAA ${ymd} responded ${r.status}; keeping the ${prev.data().eventCount} games already cached`);
++          continue;
++        }
+         data = { games: [] };
+```
+
+The extra read only happens on a 403/404 tick. An off day (no document yet, or an empty one) is still written empty,
+so nothing changes there.
+
+Second, smaller, same file: the two `fetch` calls have no timeout and the function has 30 seconds for both dates.
+Before 4 am ET the list is [today, yesterday], and yesterday is the one with the late game still being played; a stalled
+request for today uses up the whole invocation and yesterday is not polled that minute. Give each request its own limit:
+
+```diff
+-      const r = await fetch(scoreboardUrl(ymd), { headers: FETCH_HEADERS });
++      const r = await fetch(scoreboardUrl(ymd), { headers: FETCH_HEADERS, signal: AbortSignal.timeout(10000) });
+```
+
+(the existing `catch` already logs and moves on to the next date). Deploy with section 10:
+
+```sh
+firebase deploy --only functions:pollScoreboard --project march-madness-snake-draft
+```
+
+Nothing is urgent before March; `pollScoreboard` does not write outside the 3/10-4/10 window.
