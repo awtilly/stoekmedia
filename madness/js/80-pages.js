@@ -140,9 +140,9 @@ function navigate(p){
 }
 
 async function shareRoomLink() {
-  const url = new URL(window.location);
-  url.searchParams.set('room', roomId);
-  const shareUrl = url.toString();
+  // Inside the app shell window.location is capacitor://localhost, which opens nowhere: invite to the website.
+  const base = isNativeShell ? 'https://stoekmedia.com/madness/' : window.location.origin + window.location.pathname;
+  const shareUrl = base + '?room=' + encodeURIComponent(roomId);
   const shareData = {
     title: APP_NAME,
     text: 'Join my Madness Draft bracket pool! Room: ' + roomId,
