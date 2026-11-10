@@ -27,7 +27,7 @@ listing is exactly the kind of commercial use they send letters about.
 | Surface | Proposal |
 |---------|----------|
 | App Store name | **Madness Draft** (fallback: "Madness Pool", "Bracket Madness") |
-| Subtitle | "Snake-draft bracket pool with friends" |
+| Subtitle | "Snake-draft bracket pool with friends" (37 characters: over Apple's limit of 30; a 24-character version is in section 13) |
 | Bundle ID | `com.stoekmedia.madness` |
 | Keywords | bracket, pool, draft, tournament, college basketball, friends |
 | Screenshots / description | No NCAA marks, no NCAA logos. Team logos are gone from the app since #53 (they were the schools' marks), so screenshots are clean by default. |
@@ -241,6 +241,91 @@ grep -cE "Plugins.(Share|Haptics)" www/js/80-pages.js         # 2 = #58 is in th
 
 Both print `0` for builds 1-4. Then the device pass from section 9 (push on draft turn, haptic at 10 s, share an
 invite and open it on a second phone), and only then the Review Notes, which should name those three features.
+
+## 13. App Store Connect listing: ready-to-paste text (added 2026-11-10)
+
+Draft text for every field in App Store Connect, written against the app as it is on `main` plus the section 12 gate
+(push, share sheet, haptics). Placeholders are in `<angle brackets>`. Character limits are Apple's (name 30, subtitle 30,
+promotional text 170, keywords 100, description and What's New 4000); every field below was counted and fits. No NCAA
+marks appear in any field; the in-app round names (section 2, Joe's call) only show up in screenshots.
+
+| Field | Text | Notes |
+|-------|------|-------|
+| **Name** | Madness Draft | 13 characters. Section 2 still says: check the store for an existing "Madness Draft" first. |
+| **Subtitle** | Snake-draft bracket pool | 24 characters. Section 2's "Snake-draft bracket pool with friends" is 37, over the limit of 30. Alternatives: "Draft teams. Win the bracket." (29), "Bracket pool, draft style" (25). |
+| **Primary category** | Sports | Not Games: Games sits next to the 5.3 gambling rule in section 6 and invites the "is this betting?" question. No secondary category. |
+| **Age rating** | 4+ | Questionnaire: no gambling, no contests, no unrestricted web access (the app opens no browser). |
+| **Promotional text** | see below | 165 characters; can be changed without a new build, so it is the place for "Draft night is <date>" in March. |
+| **Keywords** | `bracket,pool,draft,tournament,college,basketball,friends,picks,standings,scores,commissioner,upset` | 98 characters, comma-separated, no spaces. Words already in the name or subtitle ("madness", "draft", "snake") are not repeated: Apple indexes those on its own. |
+| **Support URL** | https://stoekmedia.com/madness/ | Must answer. A short "Help / contact" paragraph on the landing page or a `support.html` would be better; not written. |
+| **Marketing URL** | https://stoekmedia.com/madness/ | Optional. |
+| **Privacy Policy URL** | https://stoekmedia.com/madness/privacy.html | Section 7. The page is on this branch and goes live when it merges; the URL must answer before the submission is sent. |
+| **Copyright** | 2027 Stoek Media | Or Joe's legal name. |
+| **App Privacy** | section 7 | Name, User Content, Device ID (push token); none linked to the user, no tracking. |
+| **Sign-in required** | No | There are no accounts. The room code and PINs go in the Review Notes (template below). |
+| **Version / What's New** | 1.0 / "First release." | |
+
+**Promotional text**
+
+```
+Draft the field with your friends, then watch every win by one of your teams count. A bracket pool with a snake draft, for fun among friends. No money changes hands.
+```
+
+**Description**
+
+```
+Madness Draft is a bracket pool for a group of friends with a twist: instead of everyone filling out a bracket, you draft the teams. Snake-draft order, one team per pick, until the field is gone. Then every win by one of your teams earns you points, and the leaderboard sorts itself out as the tournament plays.
+
+HOW IT WORKS
+- The commissioner creates a room and shares its code. Friends join with a name and a 4-digit PIN. No account, no email, no sign-up.
+- Draft night: snake order, with an optional pick clock (60, 90 or 120 seconds). Step away and the app picks the best seed left for you.
+- The tournament field, seeds and regions load with one tap from the tournament's public bracket, or can be pasted in by hand.
+- Scores update during games. Results flow into the bracket and the standings on their own.
+- Scoring is yours to set: points per round (the default doubles each round, 1-2-4-8-16-32) and an optional upset bonus equal to the seed difference.
+
+WHAT YOU SEE
+- Draft: the board, who is on the clock, which teams are left.
+- Bracket: all six rounds, with each team's owner.
+- Leaderboard: points by round and how many of each player's teams are still alive.
+- Scores: the day's games, refreshed while they are being played.
+
+ON YOUR PHONE
+- A notification when it is your turn to pick, when one of your teams' games goes final, and when the lead changes hands.
+- Invite friends straight from the share sheet.
+- A buzz when your pick clock is down to ten seconds.
+
+Madness Draft is for fun among friends. The app handles no money: no entry fees, no prizes, no payments of any kind.
+
+Madness Draft is an independent app. It is not affiliated with or endorsed by any league, tournament organizer or school.
+```
+
+The "ON YOUR PHONE" block is only true for a build that passes the section 12 gate. If a build is ever submitted without
+#54 (push) or #58 (share sheet, haptics), delete the matching line rather than ship a claim the reviewer cannot find.
+The lead-change line relies on the "Leaderboard Shake-up!" push the function already sends.
+
+**Review Notes** (the text box under App Review Information; fill the placeholders from the section 8 room)
+
+```
+Madness Draft is a bracket pool for friends. It moves no money: no entry fees, no prizes, no payments or payment links anywhere in the app.
+
+There are no user accounts. To see a room with a finished draft and a partly played tournament:
+1. Open the app. Under "Join a Room" enter the room code <REVIEW27> and tap Join.
+2. Enter the player name <Reviewer> and the PIN <1234>. You are now a player in the room.
+3. The tabs: Draft (the completed snake draft), Bracket (results through the third round, each team labelled with its owner), Leaderboard (points by round), Live Scores (the day's games; off-season this shows "No games found").
+4. Commissioner tools (change scoring, edit the bracket, re-import teams) are behind the admin PIN <5678>: tap the gear in the header (or Settings in the top tab row) and then any edit.
+
+Native features in this build:
+- Push notifications: the app asks for permission on first join. Players are notified when it is their turn to pick, when one of their teams' games ends, and when the lead changes. To see one: <in a second room, start a draft with the reviewer's player on the clock; or we can trigger a test pick on request at support@stoekmedia.com>.
+- Share sheet: tap the room code in the header. The iOS share sheet opens with an invite link that opens the room.
+- Haptics: a buzz through the Taptic Engine when your pick clock reaches ten seconds (start a timed draft in a test room to feel it).
+
+Scores and the bracket come from the tournament's public scoreboard through our own server, so the app never sends a reviewer's data to a third party. Privacy policy: https://stoekmedia.com/madness/privacy.html
+```
+
+Before sending: (1) section 8 step 5, the room still exists; (2) the three native features above were seen on a device
+running the exact build being submitted (section 12's ten-second check, then the device pass); (3) the push line's
+placeholder is replaced with something the reviewer can actually do, or the sentence is cut; (4) the subtitle in
+section 2 is updated to whichever 30-character version Joe picks.
 
 ## Appendix A. Every place the "March Madness" name lives (inventory 2026-10-17)
 
