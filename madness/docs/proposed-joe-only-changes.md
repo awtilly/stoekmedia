@@ -475,7 +475,7 @@ leave documents behind:
   phone forgets its id);
 - the commissioner removes a player.
 
-Until the staged `madness/fcm-token-current-player` branch (on top of #51) is in, every room snapshot on such a phone
+Until the staged `madness/fcm-token-current-player` branch (on top of #54, in its shared `writeFcmToken`) is in, every room snapshot on such a phone
 also re-writes that orphan document. Effects: a phone whose seat is gone keeps getting the room's finals, and a player
 who rejoined under a new id has the same token in two documents, so `sendEachForMulticast` sends each final to that
 phone twice (web push collapses them through the `tag`, the native shell does not). Fix in `functions/index.js`,
