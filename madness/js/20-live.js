@@ -95,15 +95,17 @@ function unsubscribeScoreboard() {
 async function refreshLiveScores() {
   // Cached doc is current: the Cloud Function is doing the polling for everyone.
   if (_scoreboardFresh && (Date.now() - _scoreboardSeenAt) < SCOREBOARD_MAX_AGE_MS) return;
-  // The cached doc showed every game of this day final (a past day in the picker, or tonight after the last
+  const dateStr = S.liveScoresDate || scoreboardDay();
+  // "Today" rolled over while the tab stayed open: the function stops writing yesterday's doc, so without this
+  // the device would sit on direct polling for the rest of the day. Move the listener to the new day's doc.
+  // This comes BEFORE the finished-day check below: yesterday's games are all final by then, and a screen left
+  // on the Live tab overnight (the wake lock keeps it visible) would otherwise stay quiet on yesterday for good.
+  if (_scoreboardUnsub && dateStr !== _scoreboardDate) subscribeScoreboard(dateStr); // clears _scoreboardFresh
+  // The cached doc showed every game of the shown day final (a past day in the picker, or tonight after the last
   // game): polling the relay every 30 s for the rest of the day would find nothing new. The listener stays on
   // the doc, so a correction or a late-added game still arrives.
   if (_scoreboardFresh && liveScores.length > 0 && liveScores.every(g => g.state === 'post')) return;
   _scoreboardFresh = false;
-  const dateStr = S.liveScoresDate || scoreboardDay();
-  // "Today" rolled over while the tab stayed open: the function stops writing yesterday's doc, so without this
-  // the device would sit on direct polling for the rest of the day. Move the listener to the new day's doc.
-  if (_scoreboardUnsub && dateStr !== _scoreboardDate) subscribeScoreboard(dateStr);
   const data = await ncaa.fetchScoreboard(dateStr);
   liveLastError = !data; // fetchScoreboard returns null on any failure
   if (data) {
