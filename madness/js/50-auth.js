@@ -57,7 +57,8 @@ function checkAdminSession(){
 function unlockAdmin(){
   adminUnlocked = true;
   const k = adminSessionKey();
-  if(k) localStorage.setItem(k, String(Date.now()));
+  // Storage full: stay unlocked in memory for this page; the PIN is simply asked again after a reload.
+  if(k){ try { localStorage.setItem(k, String(Date.now())); } catch(e){} }
 }
 
 function lockAdmin(){
@@ -162,8 +163,17 @@ async function requireAdmin(){
 }
 
 /* ── Player Identity ── */
-function getMyPlayerId(){ return roomId ? localStorage.getItem('mm4_me_' + roomId) : null; }
-function setMyPlayerId(id){ if(roomId) localStorage.setItem('mm4_me_' + roomId, id); }
+// Seat remembered for this page when localStorage refuses the write (storage full): without it the next render
+// found no id, showed the join screen again, and the person claimed the same seat in a loop.
+let _myIdFallback = {}; // room -> player id
+function getMyPlayerId(){
+  if(!roomId) return null;
+  try { return localStorage.getItem('mm4_me_' + roomId) || _myIdFallback[roomId] || null; } catch(e){ return _myIdFallback[roomId] || null; }
+}
+function setMyPlayerId(id){
+  if(!roomId) return;
+  try { localStorage.setItem('mm4_me_' + roomId, id); } catch(e){ _myIdFallback[roomId] = id; }
+}
 
 async function claimPlayer(id){
   const player = S.players.find(p => p.id === id);

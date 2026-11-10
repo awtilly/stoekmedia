@@ -354,7 +354,8 @@ function _applyRoomSnapshot(doc){
     // The no-change baseline is the server's state in S's key order, not S itself: a pending edit kept above
     // still has to count as a change when the debounce fires.
     _sharedAtSync = JSON.stringify(_syncedShared);
-    localStorage.setItem(stateKey(), JSON.stringify(S));
+    // The offline copy is a convenience; a full storage must not stop the screen from updating.
+    try { localStorage.setItem(stateKey(), JSON.stringify(S)); } catch(e){}
     render();
     updateAppBadge();
     if('Notification' in window && Notification.permission === 'granted') initFCM().catch(() => {});
