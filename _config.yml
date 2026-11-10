@@ -1,0 +1,2 @@
+# GitHub Pages runs Jekyll, which skips dot-folders; .well-known holds the iOS universal-link file for Madness Draft.
+include: [".well-known"]
