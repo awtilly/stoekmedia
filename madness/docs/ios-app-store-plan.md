@@ -257,7 +257,7 @@ marks appear in any field; the in-app round names (section 2, Joe's call) only s
 | **Age rating** | 4+ | Questionnaire: no gambling, no contests, no unrestricted web access (the app opens no browser). |
 | **Promotional text** | see below | 165 characters; can be changed without a new build, so it is the place for "Draft night is <date>" in March. |
 | **Keywords** | `bracket,pool,draft,tournament,college,basketball,friends,picks,standings,scores,commissioner,upset` | 98 characters, comma-separated, no spaces. Words already in the name or subtitle ("madness", "draft", "snake") are not repeated: Apple indexes those on its own. |
-| **Support URL** | https://stoekmedia.com/madness/ | Must answer. A short "Help / contact" paragraph on the landing page or a `support.html` would be better; not written. |
+| **Support URL** | https://stoekmedia.com/madness/support.html | Must answer. Written on branch `madness/support-page` (help page in the privacy.html shell: rooms, PINs, draft, scoring, bracket, scores, notifications, troubleshooting, contact); goes live when that branch merges. Until then use https://stoekmedia.com/madness/. |
 | **Marketing URL** | https://stoekmedia.com/madness/ | Optional. |
 | **Privacy Policy URL** | https://stoekmedia.com/madness/privacy.html | Section 7. The page is on this branch and goes live when it merges; the URL must answer before the submission is sent. |
 | **Copyright** | 2027 Stoek Media | Or Joe's legal name. |
