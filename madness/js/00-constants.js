@@ -6,6 +6,9 @@ function appTitleHTML(){
   const i = APP_NAME.startsWith(APP_NAME_ACCENT) ? APP_NAME_ACCENT.length : APP_NAME.length;
   return '<h1><span>' + escapeHtml(APP_NAME.slice(0, i)) + '</span>' + escapeHtml(APP_NAME.slice(i)) + '</h1>';
 }
+// The tournament a room plays for. The title game is in early April, so from May on a new room is
+// for next March's bracket, not the one that just finished (and would import with every result known).
+function tournamentYear(now = new Date()){ return now.getMonth() >= 4 ? now.getFullYear() + 1 : now.getFullYear(); }
 const RN = {1:"Round of 64", 2:"Round of 32", 3:"Sweet 16", 4:"Elite 8", 5:"Final Four", 6:"Championship"};
 // iPadOS 13+ sends a Macintosh user agent; the touch-point check catches it.
 const isIOSDevice = () => /iPad|iPhone|iPod/.test(navigator.userAgent)

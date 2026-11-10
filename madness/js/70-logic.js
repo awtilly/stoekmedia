@@ -6,6 +6,14 @@ function escapeHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt
 // Returns '' for anything that does not qualify. Same rule createRoom() has always enforced.
 function sanitizeRoomCode(raw){ const c = String(raw || '').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,20); return c.length >= 2 ? c : ''; }
 function owner(tid){ const pl = S.players.find(p => p.teamIds.includes(tid)); return pl ? pl.name : ""; }
+// One color per player (by join order) for the dots and owner codes on every screen. Gold is left out:
+// it marks "you". Rooms with more than eight players reuse colors.
+const PLAYER_COLORS = ['#1F5FAD','#7A4EAB','#2E8B57','#D1495B','#E07B24','#1B9AAA','#6B7A8F','#8C6D46'];
+function playerColor(pid){ const i = S.players.findIndex(p => p.id === pid); return PLAYER_COLORS[Math.max(i, 0) % PLAYER_COLORS.length]; }
+function playerDot(pid){ return `<span class="pdot" style="background:${playerColor(pid)}"></span>`; }
+// Three-letter owner tag for bracket slots, where a full name does not fit.
+function ownerCode(name){ return String(name || '').replace(/[^A-Za-z0-9]/g, '').slice(0, 3).toUpperCase(); }
+function ownerOf(tid){ return S.players.find(p => (p.teamIds || []).includes(tid)) || null; }
 
 function teamDisplayName(t) {
   if (t.playIn && !t.playInResolved) return t.playInTeams.map(pt => pt.name).join(' / ');
@@ -249,23 +257,37 @@ function sanitizeSharedState(s){
   return s;
 }
 
+// Points a game earns whoever owns its winner: the round value, plus the seed gap when an underdog wins.
+function gamePoints(g){
+  let pts = S.rp[g.round] || 0;
+  if(S.ub){
+    const w = S.teams.find(t => t.id === g.wid);
+    const lid = g.t1 === g.wid ? g.t2 : g.t1;
+    const l = S.teams.find(t => t.id === lid);
+    if(w && l && w.seed > l.seed) pts += (w.seed - l.seed);
+  }
+  return pts;
+}
+
+function teamWins(tid){ return (S.games || []).filter(g => g.wid === tid).length; }
+function teamPoints(tid){ return (S.games || []).filter(g => g.wid === tid).reduce((n, g) => n + gamePoints(g), 0); }
+function teamEliminated(tid){ return (S.games || []).some(g => (g.t1 === tid || g.t2 === tid) && g.wid && g.wid !== tid); }
+
 function scores(){
   return S.players.map(p => {
     let tot = 0;
     const rp = {1:0, 2:0, 3:0, 4:0, 5:0, 6:0};
     for(const g of (S.games || [])){
       if(!g.wid || !p.teamIds.includes(g.wid)) continue;
-      let pts = S.rp[g.round] || 0;
-      if(S.ub){
-        const w = S.teams.find(t => t.id === g.wid);
-        const lid = g.t1 === g.wid ? g.t2 : g.t1;
-        const l = S.teams.find(t => t.id === lid);
-        if(w && l && w.seed > l.seed) pts += (w.seed - l.seed);
-      }
+      const pts = gamePoints(g);
       rp[g.round] += pts;
       tot += pts;
     }
     return {pid:p.id, name:p.name, tot, rp};
   }).sort((a,b) => b.tot - a.tot);
 }
+
+// Standard competition ranking over scores(): players level on points share a rank (and a medal),
+// and the next rank skips (1, 2, 2, 4).
+function withRanks(sc){ return sc.map(s => ({...s, rank: 1 + sc.filter(o => o.tot > s.tot).length})); }
 
