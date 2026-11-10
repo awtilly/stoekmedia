@@ -463,3 +463,61 @@ firebase deploy --only functions:pollScoreboard --project march-madness-snake-dr
 ```
 
 Nothing is urgent before March; `pollScoreboard` does not write outside the 3/10-4/10 window.
+
+## 12. functions/index.js: "Game Final" goes to seats that are still in the room, each token once (found Shift 61, 2026-11-10)
+
+`notifyGameFinal` sends the final (and the "Leaderboard Shake-up") to every token in every document under
+`rooms/{room}/fcmTokens`, and it never asks whether the document's id is still one of the room's players. The phone
+writes its token under the player id it remembers for that room (localStorage, kept for good), so two normal events
+leave documents behind:
+
+- the commissioner starts a new tournament in the same room (`resetAll` clears `players`, and only the admin's own
+  phone forgets its id);
+- the commissioner removes a player.
+
+Until the staged `madness/fcm-token-current-player` branch (on top of #51) is in, every room snapshot on such a phone
+also re-writes that orphan document. Effects: a phone whose seat is gone keeps getting the room's finals, and a player
+who rejoined under a new id has the same token in two documents, so `sendEachForMulticast` sends each final to that
+phone twice (web push collapses them through the `tag`, the native shell does not). Fix in `functions/index.js`,
+inside `notifyGameFinal` (lines 136-148 as deployed; `players` is already parsed from the room state a few lines up):
+
+```diff
+   // Collect all FCM tokens for all players in this room
+   const tokenSnapshot = await db.collection(`rooms/${roomId}/fcmTokens`).get();
+   if (tokenSnapshot.empty) return;
+
+-  // Send game final notification to all players
++  // Send game final notification to the players who are in the room. A token document whose id is no
++  // longer a player (new tournament in the same room, or a removed player) is dropped and deleted; the
++  // phone that wrote it shows the join screen and writes a fresh document when it rejoins. Each token
++  // once: a phone that rejoined under a new id can still sit in an old document until that delete lands.
++  const seated = new Set(players.map(p => p.id));
++  const orphanDeletes = [];
+   const allTokens = [];
+   const tokenMap = {}; // token -> playerId for cleanup
+   tokenSnapshot.forEach(doc => {
++    if (!seated.has(doc.id)) { orphanDeletes.push(doc.ref.delete().catch(() => {})); return; }
+     const tokens = doc.data().tokens || [];
+     tokens.forEach(t => {
++      if (tokenMap[t]) return;
+       allTokens.push(t);
+       tokenMap[t] = doc.id;
+     });
+   });
++  await Promise.all(orphanDeletes);
+
+   if (allTokens.length === 0) return;
+```
+
+Why deleting is safe: a seat only leaves `players` through `removePlayer` or `resetAll`, and a new player's token
+document is written only after the snapshot that already carries the player (so the id is in the state the function
+reads). `notifyDraftTurn` is untouched: it reads one document, the current drafter's, who is seated by definition.
+The `tokenMap` dedupe keeps the stale-token cleanup (`cleanupStaleTokens`) exact: each failed token is removed from
+the one document it was counted from. Costs one delete per orphan document, once. Deploy with:
+
+```sh
+firebase deploy --only functions:notifyGameFinal --project march-madness-snake-draft
+```
+
+Nothing is urgent before March; the function only runs when a final is written. Worth doing before the first draft
+night if any room code is reused from 2026.
