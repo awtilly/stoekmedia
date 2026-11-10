@@ -140,14 +140,16 @@ function navigate(p){
 }
 
 async function shareRoomLink() {
-  // Inside the app shell window.location is capacitor://localhost, which opens nowhere: invite to the website.
-  const base = isNativeShell ? 'https://stoekmedia.com/madness/' : window.location.origin + window.location.pathname;
-  const shareUrl = base + '?room=' + encodeURIComponent(roomId);
-  const shareData = {
-    title: APP_NAME,
-    text: 'Join my Madness Draft bracket pool! Room: ' + roomId,
-    url: shareUrl
-  };
+  const shareUrl = inviteUrl(roomId, S.joinKey);
+  const text = 'Join my ' + APP_NAME + ' pool' + (S.year ? ' for the ' + S.year + ' tournament' : '') + '. Room ' + roomId
+    + (S.joinKey ? ', invite code ' + S.joinKey : '') + '.\nOn iPhone, get the app: ' + APP_STORE_URL;
+  // The app shell has the native share sheet plugin; WKWebView's navigator.share is not dependable.
+  const nativeShare = isNativeShell && window.Capacitor.Plugins && window.Capacitor.Plugins.Share;
+  if (nativeShare) {
+    try { await nativeShare.share({ title: APP_NAME, text, url: shareUrl, dialogTitle: 'Invite players' }); return; }
+    catch (err) { if (/cancel/i.test(String(err && err.message))) return; }
+  }
+  const shareData = { title: APP_NAME, text, url: shareUrl };
   if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
     try {
       await navigator.share(shareData);
@@ -158,10 +160,35 @@ async function shareRoomLink() {
   }
   try {
     await navigator.clipboard.writeText(shareUrl);
-    showToast('Room link copied!');
+    showToast('Invite link copied!');
   } catch {
     showToast('Link: ' + shareUrl);
   }
+}
+
+// Commissioner: issue a fresh invite code (or the first one, for a room created before codes existed).
+// Links already sent stop working for new players; everyone already in the room is unaffected.
+async function newInviteCode() {
+  if (!await requireAdmin()) return;
+  if (S.joinKey && !await appConfirm('Links you already sent will stop working for new players. Players already in the pool are not affected.', { title: 'New invite code?', confirmLabel: 'Make new code' })) return;
+  S.joinKey = newJoinKey();
+  rememberJoinKey(roomId, S.joinKey);
+  saveState();
+  render();
+  showToast('New invite code: ' + S.joinKey);
+}
+
+function inviteCardHTML() {
+  if (!roomId) return '';
+  const key = S.joinKey;
+  return `<div class="card" style="margin-bottom:14px"><span class="label">Invite Players</span>
+    <p style="font-size:13px;color:var(--g500);margin-bottom:10px">${key
+      ? `Anyone with the link can join. People who type the room code also need the invite code <span class="invite-code">${escapeHtml(key)}</span>`
+      : 'Anyone who knows the room code can join this pool.'}</p>
+    <div class="row" style="gap:8px;flex-wrap:wrap">
+      <button class="btn btn-primary" onclick="shareRoomLink()">Share invite link</button>
+      ${adminUnlocked ? `<button class="btn btn-secondary" onclick="newInviteCode()">${key ? 'New invite code' : 'Require invite code'}</button>` : ''}
+    </div></div>`;
 }
 
 async function shareLeaderboard() {
@@ -540,9 +567,10 @@ function renderDraft(c){
     const adminIsPlayer = adminUnlocked && myId && S.players.some(p => p.id === myId);
     const adminNotPlayer = adminUnlocked && (!myId || !S.players.some(p => p.id === myId));
     c.innerHTML = `<div class="section-title">Draft Lobby</div><p class="section-desc">${S.players.length} player${S.players.length!==1?'s':''} joined${S.teams.length ? `, ${S.teams.length} teams loaded` : ''}</p>
+    ${inviteCardHTML()}
     <div class="card"><span class="label">Players (${S.players.length})</span>
     ${adminUnlocked ? `<div class="row" style="margin-bottom:12px"><input id="pn" placeholder="Player name..." style="flex:1" onkeydown="if(event.key==='Enter')addPlayer()"><button class="btn btn-primary" onclick="addPlayer()">Add</button></div>` : ''}
-    ${S.players.length === 0 ? '<p style="color:var(--g400);text-align:center;padding:14px;font-size:13px">No players yet. Waiting for the commissioner to add players.</p>' : ''}
+    ${S.players.length === 0 ? '<p style="color:var(--g400);text-align:center;padding:14px;font-size:13px">No players yet. Share the invite link to get people in.</p>' : ''}
     ${S.players.map((p,i) => `<div class="player-row"><span class="player-num">#${i+1}</span><span style="flex:1;font-weight:${p.id === myId ? '800' : '600'}${p.id === myId ? ';color:var(--gold)' : ''}">${escapeHtml(p.name)}</span>${adminUnlocked ? `<button class="icon-btn" onclick="movePlayer(${i},-1)">\u25B2</button><button class="icon-btn" onclick="movePlayer(${i},1)">\u25BC</button><button class="icon-btn icon-btn-danger" onclick="removePlayer('${p.id}')">\u2715</button>` : ''}</div>`).join('')}
     ${S.players.length >= 2 ? `<p style="color:var(--g400);font-size:12px;margin-top:10px">Snake: ${S.players.map(p => escapeHtml(p.name)).join(' \u2192 ')} \u2192 ${[...S.players].reverse().map(p => escapeHtml(p.name)).join(' \u2192 ')} \u2192 ...</p>` : ''}
     ${adminNotPlayer ? `<div style="border-top:1px solid var(--g200);margin-top:14px;padding-top:14px"><button class="btn btn-secondary" onclick="adminJoinAsPlayer()" style="width:100%;justify-content:center">Join as Player (Commissioner)</button></div>` : ''}
@@ -1307,6 +1335,7 @@ function renderSettings(c){
   <div class="card" style="margin-bottom:14px"><div class="row" style="justify-content:space-between"><div><div style="font-weight:700;margin-bottom:4px">Upset Bonus</div><div style="font-size:13px;color:var(--g500)">Upsets award bonus = seed difference (e.g. 12 beats 5 = +7).</div></div>
     <button class="toggle ${S.ub?'on':'off'}" onclick="toggleUpsetBonus()"><span class="toggle-knob"></span></button></div></div>
   <div class="card"><span class="label">Preview</span><p style="font-size:13px;color:var(--g500);line-height:1.7">12-seed beats 5-seed in R64: Base <strong style="color:var(--gold)">${S.rp[1]}</strong>${S.ub ? ' + Upset <strong style="color:var(--gold)">7</strong>' : ''} = <strong>${S.rp[1]+(S.ub?7:0)} pts</strong></p></div>
+  ${inviteCardHTML()}
   ${roomId ? `<div class="card" style="margin-bottom:14px"><span class="label">Admin Access</span>
     <div class="row" style="justify-content:space-between;align-items:center">
       <div><div style="font-weight:700;margin-bottom:4px">${adminUnlocked?'Unlocked':'Locked'}</div>

@@ -235,6 +235,21 @@ function syncGames(){
   S.games = games;
 }
 
+/* ── Invite codes ──
+ * A room created since 2026-11 has S.joinKey: new players need it to join, so guessing a room name is not
+ * enough. Invite links carry it (?room=CODE&key=KEY) and each device remembers the key per room. Players
+ * already in the room can rejoin with their PIN alone. Rooms without a key stay open to anyone with the code. */
+const JOIN_KEY_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; // no 0/O or 1/I/L, so a code read aloud is typed right
+function newJoinKey(){
+  const a = new Uint32Array(6);
+  crypto.getRandomValues(a);
+  return Array.from(a, n => JOIN_KEY_CHARS[n % JOIN_KEY_CHARS.length]).join('');
+}
+function sanitizeJoinKey(raw){ const k = String(raw || '').toUpperCase().replace(/[^A-Z0-9]/g,''); return /^[A-Z0-9]{4,12}$/.test(k) ? k : ''; }
+function rememberJoinKey(code, key){ key = sanitizeJoinKey(key); if(code && key) try { localStorage.setItem('mm4_key_' + code, key); } catch(e){} }
+function knownJoinKey(code){ try { return localStorage.getItem('mm4_key_' + code) || ''; } catch(e){ return ''; } }
+function inviteUrl(code, key){ return SITE_URL + '?room=' + encodeURIComponent(code) + (key ? '&key=' + encodeURIComponent(key) : ''); }
+
 /* ── Shared-state hardening ──
  * Record ids are interpolated into inline onclick handlers (pickTeam('<id>') etc.). Every client can
  * write the whole room state, so a hostile participant could plant an id that breaks out of that
@@ -249,6 +264,7 @@ function sanitizeSharedState(s){
   for(const t of (s.teams || [])) if(t.seed != null && typeof t.seed !== 'number'){ const n = Number(t.seed); t.seed = Number.isFinite(n) ? n : 0; }
   for(const p of (s.players || [])) p.teamIds = (Array.isArray(p.teamIds) ? p.teamIds : []).filter(isSafeId);
   if(s.ds && Array.isArray(s.ds.order)) s.ds.order = s.ds.order.filter(isSafeId);
+  if(s.joinKey != null){ const k = sanitizeJoinKey(s.joinKey); if(k) s.joinKey = k; else delete s.joinKey; }
   if(s.bracket && typeof s.bracket === 'object'){
     for(const k of Object.keys(s.bracket)){
       if(Array.isArray(s.bracket[k])) s.bracket[k] = s.bracket[k].map(id => (id == null || isSafeId(id)) ? id : null);

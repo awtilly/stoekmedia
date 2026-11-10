@@ -6,6 +6,13 @@ function appTitleHTML(){
   const i = APP_NAME.startsWith(APP_NAME_ACCENT) ? APP_NAME_ACCENT.length : APP_NAME.length;
   return '<h1><span>' + escapeHtml(APP_NAME.slice(0, i)) + '</span>' + escapeHtml(APP_NAME.slice(i)) + '</h1>';
 }
+// Inside a Capacitor shell (see docs/ios-app-store-plan.md) the web code is bundled in the app. Declared here,
+// not in 90-boot.js, because the first render() runs before 90-boot.js reaches its later declarations.
+const isNativeShell = !!(typeof window !== 'undefined' && window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform());
+// Invite links always point at the website: it serves everyone, and opens the app instead for people who have it
+// (universal links, /.well-known/apple-app-site-association at the site root).
+const SITE_URL = 'https://stoekmedia.com/madness/';
+const APP_STORE_URL = 'https://apps.apple.com/app/id6829126016';
 // The tournament a room plays for. The title game is in early April, so from May on a new room is
 // for next March's bracket, not the one that just finished (and would import with every result known).
 function tournamentYear(now = new Date()){ return now.getMonth() >= 4 ? now.getFullYear() + 1 : now.getFullYear(); }
