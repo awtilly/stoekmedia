@@ -1,15 +1,28 @@
 /* ── Bottom Nav ── */
 function bottomNavHTML(_, canT) {
   const tabs = [
-    { id: 'draft', label: 'Draft', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>' },
-    { id: 'bracket', label: 'Bracket', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h4v4H3z"/><path d="M3 16h4v4H3z"/><path d="M17 10h4v4H17z"/><path d="M7 6h4v0"/><path d="M7 18h4v0"/><path d="M11 6v12"/><path d="M11 12h6"/></svg>' },
-    { id: 'leaderboard', label: 'Leaderboard', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg>' },
-    { id: 'live', label: 'Scores', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><line x1="12" y1="4" x2="12" y2="20"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M6 8h2"/><path d="M16 8h2"/><path d="M6 16h2"/><path d="M16 16h2"/></svg>' }
+    { id: 'draft', label: S.ds && S.ds.complete ? 'My Teams' : 'Draft', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>' },
+    { id: 'bracket', label: 'Bracket', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h6v5H3M3 14h6v5H3M9 7.5h3v9H9M12 12h4M16 12h5"/></svg>' },
+    { id: 'leaderboard', label: 'Standings', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V11M10 20V5M16 20v-6M2 20h20"/></svg>' },
+    { id: 'live', label: 'Scores', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="1"/><path d="M12 5v14M3 12h18"/></svg>' }
   ];
+  const turnDot = isMyDraftTurn() && S.phase !== 'draft';
   return `<nav class="bottom-nav">${tabs.map(t =>
-    `<button class="bottom-nav-btn ${S.phase===t.id?'active':''}" ${t.disabled?'disabled':''} onclick="navigate('${t.id}')">${t.icon}<span>${t.label}</span></button>`
+    `<button class="bottom-nav-btn ${S.phase===t.id?'active':''}" ${t.disabled?'disabled':''} onclick="navigate('${t.id}')">${t.id==='draft'&&turnDot?'<span class="turn-dot"></span>':''}${t.icon}<span>${t.label}</span></button>`
   ).join('')}</nav>`;
 }
+
+/* ── Draft turn ── */
+// True only on the device of the player whose pick it is (an unlocked commissioner can pick for anyone,
+// but the gold "your pick" treatment is for the drafter alone).
+function isMyDraftTurn(){
+  const ds = S.ds, me = getMyPlayerId();
+  return !!(ds && ds.started && !ds.complete && me && ds.order[ds.cp] === me);
+}
+function fmtClock(seconds){ return Math.floor(seconds / 60) + ':' + String(seconds % 60).padStart(2, '0'); }
+// Medals only once points are on the board; before the first result everyone is tied for first.
+function medalHTML(rank, tot){ return rank <= 3 && tot > 0 ? `<span class="medal m${rank}">${rank}</span>` : `<span class="rank-num">${rank}</span>`; }
+const ROUND_SHORT = {1:'R64', 2:'R32', 3:'S16', 4:'E8', 5:'F4', 6:'CH'};
 
 /* ── Go Home (back to lobby) ── */
 function goHome() {
@@ -44,24 +57,26 @@ function render(){
   const canD = S.players.length >= 2 && S.teams.length >= S.players.length;
   const canT = S.ds.started || S.ds.complete;
   const app = document.getElementById("app");
+  const turn = isMyDraftTurn();
+  const _hMyId = getMyPlayerId();
+  const _hMyP = _hMyId ? S.players.find(p => p.id === _hMyId) : null;
+  const hasLive = liveScores.some(g => g.state === 'in');
   app.innerHTML = `
-    <div class="header">
-      <div style="display:flex;align-items:center;gap:8px">
-        <button class="settings-gear" onclick="goHome()" title="Back to Lobby"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></button>
-        <div>${appTitleHTML()}<div class="header-sub">${(() => { const _hMyId = getMyPlayerId(); const _hMyP = _hMyId ? S.players.find(p => p.id === _hMyId) : null; if(_hMyP){ const myTids = _hMyP.teamIds || []; const alive = myTids.filter(tid => !(S.games||[]).some(g => (g.t1===tid||g.t2===tid) && g.wid && g.wid!==tid)).length; return 'Team ' + escapeHtml(_hMyP.name) + ' \u2014 ' + alive + '/' + myTids.length + ' alive'; } return S.players.length + ' player' + (S.players.length!==1?'s':''); })()}${roomId ? ` \u00b7 <span class="room-badge" onclick="shareRoomLink()" title="Share room link"><span class="sync-dot"></span>${roomId}</span>` : ''}${!isOnline ? ' <span class="offline-badge">Offline</span>' : ''}</div></div>
-      </div>
+    <div class="header${turn ? ' turn' : ''}">
+      <button class="settings-gear" onclick="goHome()" title="Back to Lobby"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></button>
+      <div class="header-sub">${roomId ? `<span class="room-badge" onclick="shareRoomLink()" title="Share room link">${roomId}</span>` : `<b>${escapeHtml(APP_NAME)}</b>`} \u00b7 ${_hMyP ? escapeHtml(_hMyP.name) : S.players.length + ' player' + (S.players.length!==1?'s':'')}${hasLive ? '<span class="live-tag">LIVE</span>' : ''}${!isOnline ? ' <span class="offline-badge">Offline</span>' : ''}</div>
       <button class="settings-gear" onclick="openSettings()" title="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg></button>
     </div>
+    ${turn && S.phase !== 'draft' ? `<button class="turnbar" onclick="navigate('draft')"><b>Your pick<span class="js-turn-timer"></span></b><span>Go to draft \u2192</span></button>` : ''}
     <nav class="top-nav">
-      <button class="${S.phase==='draft'?'active':''}" onclick="navigate('draft')">Draft</button>
+      <button class="${S.phase==='draft'?'active':''}" onclick="navigate('draft')">${S.ds && S.ds.complete ? 'My Teams' : 'Draft'}</button>
       <button class="${S.phase==='bracket'?'active':''}" onclick="navigate('bracket')">Bracket</button>
-      <button class="${S.phase==='leaderboard'?'active':''}" onclick="navigate('leaderboard')">Leaderboard</button>
-      <button class="${S.phase==='live'?'active':''}" onclick="navigate('live')">Live Scores</button>
+      <button class="${S.phase==='leaderboard'?'active':''}" onclick="navigate('leaderboard')">Standings</button>
+      <button class="${S.phase==='live'?'active':''}" onclick="navigate('live')">Scores</button>
       <button class="${S.phase==='settings'?'active':''}" onclick="openSettings()">Settings</button>
     </nav>
     <div class="content-scroll">
       <div id="c"></div>
-      <div class="footer"><strong>Scoring:</strong> ${Object.entries(S.rp).map(([r,p]) => `${RN[r]}=${p}pt${p!==1?'s':''}`).join(' \u00b7 ')}${S.ub ? ' \u00b7 Upset bonus=seed diff' : ''}</div>
     </div>
     ${bottomNavHTML(canD, canT)}`;
   const c = document.getElementById("c");
@@ -78,9 +93,8 @@ function render(){
   if(S.phase === 'draft' && S.ds.timerPaused && S.ds.pausedRemaining != null){
     const el = document.getElementById('draft-timer');
     if(el){
-      const secs = Math.ceil(S.ds.pausedRemaining / 1000);
-      el.textContent = secs + 's (paused)';
-      el.className = 'draft-timer ' + (secs > 30 ? 'timer-green' : secs > 10 ? 'timer-yellow' : 'timer-red');
+      el.textContent = fmtClock(Math.ceil(S.ds.pausedRemaining / 1000));
+      el.className = 'draft-timer paused';
     }
   }
   repositionInstallBanner();
@@ -126,14 +140,16 @@ function navigate(p){
 }
 
 async function shareRoomLink() {
-  const url = new URL(window.location);
-  url.searchParams.set('room', roomId);
-  const shareUrl = url.toString();
-  const shareData = {
-    title: APP_NAME,
-    text: 'Join my Madness Draft bracket pool! Room: ' + roomId,
-    url: shareUrl
-  };
+  const shareUrl = inviteUrl(roomId, S.joinKey);
+  const text = 'Join my ' + APP_NAME + ' pool' + (S.year ? ' for the ' + S.year + ' tournament' : '') + '. Room ' + roomId
+    + (S.joinKey ? ', invite code ' + S.joinKey : '') + '.\nOn iPhone, get the app: ' + APP_STORE_URL;
+  // The app shell has the native share sheet plugin; WKWebView's navigator.share is not dependable.
+  const nativeShare = isNativeShell && window.Capacitor.Plugins && window.Capacitor.Plugins.Share;
+  if (nativeShare) {
+    try { await nativeShare.share({ title: APP_NAME, text, url: shareUrl, dialogTitle: 'Invite players' }); return; }
+    catch (err) { if (/cancel/i.test(String(err && err.message))) return; }
+  }
+  const shareData = { title: APP_NAME, text, url: shareUrl };
   if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
     try {
       await navigator.share(shareData);
@@ -144,10 +160,35 @@ async function shareRoomLink() {
   }
   try {
     await navigator.clipboard.writeText(shareUrl);
-    showToast('Room link copied!');
+    showToast('Invite link copied!');
   } catch {
     showToast('Link: ' + shareUrl);
   }
+}
+
+// Commissioner: issue a fresh invite code (or the first one, for a room created before codes existed).
+// Links already sent stop working for new players; everyone already in the room is unaffected.
+async function newInviteCode() {
+  if (!await requireAdmin()) return;
+  if (S.joinKey && !await appConfirm('Links you already sent will stop working for new players. Players already in the pool are not affected.', { title: 'New invite code?', confirmLabel: 'Make new code' })) return;
+  S.joinKey = newJoinKey();
+  rememberJoinKey(roomId, S.joinKey);
+  saveState();
+  render();
+  showToast('New invite code: ' + S.joinKey);
+}
+
+function inviteCardHTML() {
+  if (!roomId) return '';
+  const key = S.joinKey;
+  return `<div class="card" style="margin-bottom:14px"><span class="label">Invite Players</span>
+    <p style="font-size:13px;color:var(--g500);margin-bottom:10px">${key
+      ? `Anyone with the link can join. People who type the room code also need the invite code <span class="invite-code">${escapeHtml(key)}</span>`
+      : 'Anyone who knows the room code can join this pool.'}</p>
+    <div class="row" style="gap:8px;flex-wrap:wrap">
+      <button class="btn btn-primary" onclick="shareRoomLink()">Share invite link</button>
+      ${adminUnlocked ? `<button class="btn btn-secondary" onclick="newInviteCode()">${key ? 'New invite code' : 'Require invite code'}</button>` : ''}
+    </div></div>`;
 }
 
 async function shareLeaderboard() {
@@ -284,7 +325,7 @@ async function importFromNCAA(){
   const locked = teamEditBlockedReason();
   if(locked){ showToast(locked); return; }
   // Year sanity: if S.year is stale (last tournament's year), offer to bump
-  const thisYear = new Date().getFullYear();
+  const thisYear = tournamentYear();
   if(S.year < thisYear){
     const bump = await appConfirm(`Your tournament year is ${S.year}. Update to ${thisYear} before importing?`, { title: 'Update Tournament Year', confirmLabel: 'Update' });
     if(bump){ S.year = thisYear; saveState(); }
@@ -363,7 +404,7 @@ function renderLive(c){
   const now = new Date();
   const todayStr = now.getFullYear() + String(now.getMonth()+1).padStart(2,'0') + String(now.getDate()).padStart(2,'0');
   const currentDate = S.liveScoresDate || todayStr;
-  const displayDate = currentDate.replace(/(\d{4})(\d{2})(\d{2})/, '$2/$3/$1');
+  const displayDate = new Date(+currentDate.slice(0,4), +currentDate.slice(4,6) - 1, +currentDate.slice(6,8)).toLocaleDateString([], {weekday:'short', month:'short', day:'numeric'});
 
   let filtered = liveScores.slice(); // copy: the sort below must not reorder the shared liveScores array
   if(S.liveScoresFilter === 'live') filtered = liveScores.filter(g => g.state === 'in');
@@ -407,32 +448,20 @@ function renderLive(c){
   if(!c.querySelector('#live-grid')){
     _liveCardCache = new Map();
     c.innerHTML = `
-    <div class="live-header">
-      <div>
-        <div class="section-title">Live Scores</div>
-        <p class="section-desc" style="margin-bottom:0">
-          <span id="live-date"></span>
-          <span id="live-pulse" class="live-pulse" style="display:none"><span class="dot"></span>LIVE</span>
-          <span id="live-updated" style="font-size:11px;color:var(--g400)"></span>
-          <span id="live-error" class="live-error" style="display:none;font-size:11px;color:var(--red)">Scores unavailable, retrying</span>
-        </p>
-      </div>
-      <div class="row" style="gap:8px">
-        <button class="btn btn-secondary btn-sm" onclick="changeLiveDate(-1)">Prev Day</button>
-        <button class="btn btn-secondary btn-sm" onclick="S.liveScoresDate='';startLiveRefresh()">Today</button>
-        <button class="btn btn-secondary btn-sm" onclick="changeLiveDate(1)">Next Day</button>
-        <button class="btn btn-secondary btn-sm" onclick="refreshLiveScores()" title="Refresh now">Refresh</button>
-      </div>
-    </div>
+    <div class="page-title">Scores<span class="date-nav"><button onclick="changeLiveDate(-1)" title="Previous day">\u2039</button><span id="live-date"></span><button onclick="changeLiveDate(1)" title="Next day">\u203a</button></span></div>
+    <p class="live-meta">
+      <span id="live-pulse" class="live-pulse" style="display:none"><span class="dot"></span>LIVE</span>
+      <button class="text-btn" onclick="S.liveScoresDate='';startLiveRefresh()">Today</button>
+      <span id="live-updated"></span>
+      <span id="live-error" class="live-error" style="display:none">Scores unavailable, retrying</span>
+    </p>
     <div class="live-filter-bar">
       ${['all','live','upcoming','final'].map(k => `<button class="live-filter-btn" data-filter="${k}" onclick="S.liveScoresFilter='${k}';renderLiveInPlace()">${k[0].toUpperCase()+k.slice(1)} (<span id="live-cnt-${k}"></span>)</button>`).join('')}
     </div>
     <div id="live-outage" class="card live-error" style="display:none;text-align:center;padding:40px;color:var(--g400)"><p style="font-size:16px;font-weight:700;margin-bottom:4px">Scores unavailable</p><p style="font-size:13px">Could not reach the scoreboard. Check your connection; this page retries automatically.</p></div>
     <div id="live-empty" class="card" style="display:none;text-align:center;padding:40px;color:var(--g400)"><p style="font-size:16px;font-weight:700;margin-bottom:4px">No games found</p><p style="font-size:13px">Try a different date or check back later.</p></div>
     <div id="live-grid" class="scores-grid"></div>
-    <div style="margin-top:16px;text-align:center;font-size:11px;color:var(--g400)">
-      Scores refresh automatically every 30 seconds. Data from NCAA.com.
-    </div>`;
+    <p class="foot">Data from NCAA.com.</p>`;
   }
 
   c.querySelector('#live-date').textContent = displayDate;
@@ -452,8 +481,10 @@ function renderLive(c){
   const cardHtml = game => {
         const awayOur = findOurTeam(game.away);
         const homeOur = findOurTeam(game.home);
-        const awayOwner = awayOur ? owner(awayOur.id) : '';
-        const homeOwner = homeOur ? owner(homeOur.id) : '';
+        const awayOwner = awayOur ? ownerOf(awayOur.id) : null;
+        const homeOwner = homeOur ? ownerOf(homeOur.id) : null;
+        const myId = getMyPlayerId();
+        const ownerTag = pl => pl ? `<span class="own${pl.id === myId ? ' me' : ''}">${playerDot(pl.id)}${escapeHtml(pl.name)}</span>` : '';
         const isLive = game.state === 'in';
         const isFinal = game.state === 'post';
         const isPre = game.state === 'pre';
@@ -468,19 +499,19 @@ function renderLive(c){
           <div class="score-teams">
             <div class="score-team-row ${awayWon?'winner':''} ${isFinal&&!awayWon?'loser':''}">
               <span class="team-seed">${game.away.seed && game.away.seed <= 16 ? game.away.seed : ''}</span>
-              <span class="team-name">${escapeHtml(game.away.name)}${awayOwner ? ` <span style="font-size:10px;color:var(--gold);font-weight:700">(${escapeHtml(awayOwner)})</span>` : ''}</span>
+              <span class="team-name">${escapeHtml(game.away.name)}</span>${ownerTag(awayOwner)}
               <span class="team-record">${game.away.record || ''}</span>
               <span class="team-score">${game.away.score || (isPre ? '' : '0')}</span>
             </div>
             <div class="score-team-row ${homeWon?'winner':''} ${isFinal&&!homeWon?'loser':''}">
               <span class="team-seed">${game.home.seed && game.home.seed <= 16 ? game.home.seed : ''}</span>
-              <span class="team-name">${escapeHtml(game.home.name)}${homeOwner ? ` <span style="font-size:10px;color:var(--gold);font-weight:700">(${escapeHtml(homeOwner)})</span>` : ''}</span>
+              <span class="team-name">${escapeHtml(game.home.name)}</span>${ownerTag(homeOwner)}
               <span class="team-record">${game.home.record || ''}</span>
               <span class="team-score">${game.home.score || (isPre ? '' : '0')}</span>
             </div>
           </div>
           <div class="score-meta">
-            <div class="score-status" style="${isFinal?'color:var(--red)':isLive?'color:var(--green)':'color:var(--g500)'}">${isLive ? game.shortDetail : isFinal ? 'FINAL' : timeStr}</div>
+            <div class="score-status">${isLive ? 'LIVE \u00b7 ' + escapeHtml(game.shortDetail) : isFinal ? 'Final' : escapeHtml(timeStr)}</div>
             ${game.note ? `<div class="score-note">${escapeHtml(game.note)}</div>` : ''}
             ${game.broadcast ? `<div class="score-broadcast">${escapeHtml(game.broadcast)}</div>` : ''}
             ${game.venue ? `<div class="score-broadcast">${escapeHtml(game.venue)}</div>` : ''}
@@ -536,9 +567,10 @@ function renderDraft(c){
     const adminIsPlayer = adminUnlocked && myId && S.players.some(p => p.id === myId);
     const adminNotPlayer = adminUnlocked && (!myId || !S.players.some(p => p.id === myId));
     c.innerHTML = `<div class="section-title">Draft Lobby</div><p class="section-desc">${S.players.length} player${S.players.length!==1?'s':''} joined${S.teams.length ? `, ${S.teams.length} teams loaded` : ''}</p>
+    ${inviteCardHTML()}
     <div class="card"><span class="label">Players (${S.players.length})</span>
     ${adminUnlocked ? `<div class="row" style="margin-bottom:12px"><input id="pn" placeholder="Player name..." style="flex:1" onkeydown="if(event.key==='Enter')addPlayer()"><button class="btn btn-primary" onclick="addPlayer()">Add</button></div>` : ''}
-    ${S.players.length === 0 ? '<p style="color:var(--g400);text-align:center;padding:14px;font-size:13px">No players yet. Waiting for the commissioner to add players.</p>' : ''}
+    ${S.players.length === 0 ? '<p style="color:var(--g400);text-align:center;padding:14px;font-size:13px">No players yet. Share the invite link to get people in.</p>' : ''}
     ${S.players.map((p,i) => `<div class="player-row"><span class="player-num">#${i+1}</span><span style="flex:1;font-weight:${p.id === myId ? '800' : '600'}${p.id === myId ? ';color:var(--gold)' : ''}">${escapeHtml(p.name)}</span>${adminUnlocked ? `<button class="icon-btn" onclick="movePlayer(${i},-1)">\u25B2</button><button class="icon-btn" onclick="movePlayer(${i},1)">\u25BC</button><button class="icon-btn icon-btn-danger" onclick="removePlayer('${p.id}')">\u2715</button>` : ''}</div>`).join('')}
     ${S.players.length >= 2 ? `<p style="color:var(--g400);font-size:12px;margin-top:10px">Snake: ${S.players.map(p => escapeHtml(p.name)).join(' \u2192 ')} \u2192 ${[...S.players].reverse().map(p => escapeHtml(p.name)).join(' \u2192 ')} \u2192 ...</p>` : ''}
     ${adminNotPlayer ? `<div style="border-top:1px solid var(--g200);margin-top:14px;padding-top:14px"><button class="btn btn-secondary" onclick="adminJoinAsPlayer()" style="width:100%;justify-content:center">Join as Player (Commissioner)</button></div>` : ''}
@@ -548,60 +580,100 @@ function renderDraft(c){
     return;
   }
   const myId = getMyPlayerId();
-  // After draft is complete, show only the player's own roster
-  if(ds.complete){
-    const myP = myId ? S.players.find(p => p.id === myId) : null;
-    const pt = myP ? S.teams.filter(t => myP.teamIds.includes(t.id)).sort((a,b) => a.seed - b.seed) : [];
-    c.innerHTML = `<div class="section-title">Your Team</div>
-    ${myP ? `<div class="card"><span class="label">Team ${escapeHtml(myP.name)} (${pt.length} teams)</span>
-      ${pt.map(t => { const w = (S.games||[]).filter(g => g.wid===t.id).length; const el = (S.games||[]).some(g => (g.t1===t.id||g.t2===t.id) && g.wid && g.wid!==t.id); return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--g100)">${teamLogoHTML(t, 24)}${seedBadge(t.seed)}<div style="flex:1"><div style="font-weight:600">${escapeHtml(teamDisplayName(t))}</div><div style="font-size:11px;color:var(--g400)">${escapeHtml(t.region)}</div></div><div style="text-align:right">${el ? '<span style="color:var(--red);font-weight:700">Eliminated</span>' : `<span style="color:var(--green);font-weight:700">${w > 0 ? w + 'W' : 'Alive'}</span>`}</div></div>`}).join('')}
-    </div>` : '<div class="card" style="text-align:center;padding:20px;color:var(--g400)">Join as a player to see your team.</div>'}
-    ${adminUnlocked ? `<div style="margin-top:14px"><div class="row" style="gap:6px;justify-content:center"><button class="btn btn-secondary btn-sm" onclick="undoDraft()" ${ds.cp === 0 ? 'disabled' : ''}>Undo Last Pick</button><button class="btn btn-danger btn-sm" onclick="resetDraft()">Reset Draft</button></div></div>` : ''}`;
-    return;
-  }
+  if(ds.complete){ renderMyTeams(c, myId); return; }
+  const per = S.players.length;
   const all = S.players.flatMap(p => p.teamIds);
   const av = S.teams.filter(t => !all.includes(t.id)).filter(t => S.fr === "All" || t.region === S.fr).filter(t => S.fs === "All" || t.seed === Number(S.fs)).sort((a,b) => a.seed - b.seed || a.name.localeCompare(b.name));
   const cid = ds.order[ds.cp], cp = S.players.find(p => p.id === cid);
-  const isMyTurn = adminUnlocked || myId === ds.order[ds.cp];
-  c.innerHTML = `<div class="row" style="justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
-    <div class="section-title">Snake Draft</div>
-    <div class="row" style="gap:6px">${adminUnlocked && ds.timerDuration > 0 ? `
-      ${ds.timerPaused
-        ? '<button class="btn btn-primary btn-sm" onclick="resumeDraftClock()">Resume Clock</button>'
-        : '<button class="btn btn-secondary btn-sm" onclick="pauseDraftClock()">Pause Clock</button>'}
-    ` : ''}<button class="btn btn-secondary btn-sm" onclick="undoDraft()" ${ds.cp === 0 ? 'disabled' : ''}>Undo</button><button class="btn btn-danger btn-sm" onclick="resetDraft()">Reset</button></div></div>
-  ${(() => {
-    let lastPickHTML = '';
-    if(ds.cp > 0){
-      const prevPid = ds.order[ds.cp - 1];
-      const prevPlayer = S.players.find(p => p.id === prevPid);
-      if(prevPlayer && prevPlayer.teamIds.length > 0){
-        const lastTid = prevPlayer.teamIds[prevPlayer.teamIds.length - 1];
-        const lastTeam = S.teams.find(t => t.id === lastTid);
-        if(lastTeam) lastPickHTML = `<div class="last-pick">Last: <strong>${escapeHtml(prevPlayer.name)}</strong> picked ${teamLogoHTML(lastTeam, 16)} #${escapeHtml(lastTeam.seed)} ${escapeHtml(teamDisplayName(lastTeam))}</div>`;
-      }
-    }
-    const upNextNames = [];
-    for(let i = 1; i <= 2 && ds.cp + i < ds.order.length; i++){
-      const nid = ds.order[ds.cp + i];
-      const np = S.players.find(p => p.id === nid);
-      if(np && !upNextNames.includes(np.name)) upNextNames.push(np.name);
-    }
-    const upNextHTML = upNextNames.length ? `<div class="up-next">Up next: ${upNextNames.map(n => escapeHtml(n)).join(', ')}</div>` : '';
-    const _turnMyId = getMyPlayerId();
-    const _isMyTurn = _turnMyId === ds.order[ds.cp];
-    const _turnMsg = _isMyTurn ? `<div class="turn-indicator your-turn">Your turn to pick!</div>` : `<div class="turn-indicator waiting">Waiting for ${escapeHtml(cp?.name || '')}...</div>`;
-    return `<div class="card active-pick" style="margin-bottom:14px">${lastPickHTML}<div style="font-size:12px;font-weight:700;color:var(--g500);text-transform:uppercase;letter-spacing:.8px">Pick ${ds.cp+1} of ${ds.order.length} — Round ${Math.floor(ds.cp/S.players.length)+1}</div><div class="pick-row"><div style="font-size:20px;font-weight:800;color:var(--gold)">${escapeHtml(cp?.name || '')}'s Pick</div><div id="draft-timer" class="draft-timer" style="display:${ds.pickDeadline || ds.timerPaused ? 'inline' : 'none'}"></div></div>${upNextHTML}<div class="progress-bar"><div class="progress-fill" style="width:${(ds.cp/ds.order.length)*100}%"></div></div></div>${_turnMyId ? _turnMsg : ''}`;
-  })()}
-  <div class="draft-grid"><div>
-    <div class="row" style="margin-bottom:10px;gap:8px;flex-wrap:wrap">
-      <select onchange="S.fr=this.value;render()" style="width:130px"><option value="All" ${S.fr==='All'?'selected':''}>All Regions</option>${REGIONS.map(r => `<option value="${r}" ${S.fr===r?'selected':''}>${r}</option>`).join('')}</select>
-      <select onchange="S.fs=this.value;render()" style="width:110px"><option value="All" ${S.fs==='All'?'selected':''}>All Seeds</option>${SEEDS.map(s => `<option value="${s}" ${String(S.fs)===String(s)?'selected':''}>Seed ${s}</option>`).join('')}</select>
-      <span style="color:var(--g400);font-size:12px">${av.length} available</span></div>
-    <div class="draft-teams">${av.map(t => `<button class="pick-btn" onclick="pickTeam('${t.id}')" ${!isMyTurn ? 'disabled' : ''}>${teamLogoHTML(t, 20)}${seedBadge(t.seed)}<div><div style="font-weight:600">${escapeHtml(teamDisplayName(t))}</div><div style="font-size:11px;color:var(--g400)">${escapeHtml(t.region)}${teamRecordDisplay(t) ? ` · ${escapeHtml(teamRecordDisplay(t))}` : ''}</div></div></button>`).join('')}</div></div>
-  <div><span class="label">Rosters</span>
-    ${S.players.map(p => {const pt = S.teams.filter(t => p.teamIds.includes(t.id)).sort((a,b) => a.seed - b.seed); const act = p.id === cid; const _isMe = p.id === myId; return `<div class="roster-card ${act?'active':''}"><div class="row" style="justify-content:space-between;margin-bottom:4px"><span style="font-weight:700;font-size:13px;color:${act||_isMe?'var(--gold)':'var(--black)'}${_isMe?';font-weight:800':''}">${escapeHtml(p.name)}</span><span style="color:var(--g400);font-size:11px">${pt.length}</span></div>${pt.map(t => `<div style="display:flex;align-items:center;gap:5px;font-size:12px;padding:1px 0">${teamLogoHTML(t, 20)}${seedBadge(t.seed)} ${escapeHtml(teamDisplayName(t))}</div>`).join('')}</div>`}).join('')}
-  </div></div>`;
+  const canPick = adminUnlocked || myId === cid;
+  const mine = isMyDraftTurn();
+  const myP = myId ? S.players.find(p => p.id === myId) : null;
+  const myTeams = myP ? S.teams.filter(t => myP.teamIds.includes(t.id)).sort((a,b) => a.seed - b.seed) : [];
+  const pickLabel = k => `${Math.floor(k / per) + 1}.${k % per + 1}`;
+  const next = S.players.find(p => p.id === ds.order[ds.cp + 1]);
+  const myNext = myId ? ds.order.indexOf(myId, ds.cp) : -1;
+  const rosterSize = Math.ceil(ds.order.length / per);
+  const hasClock = !!(ds.pickDeadline || ds.timerPaused);
+  // Every pick so far, oldest first: pick k belongs to order[k], and is that player's n-th team.
+  const log = [], seen = {};
+  for(let k = 0; k < ds.cp; k++){
+    const pl = S.players.find(p => p.id === ds.order[k]);
+    const n = seen[ds.order[k]] = (seen[ds.order[k]] || 0) + 1;
+    const t = pl && S.teams.find(x => x.id === pl.teamIds[n - 1]);
+    if(t) log.push({k, pl, t});
+  }
+  const head = mine
+    ? `<div class="turnhead"><div class="page-title">Your pick<small>Rd ${pickLabel(ds.cp).replace('.', ' \u00b7 Pick ')}</small></div>
+        <div class="clock-row"><div id="draft-timer" class="draft-timer"${hasClock ? '' : ' hidden'}></div><div class="clock-lbl">${next ? `Up next<br><b>${next.id === myId ? 'You again' : playerDot(next.id) + escapeHtml(next.name)}</b>` : 'Last pick'}</div></div></div>`
+    : `<div class="page-title"><span>${cp ? playerDot(cp.id) + escapeHtml(cp.name) : ''} is picking</span><small>Rd ${pickLabel(ds.cp).replace('.', ' \u00b7 Pick ')}</small></div>
+        <div class="clock-row"><div id="draft-timer" class="draft-timer"${hasClock ? '' : ' hidden'}></div><div class="clock-lbl">${myNext > ds.cp ? `You're up<br><b>${myNext - ds.cp === 1 ? 'next' : 'in ' + (myNext - ds.cp) + ' picks'}</b>` : ''}</div></div>`;
+  c.innerHTML = `${head}
+  ${myP ? `<div class="slots">${Array.from({length: rosterSize}, (_, i) => `<i class="${i < myTeams.length ? 'f' : ''}"></i>`).join('')}</div>
+  <div class="slots-lbl">${myTeams.length}/${rosterSize}${myTeams.length ? ' \u00b7 <b>' + myTeams.map(t => escapeHtml(t.seed + ' ' + teamDisplayName(t))).join(', ') + '</b>' : ''}</div>` : ''}
+
+  <div class="kicker">Available<select class="seed-filter" onchange="S.fs=this.value;render()"><option value="All" ${S.fs==='All'?'selected':''}>${av.length} teams \u00b7 all seeds</option>${SEEDS.map(s => `<option value="${s}" ${String(S.fs)===String(s)?'selected':''}>Seed ${s}</option>`).join('')}</select></div>
+  <div class="tabs">${['All', ...REGIONS].map(r => `<button class="${S.fr === r ? 'on' : ''}" onclick="S.fr='${r}';render()">${r}${r !== 'All' && myP ? `<sup>${myTeams.filter(t => t.region === r).length}</sup>` : ''}</button>`).join('')}</div>
+  <table class="list">${av.map(t => `<tr${canPick ? ` class="tap" onclick="confirmPick('${t.id}')"` : ''}><td class="sd">${escapeHtml(t.seed)}</td><td><div class="tn">${escapeHtml(teamDisplayName(t))}</div><div class="st">${escapeHtml(t.region)}${teamRecordDisplay(t) ? ' \u00b7 ' + escapeHtml(teamRecordDisplay(t)) : ''}</div></td><td class="num">${canPick ? '<span class="pick-link">Draft</span>' : ''}</td></tr>`).join('')}</table>
+
+  ${log.length ? `<div class="kicker">Recent picks<span>Snake order</span></div>
+  <table class="list log">${log.slice(-6).reverse().map(({k, pl, t}, i) => `<tr class="${i === 0 ? 'new' : ''}"><td class="pk">${pickLabel(k)}</td><td><b>${escapeHtml(t.seed)} ${escapeHtml(teamDisplayName(t))}</b></td><td class="num who">${playerDot(pl.id)}${escapeHtml(pl.name)}</td></tr>`).join('')}</table>` : ''}
+
+  <div class="kicker">Rosters<span>${per} players</span></div>
+  <table class="list rosters">${S.players.map(p => { const pt = S.teams.filter(t => p.teamIds.includes(t.id)).sort((a,b) => a.seed - b.seed); return `<tr class="${p.id === cid ? 'onclock' : ''}"><td class="who">${playerDot(p.id)}<b>${escapeHtml(p.name)}</b>${p.id === myId ? ' <span class="you">you</span>' : ''}</td><td class="st">${pt.map(t => escapeHtml(t.seed + ' ' + teamDisplayName(t))).join(', ') || '\u2014'}</td></tr>`; }).join('')}</table>
+
+  <div class="admin-row">${ds.timerDuration > 0 && adminUnlocked ? (ds.timerPaused
+      ? '<button onclick="resumeDraftClock()">Resume clock</button>'
+      : '<button onclick="pauseDraftClock()">Pause clock</button>') : ''}<button onclick="undoDraft()" ${ds.cp === 0 ? 'disabled' : ''}>Undo last pick</button><button class="danger" onclick="resetDraft()">Reset draft</button></div>`;
+}
+
+// A pick can't be taken back without the commissioner, so confirm it first.
+async function confirmPick(tid){
+  const t = S.teams.find(x => x.id === tid);
+  if(!t) return;
+  const rec = teamRecordDisplay(t);
+  // appConfirm escapes its text, so the message is built as plain text.
+  const ok = await appConfirm(t.seed + ' seed \u00b7 ' + t.region + (rec ? ' \u00b7 ' + rec : ''), { title: teamDisplayName(t), confirmLabel: 'Draft ' + teamDisplayName(t) });
+  if(ok) pickTeam(tid);
+}
+
+/* ── My Teams (after the draft) ── */
+function renderMyTeams(c, myId){
+  const myP = myId ? S.players.find(p => p.id === myId) : null;
+  const admin = adminUnlocked ? `<div class="admin-row"><button onclick="undoDraft()" ${S.ds.cp === 0 ? 'disabled' : ''}>Undo last pick</button><button class="danger" onclick="resetDraft()">Reset draft</button></div>` : '';
+  if(!myP){
+    c.innerHTML = `<div class="page-title">My Teams</div><p class="empty-note">Join as a player to see your teams.</p>${admin}`;
+    return;
+  }
+  const sc = withRanks(scores());
+  const me = sc.find(s => s.pid === myId);
+  const ahead = sc.filter(s => s.tot > me.tot).pop(); // nearest player above (sc is sorted high to low)
+  const behind = sc.find(s => s.tot < me.tot);
+  const tied = sc.filter(s => s.tot === me.tot).length > 1;
+  const gap = tied ? 'Tied' : ahead ? (ahead.tot - me.tot) + ' back' : behind ? 'Up ' + (me.tot - behind.tot) : '';
+  const MEDAL = {1:'Gold', 2:'Silver', 3:'Bronze'};
+  const medal = me.rank <= 3 && me.tot > 0;
+  const pt = S.teams.filter(t => myP.teamIds.includes(t.id));
+  const alive = pt.filter(t => !teamEliminated(t.id));
+  const rows = [...alive.sort((a,b) => a.seed - b.seed), ...pt.filter(t => teamEliminated(t.id)).sort((a,b) => a.seed - b.seed)];
+  const ord = n => n + (['th','st','nd','rd'][(n % 100 - 20) % 10] || ['th','st','nd','rd'][n % 100] || 'th');
+  const mx = Math.max(1, ...Object.values(me.rp));
+  const status = t => {
+    const lost = (S.games || []).find(g => (g.t1 === t.id || g.t2 === t.id) && g.wid && g.wid !== t.id);
+    if(lost) return 'Out \u00b7 ' + ROUND_SHORT[lost.round];
+    const nextG = (S.games || []).find(g => (g.t1 === t.id || g.t2 === t.id) && !g.wid);
+    return nextG ? RN[nextG.round] : (teamWins(t.id) === 6 ? 'Champion' : 'Alive');
+  };
+  const dots = w => `<span class="wins">${Array.from({length: 6}, (_, k) => `<i class="${k < w ? 'w' : ''}"></i>`).join('')}</span>`;
+  c.innerHTML = `<div class="page-title">My Teams<small>${playerDot(myId)}${escapeHtml(myP.name)}</small></div>
+  <div class="figs${medal ? ' m' + me.rank : ''}">
+    <div class="fig"><b>${medal ? medalHTML(me.rank, me.tot) : ''}${me.rank}<sup>${ord(me.rank).slice(String(me.rank).length)}</sup></b><span${medal ? ` class="medal-lbl m${me.rank}"` : ''}>${medal ? MEDAL[me.rank] + (gap ? ' \u00b7 ' + gap : '') : (gap || 'Rank')}</span></div>
+    <div class="fig"><b>${me.tot}</b><span>Points</span></div>
+    <div class="fig"><b class="alive-n">${alive.length}<sup>/${pt.length}</sup></b><span>Alive</span></div>
+  </div>
+  <div class="chart">${[1,2,3,4,5,6].map(r => `<div>${me.rp[r] || ''}<b class="r${r}${me.rp[r] ? '' : ' z'}" style="height:${me.rp[r] ? Math.max(6, me.rp[r] / mx * 58) : 2}px"></b><span>${ROUND_SHORT[r]}</span></div>`).join('')}</div>
+  <div class="kicker">Roster<span>Wins \u00b7 Pts</span></div>
+  <table class="list">${rows.map(t => { const out = teamEliminated(t.id); return `<tr class="${out ? 'out' : ''}"><td class="sd">${escapeHtml(t.seed)}</td><td><div class="tn">${escapeHtml(teamDisplayName(t))}</div><div class="st">${escapeHtml(t.region)} \u00b7 ${status(t)}</div></td><td class="num">${dots(teamWins(t.id))}</td><td class="num pts">${teamPoints(t.id) || '\u2014'}</td></tr>`; }).join('')}</table>
+  ${admin}`;
 }
 
 function _freshDraftState(players, teams, duration){
@@ -641,7 +713,7 @@ async function startDraft(){
       _beeped = false; // the snapshot listener applies the started draft and render() starts the clock
     } catch(err){
       if(err && err.msg) showToast(err.msg);
-      else { console.warn('Start draft failed:', err); showToast('Start failed — try again'); }
+      else { console.warn('Start draft failed:', err); showToast('Start failed \u2014 try again'); }
     }
     return;
   }
@@ -679,7 +751,7 @@ async function pickTeam(tid){
       }
       const taken = (remote.players || []).flatMap(p => p.teamIds || []);
       if(taken.includes(tid)){
-        throw { code: 'taken', msg: 'That team was just picked — choose another' };
+        throw { code: 'taken', msg: 'That team was just picked \u2014 choose another' };
       }
       const pl = (remote.players || []).find(p => p.id === ds.order[ds.cp]);
       if(!pl) throw { code: 'no-player', msg: 'Drafting player not found' };
@@ -704,7 +776,7 @@ async function pickTeam(tid){
     updateAppBadge();
   } catch(err){
     if(err && err.msg) showToast(err.msg);
-    else { console.warn('Pick transaction failed:', err); showToast('Pick failed — try again'); }
+    else { console.warn('Pick transaction failed:', err); showToast('Pick failed \u2014 try again'); }
   } finally {
     _pickInFlight = false;
     replayDroppedSnapshot();
@@ -765,7 +837,7 @@ async function undoDraft(){
         });
       });
       _beeped = false;
-    } catch(err){ console.warn('Undo failed:', err); showToast('Undo failed — try again'); }
+    } catch(err){ console.warn('Undo failed:', err); showToast('Undo failed \u2014 try again'); }
     return;
   }
   const ds = S.ds;
@@ -917,15 +989,17 @@ function updateDraftClock(){
   const seconds = Math.ceil(remaining / 1000);
 
   const el = document.getElementById('draft-timer');
+  // The clock ticks 4x a second but the label only changes once a second. Compare against what
+  // the element already shows (not a remembered value: render() rebuilds the element empty) so
+  // the three in-between ticks touch no DOM and force no style/layout work on phones.
+  const text = fmtClock(seconds);
   if(el){
-    // The clock ticks 4x a second but the label only changes once a second. Compare against what
-    // the element already shows (not a remembered value: render() rebuilds the element empty) so
-    // the three in-between ticks touch no DOM and force no style/layout work on phones.
-    const text = seconds + 's';
-    const cls = 'draft-timer ' + (seconds > 30 ? 'timer-green' : seconds > 10 ? 'timer-yellow' : 'timer-red');
+    const cls = 'draft-timer' + (seconds <= 15 ? ' timer-red' : '');
     if(el.textContent !== text) el.textContent = text;
     if(el.className !== cls) el.className = cls;
   }
+  const tb = document.querySelector('.js-turn-timer');
+  if(tb && tb.textContent !== ' \u00b7 ' + text) tb.textContent = ' \u00b7 ' + text;
 
   // Audio + haptic alert at 10 seconds, once per pick. Keyed to this pick's deadline rather than a flag:
   // the flag was only cleared by the device that made the pick, so every other device in the room
@@ -1074,11 +1148,13 @@ async function setDraftClock(seconds){
 /* ── Bracket Page ── */
 function renderBracket(c){
   const reg = S.bracketRegion;
+  const _myId = getMyPlayerId();
+  const _myP = _myId ? S.players.find(p => p.id === _myId) : null;
   c.innerHTML = `
-    <div class="section-title">Bracket</div>
-    <div style="display:flex;gap:4px;margin-bottom:16px;overflow-x:auto;-webkit-overflow-scrolling:touch">
-      ${REGIONS.map(r => `<button class="round-tab" style="${reg===r?'background:var(--gold-bg);color:var(--gold)':''};flex-shrink:0" onclick="S.bracketRegion='${r}';render()">${r}</button>`).join('')}
-      <button class="round-tab" style="${reg==='ff'?'background:var(--gold-bg);color:var(--gold)':''};flex-shrink:0" onclick="S.bracketRegion='ff';render()">Final Four</button>
+    <div class="page-title">Bracket</div>
+    <div class="tabs">
+      ${REGIONS.map(r => `<button class="${reg===r?'on':''}" onclick="S.bracketRegion='${r}';render()">${r}${_myP ? `<sup>${S.teams.filter(t => t.region === r && _myP.teamIds.includes(t.id)).length}</sup>` : ''}</button>`).join('')}
+      <button class="${reg==='ff'?'on':''}" onclick="S.bracketRegion='ff';render()">Final Four</button>
     </div>
     <div id="bracket-area"></div>`;
   if(reg === 'ff'){ renderFF(); return; }
@@ -1142,7 +1218,7 @@ function slotHTML(region, gi, team, winnerId){
   if(!team) return `<div class="slot empty"><span class="tn">TBD</span></div>`;
   const isWinner = winnerId === team.id;
   const isLoser = winnerId && winnerId !== team.id;
-  const ow = owner(team.id);
+  const ow = ownerOf(team.id);
   const myId = getMyPlayerId();
   const myPlayer = myId ? S.players.find(p => p.id === myId) : null;
   const isMine = myPlayer && myPlayer.teamIds.includes(team.id);
@@ -1150,7 +1226,7 @@ function slotHTML(region, gi, team, winnerId){
     onclick="advanceTeam('${region}',${gi},'${team.id}')"
     oncontextmenu="clearBracketGame('${region}',${gi},event)"
     data-lp="r:${region}:${gi}">
-    ${teamLogoHTML(team, 16)}<span class="sd">${escapeHtml(team.seed)}</span><span class="tn">${escapeHtml(teamDisplayName(team))}</span>${ow ? `<span class="ow">${escapeHtml(ow)}</span>` : ''}
+    ${teamLogoHTML(team, 16)}<span class="sd">${escapeHtml(team.seed)}</span><span class="tn">${escapeHtml(teamDisplayName(team))}</span>${ow ? `<span class="ow" style="color:${isMine ? 'var(--gold)' : playerColor(ow.id)}">${escapeHtml(ownerCode(ow.name))}</span>` : ''}
   </div>`;
 }
 
@@ -1217,34 +1293,22 @@ function renderFF(){
     `;
 }
 
-/* ── Leaderboard Page ── */
+/* ── Standings Page ── */
 function renderLeaderboard(c){
-  const sc = scores(), mx = Math.max(...sc.map(s => s.tot), 1), md = ["\uD83E\uDD47","\uD83E\uDD48","\uD83E\uDD49"];
+  const sc = withRanks(scores());
   const myId = getMyPlayerId();
-  const myIdx = myId ? sc.findIndex(s => s.pid === myId) : -1;
-  const mySc = myIdx >= 0 ? sc[myIdx] : null;
-  function aliveCount(pid){ const p = S.players.find(p=>p.id===pid); if(!p) return 0; return p.teamIds.filter(tid => !(S.games||[]).some(g => (g.t1===tid||g.t2===tid) && g.wid && g.wid!==tid)).length; }
-  const myAlive = mySc ? aliveCount(mySc.pid) : 0;
-  c.innerHTML = `<div class="section-title">Leaderboard</div>
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-    <p class="section-desc" style="margin:0"></p>
-    <button class="btn btn-secondary btn-sm" onclick="shareLeaderboard()" title="Share leaderboard">
-      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>Share
-    </button>
-  </div>
-  ${mySc ? `<div class="your-standing"><div class="row" style="justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
-    <div><div class="rank">#${myIdx+1}</div><div style="font-weight:700">${escapeHtml(mySc.name)}</div></div>
-    <div style="text-align:right"><div class="stat"><strong>${mySc.tot}</strong> points</div><div class="stat"><strong>${myAlive}</strong> teams alive</div>
-    ${myIdx > 0 ? `<div class="stat">${sc[myIdx-1].tot - mySc.tot} pts behind #${myIdx}</div>` : ''}${myIdx < sc.length-1 && myIdx >= 0 ? `<div class="stat">${mySc.tot - sc[myIdx+1].tot} pts ahead of #${myIdx+2}</div>` : ''}</div>
-  </div></div>` : ''}
-  <div class="row" style="gap:12px;margin-bottom:24px;flex-wrap:wrap">
-    ${sc.slice(0,3).map((s,i) => `<div class="podium-card ${i===0?'first':''} ${s.pid===myId?'mine':''}"><div style="font-size:28px;margin-bottom:2px">${md[i]||''}</div><div style="font-size:16px;font-weight:800${s.pid===myId?';color:var(--gold)':''}">${escapeHtml(s.name)}</div><div class="podium-pts">${s.tot}</div><div style="font-size:11px;color:var(--g400)">points</div><div style="font-size:11px;color:var(--g400)">${aliveCount(s.pid)} alive</div></div>`).join('')}</div>
-  <div class="card" style="margin-bottom:14px"><span class="label">Points by Round</span><div style="overflow-x:auto"><table><thead><tr><th>Player</th>${[1,2,3,4,5,6].map(r => `<th style="text-align:center;font-size:10px">${RN[r].replace('Round of ','R')}</th>`).join('')}<th style="text-align:center;color:var(--gold)">Total</th><th style="text-align:center;font-size:10px">Alive</th></tr></thead><tbody>
-    ${sc.map((s,i) => `<tr class="${s.pid===myId?'lb-row-mine':''}" style="background:${i%2===0?'var(--g50)':'var(--white)'}"><td style="font-weight:700"><span style="color:var(--g300);margin-right:6px">#${i+1}</span><span${s.pid===myId?' style="color:var(--gold)"':''}>${escapeHtml(s.name)}</span></td>${[1,2,3,4,5,6].map(r => `<td class="${s.rp[r]>0?'val':'dim'}">${s.rp[r]}</td>`).join('')}<td class="pts">${s.tot}</td><td style="text-align:center;font-size:12px;color:var(--g500)">${aliveCount(s.pid)}</td></tr>`).join('')}</tbody></table></div></div>
-  <div class="card" style="margin-bottom:14px"><span class="label">Score Bars</span>
-    ${sc.map(s => `<div class="row" style="margin-bottom:6px"><span style="width:70px;font-weight:${s.pid===myId?'800':'700'};font-size:13px;text-align:right${s.pid===myId?';color:var(--gold)':''}">${escapeHtml(s.name)}</span><div class="bar-container"><div class="bar-fill ${s.pid===myId?'mine':''}" style="width:${(s.tot/mx)*100}%"></div></div><span style="width:36px;font-weight:800;font-size:14px;color:var(--gold)">${s.tot}</span><span style="width:40px;font-size:11px;color:var(--g400);text-align:center">${aliveCount(s.pid)}&#x1f7e2;</span></div>`).join('')}</div>
-  <div class="card"><span class="label">Team Rosters & Status</span>
-    ${S.players.map(p => {const isMe = p.id === myId; const pt = S.teams.filter(t => p.teamIds.includes(t.id)).sort((a,b) => a.seed - b.seed); return `<div class="${isMe?'roster-mine':''}" style="${isMe?'':'margin-bottom:14px'}"><h4 style="font-weight:${isMe?'800':'700'};margin-bottom:6px;font-size:14px${isMe?';color:var(--gold)':''}">${escapeHtml(p.name)}</h4><div class="row" style="flex-wrap:wrap;gap:5px">${pt.map(t => {const w = (S.games||[]).filter(g => g.wid===t.id).length; const el = (S.games||[]).some(g => (g.t1===t.id||g.t2===t.id) && g.wid && g.wid!==t.id); return `<span class="tag ${el?'tag-elim':'tag-alive'}">${teamLogoHTML(t, 16)}${seedBadge(t.seed)} ${escapeHtml(teamDisplayName(t))}${w>0?`<span style="color:var(--green);font-weight:700">W${w}</span>`:''}${el?'<span style="color:var(--red)">\u2715</span>':''}</span>`}).join('')}</div></div>`}).join('')}</div>`;
+  const rosterSize = S.players.length ? Math.max(1, ...S.players.map(p => p.teamIds.length)) : 0;
+  const aliveCount = pid => { const p = S.players.find(p => p.id === pid); return p ? p.teamIds.filter(tid => !teamEliminated(tid)).length : 0; };
+  c.innerHTML = `<div class="page-title">Standings<button class="text-btn" onclick="shareLeaderboard()">Share</button></div>
+  <div class="kicker">Points<span>Alive \u00b7 Pts</span></div>
+  <table class="list stand">${sc.map(s => `<tr class="${s.pid === myId ? 'me' : ''}"><td class="rk">${medalHTML(s.rank, s.tot)}</td>
+    <td class="who">${playerDot(s.pid)}<b>${escapeHtml(s.name)}</b>${s.pid === myId ? ' <span class="you">you</span>' : ''}</td>
+    <td class="num"><span class="alive-dots">${Array.from({length: Math.min(rosterSize, 16)}, (_, k) => `<i class="${k < aliveCount(s.pid) ? 'a' : ''}"></i>`).join('')}</span></td>
+    <td class="num tot">${s.tot}</td></tr>`).join('')}</table>
+  <div class="kicker">By round<span></span></div>
+  <table class="list byround"><tr><th></th><th>Player</th>${[1,2,3,4,5,6].map(r => `<th class="num">${ROUND_SHORT[r]}</th>`).join('')}</tr>
+    ${sc.map(s => `<tr class="${s.pid === myId ? 'me' : ''}"><td class="rk">${medalHTML(s.rank, s.tot)}</td><td><b>${escapeHtml(s.name)}</b></td>${[1,2,3,4,5,6].map(r => `<td class="num${s.rp[r] ? '' : ' z'}">${s.rp[r] || '\u2014'}</td>`).join('')}</tr>`).join('')}</table>
+  <p class="foot">Scoring: ${[1,2,3,4,5,6].map(r => `${ROUND_SHORT[r]} ${S.rp[r]}`).join(' \u00b7 ')}${S.ub ? ' \u00b7 upset bonus = seed difference' : ''}</p>`;
 }
 
 /* ── Settings Page ── */
@@ -1263,6 +1327,7 @@ function renderSettings(c){
   <div class="card" style="margin-bottom:14px"><div class="row" style="justify-content:space-between"><div><div style="font-weight:700;margin-bottom:4px">Upset Bonus</div><div style="font-size:13px;color:var(--g500)">Upsets award bonus = seed difference (e.g. 12 beats 5 = +7).</div></div>
     <button class="toggle ${S.ub?'on':'off'}" onclick="toggleUpsetBonus()"><span class="toggle-knob"></span></button></div></div>
   <div class="card"><span class="label">Preview</span><p style="font-size:13px;color:var(--g500);line-height:1.7">12-seed beats 5-seed in R64: Base <strong style="color:var(--gold)">${S.rp[1]}</strong>${S.ub ? ' + Upset <strong style="color:var(--gold)">7</strong>' : ''} = <strong>${S.rp[1]+(S.ub?7:0)} pts</strong></p></div>
+  ${inviteCardHTML()}
   ${roomId ? `<div class="card" style="margin-bottom:14px"><span class="label">Admin Access</span>
     <div class="row" style="justify-content:space-between;align-items:center">
       <div><div style="font-weight:700;margin-bottom:4px">${adminUnlocked?'Unlocked':'Locked'}</div>
@@ -1310,7 +1375,7 @@ function renderSettings(c){
 
 async function changeYear(v){
   if(!await requireAdmin()) return;
-  S.year = Number(v) || new Date().getFullYear();
+  S.year = Number(v) || tournamentYear();
   saveState();
   render();
 }
