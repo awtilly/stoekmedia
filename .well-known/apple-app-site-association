@@ -1,0 +1,12 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["3WCTWL4523.com.stoekmedia.madness"],
+        "components": [
+          { "/": "/madness/*", "?": { "room": "?*" }, "comment": "Room invite links open the Madness Draft app" }
+        ]
+      }
+    ]
+  }
+}
