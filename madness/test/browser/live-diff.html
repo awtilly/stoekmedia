@@ -16,7 +16,7 @@
   window.firebase = { initializeApp() {}, firestore: fakeFirestore, messaging: () => ({}) };
 </script>
 <script src="../../js/00-constants.js"></script>
-<script src="../../js/10-espn.js"></script>
+<script src="../../js/10-ncaa.js"></script>
 <script src="../../js/20-live.js"></script>
 <script src="../../js/30-state.js"></script>
 <script src="../../js/40-ui.js"></script>
@@ -57,7 +57,7 @@
   check(c.querySelector('#live-cnt-all').textContent === '3', 'All count = 3');
   check(c.querySelector('#live-pulse').style.display === '', 'LIVE pulse shown while a game is in progress');
   check(c.querySelector('.live-filter-btn[data-filter="all"]').classList.contains('active'), 'All filter active');
-  check(first[0].textContent.includes('(Ann)'), 'owner tag rendered for drafted team');
+  check(first[0].querySelector('.own')?.textContent === 'Ann', 'owner tag rendered for drafted team');
   const updated1 = c.querySelector('#live-updated').textContent;
 
   // Second poll: only g1's score changed.
