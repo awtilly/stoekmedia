@@ -37,13 +37,13 @@ function fakeShare(behaviour) {
   return { calls, async share(opts) { calls.push(opts); if (behaviour === 'cancel') throw new Error('Share canceled'); if (behaviour === 'fail') throw new Error('boom'); } };
 }
 
-test('shareRoomLink: in the shell the Share plugin gets title, text and the room URL; the clipboard is not touched', async () => {
+test('shareRoomLink: in the shell the Share plugin gets title, text and the public invite link; the clipboard is not touched', async () => {
   const share = fakeShare();
   const { app, clip } = pagesApp({ share });
   await app.shareRoomLink();
   assert.equal(share.calls.length, 1);
   assert.match(share.calls[0].url, /\?room=ROOM1$/);
-  assert.match(share.calls[0].text, /Room: ROOM1/);
+  assert.match(share.calls[0].text, /Room ROOM1/);
   assert.equal(share.calls[0].dialogTitle, share.calls[0].title);
   assert.deepEqual(clip, []);
   assert.deepEqual(app.__calls.toasts, []);
@@ -64,7 +64,7 @@ test('a plugin failure that is not a cancel falls back to the clipboard like the
   const { app, clip } = pagesApp({ share });
   await app.shareRoomLink();
   assert.equal(clip.length, 1);
-  assert.deepEqual(app.__calls.toasts, ['Room link copied!']);
+  assert.deepEqual(app.__calls.toasts, ['Invite link copied!']);
 });
 
 test('web: no plugin -> navigator.share when available, clipboard otherwise (unchanged)', async () => {
@@ -90,17 +90,7 @@ test('triggerHaptic: Haptics plugin impact in the shell; Vibration API still win
   assert.equal(impacts.length, 1);
 });
 
-test('roomShareUrl: a web page keeps its own address; the shell (capacitor://localhost) shares the public site', () => {
-  pagesApp();
-  assert.equal(roomShareUrl('https://stoekmedia.com/madness/', 'ROOM1'), 'https://stoekmedia.com/madness/?room=ROOM1');
-  assert.equal(roomShareUrl('https://stoekmedia.com/madness/?room=OLD&x=1', 'ROOM1'), 'https://stoekmedia.com/madness/?room=ROOM1&x=1', 'an existing room parameter is replaced');
-  assert.equal(roomShareUrl('http://localhost:8787/madness/', 'ROOM1'), 'http://localhost:8787/madness/?room=ROOM1', 'local and staging pages still share themselves');
-  assert.equal(roomShareUrl('capacitor://localhost/', 'ROOM1'), 'https://stoekmedia.com/madness/?room=ROOM1');
-  assert.equal(roomShareUrl('capacitor://localhost/index.html?room=OLD', 'ROOM1'), 'https://stoekmedia.com/madness/?room=ROOM1');
-  assert.equal(roomShareUrl({ toString: () => 'capacitor://localhost/' }, 'ROOM1'), 'https://stoekmedia.com/madness/?room=ROOM1', 'accepts a Location object');
-});
-
-test('shareRoomLink in the shell: the share sheet and the clipboard fallback both get the public link, never capacitor://', async () => {
+test('shareRoomLink in the shell: the share sheet and the clipboard fallback both get the public site link (inviteUrl), never capacitor://', async () => {
   const share = fakeShare();
   let { app } = pagesApp({ share });
   app.window.location = 'capacitor://localhost/?room=ROOM1';
