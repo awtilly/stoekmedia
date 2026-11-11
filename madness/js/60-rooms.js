@@ -221,6 +221,8 @@ async function createRoom(){
   if(!S.bracketRegion) S.bracketRegion = "South";
   if(!S.games) S.games = [];
   syncGames();
+  S.joinKey = newJoinKey();
+  rememberJoinKey(code, S.joinKey);
   // Create inside a transaction: the get() above is only a courtesy check. If someone else grabbed the
   // same code in the meantime, their room (and admin PIN) must not be overwritten.
   const ref = db.collection("rooms").doc(code);
