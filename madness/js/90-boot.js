@@ -2,6 +2,13 @@
 const params = new URLSearchParams(window.location.search);
 const tabParam = params.get("tab");
 let urlRoom = sanitizeRoomCode(params.get("room")); // "" (falsy) for junk => lobby
+// Invite links carry the room's invite code. Keep it on this device and out of the address bar.
+if(urlRoom && params.get("key")){
+  rememberJoinKey(urlRoom, params.get("key"));
+  const url = new URL(window.location);
+  url.searchParams.delete("key");
+  window.history.replaceState({}, "", url);
+}
 
 // Home-screen shortcuts (manifest.json) open ./?tab=... with no room param.
 // Fall back to the most recently used room so they land in the right tournament.
@@ -46,9 +53,28 @@ if(urlRoom){
 }
 
 /* ── Service Worker & Install Banner ── */
-// Inside a Capacitor shell (see docs/ios-app-store-plan.md) the web code is bundled in the app:
-// WKWebView has no service worker for the capacitor:// scheme and "install" makes no sense.
-const isNativeShell = !!(window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform());
+// isNativeShell (00-constants.js): no service worker for the capacitor:// scheme, and "install" makes no sense.
+
+// Universal links: an invite link tapped on an iPhone with the app installed opens the app with that URL.
+function openInviteUrl(href){
+  let u;
+  try { u = new URL(href); } catch(e){ return; }
+  const code = sanitizeRoomCode(u.searchParams.get('room'));
+  if(!code) return;
+  rememberJoinKey(code, u.searchParams.get('key'));
+  if(code === roomId){ render(); return; }
+  window.location.href = './?room=' + encodeURIComponent(code);
+}
+if(isNativeShell && window.Capacitor.Plugins && window.Capacitor.Plugins.App){
+  const capApp = window.Capacitor.Plugins.App;
+  capApp.addListener('appUrlOpen', e => openInviteUrl(e && e.url));
+  // The launch URL stays the same for the app's lifetime: act on it once, not on every reload.
+  capApp.getLaunchUrl().then(r => {
+    if(!r || !r.url || sessionStorage.getItem('mm4_launch_url') === r.url) return;
+    sessionStorage.setItem('mm4_launch_url', r.url);
+    openInviteUrl(r.url);
+  }).catch(() => {});
+}
 
 if('serviceWorker' in navigator && !isNativeShell){
   navigator.serviceWorker.register('sw.js').then(reg => {
