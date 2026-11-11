@@ -18,7 +18,7 @@ const CACHE = path.join(APP, '.vendor-cache');
 
 // sw.js is left out on purpose: WKWebView runs no service worker for capacitor://, and
 // js/90-boot.js skips registration inside the shell (isNativeShell).
-const COPY = ['index.html', 'manifest.json', 'privacy.html', 'js', 'icons'];
+const COPY = ['index.html', 'manifest.json', 'privacy.html', 'js', 'icons', 'fonts'];
 
 async function vendor(url) {
   const m = url.match(/^https:\/\/www\.gstatic\.com\/(firebasejs\/[\d.]+\/[\w.-]+\.js)$/);

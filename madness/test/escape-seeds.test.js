@@ -7,7 +7,7 @@ const { createApp } = require('./_harness');
 
 /* Team seeds come from shared room state. sanitizeSharedState now coerces any non-number seed to a
  * number (0 if it is not one), so every template that prints a seed gets a number; the draft's
- * "Last: ... picked #<seed>" banner also escapes it. Honest numeric seeds look the same. */
+ * recent-picks log also escapes it. Honest numeric seeds look the same. */
 const HOSTILE = '<img src=x onerror=alert(1)>';
 let pagesLoaded = false;
 function draftApp() {
@@ -30,13 +30,13 @@ function draftApp() {
   return app;
 }
 
-test('renderDraft: the last-pick banner escapes the team seed', () => {
+test('renderDraft: the recent-picks log escapes the team seed', () => {
   const app = draftApp();
   const c = { innerHTML: '' };
   app.renderDraft(c);
-  assert.match(c.innerHTML, /class="last-pick"/, 'banner rendered');
+  assert.match(c.innerHTML, /class="list log"/, 'log rendered');
   assert.doesNotMatch(c.innerHTML, /<img src=x/, 'raw seed must not reach the DOM');
-  assert.match(c.innerHTML, /#&lt;img src=x onerror=alert\(1\)&gt;/, 'seed is shown escaped');
+  assert.match(c.innerHTML, /<b>&lt;img src=x onerror=alert\(1\)&gt; South 1<\/b>/, 'seed is shown escaped');
 });
 
 test('renderDraft: an honest numeric seed renders unchanged', () => {
@@ -44,7 +44,7 @@ test('renderDraft: an honest numeric seed renders unchanged', () => {
   app.S.teams.find(t => t.id === 'South-1').seed = 1;
   const c = { innerHTML: '' };
   app.renderDraft(c);
-  assert.match(c.innerHTML, /picked .*#1 /, 'numeric seed still shows as #1');
+  assert.match(c.innerHTML, /<b>1 South 1<\/b>/, 'numeric seed still shows as 1');
 });
 
 test('sanitizeSharedState: seeds from room state are always numbers', () => {
