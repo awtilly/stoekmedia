@@ -20,7 +20,7 @@ function pagesApp() {
     pagesLoaded = true;
   }
   app.render = () => { app.__calls.render++; };
-  app.S.year = new Date().getFullYear();
+  app.S.year = app.eval('tournamentYear()'); // the import compares against the tournament year, not the calendar year
   app.S.teams = [];
   app.appConfirm = async () => true;
   return { app, btn };
