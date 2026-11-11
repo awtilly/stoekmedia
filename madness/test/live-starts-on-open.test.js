@@ -25,6 +25,7 @@ function boot({ search, savedPhase, shellUp }) {
     renderLobby() { calls.push('lobby'); },
     startLiveRefresh() { calls.push('startLive'); },
     isIOSDevice: () => false,
+    isNativeShell: false, rememberJoinKey() {}, // 00-constants / 70-logic globals that 90-boot.js reads since the invite-code change
     localStorage: { getItem: () => null, setItem() {} },
   };
   vm.createContext(sandbox);
