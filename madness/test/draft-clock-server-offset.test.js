@@ -106,14 +106,14 @@ test('a device 40 s fast shows the real remaining time and does not auto-pick ea
     app.autoPickHighestSeed = () => { picks++; };
     // Uncalibrated (old behaviour): the fast clock already thinks only 20 s remain.
     app.updateDraftClock();
-    assert.equal(el.textContent, '20s');
+    assert.equal(el.textContent, '0:20');
     // Two snapshots (baseline, then the start-draft write) calibrate the device.
     app.noteServerTime(snap(now - 40_000 - 1_000));
     app.noteServerTime(snap(now - 40_000));
     app.updateDraftClock();
-    assert.equal(el.textContent, '60s', 'calibrated: the full minute shows');
+    assert.equal(el.textContent, '1:00', 'calibrated: the full minute shows');
     now += 20_000; app.updateDraftClock();
-    assert.equal(el.textContent, '40s');
+    assert.equal(el.textContent, '0:40');
     assert.equal(picks, 0, 'local clock passed the deadline 20 s ago; no early auto-pick');
     now += 40_000; app.updateDraftClock();
     assert.equal(picks, 1, 'auto-pick fires when server time reaches the deadline');
