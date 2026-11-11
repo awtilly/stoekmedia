@@ -6,6 +6,14 @@ function escapeHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt
 // Returns '' for anything that does not qualify. Same rule createRoom() has always enforced.
 function sanitizeRoomCode(raw){ const c = String(raw || '').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,20); return c.length >= 2 ? c : ''; }
 function owner(tid){ const pl = S.players.find(p => p.teamIds.includes(tid)); return pl ? pl.name : ""; }
+// One color per player (by join order) for the dots and owner codes on every screen. Gold is left out:
+// it marks "you". Rooms with more than eight players reuse colors.
+const PLAYER_COLORS = ['#1F5FAD','#7A4EAB','#2E8B57','#D1495B','#E07B24','#1B9AAA','#6B7A8F','#8C6D46'];
+function playerColor(pid){ const i = S.players.findIndex(p => p.id === pid); return PLAYER_COLORS[Math.max(i, 0) % PLAYER_COLORS.length]; }
+function playerDot(pid){ return `<span class="pdot" style="background:${playerColor(pid)}"></span>`; }
+// Three-letter owner tag for bracket slots, where a full name does not fit.
+function ownerCode(name){ return String(name || '').replace(/[^A-Za-z0-9]/g, '').slice(0, 3).toUpperCase(); }
+function ownerOf(tid){ return S.players.find(p => (p.teamIds || []).includes(tid)) || null; }
 
 function teamDisplayName(t) {
   if (t.playIn && !t.playInResolved) return t.playInTeams.map(pt => pt.name).join(' / ');
@@ -227,6 +235,21 @@ function syncGames(){
   S.games = games;
 }
 
+/* ── Invite codes ──
+ * A room created since 2026-11 has S.joinKey: new players need it to join, so guessing a room name is not
+ * enough. Invite links carry it (?room=CODE&key=KEY) and each device remembers the key per room. Players
+ * already in the room can rejoin with their PIN alone. Rooms without a key stay open to anyone with the code. */
+const JOIN_KEY_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; // no 0/O or 1/I/L, so a code read aloud is typed right
+function newJoinKey(){
+  const a = new Uint32Array(6);
+  crypto.getRandomValues(a);
+  return Array.from(a, n => JOIN_KEY_CHARS[n % JOIN_KEY_CHARS.length]).join('');
+}
+function sanitizeJoinKey(raw){ const k = String(raw || '').toUpperCase().replace(/[^A-Z0-9]/g,''); return /^[A-Z0-9]{4,12}$/.test(k) ? k : ''; }
+function rememberJoinKey(code, key){ key = sanitizeJoinKey(key); if(code && key) try { localStorage.setItem('mm4_key_' + code, key); } catch(e){} }
+function knownJoinKey(code){ try { return localStorage.getItem('mm4_key_' + code) || ''; } catch(e){ return ''; } }
+function inviteUrl(code, key){ return SITE_URL + '?room=' + encodeURIComponent(code) + (key ? '&key=' + encodeURIComponent(key) : ''); }
+
 /* ── Shared-state hardening ──
  * Record ids are interpolated into inline onclick handlers (pickTeam('<id>') etc.). Every client can
  * write the whole room state, so a hostile participant could plant an id that breaks out of that
@@ -241,6 +264,7 @@ function sanitizeSharedState(s){
   for(const t of (s.teams || [])) if(t.seed != null && typeof t.seed !== 'number'){ const n = Number(t.seed); t.seed = Number.isFinite(n) ? n : 0; }
   for(const p of (s.players || [])) p.teamIds = (Array.isArray(p.teamIds) ? p.teamIds : []).filter(isSafeId);
   if(s.ds && Array.isArray(s.ds.order)) s.ds.order = s.ds.order.filter(isSafeId);
+  if(s.joinKey != null){ const k = sanitizeJoinKey(s.joinKey); if(k) s.joinKey = k; else delete s.joinKey; }
   if(s.bracket && typeof s.bracket === 'object'){
     for(const k of Object.keys(s.bracket)){
       if(Array.isArray(s.bracket[k])) s.bracket[k] = s.bracket[k].map(id => (id == null || isSafeId(id)) ? id : null);
@@ -249,19 +273,29 @@ function sanitizeSharedState(s){
   return s;
 }
 
+// Points a game earns whoever owns its winner: the round value, plus the seed gap when an underdog wins.
+function gamePoints(g){
+  let pts = S.rp[g.round] || 0;
+  if(S.ub){
+    const w = S.teams.find(t => t.id === g.wid);
+    const lid = g.t1 === g.wid ? g.t2 : g.t1;
+    const l = S.teams.find(t => t.id === lid);
+    if(w && l && w.seed > l.seed) pts += (w.seed - l.seed);
+  }
+  return pts;
+}
+
+function teamWins(tid){ return (S.games || []).filter(g => g.wid === tid).length; }
+function teamPoints(tid){ return (S.games || []).filter(g => g.wid === tid).reduce((n, g) => n + gamePoints(g), 0); }
+function teamEliminated(tid){ return (S.games || []).some(g => (g.t1 === tid || g.t2 === tid) && g.wid && g.wid !== tid); }
+
 function scores(){
   return S.players.map(p => {
     let tot = 0;
     const rp = {1:0, 2:0, 3:0, 4:0, 5:0, 6:0};
     for(const g of (S.games || [])){
       if(!g.wid || !p.teamIds.includes(g.wid)) continue;
-      let pts = S.rp[g.round] || 0;
-      if(S.ub){
-        const w = S.teams.find(t => t.id === g.wid);
-        const lid = g.t1 === g.wid ? g.t2 : g.t1;
-        const l = S.teams.find(t => t.id === lid);
-        if(w && l && w.seed > l.seed) pts += (w.seed - l.seed);
-      }
+      const pts = gamePoints(g);
       rp[g.round] += pts;
       tot += pts;
     }
@@ -305,3 +339,7 @@ function mergeSharedState(local, remote, knownIds){
   }
   return out;
 }
+// Standard competition ranking over scores(): players level on points share a rank (and a medal),
+// and the next rank skips (1, 2, 2, 4).
+function withRanks(sc){ return sc.map(s => ({...s, rank: 1 + sc.filter(o => o.tot > s.tot).length})); }
+

@@ -227,6 +227,12 @@ async function selfRegister(){
   const pin = document.getElementById('join-pin').value.trim();
   if(!name){ showToast('Enter your name'); return; }
   if(!/^\d{4}$/.test(pin)){ showToast('PIN must be 4 digits'); return; }
+  if(S.joinKey){
+    const keyInput = document.getElementById('join-key');
+    const key = sanitizeJoinKey(keyInput ? keyInput.value : knownJoinKey(roomId));
+    if(key !== S.joinKey){ showToast(keyInput && keyInput.value.trim() ? 'Wrong invite code' : 'Enter the invite code from the commissioner'); return; }
+    rememberJoinKey(roomId, key);
+  }
   if(S.players.some(p => p.name.toLowerCase() === name.toLowerCase())){
     showToast('That name is taken. Tap your name below to rejoin.');
     return;
@@ -260,29 +266,38 @@ async function adminJoinAsPlayer(){
 
 function renderJoinScreen(){
   const players = S.players || [];
+  const started = !!(S.ds && S.ds.started);
+  const needKey = !!S.joinKey && knownJoinKey(roomId) !== S.joinKey;
+  const status = !started ? 'Draft not started' : S.ds.complete ? 'Draft complete' : 'Draft in progress';
   document.getElementById("app").innerHTML = `
     <div class="lobby">
       ${appTitleHTML()}
-      <p class="lobby-sub">Welcome to room <strong>${escapeHtml(roomId)}</strong></p>
-      <div class="lobby-card">
+      <p class="lobby-sub">You're invited to <strong>${escapeHtml(roomId)}</strong></p>
+      <p class="join-meta">${players.length} player${players.length !== 1 ? 's' : ''} \u00b7 ${status}${S.year ? ' \u00b7 ' + escapeHtml(S.year) + ' tournament' : ''}</p>
+      ${started ? `<div class="lobby-card">
+        <h3>${S.ds.complete ? "This draft is finished" : "The draft has started"}</h3>
+        <p>New players can't join now. If you're already in this pool, tap your name below. Otherwise ask the commissioner to add you before the next draft.</p>
+      </div>` : `<div class="lobby-card">
         <h3>Join as New Player</h3>
-        <p>Enter your name and a 4-digit PIN to join the draft.</p>
+        <p>Pick a name and a 4-digit PIN. You'll use the PIN to get back in on another device.</p>
         <div style="display:flex;flex-direction:column;gap:10px">
           <input id="join-name" type="text" placeholder="Your name" style="width:100%" autocomplete="off">
           <input id="join-pin" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" placeholder="4-digit PIN" style="width:100%" autocomplete="off">
+          ${needKey ? `<input id="join-key" type="text" placeholder="Invite code" maxlength="12" style="width:100%;text-transform:uppercase" autocomplete="off" autocapitalize="characters">` : ''}
           <button class="btn btn-primary" style="width:100%;justify-content:center" onclick="selfRegister()">Join</button>
         </div>
-      </div>
+      </div>`}
       ${players.length > 0 ? `
-        <div class="lobby-or">or</div>
+        ${started ? '' : '<div class="lobby-or">or</div>'}
         <div class="lobby-card">
-          <h3>Returning Player?</h3>
-          <p>Tap your name and enter your PIN to rejoin.</p>
+          <h3>Already in this pool?</h3>
+          <p>Tap your name and enter your PIN.</p>
           <div style="display:flex;flex-direction:column;gap:6px">
             ${players.map(p => `<button class="btn btn-secondary" style="width:100%;justify-content:center" onclick="claimPlayer('${p.id}')">${escapeHtml(p.name)}</button>`).join('')}
           </div>
         </div>
       ` : ''}
+      ${!isNativeShell ? `<p class="join-meta" style="margin-top:16px">On iPhone? <a href="${APP_STORE_URL}" target="_blank" rel="noopener">Get the app</a> for draft alerts.</p>` : ''}
       <div style="margin-top:16px;display:flex;gap:8px;justify-content:center">
         <button class="btn btn-secondary btn-sm" onclick="goHome()">Switch Tournament</button>
       </div>
