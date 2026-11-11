@@ -22,7 +22,7 @@ function joinApp(players) {
         page.els[id] = { id, value: '', innerHTML: '' };
       }
       if (page.els['join-returning']) {
-        const m = html.match(/<div id="join-returning">([\s\S]*?)<\/div>\s*<div style="margin-top:16px/);
+        const m = html.match(/<div id="join-returning">([\s\S]*?)<\/div>\s*(?:<p class="join-meta"[\s\S]*?<\/p>\s*)?<div style="margin-top:16px/);
         page.els['join-returning'].innerHTML = m ? m[1] : 'NOT FOUND';
       }
       page.html = html;
@@ -40,7 +40,7 @@ test('first draw builds the form and the list of names', () => {
   assert.equal(page.rebuilds, 1);
   assert.ok(page.els['join-name'] && page.els['join-pin'], 'form is on the page');
   assert.match(page.els['join-returning'].innerHTML, /claimPlayer\('p1'\)/);
-  assert.match(page.els['join-returning'].innerHTML, /Returning Player\?/);
+  assert.match(page.els['join-returning'].innerHTML, /Already in this pool\?/);
 });
 
 test('somebody else joins while a name and PIN are being typed: the form is left alone and the new name is listed', () => {
@@ -65,7 +65,7 @@ test('first person in an empty room: no "Returning Player" card, and it appears 
   app.S.players = [ann];
   app.renderJoinScreen();
   assert.equal(page.rebuilds, 1);
-  assert.match(page.els['join-returning'].innerHTML, /Returning Player\?/);
+  assert.match(page.els['join-returning'].innerHTML, /Already in this pool\?/);
 });
 
 test('the last listed player is removed: the card goes away without touching the form', () => {
@@ -90,5 +90,5 @@ test('another screen was shown in between, or the room changed: the form is buil
   app.renderJoinScreen();
   assert.equal(page.rebuilds, 3, 'never carry one room\'s typed PIN into another room\'s form');
   assert.equal(page.els['join-name'].value, '');
-  assert.match(page.html, /Welcome to room <strong>ROOM2<\/strong>/);
+  assert.match(page.html, /You're invited to <strong>ROOM2<\/strong>/);
 });
