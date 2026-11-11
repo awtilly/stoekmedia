@@ -21,7 +21,7 @@ function pagesApp() {
     pagesLoaded = true;
   }
   app.render = () => { app.__calls.render++; }; // loading 80-pages.js replaced the harness stub
-  app.S.year = new Date().getFullYear(); // no "update the year?" dialog in the way
+  app.S.year = app.eval('tournamentYear()'); // the import compares against the tournament year, not the calendar year // no "update the year?" dialog in the way
   app.S.teams = [{ id: 'old-1', name: 'Old Team', seed: 1, region: 'South', logo: '', abbr: '', ncaaId: '', color: '', record: '' }];
   app.S.players = [{ id: 'a', name: 'Ann', teamIds: [] }, { id: 'b', name: 'Bob', teamIds: [] }];
   app.appConfirm = async () => true;
