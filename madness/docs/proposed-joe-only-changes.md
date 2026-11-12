@@ -182,6 +182,10 @@ cache name. Also, each distinct `?room=` URL adds a cache entry that nothing evi
 
 Keying every navigation under `./index.html` keeps one fresh shell and stops the per-room growth.
 
+> **Correction, Shift 66 (2026-11-12):** as written, a visit to `privacy.html` or `support.html` (navigations in the
+> same scope) would be stored as the shell and shown offline in place of the app. Store only when the page is the app
+> itself; `docs/sw.proposed.js` has the corrected lines (`isShell`).
+
 ### 7d. Notification click focuses the first Madness tab even if it is a different room
 
 `notificationclick` focuses any window whose URL contains `/madness/` and ignores `data.url`. With two rooms open, or
@@ -579,3 +583,15 @@ only the page, `index.html` and the two SDK scripts. The app loads nothing else 
 
 The app side has a stop-gap that does not need this deploy (branch `madness/relay-cache-bypass`: the stored answer
 is removed before each relay request). It keeps working after this change and can stay.
+
+## 14. One file for every sw.js change above: `docs/sw.proposed.js` (Shift 66, 2026-11-12)
+
+`docs/sw.proposed.js` is the `sw.js` on main (a0e8af82) with sections 2, 7a to 7e (7c corrected as noted there) and
+13 applied and the cache name at `mm-draft-v9`. Section 4 is not in it: it has to wait until the push payload
+change of section 3 is deployed. To use it: copy it over `madness/sw.js`, commit, merge.
+
+Checked in headless Chrome: the file installs (all five precache entries are stored, including the messaging
+script from 7e), a counting endpoint on another origin returns 1, 2, 3, 4, 5, 6 through it, and the app's Live tab
+served with it talks to the score relay directly (no service-worker answer for the relay at 1, 2, 8, 10 and 39
+seconds; the page reports no errors). Not checked here: the push paths (7a, 7b, 7d) need a real push to a real
+device, and the offline shell (7c) needs a phone in airplane mode.
