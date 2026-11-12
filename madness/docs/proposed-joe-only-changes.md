@@ -536,6 +536,10 @@ service worker is active (the website and the installed web app; not the iOS app
 - **Bracket import:** before Selection Sunday the relay answers the bracket route with 200 and an empty list. A
   commissioner who taps Import early has that answer stored, and the import then says "not available yet" on that
   device after Selection Sunday as well.
+- **First Four:** the play-in slots are filled in by asking for the same bracket address again, once an hour
+  (`autoResolvePlayIns`). A device that imported the bracket, or had the room open, before the First Four games
+  finished keeps getting the bracket as it was then, so on that device the play-in winners never fill in by
+  themselves (a device that first opens the room afterwards does resolve them and writes them to the room).
 
 Checked two ways on 2026-11-12. (1) Headless Chrome against the real `sw.js` with a counting endpoint on another
 origin: after the service worker controls the page, four requests in a row and one with `cache: 'no-store'` all
