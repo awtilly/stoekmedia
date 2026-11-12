@@ -174,6 +174,10 @@ Reviewers get a demo in the Review Notes, no account needed (good: no login = no
 4. Review Notes text: room code, one player name + PIN to log in as, admin PIN, and a sentence on
    what each tab shows. State: "No real-money play. The app facilitates no payments or prizes."
 5. Re-check the room still exists the day before each submission (nothing deletes it, but verify).
+6. Since PR #65 a new room has an invite code, and a NEW player who types the room code is asked for it. The
+   reviewer does not need it: the Review Notes send them to the existing player <Reviewer> under "Already in
+   this pool?" (PIN only). Walk that exact path on a clean phone before submitting, and keep the invite code out
+   of the notes unless a step asks the reviewer to join as somebody new.
 
 ## 9. Timeline back from Selection Sunday 2027-03-14
 
@@ -310,8 +314,8 @@ Madness Draft is a bracket pool for friends. It moves no money: no entry fees, n
 
 There are no user accounts. To see a room with a finished draft and a partly played tournament:
 1. Open the app. Under "Join a Room" enter the room code <REVIEW27> and tap Join.
-2. Enter the player name <Reviewer> and the PIN <1234>. You are now a player in the room.
-3. The tabs: Draft (the completed snake draft), Bracket (results through the third round, each team labelled with its owner), Leaderboard (points by round), Live Scores (the day's games; off-season this shows "No games found").
+2. The draft in this room is finished, so the screen says "This draft is finished". Under "Already in this pool?" tap <Reviewer> and enter the PIN <1234>. You are now that player. (No invite code is needed for a player who is already in the room.)
+3. The tabs: Draft (the completed snake draft), Bracket (results through the third round, each team labelled with its owner), Leaderboard (points by round), Live Scores (the day's college basketball games; outside the season this shows "No games found").
 4. Commissioner tools (change scoring, edit the bracket, re-import teams) are behind the admin PIN <5678>: tap the gear in the header (or Settings in the top tab row) and then any edit.
 
 Native features in this build:
