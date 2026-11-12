@@ -1,6 +1,6 @@
 function defaultState(){ return {
   phase: "draft",
-  year: new Date().getFullYear(),
+  year: tournamentYear(),
   players: [],
   teams: [],
   ds: {order:[], cp:0, started:false, complete:false},
