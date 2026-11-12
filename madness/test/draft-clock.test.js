@@ -42,32 +42,30 @@ test('four ticks inside the same second write the timer element once (text + cla
     Date.now = () => now;
     const app = clockApp(now + 45_000, el);
     app.updateDraftClock();
-    assert.equal(el.textContent, '45s');
-    assert.equal(el.className, 'draft-timer timer-green');
-    assert.equal(el.writes, 2, 'first tick fills the freshly rendered (empty) element');
+    assert.equal(el.textContent, '0:45');
+    assert.equal(el.className, 'draft-timer');
+    assert.equal(el.writes, 1, 'first tick fills the freshly rendered (empty) element');
     for (const step of [250, 250, 250]) { now += step; app.updateDraftClock(); }
-    assert.equal(el.writes, 2, 'same second: no DOM writes');
+    assert.equal(el.writes, 1, 'same second: no DOM writes');
     now += 250; app.updateDraftClock();
-    assert.equal(el.textContent, '44s');
-    assert.equal(el.writes, 3, 'new second: text written, class unchanged');
+    assert.equal(el.textContent, '0:44');
+    assert.equal(el.writes, 2, 'new second: text written, class unchanged');
   } finally { Date.now = realNow; }
 });
 
-test('crossing the 30s and 10s thresholds still swaps the colour class', () => {
+test('the clock turns red at 15 seconds', () => {
   const el = fakeTimerEl();
   const realNow = Date.now;
   try {
     let now = 5_000_000;
     Date.now = () => now;
-    const app = clockApp(now + 31_000, el);
+    const app = clockApp(now + 16_000, el);
     app.updateDraftClock();
-    assert.equal(el.className, 'draft-timer timer-green');
+    assert.equal(el.className, 'draft-timer');
+    assert.equal(el.textContent, '0:16');
     now += 1_000; app.updateDraftClock();
-    assert.equal(el.className, 'draft-timer timer-yellow');
-    assert.equal(el.textContent, '30s');
-    now += 20_000; app.updateDraftClock();
     assert.equal(el.className, 'draft-timer timer-red');
-    assert.equal(el.textContent, '10s');
+    assert.equal(el.textContent, '0:15');
   } finally { Date.now = realNow; }
 });
 
@@ -79,12 +77,12 @@ test('a re-rendered (empty) element is filled on the next tick even when the sec
     const first = fakeTimerEl();
     const app = clockApp(now + 20_000, first);
     app.updateDraftClock();
-    assert.equal(first.textContent, '20s');
+    assert.equal(first.textContent, '0:20');
     const rebuilt = fakeTimerEl();            // render() replaced the DOM; same deadline, same second
     app.document.getElementById = id => (id === 'draft-timer' ? rebuilt : null);
     app.updateDraftClock();
-    assert.equal(rebuilt.textContent, '20s');
-    assert.equal(rebuilt.className, 'draft-timer timer-yellow');
+    assert.equal(rebuilt.textContent, '0:20');
+    assert.equal(rebuilt.className, 'draft-timer');
   } finally { Date.now = realNow; }
 });
 
