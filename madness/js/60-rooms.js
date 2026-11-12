@@ -131,6 +131,7 @@ function connectToRoom(code){
   if(unsubRoom) unsubRoom();
   saveRecentRoom(code);
   const gen = ++_roomGeneration;
+  _awaitingRoom = true;
   _lastSyncedState = null; // never let the previous room's string suppress this room's first snapshot
   _droppedDuringPick = null;
   unsubRoom = db.collection("rooms").doc(code).onSnapshot(doc => {
@@ -171,6 +172,7 @@ function _applyRoomSnapshot(doc){
     showToast('Room ' + code + ' not found');
     return;
   }
+  _awaitingRoom = false;
   const data = doc.data();
   if(!data || !data.state) return;
   // Firestore delivers our own write back twice (latency-compensated, then server-acked with the
