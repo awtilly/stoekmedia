@@ -9,6 +9,10 @@ on:
     branches: [main]
     paths: ['madness/**']
 
+# Read-only: the job only checks out the code and runs the tests.
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
