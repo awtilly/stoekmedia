@@ -593,5 +593,6 @@ change of section 3 is deployed. To use it: copy it over `madness/sw.js`, commit
 Checked in headless Chrome: the file installs (all five precache entries are stored, including the messaging
 script from 7e), a counting endpoint on another origin returns 1, 2, 3, 4, 5, 6 through it, and the app's Live tab
 served with it talks to the score relay directly (no service-worker answer for the relay at 1, 2, 8, 10 and 39
-seconds; the page reports no errors). Not checked here: the push paths (7a, 7b, 7d) need a real push to a real
-device, and the offline shell (7c) needs a phone in airplane mode.
+seconds; the page reports no errors). Offline shell (7c): open the app, open `privacy.html`, stop the web server,
+open the app address again: the app's lobby is shown, not the privacy page. Not checked here: the push paths (7a,
+7b, 7d) need a real push to a real device, and none of this was run in Safari.
