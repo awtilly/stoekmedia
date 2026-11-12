@@ -69,16 +69,55 @@ function lockAdmin(){
 
 let _pinFailCount = 0;
 
+/* True only when a stored session exists and is older than the 4 h window. */
+function adminSessionExpired(){
+  const k = adminSessionKey();
+  if(!k) return false;
+  try {
+    const raw = localStorage.getItem(k);
+    if(!raw) return false;
+    return Date.now() - Number(raw) > ADMIN_SESSION_HOURS * 3600 * 1000;
+  } catch(e){ return false; }
+}
+
 async function requireAdmin(){
   if(!roomId) return true;
+  // A tab left open past the 4 h window stays unlocked in memory; drop it so the PIN is asked again.
+  if(adminUnlocked && adminSessionExpired()) checkAdminSession();
   if(adminUnlocked) return true;
-  const doc = await db.collection("rooms").doc(roomId).get();
+  let doc;
+  try {
+    doc = await db.collection("rooms").doc(roomId).get();
+  } catch(e){
+    console.warn('requireAdmin: could not read the room', e);
+    showToast("Can't verify the PIN right now. Check your connection and try again.");
+    return false;
+  }
   const data = doc.exists ? doc.data() : null;
   if(!data || !data.adminPin){
     const pin = await appPrompt("This room has no admin PIN yet.\nSet a 4-digit PIN to protect editing:", { title: 'Set Admin PIN', placeholder: '4-digit PIN' });
     if(!pin || !/^\d{4}$/.test(pin.trim())){ await appAlert("PIN must be exactly 4 digits."); return false; }
     const hashed = await hashPin(pin.trim());
-    await db.collection("rooms").doc(roomId).set({ adminPin: hashed, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+    // Two devices can both see "no PIN yet". The first PIN written wins; the other device is told and asked for it,
+    // instead of silently replacing the commissioner's PIN with its own.
+    const ref = db.collection("rooms").doc(roomId);
+    let alreadySet = false;
+    try {
+      await db.runTransaction(async (tx) => {
+        const cur = await tx.get(ref);
+        const d = cur.exists ? cur.data() : null;
+        if(d && d.adminPin){ alreadySet = true; return; }
+        tx.set(ref, { adminPin: hashed, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+      });
+    } catch(e){
+      console.warn('requireAdmin: could not save the PIN', e);
+      showToast("Couldn't save the PIN. Check your connection and try again.");
+      return false;
+    }
+    if(alreadySet){
+      await appAlert("Someone else just set this room's admin PIN. Enter that PIN to continue.");
+      return requireAdmin();
+    }
     unlockAdmin();
     return true;
   }
@@ -159,16 +198,31 @@ async function claimPlayer(id){
       delete player.passphraseHash;
       saveState();
     }
+  } else {
+    // No credential at all (a 2026 room from before PINs, or a state edited by hand). Every
+    // creation path sets a PIN, so instead of letting any tap take the seat, lock it now.
+    const newPin = await appPrompt('This seat has no PIN yet. Set a 4-digit PIN to claim it:', { title: 'Set your PIN', placeholder: '4-digit PIN' });
+    if(!newPin || !/^\d{4}$/.test(newPin.trim())){ showToast('PIN must be 4 digits'); return; }
+    player.pinHash = await hashPin(newPin.trim());
+    saveState();
   }
   setMyPlayerId(id);
   render();
 }
 
 async function selfRegister(){
+  // ds.order was fixed when the draft started; a player added now has no turn and no teams (removePlayer has the same guard).
+  if(S.ds && S.ds.started){ showToast('The draft has started. Ask the commissioner to reset it before new players join.'); return; }
   const name = document.getElementById('join-name').value.trim();
   const pin = document.getElementById('join-pin').value.trim();
   if(!name){ showToast('Enter your name'); return; }
   if(!/^\d{4}$/.test(pin)){ showToast('PIN must be 4 digits'); return; }
+  if(S.joinKey){
+    const keyInput = document.getElementById('join-key');
+    const key = sanitizeJoinKey(keyInput ? keyInput.value : knownJoinKey(roomId));
+    if(key !== S.joinKey){ showToast(keyInput && keyInput.value.trim() ? 'Wrong invite code' : 'Enter the invite code from the commissioner'); return; }
+    rememberJoinKey(roomId, key);
+  }
   if(S.players.some(p => p.name.toLowerCase() === name.toLowerCase())){
     showToast('That name is taken. Tap your name below to rejoin.');
     return;
@@ -202,29 +256,38 @@ async function adminJoinAsPlayer(){
 
 function renderJoinScreen(){
   const players = S.players || [];
+  const started = !!(S.ds && S.ds.started);
+  const needKey = !!S.joinKey && knownJoinKey(roomId) !== S.joinKey;
+  const status = !started ? 'Draft not started' : S.ds.complete ? 'Draft complete' : 'Draft in progress';
   document.getElementById("app").innerHTML = `
     <div class="lobby">
-      <h1><span>March Madness</span> Draft</h1>
-      <p class="lobby-sub">Welcome to room <strong>${roomId}</strong></p>
-      <div class="lobby-card">
+      ${appTitleHTML()}
+      <p class="lobby-sub">You're invited to <strong>${escapeHtml(roomId)}</strong></p>
+      <p class="join-meta">${players.length} player${players.length !== 1 ? 's' : ''} \u00b7 ${status}${S.year ? ' \u00b7 ' + escapeHtml(S.year) + ' tournament' : ''}</p>
+      ${started ? `<div class="lobby-card">
+        <h3>${S.ds.complete ? "This draft is finished" : "The draft has started"}</h3>
+        <p>New players can't join now. If you're already in this pool, tap your name below. Otherwise ask the commissioner to add you before the next draft.</p>
+      </div>` : `<div class="lobby-card">
         <h3>Join as New Player</h3>
-        <p>Enter your name and a 4-digit PIN to join the draft.</p>
+        <p>Pick a name and a 4-digit PIN. You'll use the PIN to get back in on another device.</p>
         <div style="display:flex;flex-direction:column;gap:10px">
           <input id="join-name" type="text" placeholder="Your name" style="width:100%" autocomplete="off">
           <input id="join-pin" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" placeholder="4-digit PIN" style="width:100%" autocomplete="off">
+          ${needKey ? `<input id="join-key" type="text" placeholder="Invite code" maxlength="12" style="width:100%;text-transform:uppercase" autocomplete="off" autocapitalize="characters">` : ''}
           <button class="btn btn-primary" style="width:100%;justify-content:center" onclick="selfRegister()">Join</button>
         </div>
-      </div>
+      </div>`}
       ${players.length > 0 ? `
-        <div class="lobby-or">or</div>
+        ${started ? '' : '<div class="lobby-or">or</div>'}
         <div class="lobby-card">
-          <h3>Returning Player?</h3>
-          <p>Tap your name and enter your PIN to rejoin.</p>
+          <h3>Already in this pool?</h3>
+          <p>Tap your name and enter your PIN.</p>
           <div style="display:flex;flex-direction:column;gap:6px">
             ${players.map(p => `<button class="btn btn-secondary" style="width:100%;justify-content:center" onclick="claimPlayer('${p.id}')">${escapeHtml(p.name)}</button>`).join('')}
           </div>
         </div>
       ` : ''}
+      ${!isNativeShell ? `<p class="join-meta" style="margin-top:16px">On iPhone? <a href="${APP_STORE_URL}" target="_blank" rel="noopener">Get the app</a> for draft alerts.</p>` : ''}
       <div style="margin-top:16px;display:flex;gap:8px;justify-content:center">
         <button class="btn btn-secondary btn-sm" onclick="goHome()">Switch Tournament</button>
       </div>
