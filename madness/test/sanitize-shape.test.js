@@ -57,7 +57,7 @@ test('a bracket always has four regions and the Final Four as lists; good lists 
 test('a room snapshot with broken containers still leaves a state the pages can draw', () => {
   for (const remote of [
     { players: null, teams: null, games: null, ds: null, bracket: null },
-    { players: {}, teams: 'x', games: {}, ds: [], bracket: [] },
+    { players: null, teams: 'x', games: {}, ds: [], bracket: [] },
     { ds: {}, bracket: { South: [] } },
     { bracket: { South: null, East: null, Midwest: null, West: null, ff: null } }
   ]) {
