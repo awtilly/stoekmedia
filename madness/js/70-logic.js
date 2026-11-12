@@ -257,8 +257,22 @@ function inviteUrl(code, key){ return SITE_URL + '?room=' + encodeURIComponent(c
  * so anything outside [A-Za-z0-9_-] is dropped at the data boundary (snapshot apply + local load). */
 const SAFE_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
 function isSafeId(id){ return typeof id === 'string' && SAFE_ID_RE.test(id); }
+const BRACKET_KEYS = ['South', 'East', 'Midwest', 'West', 'ff'];
 function sanitizeSharedState(s){
   if(!s || typeof s !== 'object') return s;
+  // Shape first: the page reads these containers without checking them, so a damaged room document must
+  // not stop every phone in the pool from drawing the room. Only a key that is present is repaired.
+  const isObj = v => !!v && typeof v === 'object' && !Array.isArray(v);
+  for(const k of ['players', 'teams', 'games']) if(k in s && !Array.isArray(s[k])) s[k] = [];
+  if(Array.isArray(s.games)) s.games = s.games.filter(isObj);
+  if('ds' in s){
+    if(!isObj(s.ds)) s.ds = {order:[], cp:0, started:false, complete:false};
+    if(!Array.isArray(s.ds.order)) s.ds.order = [];
+  }
+  if('bracket' in s){
+    if(!isObj(s.bracket)) s.bracket = {};
+    for(const k of BRACKET_KEYS) if(!Array.isArray(s.bracket[k])) s.bracket[k] = Array(k === 'ff' ? 3 : 15).fill(null);
+  }
   if(Array.isArray(s.players)) s.players = s.players.filter(p => p && isSafeId(p.id));
   if(Array.isArray(s.teams)) s.teams = s.teams.filter(t => t && isSafeId(t.id));
   for(const t of (s.teams || [])) if(t.seed != null && typeof t.seed !== 'number'){ const n = Number(t.seed); t.seed = Number.isFinite(n) ? n : 0; }
