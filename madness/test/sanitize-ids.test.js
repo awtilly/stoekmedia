@@ -36,7 +36,7 @@ test('sanitizeSharedState drops players and teams with hostile ids and scrubs re
 
 test('sanitizeSharedState leaves a well-formed state untouched and tolerates missing fields', () => {
   const app = createApp();
-  const good = { players: [{ id: 'p1', name: 'A', teamIds: ['South-1'] }], teams: [{ id: 'South-1' }], ds: { order: ['p1'] }, bracket: { South: ['South-1'], ff: [null] } };
+  const good = { players: [{ id: 'p1', name: 'A', teamIds: ['South-1'] }], teams: [{ id: 'South-1', name: 'Duke' }], ds: { order: ['p1'] }, bracket: { South: ['South-1'], ff: [null] } };
   const before = JSON.stringify(good);
   app.sanitizeSharedState(good);
   assert.equal(JSON.stringify(good), before);
