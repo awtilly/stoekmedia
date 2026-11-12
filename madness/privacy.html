@@ -102,7 +102,7 @@
         <ul>
           <li><strong>Display name.</strong> The name you or the commissioner enter for your spot in the room. Use a nickname if you prefer; nothing requires a real name.</li>
           <li><strong>4-digit PIN.</strong> Players and commissioners can protect their spot with a 4-digit PIN. The PIN itself is never stored. The app stores a salted SHA-256 hash of it, which cannot be turned back into the PIN.</li>
-          <li><strong>Room code.</strong> The short code that identifies your group's room.</li>
+          <li><strong>Room code.</strong> The short code that identifies your group's room. Each room also has a random invite code, made by the app, that new players need in order to join.</li>
           <li><strong>Your picks.</strong> The teams you draft, your bracket selections, and the room settings the commissioner chooses (scoring system, draft order, team list).</li>
         </ul>
 
@@ -110,7 +110,7 @@
         <p>If you choose to allow notifications, your browser or phone issues a push token through Firebase Cloud Messaging. The app stores that token inside your room so it can tell you when it is your turn to pick, when a game goes final, and when the leaderboard changes. The token identifies a device, not a person. Decline the notification prompt and no token is ever created. Tokens that stop working are removed automatically.</p>
 
         <h3>1.3 Stored on your device only</h3>
-        <p>The app keeps a small amount of information in your browser's local storage so it works offline and remembers you between visits: the rooms you have joined recently, which player in each room is you, whether you dismissed the install or notification banner, and a cached copy of the room so it can open without a connection. This never leaves your device, and clearing your browser data removes it.</p>
+        <p>The app keeps a small amount of information in your browser's local storage so it works offline and remembers you between visits: the rooms you have joined recently, which player in each room is you, the invite code of a room you were invited to, whether you dismissed the install or notification banner, and a cached copy of the room so it can open without a connection. This never leaves your device, and clearing your browser data removes it.</p>
 
         <h3>1.4 What we do not collect</h3>
         <p>No email address, no phone number, no password, no payment details, no location, no contacts, no photos. The app does not run advertising trackers or analytics scripts, and it does not use cookies.</p>
