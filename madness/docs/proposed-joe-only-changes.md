@@ -521,3 +521,57 @@ firebase deploy --only functions:notifyGameFinal --project march-madness-snake-d
 
 Nothing is urgent before March; the function only runs when a final is written. Worth doing before the first draft
 night if any room code is reused from 2026.
+
+## 13. sw.js: the score relay's answers are cached forever (found Shift 66, 2026-11-12; LIVE on the website today)
+
+The last branch of the `fetch` handler is cache-first for "everything else". That includes the app's requests to the
+score relay (`https://us-central1-….cloudfunctions.net/ncaa/...`): the first answer for a URL is stored in Cache
+Storage and every later request for the same URL gets that stored copy, for as long as `CACHE_NAME` stays the same.
+`fetch(url, { cache: 'no-store' })` from the page does not get past it. Two things follow in any browser where the
+service worker is active (the website and the installed web app; not the iOS app, which has no service worker):
+
+- **Live tab:** a day's scoreboard is frozen at the first answer of that day on that device whenever the app polls
+  the relay itself (always, until `pollScoreboard` is switched on; after that, whenever its document is stale or the
+  day is not covered). A day first looked at before its games tipped off stays "scheduled" on that device.
+- **Bracket import:** before Selection Sunday the relay answers the bracket route with 200 and an empty list. A
+  commissioner who taps Import early has that answer stored, and the import then says "not available yet" on that
+  device after Selection Sunday as well.
+
+Checked two ways on 2026-11-12. (1) Headless Chrome against the real `sw.js` with a counting endpoint on another
+origin: after the service worker controls the page, four requests in a row and one with `cache: 'no-store'` all
+return the first number. (2) The live site in a throwaway profile: after one visit to `/madness/?tab=live`, Cache
+Storage `mm-draft-v8` holds `…/ncaa/scoreboard/basketball-men/d1/2026/11/12`, and a page fetch of that URL returns
+the stored copy byte for byte.
+
+Fix: cache only what is meant to be cached (the app's own files and the Firebase SDK scripts), and bump the cache
+name so the answers already stored on people's devices are dropped when the new worker activates. The same bump
+covers sections 2, 4 and 7.
+
+```diff
+-const CACHE_NAME = 'mm-draft-v8';
++const CACHE_NAME = 'mm-draft-v9';
+```
+
+```diff
+   const url = new URL(event.request.url);
+ 
+-  // Pass through Firestore/Firebase API calls
+-  if (url.hostname.includes('firestore.googleapis.com') ||
+-      url.hostname.includes('firebaseio.com') ||
+-      (url.hostname.includes('firebase') && url.pathname.includes('/documents/'))) {
++  // Only the app's own files and the Firebase SDK scripts are cached. Everything else goes straight to the
++  // network untouched: Firestore, and the score relay (Cloud Functions), whose answers change every minute.
++  // Cache-first on the relay kept the first answer for a URL forever (frozen scores, a bracket import stuck on
++  // "not available yet").
++  if (event.request.method !== 'GET' ||
++      !(url.origin === self.location.origin || url.hostname === 'www.gstatic.com')) {
+     return;
+   }
+```
+
+The same two checks with this version of `sw.js`: the counting endpoint returns 1, 2, 3, 4, 5 and Cache Storage holds
+only the page, `index.html` and the two SDK scripts. The app loads nothing else from another origin (checked:
+`index.html`, `js/`), so nothing that was cached on purpose stops being cached.
+
+The app side has a stop-gap that does not need this deploy (branch `madness/relay-cache-bypass`: the stored answer
+is removed before each relay request). It keeps working after this change and can stay.
