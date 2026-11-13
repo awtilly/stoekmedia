@@ -134,3 +134,17 @@ test('a save that fails after a snapshot was held back for it is sent again by t
   assert.equal(server().ub, false);
   assert.equal(server().rp[3], 9);
 }));
+
+test('the echo never arrives on its own (another phone changed the same setting right after): the phone still ends on what the server holds', withTimers(async () => {
+  const { app, finish, fire, elsewhere, deliver, set, server } = steppedRoom();
+  set('ub', false);
+  await fire();
+  deliver(elsewhere(r => { r.rp[3] = 9; }));        // held back for ub; it is the state the save will be built on
+  await finish(0);                                  // committed and confirmed: the server says "off"
+  assert.equal(server().ub, false);
+  const later = elsewhere(r => { r.ub = true; });   // another phone turns it on again before our echo is delivered
+  deliver(later);                                   // one snapshot carrying both
+  assert.equal(app.S.ub, true, 'after the save is confirmed a snapshot is taken at its word');
+  assert.equal(app.S.ub, server().ub);
+  assert.deepEqual(app.eval('Object.keys(_inFlight)'), []);
+}));
