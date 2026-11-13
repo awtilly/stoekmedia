@@ -59,6 +59,9 @@ function _pendingLocalEdits(remote, baseRaw, seenRaw){
   // these two, a second tap made while the first tap's save was on its way was dropped by either snapshot.
   const isKnown = (k, theirs) => !!(raw && (theirs === JSON.stringify(raw[k]) || (seen && theirs === JSON.stringify(seen[k]))
       || _recentSent.some(sent => theirs === JSON.stringify(sent[k]))));
+  // The same value in a snapshot is this save's echo only once the server has confirmed the save, or this phone
+  // has been shown the room the save was built on: before that it can be an older snapshot of an older value.
+  const isEcho = f => f.sent && (f.acked || f.sawPre);
   for(const k of Object.keys(edits)){
     if(k === 'ds' || k === 'players') continue;
     const theirs = JSON.stringify(remote[k]);
@@ -69,7 +72,7 @@ function _pendingLocalEdits(remote, baseRaw, seenRaw){
     // save yet, the baseline is the value in flight: the newer edit may equal what the snapshot shows and still
     // has to be sent, or the save in flight lands after it and undoes it.
     // (Also after the server has confirmed that save: a snapshot from before it can still arrive.)
-    if(theirs === f.v && f.sent) delete _inFlight[k]; else _pendingBase[k] = f.v;
+    if(theirs === f.v && isEcho(f)) delete _inFlight[k]; else _pendingBase[k] = f.v;
   }
   // Keys in flight with no newer edit: keep them on screen while the snapshot is merely older than the save.
   for(const k of flying){
@@ -79,7 +82,7 @@ function _pendingLocalEdits(remote, baseRaw, seenRaw){
     // Its echo, something new from another phone, a save the server has already confirmed (a snapshot after
     // that is the server's word), or a value this phone no longer shows: the snapshot wins, as before.
     // (The same value before the save has even been handed over is an older save's echo, not this one's.)
-    if(theirs === f.v){ if(f.sent) delete _inFlight[k]; continue; }
+    if(theirs === f.v){ if(isEcho(f)) delete _inFlight[k]; continue; }
     if(f.acked || JSON.stringify(S[k]) !== f.v || !isKnown(k, theirs)){ delete _inFlight[k]; continue; }
     edits[k] = S[k];
     _pendingBase[k] = f.v;
@@ -198,7 +201,7 @@ function _writeSharedState(){
     // Cleaned like every copy this device shows: the merge below reads its roster and draft state.
     const remote = snap.exists && snap.data().state ? sanitizeSharedState(JSON.parse(snap.data().state)) : null;
     preState = snap.exists ? snap.data().state : null;
-    for(const k in _inFlight){ if(_inFlight[k].no === writeNo) _inFlight[k].sent = true; }
+    for(const k in _inFlight){ if(_inFlight[k].no === writeNo){ _inFlight[k].sent = true; _inFlight[k].pre = preState; _inFlight[k].sawPre = _serverSeen === preState; } }
     let ours = shared;
     if(remote && mine){
       // Same key order as our own copy, so an untouched server gives back exactly localJson.
@@ -449,6 +452,7 @@ function _applyRoomSnapshot(doc){
   _lastSyncedState = data.state;
   _echoWriteNo = 0;
   _lastRoomDoc = doc;
+  for(const k in _inFlight){ if(_inFlight[k].sent && _inFlight[k].pre === data.state) _inFlight[k].sawPre = true; }
   const baseBefore = _syncBase; // what this device had synced before this snapshot (a string: nothing in S can alias it)
   const seenBefore = _serverSeen;
   _syncBase = data.state;
