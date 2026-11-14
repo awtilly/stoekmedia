@@ -16,7 +16,7 @@ function roomApp(code) {
       doc: (id) => ({ set: (data) => { writes.push({ id, state: JSON.parse(data.state) }); return Promise.resolve(); } })
     })
   };
-  vm.runInThisContext('_firestoreWriteTimer = null; _isRemoteUpdate = false; _lastSyncedState = null');
+  vm.runInThisContext('_firestoreWriteTimer = null; _isRemoteUpdate = false; _lastSyncedState = null; _sharedAtSync = null');
   app.roomId = code;
   app.S.players = [{ id: 'p1', name: 'Ann', teamIds: [] }];
   return { app, writes };
