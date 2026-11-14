@@ -279,3 +279,16 @@ test('a player removed here again while the save adding them is on its way is no
   assert.deepEqual(app.S.players.map(p => p.id), ['p1']);
   assert.equal(app.eval('Object.keys(_rosterInFlight).length'), 0);
 }));
+
+test('a player removed on another phone while this phone was adding somebody stays removed', withTimers(async () => {
+  const { app, finish, fire, elsewhere, deliver, set, server, srv } = steppedRoom();
+  const second = elsewhere(r => { r.players.push({ id: 'p2', name: 'Bob', teamIds: [] }); });
+  deliver(second);                                  // this phone lists Ann and Bob
+  set('players', app.S.players.concat([{ id: 'n7', name: 'Mine', teamIds: [] }])); // adds somebody; waits in the debounce
+  deliver(elsewhere(r => { r.players = r.players.filter(p => p.id !== 'p2'); })); // another phone removes Bob
+  await fire();
+  await finish(0);
+  assert.deepEqual(server().players.map(p => p.id), ['p1', 'n7'], 'Bob was not written back; the new player is in');
+  deliver(srv.state);
+  assert.deepEqual(app.S.players.map(p => p.id), ['p1', 'n7'], 'and this phone shows what the room holds');
+}));

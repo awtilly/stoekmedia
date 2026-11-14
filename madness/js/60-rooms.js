@@ -219,9 +219,10 @@ function _writeSharedState(){
       for(const k in shared) ours[k] = ((mine.includes(k) && !(_keyWriteNo[k] > writeNo)) || !(k in remote)) ? shared[k] : remote[k];
       for(const k in remote){ if(!(k in ours) && !VIEW_LOCAL.includes(k)) ours[k] = remote[k]; }
     }
-    const merged = remote ? mergeSharedState(ours, remote, knownIds) : ours;
+    const merged = remote ? mergeSharedState(ours, remote, knownIds, true) : ours;
     const json = JSON.stringify(merged);
     writtenIds = (merged.players || []).map(p => p.id);
+    for(const id of Object.keys(_rosterInFlight)){ if(_rosterInFlight[id] === writeNo && !writtenIds.includes(id)) delete _rosterInFlight[id]; }
     // The echo of this write is skipped by _applyRoomSnapshot only when it carries exactly what we
     // sent from. If the merge took anything from the server (draft progress, another device's edit), or
     // a snapshot replaced S while the write was in flight, leave the echo to be applied so this device
@@ -496,6 +497,7 @@ function _applyRoomSnapshot(doc){
     // From the next snapshot on, the same value is the save's echo. Not for this one: it is the room the save was
     // built on, and it can already hold that value while an older save of this phone is about to change it.
     for(const k in _inFlight){ if(_inFlight[k].sent && _inFlight[k].pre === data.state) _inFlight[k].sawPre = true; }
+    const knownBefore = _lastSnapshotPlayerIds;
     _lastSnapshotPlayerIds = (remote.players || []).map(p => p.id);
     const shownBefore = S.players || [];
     Object.assign(S, remote, local, pending || {});
@@ -506,6 +508,10 @@ function _applyRoomSnapshot(doc){
       const mine = shownBefore.find(p => p && p.id === id);
       if(!mine || (remote.players || []).some(p => p.id === id)){ delete _rosterInFlight[id]; continue; }
       if(!(S.players || []).some(p => p.id === id)){ S.players = (S.players || []).concat([mine]); rosterKept = true; }
+    }
+    if(knownBefore){
+      const there = new Set(_lastSnapshotPlayerIds);
+      for(const p of (S.players || [])){ if(p && !there.has(p.id) && knownBefore.includes(p.id)) _lastSnapshotPlayerIds.push(p.id); }
     }
     sanitizeSharedState(S);
     if(S.ds && S.ds.pickDeadline && typeof S.ds.pickDeadline === 'object' && S.ds.pickDeadline.seconds){
