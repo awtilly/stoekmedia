@@ -243,6 +243,11 @@ async function _checkGameFinalsNow() {
         const winnerTeam = S.teams.find(t => t.ncaaId === winner.ncaaId);
         _unsyncedAdvances.set(game.id, { game, teamId: winnerTeam && winnerTeam.id, since: Date.now() });
       }
+    } else if (isFirstReporter && _advancedFinals.has(game.id)) {
+      // This device filled the slot on an earlier poll whose report threw (the advance only reached localStorage) and
+      // the retry made it the first reporter after all. Save now: nothing else on this device would, and the other
+      // devices only repair the room through their 30 s unsynced-advance check.
+      advanced = true; shouldSync = true;
     } else if (reported && awayInRoom && homeInRoom && !_advancedFinals.has(game.id)) {
       // Both teams are ours but no slot matched: a feeder is still undecided. Keep it for the next poll.
       _pendingAdvance.set(game.id, game);
