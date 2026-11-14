@@ -234,7 +234,10 @@ function _writeSharedState(){
       // the players this save was adding. Calling those "known" made the next roster edit from this phone read
       // "known, but not here" as "removed here" and delete them on the server. Only the ones still shown count.
       const shown = _snapshotSeq === seqAtStart ? null : new Set((S.players || []).map(p => p.id));
-      _lastSnapshotPlayerIds = Array.from(new Set((_lastSnapshotPlayerIds || []).concat(shown ? writtenIds.filter(id => shown.has(id)) : writtenIds)));
+      // And only the ones this phone sent: a player the merge took from the server (added on another phone while this
+      // save was on its way) is not on this screen yet. Known-but-not-here reads as "removed here" in the next merge.
+      const sentIds = new Set((shared.players || []).map(p => p.id));
+      _lastSnapshotPlayerIds = Array.from(new Set((_lastSnapshotPlayerIds || []).concat(writtenIds.filter(id => sentIds.has(id) && (!shown || shown.has(id))))));
     }
     _writeRetries = 0;
     // The server has the save. A key of it that a snapshot was held back for: if that snapshot is not the state

@@ -169,3 +169,35 @@ test('toggled back while the first save is being retried: the confirmation of th
   assert.equal(app.S.year, 2031);
   assert.equal(app.S.rp[3], 9);
 }));
+
+test('a player who joined on another phone while a save was on its way is not removed by the next roster change made here', withTimers(async () => {
+  const { app, finish, fire, elsewhere, deliver, set, server, srv } = steppedRoom();
+  set('ub', false);
+  await fire();                                     // save 1 is on its way
+  const joined = elsewhere(r => { r.players.push({ id: 'n1', name: 'New', teamIds: [] }); }); // not shown here yet
+  await finish(0);                                  // save 1 lands on top of it and keeps the new player
+  assert.deepEqual(server().players.map(p => p.id), ['p1', 'n1']);
+  set('players', app.S.players.concat([{ id: 'n2', name: 'Mine', teamIds: [] }])); // this phone adds somebody
+  deliver(joined);                                  // only now does the other phone's join arrive
+  assert.deepEqual(app.S.players.map(p => p.id).sort(), ['n1', 'n2', 'p1'], 'both the join and the local add are shown');
+  await fire();
+  await finish(1);
+  assert.deepEqual(server().players.map(p => p.id).sort(), ['n1', 'n2', 'p1'], 'nobody was taken out of the room');
+  deliver(srv.state);
+  assert.deepEqual(app.S.players.map(p => p.id).sort(), ['n1', 'n2', 'p1']);
+}));
+
+test('a player this phone added and removed again before the save was confirmed stays removed', withTimers(async () => {
+  const { app, finish, fire, deliver, set, server, srv } = steppedRoom();
+  set('players', app.S.players.concat([{ id: 'n3', name: 'Oops', teamIds: [] }]));
+  await fire();                                     // the save with the new player is on its way
+  set('players', app.S.players.filter(p => p.id !== 'n3')); // removed again straight away
+  await finish(0);
+  assert.deepEqual(server().players.map(p => p.id), ['p1', 'n3']);
+  deliver(srv.state);                               // the first save's echo arrives while the removal waits
+  await fire();
+  await finish(1);
+  assert.deepEqual(server().players.map(p => p.id), ['p1'], 'the removal reached the server');
+  deliver(srv.state);
+  assert.deepEqual(app.S.players.map(p => p.id), ['p1']);
+}));
