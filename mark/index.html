@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Stoek S — Mark Preview | Stoek Media</title>
+  <meta name="description" content="The Stoek S monogram in every format: favicon, display, leather deboss, wax seal, brass marker and the S-in-oval lockup.">
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="canonical" href="https://stoekmedia.com/mark/">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap" rel="stylesheet">
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/images/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/assets/images/01a-favicon-16px-cream-on-green.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/images/favicon-180.png">
+
+  <style>
+    :root {
+      --cream: #f5f1e8;
+      --cream-2: #ece6d8;
+      --paper: #fbf9f3;
+      --ink: #1c1c1c;
+      --ink-2: rgba(28, 28, 28, 0.66);
+      --green: #2d5a3f;
+      --green-deep: #234732;
+      --brass: #9c7a3c;
+      --line: rgba(28, 28, 28, 0.16);
+      --serif: 'Source Serif 4', Georgia, 'Times New Roman', serif;
+      --mono: 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--cream);
+      color: var(--ink);
+      font-family: var(--serif);
+      font-size: 1.0625rem;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+    img { display: block; max-width: 100%; height: auto; }
+    a { color: var(--green); }
+    .wrap { max-width: 1120px; margin: 0 auto; padding: 0 1.5rem; }
+
+    .tag {
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--ink-2);
+    }
+    .tag b { color: var(--brass); font-weight: 500; }
+
+    /* Top bar */
+    .bar { border-bottom: 1px solid var(--line); }
+    .bar .wrap { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding-top: 1rem; padding-bottom: 1rem; }
+    .bar a.home { display: flex; align-items: center; gap: 0.65rem; text-decoration: none; color: var(--ink); font-family: var(--mono); font-size: 0.8rem; letter-spacing: 0.14em; text-transform: uppercase; }
+    .bar a.home img { width: 32px; height: 32px; }
+
+    /* Hero */
+    .hero { padding: 4.5rem 0 3.5rem; text-align: center; }
+    .hero .mark { width: 180px; height: 180px; margin: 0 auto 2rem; border: 1px solid var(--line); }
+    h1 { font-weight: 400; font-size: clamp(2.2rem, 5.5vw, 3.6rem); line-height: 1.1; letter-spacing: -0.01em; }
+    .rule { width: 72px; height: 2px; background: var(--brass); margin: 1.5rem auto; }
+    .hero p { max-width: 600px; margin: 0 auto 1.25rem; color: var(--ink-2); }
+
+    .jump { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.5rem 1.25rem; margin-top: 1.75rem; list-style: none; }
+    .jump a { font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.14em; text-transform: uppercase; text-decoration: none; border-bottom: 1px solid var(--brass); padding-bottom: 2px; }
+
+    /* Sections */
+    section.block { padding: 3.5rem 0; border-top: 1px solid var(--line); }
+    section.block.green { background: var(--green); color: var(--cream); border-top: 0; }
+    section.block.green .tag { color: rgba(245, 241, 232, 0.72); }
+    section.block.green .tag b { color: #d2b473; }
+    section.block.green p { color: rgba(245, 241, 232, 0.82); }
+    .head { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 1rem 3rem; align-items: end; margin-bottom: 2rem; }
+    h2 { font-weight: 400; font-size: clamp(1.6rem, 3.2vw, 2.2rem); line-height: 1.15; margin-top: 0.5rem; }
+    .head p { color: var(--ink-2); }
+
+    figure.sheet { background: var(--paper); border: 1px solid var(--line); }
+    figure.sheet a { display: block; }
+    figure.sheet figcaption { border-top: 1px solid var(--line); padding: 0.7rem 1rem; display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+    section.block.green figure.sheet { border-color: rgba(245, 241, 232, 0.25); }
+    section.block.green figure.sheet figcaption { background: var(--green-deep); border-top-color: rgba(245, 241, 232, 0.18); }
+
+    /* Actual-size specimens */
+    .specimens { display: flex; flex-wrap: wrap; gap: 1.25rem; margin-bottom: 1.5rem; }
+    .spec { flex: 1 1 200px; background: var(--paper); border: 1px solid var(--line); padding: 1.5rem 1rem 1rem; text-align: center; }
+    .spec.dark { background: var(--ink); border-color: var(--ink); }
+    .spec.dark .tag { color: rgba(245, 241, 232, 0.7); }
+    .spec .px { height: 190px; display: flex; align-items: center; justify-content: center; gap: 1.25rem; }
+    .spec .px.short { height: 72px; }
+    .spec img.crisp { image-rendering: pixelated; image-rendering: crisp-edges; }
+
+    .pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.25rem; }
+
+    footer { border-top: 1px solid var(--line); padding: 2.5rem 0 3.5rem; text-align: center; }
+    footer .rule { margin: 0 auto 1.25rem; }
+
+    @media (max-width: 760px) {
+      .head { grid-template-columns: 1fr; }
+      .pair { grid-template-columns: 1fr; }
+      .hero { padding: 3rem 0 2.5rem; }
+      section.block { padding: 2.5rem 0; }
+    }
+  </style>
+</head>
+<body>
+
+  <header class="bar">
+    <div class="wrap">
+      <a class="home" href="/"><img src="/assets/images/mark/02a-favicon-32px-cream-on-green.png" width="32" height="32" alt="">Stoek Media</a>
+      <span class="tag">Mark preview &middot; <b>Direction D</b></span>
+    </div>
+  </header>
+
+  <main>
+    <div class="hero">
+      <div class="wrap">
+        <img class="mark" src="/assets/images/03-display-180px.png" width="180" height="180" alt="The Stoek S monogram, ink on cream, 180 pixels">
+        <span class="tag">The maker's mark &middot; <b>11.2026</b></span>
+        <h1>The Stoek S</h1>
+        <div class="rule"></div>
+        <p>One ribbon, three runs, one slash woven over, under and over. Drawn from lines and true arcs so it holds at sixteen pixels, in veg-tan leather, in wax and in brass.</p>
+        <ul class="jump">
+          <li><a href="#overview">Overview</a></li>
+          <li><a href="#px16">16 px</a></li>
+          <li><a href="#px32">32 px</a></li>
+          <li><a href="#px180">180 px</a></li>
+          <li><a href="#leather">Leather</a></li>
+          <li><a href="#seal">Wax seal</a></li>
+          <li><a href="#marker">Brass marker</a></li>
+          <li><a href="#oval">Oval lockup</a></li>
+        </ul>
+      </div>
+    </div>
+
+    <section class="block" id="overview">
+      <div class="wrap">
+        <div class="head">
+          <div><span class="tag"><b>00</b> &middot; Overview</span><h2>Everything on one sheet</h2></div>
+          <p>The whole system at a glance: the clean master, the screen sizes, the three physical proofs and the oval lockup. Tap any sheet on this page to open it full size.</p>
+        </div>
+        <figure class="sheet">
+          <a href="/assets/images/mark/00-overview.png"><img src="/assets/images/mark/00-overview.png" width="2004" height="2444" alt="Overview sheet of the Stoek S in every format"></a>
+          <figcaption><span class="tag">Overview sheet</span><span class="tag">2004 &times; 2444</span></figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section class="block" id="px16">
+      <div class="wrap">
+        <div class="head">
+          <div><span class="tag"><b>01</b> &middot; Favicon</span><h2>16 px</h2></div>
+          <p>The smallest proof, with every pixel placed by hand. The cream-on-green tile is the favicon now live on this site.</p>
+        </div>
+        <div class="specimens">
+          <div class="spec"><div class="px short"><img class="crisp" src="/assets/images/01a-favicon-16px-cream-on-green.png" width="16" height="16" alt="16 pixel favicon, cream on green"><img class="crisp" src="/assets/images/01b-favicon-16px-ink-on-cream.png" width="16" height="16" alt="16 pixel favicon, ink on cream"></div><span class="tag">Actual size</span></div>
+          <div class="spec dark"><div class="px short"><img class="crisp" src="/assets/images/01a-favicon-16px-cream-on-green.png" width="16" height="16" alt=""><img class="crisp" src="/assets/images/01b-favicon-16px-ink-on-cream.png" width="16" height="16" alt=""></div><span class="tag">On a dark tab</span></div>
+          <div class="spec"><div class="px short"><img class="crisp" src="/assets/images/01a-favicon-16px-cream-on-green.png" width="64" height="64" alt=""><img class="crisp" src="/assets/images/01b-favicon-16px-ink-on-cream.png" width="64" height="64" alt=""></div><span class="tag">Enlarged 4&times;</span></div>
+        </div>
+        <figure class="sheet">
+          <a href="/assets/images/mark/01-favicon-16px-sheet.png"><img loading="lazy" src="/assets/images/mark/01-favicon-16px-sheet.png" width="1400" height="900" alt="16 pixel favicon sheet with pixel grid and browser tab previews"></a>
+          <figcaption><span class="tag">Pixel grid + browser tabs</span><span class="tag">16 &times; 16</span></figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section class="block" id="px32">
+      <div class="wrap">
+        <div class="head">
+          <div><span class="tag"><b>02</b> &middot; Favicon</span><h2>32 px</h2></div>
+          <p>An optical cut made on the pixel grid for high-density tabs and bookmarks, with the weave gaps opened up so the slash stays legible.</p>
+        </div>
+        <div class="specimens">
+          <div class="spec"><div class="px short"><img class="crisp" src="/assets/images/mark/02a-favicon-32px-cream-on-green.png" width="32" height="32" alt="32 pixel favicon, cream on green"><img class="crisp" src="/assets/images/mark/02b-favicon-32px-ink-on-cream.png" width="32" height="32" alt="32 pixel favicon, ink on cream"></div><span class="tag">Actual size</span></div>
+          <div class="spec dark"><div class="px short"><img class="crisp" src="/assets/images/mark/02a-favicon-32px-cream-on-green.png" width="32" height="32" alt=""><img class="crisp" src="/assets/images/mark/02b-favicon-32px-ink-on-cream.png" width="32" height="32" alt=""></div><span class="tag">On a dark tab</span></div>
+          <div class="spec"><div class="px short"><img class="crisp" src="/assets/images/mark/02a-favicon-32px-cream-on-green.png" width="64" height="64" alt=""><img class="crisp" src="/assets/images/mark/02b-favicon-32px-ink-on-cream.png" width="64" height="64" alt=""></div><span class="tag">Enlarged 2&times;</span></div>
+        </div>
+        <figure class="sheet">
+          <a href="/assets/images/mark/02-favicon-32px-sheet.png"><img loading="lazy" src="/assets/images/mark/02-favicon-32px-sheet.png" width="1400" height="900" alt="32 pixel favicon sheet with pixel grid and browser tab previews"></a>
+          <figcaption><span class="tag">Pixel grid + browser tabs</span><span class="tag">32 &times; 32</span></figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section class="block" id="px180">
+      <div class="wrap">
+        <div class="head">
+          <div><span class="tag"><b>03</b> &middot; Display</span><h2>180 px + construction</h2></div>
+          <p>The master drawing at display size, also used as the home-screen icon. The sheet shows how the ribbon and the slash are built.</p>
+        </div>
+        <div class="specimens">
+          <div class="spec"><div class="px"><img src="/assets/images/03-display-180px.png" width="180" height="180" alt="The Stoek S at 180 pixels, ink on cream"></div><span class="tag">Actual size &middot; 180 &times; 180</span></div>
+        </div>
+        <figure class="sheet">
+          <a href="/assets/images/mark/03-display-180px-sheet.png"><img loading="lazy" src="/assets/images/mark/03-display-180px-sheet.png" width="1400" height="1000" alt="Construction drawing of the Stoek S with the 180 pixel versions"></a>
+          <figcaption><span class="tag">Construction sheet</span><span class="tag">Lines + arcs only</span></figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section class="block" id="leather">
+      <div class="wrap">
+        <div class="head">
+          <div><span class="tag"><b>04</b> &middot; Physical proof</span><h2>Leather deboss</h2></div>
+          <p>A 25 mm brass die pressed into veg-tan, shown on a notebook cover. This is the application the mark was drawn for first.</p>
+        </div>
+        <figure class="sheet">
+          <a href="/assets/images/mark/04-leather-deboss-vegtan.png"><img loading="lazy" src="/assets/images/mark/04-leather-deboss-vegtan.png" width="1600" height="1120" alt="Mockup of the Stoek S debossed into veg-tan leather"></a>
+          <figcaption><span class="tag">Veg-tan deboss mockup</span><span class="tag">25 mm die</span></figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section class="block green" id="seal">
+      <div class="wrap">
+        <div class="pair">
+          <div id="seal-col">
+            <span class="tag"><b>05</b> &middot; Physical proof</span>
+            <h2>Wax seal</h2>
+            <p style="margin: 0.75rem 0 1.5rem;">A 25 mm signet using the S-in-oval lockup, in green wax with cream-rubbed relief.</p>
+            <figure class="sheet">
+              <a href="/assets/images/mark/05-wax-seal-25mm.png"><img loading="lazy" src="/assets/images/mark/05-wax-seal-25mm.png" width="1400" height="1000" alt="Mockup of a green wax seal carrying the Stoek S in an oval"></a>
+              <figcaption><span class="tag">Wax seal mockup</span><span class="tag">25 mm</span></figcaption>
+            </figure>
+          </div>
+          <div id="marker">
+            <span class="tag"><b>06</b> &middot; Physical proof</span>
+            <h2>Brass marker</h2>
+            <p style="margin: 0.75rem 0 1.5rem;">A 0.75 in solid-brass ball marker with a lathe-turned face and the engraved lockup, antiqued.</p>
+            <figure class="sheet">
+              <a href="/assets/images/mark/06-brass-ball-marker-0.75in.png"><img loading="lazy" src="/assets/images/mark/06-brass-ball-marker-0.75in.png" width="1400" height="1000" alt="Mockup of a brass golf ball marker engraved with the Stoek S in an oval"></a>
+              <figcaption><span class="tag">Brass marker mockup</span><span class="tag">19 mm &middot; 0.75 in</span></figcaption>
+            </figure>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="block" id="oval" style="border-top: 0;">
+      <div class="wrap">
+        <div class="head">
+          <div><span class="tag"><b>07</b> &middot; Secondary mark</span><h2>S-in-oval lockup</h2></div>
+          <p>The signet version for round and oval applications: the seal, the marker, a watch keeper and avatars.</p>
+        </div>
+        <div class="specimens">
+          <div class="spec"><div class="px"><img src="/assets/images/mark/07a-S-in-oval-180px-cream-on-green.png" width="180" height="180" alt="S-in-oval lockup, cream on green"></div><span class="tag">Cream on green &middot; 180 px</span></div>
+          <div class="spec"><div class="px"><img src="/assets/images/mark/07b-S-in-oval-180px-ink-on-cream.png" width="180" height="180" alt="S-in-oval lockup, ink line on cream"></div><span class="tag">Ink line &middot; 180 px</span></div>
+        </div>
+        <figure class="sheet">
+          <a href="/assets/images/mark/07-S-in-oval-180px-sheet.png"><img loading="lazy" src="/assets/images/mark/07-S-in-oval-180px-sheet.png" width="1400" height="900" alt="S-in-oval lockup sheet in both colourways and at small sizes"></a>
+          <figcaption><span class="tag">Lockup sheet</span><span class="tag">Both colourways</span></figcaption>
+        </figure>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <div class="rule"></div>
+      <p class="tag">Stoek Media &middot; Charlotte, NC &middot; <b>Direction D</b> &middot; 11.2026</p>
+      <p style="margin-top: 1rem;"><a href="/">Back to stoekmedia.com</a></p>
+    </div>
+  </footer>
+
+</body>
+</html>
