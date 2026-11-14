@@ -22,7 +22,7 @@ function connectedApp() {
   app.unsubRoom = null;
   app._roomGeneration = 0;
   app._pickInFlight = false;
-  vm.runInThisContext('_lastSyncedState = null; _droppedDuringPick = null');
+  vm.runInThisContext('_lastSyncedState = null; _sharedAtSync = null; _droppedDuringPick = null');
   const handlers = [];
   app.db = { collection: () => ({ doc: () => ({ onSnapshot: (cb) => { handlers.push(cb); return () => {}; } }) }) };
   app.roomId = 'ROOM1';
