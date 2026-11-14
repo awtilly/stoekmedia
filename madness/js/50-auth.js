@@ -226,7 +226,15 @@ async function claimPlayer(id){
   render();
 }
 
+// True from entering a room (connectToRoom) until its document has arrived, from the server or from Firestore's
+// own cache (_applyRoomSnapshot). Until then S is only this device's blank default. Declared here, with the join
+// screen that reads it; 60-rooms.js sets it.
+let _awaitingRoom = false;
+
 async function selfRegister(){
+  // The room has not loaded yet (slow or no connection on a first visit): S is a blank default, and joining now
+  // would save a room with one player and no teams over everybody else's.
+  if(roomId && _awaitingRoom){ showToast('Still loading the room. Check your connection and try again in a moment.'); return; }
   // ds.order was fixed when the draft started; a player added now has no turn and no teams (removePlayer has the same guard).
   if(S.ds && S.ds.started){ showToast('The draft has started. Ask the commissioner to reset it before new players join.'); return; }
   const name = document.getElementById('join-name').value.trim();
@@ -287,6 +295,7 @@ function _joinReturningHTML(players, started){
 let _joinScreenKey = null; // room and form variant (draft started? invite code needed?) whose join form is on the page
 
 function renderJoinScreen(){
+  const loading = !!roomId && _awaitingRoom; // no join form until the room is here: see selfRegister
   const players = S.players || [];
   const started = !!(S.ds && S.ds.started);
   const needKey = !!S.joinKey && knownJoinKey(roomId) !== S.joinKey;
@@ -306,8 +315,10 @@ function renderJoinScreen(){
     <div class="lobby">
       ${appTitleHTML()}
       <p class="lobby-sub">You're invited to <strong>${escapeHtml(roomId)}</strong></p>
-      <p class="join-meta">${players.length} player${players.length !== 1 ? 's' : ''} \u00b7 ${status}${S.year ? ' \u00b7 ' + escapeHtml(S.year) + ' tournament' : ''}</p>
-      ${started ? `<div class="lobby-card">
+      <p class="join-meta">${loading ? 'Loading the room\u2026' : `${players.length} player${players.length !== 1 ? 's' : ''} \u00b7 ${status}${S.year ? ' \u00b7 ' + escapeHtml(S.year) + ' tournament' : ''}`}</p>
+      ${loading ? `<div class="lobby-card">
+        <p>Getting the players and settings. If this takes more than a few seconds, check your connection.</p>
+      </div>` : started ? `<div class="lobby-card">
         <h3>${S.ds.complete ? "This draft is finished" : "The draft has started"}</h3>
         <p>New players can't join now. If you're already in this pool, tap your name below. Otherwise ask the commissioner to add you before the next draft.</p>
       </div>` : `<div class="lobby-card">
