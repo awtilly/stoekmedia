@@ -55,3 +55,24 @@ test('refreshLiveScores: an empty doc or a stopped listener still polls', async 
   await app.refreshLiveScores();
   assert.equal(fetches(), 2);
 });
+
+test('refreshLiveScores: a finished day still hands over to the new day when "today" rolls over', async () => {
+  const app = createApp();
+  let fetched = [];
+  app.fetch = async (url) => { fetched.push(String(url)); return { ok: true, json: async () => ({ games: [] }) }; };
+  const listened = [];
+  app.db = { collection: () => ({ doc: (d) => ({ onSnapshot: () => { listened.push(d); return () => {}; } }) }) };
+  app.eval("scoreboardDay = () => '20270318'");
+  app.subscribeScoreboard('20270318');
+  assert.equal(app.applyCachedScoreboard({ events: [game('1', 'post'), game('2', 'post')], fetchedAt: ts(clock) }, false), true);
+  clock += 4 * 60_000;
+  await app.refreshLiveScores();
+  assert.equal(fetched.length, 0, 'the day is over: quiet');
+  // 4 am ET passes while the tab stays open (wake lock keeps the screen on): the day changes.
+  app.eval("scoreboardDay = () => '20270319'");
+  clock += 60 * 60_000;
+  await app.refreshLiveScores();
+  assert.equal(app.eval('_scoreboardDate'), '20270319', 'the listener must move to the new day');
+  assert.equal(fetched.length, 1, 'and the new day is polled once');
+  assert.match(fetched[0], /2027\/03\/19/);
+});
