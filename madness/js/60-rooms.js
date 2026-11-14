@@ -133,7 +133,8 @@ function _writeSharedState(){
   const knownIds = _lastSnapshotPlayerIds;
   db.runTransaction(async tx => {
     const snap = await tx.get(ref);
-    const remote = snap.exists && snap.data().state ? JSON.parse(snap.data().state) : null;
+    // Cleaned like every copy this device shows: the merge below reads its roster and draft state.
+    const remote = snap.exists && snap.data().state ? sanitizeSharedState(JSON.parse(snap.data().state)) : null;
     let ours = shared;
     if(remote && mine){
       // Same key order as our own copy, so an untouched server gives back exactly localJson.
@@ -350,7 +351,7 @@ function _applyRoomSnapshot(doc){
   try {
     const local = {};
     for(const k of VIEW_LOCAL) local[k] = S[k];
-    const remote = JSON.parse(data.state);
+    const remote = sanitizeSharedState(JSON.parse(data.state)); // cleaned before the roster and the pending-edit merge read it
     const pending = _pendingLocalEdits(remote, baseBefore); // before the roster ids and S move on to this snapshot
     _lastSnapshotPlayerIds = (remote.players || []).map(p => p.id);
     Object.assign(S, remote, local, pending || {});
