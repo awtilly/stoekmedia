@@ -458,7 +458,6 @@ function _applyRoomSnapshot(doc){
   _lastSyncedState = data.state;
   _echoWriteNo = 0;
   _lastRoomDoc = doc;
-  for(const k in _inFlight){ if(_inFlight[k].sent && _inFlight[k].pre === data.state) _inFlight[k].sawPre = true; }
   const baseBefore = _syncBase; // what this device had synced before this snapshot (a string: nothing in S can alias it)
   const seenBefore = _serverSeen;
   _syncBase = data.state;
@@ -470,6 +469,9 @@ function _applyRoomSnapshot(doc){
     for(const k of VIEW_LOCAL) local[k] = S[k];
     const remote = sanitizeSharedState(JSON.parse(data.state)); // cleaned before the roster and the pending-edit merge read it
     const pending = _pendingLocalEdits(remote, baseBefore, seenBefore); // before the roster ids and S move on to this snapshot
+    // From the next snapshot on, the same value is the save's echo. Not for this one: it is the room the save was
+    // built on, and it can already hold that value while an older save of this phone is about to change it.
+    for(const k in _inFlight){ if(_inFlight[k].sent && _inFlight[k].pre === data.state) _inFlight[k].sawPre = true; }
     _lastSnapshotPlayerIds = (remote.players || []).map(p => p.id);
     Object.assign(S, remote, local, pending || {});
     sanitizeSharedState(S);

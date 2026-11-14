@@ -201,3 +201,27 @@ test('a player this phone added and removed again before the save was confirmed 
   deliver(srv.state);
   assert.deepEqual(app.S.players.map(p => p.id), ['p1']);
 }));
+
+test('off, on, off in quick succession with two saves on their way: the room a save was built on is not taken for its confirmation', withTimers(async () => {
+  const { app, step, finish, fire, elsewhere, deliver, set, server, srv, txs } = steppedRoom();
+  const before = elsewhere(r => { r.rp[3] = 9; }); // another phone changed the scoring; not shown here yet
+  set('ub', false);
+  await fire();                                     // save 1 ("off") starts
+  await step(0);                                    // ... and has read the room
+  set('ub', true);
+  await fire();                                     // save 2 ("on") starts
+  await step(1);                                    // ... and has read the same room
+  set('ub', false);                                 // tapped off again: waits in the debounce
+  await finish(0);                                  // save 1 lands: the room says "off"
+  const afterFirst = srv.state;
+  deliver(before);                                  // the room both saves were built on ("on", like save 2)
+  deliver(afterFirst);                              // save 1 as the server has it
+  assert.equal(app.S.ub, false, 'the last tap stays on screen');
+  await fire();                                     // the debounce runs out: the last tap has to be sent
+  await finish(1);                                  // save 2 is run again and must not put "on" back
+  if (txs[2]) await finish(2);
+  assert.equal(server().ub, false, 'the last tap is what the room ends on');
+  deliver(srv.state);
+  assert.equal(app.S.ub, false);
+  assert.equal(app.S.rp[3], 9);
+}));
