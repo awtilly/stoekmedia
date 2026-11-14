@@ -18,6 +18,7 @@ function setup(opts) {
   vm.runInThisContext('_unsyncedAdvances.clear(); _pendingAdvance.clear(); _reportedFinals.clear(); _advancedFinals.clear();' +
     ' _catchUpDone = null; _catchUpBusy = false; liveScores = []; _checkFinalsChain = Promise.resolve();');
   vm.runInThisContext('_lastSyncedState = ' + (o.snapshotArrived ? '"{}"' : 'null'));
+  vm.runInThisContext('_emptyDaysConfirmed.clear(); _emptyDaysConfirmed.add("20270320"); _emptyDayUnconfirmed = null;'); // today's empty doc is a known off day: only the catch-up's relay calls are counted
   const T = id => app.S.teams.find(t => t.id === id);
   const late = finalGame(T('South-16'), T('South-1'), T('South-1'));
   late.id = 'late-game-0030et';
@@ -58,7 +59,7 @@ function setup(opts) {
     Object.assign(globalThis, realTimers);
     app.scoreboardDay = t.realDay;
     app.ncaa.fetchScoreboard = t.realFetch;
-    vm.runInThisContext('_lastSyncedState = null; _catchUpDone = null; _unsyncedAdvances.clear(); _pendingAdvance.clear(); _reportedFinals.clear(); _advancedFinals.clear(); liveScores = [];');
+    vm.runInThisContext('_emptyDaysConfirmed.clear(); _lastSyncedState = null; _catchUpDone = null; _unsyncedAdvances.clear(); _pendingAdvance.clear(); _reportedFinals.clear(); _advancedFinals.clear(); liveScores = [];');
   };
   return t;
 }
@@ -234,5 +235,67 @@ test('the normal check is unchanged: a final on the shown day is still reported'
     assert.deepEqual(t.sets, ['late-game-0030et']);
     assert.equal(t.app.S.bracket.South[0], 'South-1');
     assert.equal(t.app.__calls.saveState, 1);
+  } finally { t.done(); }
+});
+
+/* The function's last poll of the night can be told "nothing" by a failing upstream, and nothing rewrites that
+ * document afterwards. An empty day-before document is confirmed once through the relay. */
+const emptyYesterday = () => ({
+  '20270320': { events: [], fetchedAt: ts(Date.now()) },
+  '20270319': { events: [], fetchedAt: ts(Date.now() - 4 * 3600000) },
+});
+// the relay's raw payload for one final (the shape ncaa.parseScoreboard reads)
+const rawFinal = (g) => ({ games: [{ game: {
+  gameID: g.id, gameState: 'final', bracketId: '201',
+  away: { names: { short: g.away.name, seo: g.away.ncaaId }, score: g.away.winner ? '70' : '60', seed: String(g.away.seed || ''), winner: !!g.away.winner },
+  home: { names: { short: g.home.name, seo: g.home.ncaaId }, score: g.home.winner ? '70' : '60', seed: String(g.home.seed || ''), winner: !!g.home.winner }
+} }] });
+
+test('the day-before document is empty but the relay has the final: it is caught up, still without a push', async () => {
+  const t = setup({ docs: emptyYesterday() });
+  try {
+    vm.runInThisContext('_catchUpRelayAt = 0');
+    t.app.ncaa.fetchScoreboard = async (day) => { t.relay.push(day); return rawFinal(t.late); };
+    t.app.startLiveRefresh();
+    await tick();
+    assert.deepEqual(t.relay, ['20270319'], 'the relay is asked once for the day before');
+    assert.equal(t.app.S.bracket.South[0], 'South-1', 'the winner is in the bracket');
+    assert.deepEqual(t.sets, [], 'no gameResult hours later');
+    for (const fn of t.intervals) fn();
+    await tick();
+    assert.deepEqual(t.relay, ['20270319'], 'done for the session');
+  } finally { t.done(); }
+});
+
+test('the day before really had no games: the relay confirms it once and the catch-up is done', async () => {
+  const t = setup({ docs: emptyYesterday() });
+  try {
+    vm.runInThisContext('_catchUpRelayAt = 0');
+    t.app.ncaa.fetchScoreboard = async (day) => { t.relay.push(day); return { games: [] }; };
+    t.app.startLiveRefresh();
+    await tick();
+    for (const fn of t.intervals) fn();
+    await tick();
+    assert.deepEqual(t.relay, ['20270319']);
+    assert.equal(t.reads.filter(r => r === 'scoreboard/20270319').length, 1, 'not read again either');
+    assert.equal(t.app.__calls.saveState, 0);
+  } finally { t.done(); }
+});
+
+test('the relay cannot confirm the empty day before: asked again after two minutes, not on every 30 s tick', async () => {
+  const t = setup({ docs: emptyYesterday() });
+  try {
+    vm.runInThisContext('_catchUpRelayAt = 0');
+    t.app.startLiveRefresh();          // the stubbed relay answers null = failure
+    await tick();
+    assert.deepEqual(t.relay, ['20270319']);
+    for (let i = 0; i < 3; i++) { for (const fn of t.intervals) fn(); await tick(); }
+    assert.deepEqual(t.relay, ['20270319'], 'three ticks later: still one request');
+    vm.runInThisContext('_catchUpRelayAt = Date.now() - 121000');
+    t.app.ncaa.fetchScoreboard = async (day) => { t.relay.push(day); return rawFinal(t.late); };
+    for (const fn of t.intervals) fn();
+    await tick();
+    assert.deepEqual(t.relay, ['20270319', '20270319']);
+    assert.equal(t.app.S.bracket.South[0], 'South-1', 'caught up once the relay answers');
   } finally { t.done(); }
 });
