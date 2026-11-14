@@ -117,8 +117,18 @@ function getTeamForSlot(region, gameIdx, slotIdx){
   return winnerId ? S.teams.find(t => t.id === winnerId) : null;
 }
 
+/* The tapped team is the one the page showed BEFORE the admin check; that check can be a PIN prompt, and another
+ * admin may have changed an earlier result meanwhile so the game now holds other teams. Only a team the game still
+ * shows may win it. A game with no team known yet (both feeders open) is left alone: nothing was shown to tap. */
+function teamNoLongerInGame(region, gameIdx, teamId){
+  const t0 = getTeamForSlot(region, gameIdx, 0), t1 = getTeamForSlot(region, gameIdx, 1);
+  if(!t0 && !t1) return false;
+  return (!t0 || t0.id !== teamId) && (!t1 || t1.id !== teamId);
+}
+
 async function advanceTeam(region, gameIdx, teamId){
   if(!await requireAdmin()) return;
+  if(teamNoLongerInGame(region, gameIdx, teamId)){ showToast('That game changed while the PIN prompt was open. Tap the winner again.'); return; }
   const b = S.bracket[region];
   const oldWinner = b[gameIdx];
   if(oldWinner === teamId) return; // no-op, skip Firestore write
