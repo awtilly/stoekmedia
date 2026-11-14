@@ -233,6 +233,9 @@ async function resetAll(){
       bracket: {South:Array(15).fill(null), East:Array(15).fill(null), Midwest:Array(15).fill(null), West:Array(15).fill(null), ff:Array(3).fill(null)},
       bracketRegion:'South', fr:'All', fs:'All', liveScoresDate:'', liveScoresFilter:'all'
     });
+    // A room kept from last March is being reused for the next tournament: move the year on, so the invite text,
+    // the join screen and the import button name the tournament people are joining for. A year set ahead stays.
+    freshState.year = Math.max(Number(S.year) || 0, tournamentYear());
     const shared = {};
     for(const k in freshState){ if(!VIEW_LOCAL.includes(k)) shared[k] = freshState[k]; }
     // Wait for the reset to reach Firestore before reloading: an unawaited write followed by an
