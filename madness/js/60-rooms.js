@@ -2,6 +2,45 @@
 const VIEW_LOCAL = ['phase','bracketRegion','fr','fs','liveScoresDate','liveScoresFilter'];
 // Player ids in the last room snapshot we applied; lets mergeSharedState tell "removed here" from "added elsewhere".
 let _lastSnapshotPlayerIds = null;
+// The shared part of S as this device last received it from, or sent it to, Firestore (taken from S itself, so
+// it compares cleanly against S). Baseline for _pendingLocalEdits().
+let _syncedShared = null;
+
+function _sharedCopyOfS(){
+  const shared = {};
+  for(const k in S){ if(!VIEW_LOCAL.includes(k)) shared[k] = S[k]; }
+  return JSON.parse(JSON.stringify(shared));
+}
+
+/* Shared keys this device has changed since the last sync while that change is still waiting in the 800 ms
+ * debounce. A snapshot arriving in that window used to replace S wholesale: the edit vanished from the screen and
+ * the debounce then wrote the server's own state back, so it never reached anyone. Returns {key: value to keep}
+ * or null. ds and players follow the same rules as the write (mergeSharedState): the server's draft progress
+ * wins, local roster changes are kept. */
+function _pendingLocalEdits(remote, baseRaw){
+  if(!_firestoreWriteTimer || !_syncedShared) return null;
+  const edits = {};
+  let any = false;
+  for(const k in S){
+    if(VIEW_LOCAL.includes(k)) continue;
+    if(JSON.stringify(S[k]) !== JSON.stringify(_syncedShared[k])){ edits[k] = S[k]; any = true; }
+  }
+  // A key the snapshot changed as well is a real conflict: the snapshot wins, as it always has (another phone
+  // may have advanced more of the bracket than this one). ds and players have a proper merge below instead.
+  let raw = null;
+  try { raw = baseRaw ? JSON.parse(baseRaw) : null; } catch(e){} // baseRaw: _syncBase as it was before this snapshot
+  for(const k of Object.keys(edits)){
+    if(k === 'ds' || k === 'players') continue;
+    if(!raw || JSON.stringify(remote[k]) !== JSON.stringify(raw[k])) delete edits[k];
+  }
+  if(!Object.keys(edits).length) return null;
+  if('ds' in edits || 'players' in edits){
+    const merged = mergeSharedState({ ds: S.ds, players: S.players }, remote, _lastSnapshotPlayerIds);
+    if('ds' in edits) edits.ds = merged.ds;
+    if('players' in edits) edits.players = merged.players;
+  }
+  return edits;
+}
 
 let _isRemoteUpdate = false;
 let _firestoreWriteTimer = null;
@@ -69,6 +108,7 @@ function _writeSharedState(){
   try { base = baseAtStart ? JSON.parse(baseAtStart) : null; } catch(e){}
   const mine = base && Object.keys(shared).filter(k => JSON.stringify(shared[k]) !== JSON.stringify(base[k]));
   _syncBase = localJson; // these edits are now with this write; the next write sends only what changes after this
+  _syncedShared = JSON.parse(localJson); // nothing is pending any more: this is what the server is being sent
   let expectSynced = _lastSyncedState; // what _lastSyncedState holds unless a snapshot is applied during the write
   let snapshotDuringWrite = false;
   const ref = db.collection("rooms").doc(roomId);
@@ -216,6 +256,7 @@ function joinRoom(){
 function connectToRoom(code){
   if(unsubRoom) unsubRoom();
   _lastSnapshotPlayerIds = null; // the previous room's roster says nothing about this one
+  _syncedShared = null;
   saveRecentRoom(code);
   const gen = ++_roomGeneration;
   _lastSyncedState = null; // never let the previous room's string suppress this room's first snapshot
@@ -268,19 +309,27 @@ function _applyRoomSnapshot(doc){
   // real updatedAt). Both carry the exact string we wrote, so neither needs a parse or a redraw.
   if(data.state === _lastSyncedState) return;
   _lastSyncedState = data.state;
+  const baseBefore = _syncBase; // what this device had synced before this snapshot (a string: nothing in S can alias it)
   _syncBase = data.state;
   _isRemoteUpdate = true; // gates saveState's Firestore write; MUST clear even if the parse or render throws
   try {
     const local = {};
     for(const k of VIEW_LOCAL) local[k] = S[k];
     const remote = JSON.parse(data.state);
+    const pending = _pendingLocalEdits(remote, baseBefore); // before the roster ids and S move on to this snapshot
     _lastSnapshotPlayerIds = (remote.players || []).map(p => p.id);
-    Object.assign(S, remote, local);
+    Object.assign(S, remote, local, pending || {});
     sanitizeSharedState(S);
     if(S.ds && S.ds.pickDeadline && typeof S.ds.pickDeadline === 'object' && S.ds.pickDeadline.seconds){
       S.ds.pickDeadline = new firebase.firestore.Timestamp(S.ds.pickDeadline.seconds, S.ds.pickDeadline.nanoseconds || 0);
     }
-    _sharedAtSync = _sharedJson(); // taken from S (after sanitising), so it compares cleanly against S later
+    // Baseline = what the server holds. Keys kept from a pending edit stay "edited" (the debounce is still
+    // running and will send them), so a second snapshot in the same window does not wipe them either.
+    _syncedShared = _sharedCopyOfS();
+    if(pending) for(const k in pending) _syncedShared[k] = remote[k] === undefined ? undefined : JSON.parse(JSON.stringify(remote[k])); // a copy: S may hold the same object
+    // The no-change baseline is the server's state in S's key order, not S itself: a pending edit kept above
+    // still has to count as a change when the debounce fires.
+    _sharedAtSync = JSON.stringify(_syncedShared);
     localStorage.setItem(stateKey(), JSON.stringify(S));
     render();
     updateAppBadge();
