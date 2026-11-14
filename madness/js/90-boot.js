@@ -9,6 +9,13 @@ if(urlRoom && params.get("key")){
   url.searchParams.delete("key");
   window.history.replaceState({}, "", url);
 }
+// The tab a home-screen shortcut asks for is used once, below. Left in the address it sent every later reload
+// (the "new version" Refresh button, New Tournament) back to that tab, whichever tab the person was on.
+if(tabParam){
+  const url = new URL(window.location);
+  url.searchParams.delete("tab");
+  window.history.replaceState({}, "", url);
+}
 
 // Home-screen shortcuts (manifest.json) open ./?tab=... with no room param.
 // Fall back to the most recently used room so they land in the right tournament.
