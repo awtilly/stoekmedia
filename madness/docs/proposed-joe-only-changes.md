@@ -182,6 +182,10 @@ cache name. Also, each distinct `?room=` URL adds a cache entry that nothing evi
 
 Keying every navigation under `./index.html` keeps one fresh shell and stops the per-room growth.
 
+> **Correction, Shift 66 (2026-11-12):** as written, a visit to `privacy.html` or `support.html` (navigations in the
+> same scope) would be stored as the shell and shown offline in place of the app. Store only when the page is the app
+> itself; `docs/sw.proposed.js` has the corrected lines (`isShell`).
+
 ### 7d. Notification click focuses the first Madness tab even if it is a different room
 
 `notificationclick` focuses any window whose URL contains `/madness/` and ignores `data.url`. With two rooms open, or
@@ -269,46 +273,95 @@ calls from the function's egress IP. A few dozen phones in fallback is enough to
 answers 502 → every Live tab shows "scores unavailable"), which is exactly the moment the fallback exists for.
 
 Fix (zero dependencies, functions/ only): a per-instance in-memory cache keyed by path, 30 s TTL, and serve the last
-good body when the upstream answers 429/5xx so a rate-limit never blanks the Live tab. With `maxInstances: 5` the
+good body when the upstream is in trouble so a rate-limit never blanks the Live tab. With `maxInstances: 5` the
 worst case becomes 5 upstream calls per 30 s per route, independent of how many phones are polling.
 
+Revised Shift 60 (2026-11-09); this replaces the first version of the diff. Four things changed:
+
+- **The cache is bounded** (`CACHE_MAX = 64` routes, the oldest is dropped). The first version kept every route it
+  had ever answered for the life of the instance; phones only ask for today, yesterday and a picked day, so 64 never
+  drops a route in use, and the instance's memory no longer depends on how many different dates were requested.
+- **A failing upstream is asked once per 30 s per route, not once per phone.** The first version went back to the
+  upstream on every request once the 30 s had passed, also while it was answering 429, which is the one moment the
+  extra calls hurt. Now a stale answer also restarts the 30 s wait (`checked`).
+- **A 404/403 for a route that answered 200 a moment ago serves the last body** instead of an empty day. For
+  seasons after 2025 the upstream answers a day without games with 200 and an empty list, and 404 when its own
+  request to NCAA.com failed (§11 has the detail), so a 404 right after a 200 is an outage, not an off day.
+- **Stale has an age limit** (`STALE_MAX_MS`, 10 minutes). After that the relay answers what it answers today
+  (502, or the empty day with `upstreamStatus`), and the app shows its "Scores unavailable" line instead of a
+  scoreboard frozen at some earlier minute.
+
+The diff below is the real `git diff` of the change (it applies with `git apply` from the repo root). It was
+run against a copy of `functions/ncaa.js` as deployed on main 0354aeef with a stubbed `fetch` and clock, 7 checks:
+hit inside 30 s, refetch after, stale on 429 / 500 / network error / 404, no stale after 10 minutes, the plain 404
+answer unchanged when nothing is cached, never more than 64 entries with the most recent kept, a route that keeps
+being refreshed is never the one dropped, and 40 requests during a 429 make one upstream call. `functions/` itself
+was not touched.
+
 ```diff
---- madness/functions/ncaa.js
+--- a/madness/functions/ncaa.js
++++ b/madness/functions/ncaa.js
+@@ -12,6 +12,21 @@
  const { onRequest } = require('firebase-functions/v2/https');
  const { NCAA_API_BASE, FETCH_HEADERS, allowedPath } = require('./scoreboard-logic');
-+
+ 
 +// Per-instance response cache. cloudfunctions.net URLs have no CDN, so the Cache-Control header below only helps
 +// the browser; this keeps N phones in fallback from becoming N upstream calls (ncaa-api allows ~3 req/s per IP).
 +const CACHE_TTL_MS = 30 * 1000;
-+const _cache = new Map(); // path -> { body, at }
-@@
++const STALE_MAX_MS = 10 * 60 * 1000; // how old a body may be and still be served when the upstream is in trouble
++const CACHE_MAX = 64;                // entries; phones only ask for today, yesterday and a picked day
++const _cache = new Map(); // path -> { body, at, checked }, oldest first
++
++function sendStale(res, hit) {
++  if (!hit || Date.now() - hit.at > STALE_MAX_MS) return false;
++  hit.checked = Date.now();            // do not ask a struggling upstream again for this route for 30 s
++  res.set('X-Cache', 'stale');
++  res.type('application/json').status(200).send(hit.body);
++  return true;
++}
++
+ const ALLOWED_ORIGINS = [
+   /^https:\/\/([a-z0-9-]+\.)?stoekmedia\.com$/,
+   /^capacitor:\/\/localhost$/,
+@@ -30,19 +45,37 @@ exports.ncaa = onRequest({
+   if (req.method !== 'GET') { res.status(405).json({ error: 'GET only' }); return; }
+   const p = String(req.path || '').replace(/\/+$/, '');
    if (!allowedPath(p)) { res.status(404).json({ error: 'route not available' }); return; }
 +  const hit = _cache.get(p);
-+  if (hit && Date.now() - hit.at < CACHE_TTL_MS) {
++  if (hit && Date.now() - hit.checked < CACHE_TTL_MS) {
 +    res.set('Cache-Control', 'public, max-age=30');
-+    res.set('X-Cache', 'hit');
++    res.set('X-Cache', hit.checked === hit.at ? 'hit' : 'stale');
 +    res.type('application/json').status(200).send(hit.body);
 +    return;
 +  }
    try {
      const r = await fetch(NCAA_API_BASE + p, { headers: FETCH_HEADERS });
      if (r.status === 404 || r.status === 403) {
-       ...unchanged...
++      // This route answered 200 a moment ago, so this 404 is the upstream failing to reach NCAA.com, not an off day.
++      if (sendStale(res, hit)) return;
+       // ncaa.com: no page for that date/year yet (off day, or the bracket is not published). Empty, not an error.
+       res.set('Cache-Control', 'public, max-age=60');
+       res.status(200).json(p.startsWith('/brackets') ? { championships: [], upstreamStatus: r.status } : { games: [], upstreamStatus: r.status });
+       return;
      }
 -    if (!r.ok) { res.status(502).json({ error: 'upstream ' + r.status }); return; }
 +    if (!r.ok) {
 +      // Rate-limited or upstream trouble: a slightly stale scoreboard beats an empty Live tab.
-+      if (hit) { res.set('X-Cache', 'stale'); res.type('application/json').status(200).send(hit.body); return; }
++      if (sendStale(res, hit)) return;
 +      res.status(502).json({ error: 'upstream ' + r.status }); return;
 +    }
      const body = await r.text();
-+    _cache.set(p, { body, at: Date.now() });
++    _cache.delete(p);                                  // re-insert = most recent
++    const t = Date.now();
++    _cache.set(p, { body, at: t, checked: t });
++    if (_cache.size > CACHE_MAX) _cache.delete(_cache.keys().next().value); // drop the oldest; memory stays bounded
      res.set('Cache-Control', 'public, max-age=30');
      res.type('application/json').status(200).send(body);
    } catch (err) {
-+    if (hit) { res.set('X-Cache', 'stale'); res.type('application/json').status(200).send(hit.body); return; }
++    if (sendStale(res, hit)) return;
      res.status(502).json({ error: String(err && err.message || err) });
    }
+ });
 ```
 
 Then `firebase deploy --only functions:ncaa --project march-madness-snake-draft`, and `curl -sI` the scoreboard
@@ -358,3 +411,188 @@ firebase deploy --only functions:pollScoreboard --project march-madness-snake-dr
 Nothing is urgent before March; `pollScoreboard` does not write outside the 3/10-4/10 window. The replay script that
 found this is `caddyshack/tools/night-shift/progress/madness-scripts/ncaa-tournament-replay.js` (`--harness` points it
 at any checkout); with the fix it reports 67 writes, 0 pending, champion Michigan, in order and out of order.
+
+## 11. functions/scoreboard.js: a failing upstream must not be written as an empty day (found Shift 59, 2026-11-08)
+
+`pollScoreboard` treats a 403/404 from ncaa-api as "no scoreboard page for that date" and writes an empty day, so
+phones stay on the cache on an off day. That was true of the old ncaa.com feed. Today (checked 2026-11-08 against the
+live proxy and the ncaa-api source, `src/index.ts` scoreboard route):
+
+- a day without games is a plain **200** with `"games": []` (2026/07/15 and 2027/03/20 both answer that way);
+- a **404** is what ncaa-api returns for the current season when its own fetch of the NCAA feed fails: the new feed
+  throws, it falls through to the old endpoint logic, and that returns 404 for any year after 2025.
+
+So in March 2027 the 404 branch can only fire when the NCAA feed has a bad minute, and what it does then is replace
+`scoreboard/{today}` with zero events. Every phone gets that document from the server, treats it as current, shows
+"No games found" in the middle of a game and stays off the fallback poll. Nothing is logged, because the branch is
+silent. A longer outage reads as an empty day for as long as it lasts instead of "last known scores, unavailable". The
+sustained case is not far-fetched: ncaa-api reads the NCAA feed through a fixed persisted-query id, and when NCAA
+changes that id every scoreboard request fails this way until ncaa-api is updated and its public instance redeployed.
+
+The `madness/live-empty-day-guard` branch covers the phones (an empty document does not replace the same day's games,
+and the proxy's `upstreamStatus` answer counts as a failed poll). The function should stop writing the empty day over
+a good one. In `functions/scoreboard.js`:
+
+```diff
+       const r = await fetch(scoreboardUrl(ymd), { headers: FETCH_HEADERS });
+       if (r.status === 404 || r.status === 403) {
+-        // ncaa.com answers 403/404 for a date with no scoreboard page (an off day between rounds):
+-        // write an empty day so phones stay on the cache instead of falling back to direct polling.
++        // A day without games is a 200 with an empty list. 403/404 is ncaa-api failing to reach the NCAA feed
++        // (or, on the old feed, a date with no page): never let it replace games that are already cached.
++        const prev = await db.doc(`scoreboard/${ymd}`).get();
++        if (prev.exists && (prev.data().eventCount || 0) > 0) {
++          console.warn(`NCAA ${ymd} responded ${r.status}; keeping the ${prev.data().eventCount} games already cached`);
++          continue;
++        }
+         data = { games: [] };
+```
+
+The extra read only happens on a 403/404 tick. An off day (no document yet, or an empty one) is still written empty,
+so nothing changes there.
+
+Second, smaller, same file: the two `fetch` calls have no timeout and the function has 30 seconds for both dates.
+Before 4 am ET the list is [today, yesterday], and yesterday is the one with the late game still being played; a stalled
+request for today uses up the whole invocation and yesterday is not polled that minute. Give each request its own limit:
+
+```diff
+-      const r = await fetch(scoreboardUrl(ymd), { headers: FETCH_HEADERS });
++      const r = await fetch(scoreboardUrl(ymd), { headers: FETCH_HEADERS, signal: AbortSignal.timeout(10000) });
+```
+
+(the existing `catch` already logs and moves on to the next date). Deploy with section 10:
+
+```sh
+firebase deploy --only functions:pollScoreboard --project march-madness-snake-draft
+```
+
+Nothing is urgent before March; `pollScoreboard` does not write outside the 3/10-4/10 window.
+
+## 12. functions/index.js: "Game Final" goes to seats that are still in the room, each token once (found Shift 61, 2026-11-10)
+
+`notifyGameFinal` sends the final (and the "Leaderboard Shake-up") to every token in every document under
+`rooms/{room}/fcmTokens`, and it never asks whether the document's id is still one of the room's players. The phone
+writes its token under the player id it remembers for that room (localStorage, kept for good), so two normal events
+leave documents behind:
+
+- the commissioner starts a new tournament in the same room (`resetAll` clears `players`, and only the admin's own
+  phone forgets its id);
+- the commissioner removes a player.
+
+Until the staged `madness/fcm-token-current-player` branch (on top of #54, in its shared `writeFcmToken`) is in, every room snapshot on such a phone
+also re-writes that orphan document. Effects: a phone whose seat is gone keeps getting the room's finals, and a player
+who rejoined under a new id has the same token in two documents, so `sendEachForMulticast` sends each final to that
+phone twice (web push collapses them through the `tag`, the native shell does not). Fix in `functions/index.js`,
+inside `notifyGameFinal` (lines 136-148 as deployed; `players` is already parsed from the room state a few lines up):
+
+```diff
+   // Collect all FCM tokens for all players in this room
+   const tokenSnapshot = await db.collection(`rooms/${roomId}/fcmTokens`).get();
+   if (tokenSnapshot.empty) return;
+
+-  // Send game final notification to all players
++  // Send game final notification to the players who are in the room. A token document whose id is no
++  // longer a player (new tournament in the same room, or a removed player) is dropped and deleted; the
++  // phone that wrote it shows the join screen and writes a fresh document when it rejoins. Each token
++  // once: a phone that rejoined under a new id can still sit in an old document until that delete lands.
++  const seated = new Set(players.map(p => p.id));
++  const orphanDeletes = [];
+   const allTokens = [];
+   const tokenMap = {}; // token -> playerId for cleanup
+   tokenSnapshot.forEach(doc => {
++    if (!seated.has(doc.id)) { orphanDeletes.push(doc.ref.delete().catch(() => {})); return; }
+     const tokens = doc.data().tokens || [];
+     tokens.forEach(t => {
++      if (tokenMap[t]) return;
+       allTokens.push(t);
+       tokenMap[t] = doc.id;
+     });
+   });
++  await Promise.all(orphanDeletes);
+
+   if (allTokens.length === 0) return;
+```
+
+Why deleting is safe: a seat only leaves `players` through `removePlayer` or `resetAll`, and a new player's token
+document is written only after the snapshot that already carries the player (so the id is in the state the function
+reads). `notifyDraftTurn` is untouched: it reads one document, the current drafter's, who is seated by definition.
+The `tokenMap` dedupe keeps the stale-token cleanup (`cleanupStaleTokens`) exact: each failed token is removed from
+the one document it was counted from. Costs one delete per orphan document, once. Deploy with:
+
+```sh
+firebase deploy --only functions:notifyGameFinal --project march-madness-snake-draft
+```
+
+Nothing is urgent before March; the function only runs when a final is written. Worth doing before the first draft
+night if any room code is reused from 2026.
+
+## 13. sw.js: the score relay's answers are cached forever (found Shift 66, 2026-11-12; LIVE on the website today)
+
+The last branch of the `fetch` handler is cache-first for "everything else". That includes the app's requests to the
+score relay (`https://us-central1-….cloudfunctions.net/ncaa/...`): the first answer for a URL is stored in Cache
+Storage and every later request for the same URL gets that stored copy, for as long as `CACHE_NAME` stays the same.
+`fetch(url, { cache: 'no-store' })` from the page does not get past it. Two things follow in any browser where the
+service worker is active (the website and the installed web app; not the iOS app, which has no service worker):
+
+- **Live tab:** a day's scoreboard is frozen at the first answer of that day on that device whenever the app polls
+  the relay itself (always, until `pollScoreboard` is switched on; after that, whenever its document is stale or the
+  day is not covered). A day first looked at before its games tipped off stays "scheduled" on that device.
+- **Bracket import:** before Selection Sunday the relay answers the bracket route with 200 and an empty list. A
+  commissioner who taps Import early has that answer stored, and the import then says "not available yet" on that
+  device after Selection Sunday as well.
+- **First Four:** the play-in slots are filled in by asking for the same bracket address again, once an hour
+  (`autoResolvePlayIns`). A device that imported the bracket, or had the room open, before the First Four games
+  finished keeps getting the bracket as it was then, so on that device the play-in winners never fill in by
+  themselves (a device that first opens the room afterwards does resolve them and writes them to the room).
+
+Checked two ways on 2026-11-12. (1) Headless Chrome against the real `sw.js` with a counting endpoint on another
+origin: after the service worker controls the page, four requests in a row and one with `cache: 'no-store'` all
+return the first number. (2) The live site in a throwaway profile: after one visit to `/madness/?tab=live`, Cache
+Storage `mm-draft-v8` holds `…/ncaa/scoreboard/basketball-men/d1/2026/11/12`, and a page fetch of that URL returns
+the stored copy byte for byte.
+
+Fix: cache only what is meant to be cached (the app's own files and the Firebase SDK scripts), and bump the cache
+name so the answers already stored on people's devices are dropped when the new worker activates. The same bump
+covers sections 2, 4 and 7.
+
+```diff
+-const CACHE_NAME = 'mm-draft-v8';
++const CACHE_NAME = 'mm-draft-v9';
+```
+
+```diff
+   const url = new URL(event.request.url);
+ 
+-  // Pass through Firestore/Firebase API calls
+-  if (url.hostname.includes('firestore.googleapis.com') ||
+-      url.hostname.includes('firebaseio.com') ||
+-      (url.hostname.includes('firebase') && url.pathname.includes('/documents/'))) {
++  // Only the app's own files and the Firebase SDK scripts are cached. Everything else goes straight to the
++  // network untouched: Firestore, and the score relay (Cloud Functions), whose answers change every minute.
++  // Cache-first on the relay kept the first answer for a URL forever (frozen scores, a bracket import stuck on
++  // "not available yet").
++  if (event.request.method !== 'GET' ||
++      !(url.origin === self.location.origin || url.hostname === 'www.gstatic.com')) {
+     return;
+   }
+```
+
+The same two checks with this version of `sw.js`: the counting endpoint returns 1, 2, 3, 4, 5 and Cache Storage holds
+only the page, `index.html` and the two SDK scripts. The app loads nothing else from another origin (checked:
+`index.html`, `js/`), so nothing that was cached on purpose stops being cached.
+
+The app side has a stop-gap that does not need this deploy (branch `madness/relay-cache-bypass`: the stored answer
+is removed before each relay request). It keeps working after this change and can stay.
+
+## 14. One file for every sw.js change above: `docs/sw.proposed.js` (Shift 66, 2026-11-12)
+
+`docs/sw.proposed.js` is the `sw.js` on main (a0e8af82) with sections 2, 7a to 7e (7c corrected as noted there) and
+13 applied and the cache name at `mm-draft-v9`. Section 4 is not in it: it has to wait until the push payload
+change of section 3 is deployed. To use it: copy it over `madness/sw.js`, commit, merge.
+
+Checked in headless Chrome: the file installs (all five precache entries are stored, including the messaging
+script from 7e), a counting endpoint on another origin returns 1, 2, 3, 4, 5, 6 through it, and the app's Live tab
+served with it talks to the score relay directly (no service-worker answer for the relay at 1, 2, 8, 10 and 39
+seconds; the page reports no errors). Offline shell (7c): open the app, open `privacy.html`, stop the web server,
+open the app address again: the app's lobby is shown, not the privacy page. Not checked here: the push paths (7a,
+7b, 7d) need a real push to a real device, and none of this was run in Safari.
