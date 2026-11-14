@@ -14,14 +14,35 @@ const ncaa = {
     return d.slice(0, 4) + '/' + d.slice(4, 6) + '/' + d.slice(6, 8);
   },
 
+  /* A stalled connection (a phone that has just lost signal, iOS Safari waking up) can leave fetch pending for
+   * minutes: the bracket import stayed on 'Importing...' with its button disabled, and every 30 s poll started
+   * another request that never settled. After this long the request is abandoned and treated as a failure. */
+  timeoutMs: 15000,
+
+  /* The service worker answers any GET it has seen before from its own cache, for good, and a page cannot ask
+   * it not to. For the relay that meant the first scoreboard of the day, or a bracket asked for before Selection
+   * Sunday, was all this browser ever got. Remove the stored answer first so the request reaches the network.
+   * Never waits long and never fails the request: at worst this one request gets the stored answer again. */
+  async _dropStoredAnswer(url) {
+    if (typeof caches === 'undefined') return;
+    const drop = (async () => { for (const name of await caches.keys()) await (await caches.open(name)).delete(url, { ignoreVary: true }); })();
+    try { await Promise.race([drop, new Promise(r => setTimeout(r, 1000))]); } catch (e) {}
+    drop.catch(() => {});
+  },
+
   async _get(path) {
+    await this._dropStoredAnswer(NCAA_API_BASE + path);
+    const ctl = typeof AbortController === 'function' ? new AbortController() : null;
+    const timer = ctl ? setTimeout(() => ctl.abort(), this.timeoutMs) : null;
     try {
-      const r = await fetch(NCAA_API_BASE + path);
+      const r = await fetch(NCAA_API_BASE + path, ctl ? { signal: ctl.signal } : undefined);
       if (!r.ok) throw new Error(r.status);
       return await r.json();
     } catch (e) {
       console.warn('NCAA fetch failed:', path, e);
       return null;
+    } finally {
+      if (timer) clearTimeout(timer);
     }
   },
 
