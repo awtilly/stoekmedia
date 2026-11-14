@@ -270,6 +270,16 @@ function sanitizeSharedState(s){
       if(Array.isArray(s.bracket[k])) s.bracket[k] = s.bracket[k].map(id => (id == null || isSafeId(id)) ? id : null);
     }
   }
+  // Settings the page prints as numbers (footer scoring line, Settings tab) must arrive as numbers too.
+  const num = (v, fallback) => { const n = Number(v); return Number.isFinite(n) ? n : fallback; };
+  if('year' in s) s.year = Math.trunc(num(s.year, new Date().getFullYear()));
+  if('rp' in s){
+    const rp = (s.rp && typeof s.rp === 'object') ? s.rp : {};
+    s.rp = {};
+    for(const r of [1,2,3,4,5,6]) s.rp[r] = num(rp[r], 0);
+  }
+  if('ub' in s) s.ub = !!s.ub;
+  if('draftClockDuration' in s) s.draftClockDuration = Math.max(0, num(s.draftClockDuration, 0));
   return s;
 }
 
