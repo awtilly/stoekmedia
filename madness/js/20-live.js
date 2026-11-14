@@ -149,13 +149,19 @@ function subscribeScoreboard(dateStr) {
   _scoreboardUnsub = db.collection(SCOREBOARD_COLLECTION).doc(dateStr).onSnapshot(doc => {
     if (!doc.exists || !applyCachedScoreboard(doc.data(), !!(doc.metadata && doc.metadata.fromCache))) {
       _scoreboardFresh = false;
+      _cancelLiveFallback(); // this poll is the one the fallback timer was waiting to make
       refreshLiveScores();
     }
   }, err => {
     console.warn('Scoreboard cache unavailable, polling the scoreboard directly:', err && err.code || err);
     _scoreboardFresh = false;
+    _cancelLiveFallback();
     refreshLiveScores();
   });
+}
+
+function _cancelLiveFallback() {
+  if (_liveFallbackTimer) { clearTimeout(_liveFallbackTimer); _liveFallbackTimer = null; }
 }
 
 function unsubscribeScoreboard() {
