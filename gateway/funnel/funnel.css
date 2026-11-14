@@ -52,6 +52,17 @@ input[type=text],input[type=email],input[type=tel]{font:inherit;padding:13px 14p
 .slot{border:1.5px solid var(--navy);background:#fff;color:var(--navy);border-radius:8px;padding:12px 14px;font-weight:600}
 .slot[aria-pressed=true]{background:var(--ok);border-color:var(--ok);color:#fff}
 .okline{background:var(--ok-bg);color:var(--ok);font-weight:600;border-radius:8px;padding:10px 14px}
+/* locked calendar preview */
+.cal{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px;display:flex;flex-direction:column;gap:10px}
+.calhead{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}
+.calhead span{font-size:13px;color:var(--muted)}
+.calwrap{position:relative}
+.calgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;text-align:center;font-size:14px;opacity:.45;font-variant-numeric:tabular-nums}
+.calgrid .dow{font-size:11px;font-weight:700;color:var(--muted)}
+.calgrid .day{padding:7px 0;border-radius:8px}
+.calgrid .day.on{background:var(--gold);color:var(--navy);font-weight:700}
+.callock{position:absolute;left:50%;bottom:2px;transform:translateX(-50%);background:#fff;border:1px solid var(--line);border-radius:8px;padding:10px 14px;font-weight:600;font-size:14.5px;text-align:center;width:max-content;max-width:86%;box-shadow:0 2px 10px rgba(10,22,40,.12)}
+.consent{font-size:12.5px;color:var(--muted);line-height:1.45}
 /* hub: ads */
 .tabs{display:flex;flex-wrap:wrap;gap:8px}
 .tab{border:1.5px solid var(--line);background:#fff;color:var(--navy);border-radius:999px;padding:8px 16px;font-weight:600;font-size:15px}

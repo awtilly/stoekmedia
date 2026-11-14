@@ -72,7 +72,7 @@ if(page==="start"){
     function(){return{c:text("f-sites","text","How many sites, and what hours need coverage?","sites","Rough is fine",true),ok:function(){return (a.sites||"").trim()}}},
     function(){return{c:[radios("pain","Which sounds most like your setup?",PAINS,function(){return a.pain},function(v){a.pain=v})],ok:function(){return a.pain!=null}}},
     function(){return{c:[radios("con","When does your current contract come up?",CONS,function(){return a.contract},function(v){a.contract=v})],ok:function(){return a.contract}}},
-    function(){return{c:[el("div",{"class":"main",style:"font-family:var(--serif);font-weight:700;font-size:24px",text:"Where should we reach you?"})].concat(text("f-email","email","Email","email"),text("f-co","text","Company","company"),text("f-ph","tel","Phone","phone")),ok:function(){return (a.email||"").trim()&&(a.phone||"").trim()}}}
+    function(){return{c:[el("div",{"class":"main",style:"font-family:var(--serif);font-weight:700;font-size:24px",text:"Where should we reach you?"})].concat(text("f-email","email","Email","email"),text("f-co","text","Company","company"),text("f-ph","tel","Phone","phone"),[el("p",{"class":"consent",text:"By sending this, you agree that Gateway Security may call and text you at this number about your request. Message and data rates may apply. Reply STOP to opt out."})]),ok:function(){return (a.email||"").trim()&&(a.phone||"").trim()}}}
   ];
   function drawForm(){
     var box=$("form");box.textContent="";var cur=Q[step](),last=step===Q.length-1;
@@ -82,6 +82,15 @@ if(page==="start"){
     box.appendChild(f);var first=f.querySelector("input");if(first&&first.type!=="radio")first.focus();f.scrollIntoView({block:"nearest"});
   }
   $("open").addEventListener("click",function(){clearInterval(vt);$("open").hidden=true;step=0;drawForm()});
+  (function(){var box=$("cal");if(!box)return;var now=new Date(),y=now.getFullYear(),mo=now.getMonth(),mons=["January","February","March","April","May","June","July","August","September","October","November","December"];
+    var open={},x=new Date(now.getTime()),n=0;while(n<4){x.setDate(x.getDate()+1);if(x.getDay()!==0&&x.getDay()!==6){if(x.getMonth()===mo)open[x.getDate()]=1;n++}}
+    if(Object.keys(open).length<2){mo=(mo+1)%12;if(mo===0)y++;open={};x=new Date(y,mo,1);n=0;while(n<4){if(x.getDay()!==0&&x.getDay()!==6){open[x.getDate()]=1;n++}x.setDate(x.getDate()+1)}}
+    var grid=el("div",{"class":"calgrid","aria-hidden":"true"});["S","M","T","W","T","F","S"].forEach(function(d){grid.appendChild(el("span",{"class":"dow",text:d}))});
+    var first=new Date(y,mo,1).getDay(),days=new Date(y,mo+1,0).getDate();for(var i=0;i<first;i++)grid.appendChild(el("span"));
+    for(var d=1;d<=days;d++)grid.appendChild(el("span",{"class":open[d]?"day on":"day",text:String(d)}));
+    box.appendChild(el("div",{"class":"calhead"},[el("b",{text:mons[mo]+" "+y}),el("span",{text:"Times open this week"})]));
+    box.appendChild(el("div",{"class":"calwrap"},[grid,el("div",{"class":"callock",text:"Answer six short questions to pick a time."})]));
+  })();
 }
 
 /* ---------- thank-you and booking ---------- */
