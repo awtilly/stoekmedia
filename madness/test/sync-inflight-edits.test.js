@@ -148,3 +148,24 @@ test('the echo never arrives on its own (another phone changed the same setting 
   assert.equal(app.S.ub, server().ub);
   assert.deepEqual(app.eval('Object.keys(_inFlight)'), []);
 }));
+
+test('toggled back while the first save is being retried: the confirmation of that save does not make the newer tap "nothing to send"', withTimers(async () => {
+  const { app, step, finish, fire, elsewhere, deliver, set, server, srv } = steppedRoom();
+  set('ub', false);
+  await fire();                                     // save 1 is on its way
+  deliver(elsewhere(r => { r.rp[3] = 9; }));        // an older, unrelated change: held back for "ub"
+  await step(0);                                    // save 1 has read the room
+  const later = elsewhere(r => { r.year = 2031; }); // another phone commits first: save 1 will be run again
+  set('ub', true);                                  // tapped back; this edit waits in the debounce
+  await finish(0);                                  // save 1 lands ("off") and is confirmed
+  assert.equal(server().ub, false);
+  assert.equal(app.S.ub, true, 'the newer tap stays on screen');
+  await fire();                                     // the debounce runs out
+  await finish(1);
+  assert.equal(server().ub, true, 'the newer tap reached the server');
+  deliver(later);
+  deliver(srv.state);
+  assert.equal(app.S.ub, true);
+  assert.equal(app.S.year, 2031);
+  assert.equal(app.S.rp[3], 9);
+}));

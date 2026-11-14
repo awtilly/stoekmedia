@@ -245,7 +245,10 @@ function _writeSharedState(){
       const f = _inFlight[k];
       if(f.no !== writeNo) continue;
       f.acked = true;
-      if(f.held && _serverSeen !== preState){ delete _inFlight[k]; reapply = true; }
+      // Not a key edited again since (that edit is waiting in the debounce): the older snapshot's value would become
+      // its baseline, and where the two are equal the newer edit was judged "nothing to send". It stays in flight,
+      // confirmed, so the baseline stays the value this save sent until its echo or the newer save.
+      if(f.held && _serverSeen !== preState && JSON.stringify(S[k]) === f.v){ delete _inFlight[k]; reapply = true; }
     }
     if(reapply && roomId && ref.id === roomId && _lastRoomDoc && !_pickInFlight){
       _lastSyncedState = null;
