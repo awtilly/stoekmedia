@@ -32,7 +32,12 @@ function _showModal(html) {
     overlay.addEventListener('click', e => { if (e.target === overlay) overlay._close(null); });
 
     const input = overlay.querySelector('.modal-input');
-    if (input) setTimeout(() => input.focus(), 100);
+    if (input) {
+      // Focus synchronously: iOS Safari only opens the keyboard for a focus() that runs inside the
+      // user's tap, so a delayed focus leaves the PIN/name box without a keyboard until it is tapped.
+      try { input.focus({ preventScroll: true }); } catch (e) { input.focus(); }
+      setTimeout(() => { if (document.activeElement !== input) input.focus(); }, 100);
+    }
   });
 }
 
