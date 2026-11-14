@@ -13,7 +13,7 @@ button{font:inherit;cursor:pointer}
 :focus-visible{outline:3px solid var(--gold);outline-offset:2px}
 .top{color:var(--navy);padding:22px 24px 0;max-width:1180px;margin:0 auto;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
 .top .name{font-family:var(--serif);font-weight:800;letter-spacing:.02em;text-transform:uppercase;font-size:17px;text-decoration:none}
-.top .name b{color:#9a7a12}
+.top .name b{color:#7a5f08}
 .top .tel{font-size:14px;color:var(--muted);font-weight:500}
 main{max-width:680px;margin:0 auto;padding:36px 20px 56px;display:flex;flex-direction:column;gap:22px}
 main.wide{max-width:1180px}
@@ -43,7 +43,9 @@ p{margin:0}
 fieldset{border:0;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
 input[type=text],input[type=email],input[type=tel]{font:inherit;padding:13px 14px;border:1.5px solid var(--line);border-radius:8px;width:100%;background:#fff;color:var(--navy)}
 .opt{display:flex;gap:12px;align-items:center;border:1.5px solid var(--line);border-radius:8px;padding:13px 14px;background:#fff}
-.opt:has(input:checked){border-color:var(--navy);background:#eef1f7;font-weight:600}
+.opt.sel{border-color:var(--navy);background:#eef1f7;font-weight:600}
+.opt{cursor:pointer;min-height:48px}
+.opt input{width:20px;height:20px;flex:none;accent-color:var(--navy)}
 .sm{font-size:14px;color:var(--muted)}
 .warn{font-size:14px;color:#9a3412;min-height:1.3em}
 .row{display:flex;gap:10px;justify-content:space-between;align-items:center;flex-wrap:wrap}
@@ -98,12 +100,12 @@ footer a{color:var(--muted)}
 @media (prefers-reduced-motion:no-preference){.fade{animation:fade .3s ease-out}@keyframes fade{from{opacity:.3;transform:translateY(5px)}to{opacity:1;transform:none}}}
 
 /* ---- v2 layout: copy on the left, booking card on the right ---- */
-.eyebrow{font-size:13px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#9a7a12}
+.eyebrow{font-size:13px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#7a5f08}
 .subhead{font-size:clamp(17px,2.4vw,20px);color:#3c465a;max-width:46ch}
 .split{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(0,.92fr);gap:56px;align-items:start}
 .split .copy{display:flex;flex-direction:column;gap:22px}
 .split .book{position:sticky;top:24px}
-@media (max-width:900px){.split{display:flex;flex-direction:column;gap:22px}.split .copy{display:contents}.split .book{position:static;order:1}.split .review{order:2}.split .next3{order:3}}
+@media (max-width:900px){.split{display:flex;flex-direction:column;align-items:stretch;gap:22px;max-width:680px;margin:0 auto;width:100%}.split .copy{display:contents}.split .book{position:static;order:1}.split .review{order:2}.split .next3{order:3}.split .eyebrow{order:-4}.split h1{order:-3}.split .video{order:-2}.split #open{order:-1}}
 .marks{display:flex;flex-wrap:wrap;gap:8px 22px;font-size:14.5px;font-weight:600}
 .marks span{display:flex;align-items:center;gap:8px}
 .marks span::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--gold)}
@@ -121,3 +123,25 @@ footer a{color:var(--muted)}
 .review .g{font-weight:700;color:var(--navy);border:1px solid var(--line);border-radius:999px;padding:3px 11px;font-size:13px;background:#fbf8f1}
 .next3 div{border-top:3px solid var(--gold)}
 .tab[aria-pressed=true]{background:var(--navy)}
+
+/* ---- device hardening ---- */
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+body{overflow-wrap:break-word;min-width:300px}
+img,video{max-width:100%}
+.video{width:100%;min-width:0}
+@supports not (aspect-ratio:16/9){.video{min-height:200px}}
+input,button,.btn,.slot,.tab{-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+input[type=text],input[type=email],input[type=tel]{font-size:17px;min-height:50px;-webkit-appearance:none;appearance:none}
+.btn,.slot{min-height:48px}
+.top{padding-left:max(20px,env(safe-area-inset-left));padding-right:max(20px,env(safe-area-inset-right))}
+main{padding-left:max(20px,env(safe-area-inset-left));padding-right:max(20px,env(safe-area-inset-right))}
+.noscript{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px 16px;font-weight:600}
+@media (max-width:480px){.video small{position:static;opacity:.7}.video{padding:16px 14px;gap:8px}.video .play{width:54px;height:54px;font-size:20px}}
+@media (max-width:380px){
+  h1{font-size:29px}
+  .card{padding:18px}
+  .stepsline{gap:10px;font-size:13px}
+  .top .tel{font-size:13px}
+  .row .btn{padding:14px 18px}
+}
+@media (min-width:901px) and (max-width:1100px){.split{gap:32px}}

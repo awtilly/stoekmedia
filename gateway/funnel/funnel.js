@@ -27,7 +27,9 @@ var ASK=" Want 15 minutes to go over your site?";
 var VIDEO=["I'm [first name], [title] at Gateway Security. St. Louis-built, family-run.","If you're responsible for security at a building, a store or a clinic in St. Louis, you probably already have a security company, and you're probably the one managing it.","Here's how it starts: a short call, then a walk of your site, an honest read on your setup, whoever you hire.","Then a proposal in person, and a written plan."];
 
 var qs=new URLSearchParams(location.search);
-function store(k,v){try{if(v===undefined)return JSON.parse(sessionStorage.getItem(k)||"null");sessionStorage.setItem(k,JSON.stringify(v))}catch(e){return null}}
+function bag(){try{var o=JSON.parse(window.name||"{}");return o&&o.gw?o:{gw:1}}catch(e){return{gw:1}}}
+function store(k,v){if(v===undefined){try{var r=sessionStorage.getItem(k);if(r!==null)return JSON.parse(r)}catch(e){}var b=bag();return b[k]===undefined?null:b[k]}
+  try{sessionStorage.setItem(k,JSON.stringify(v))}catch(e){}try{var o=bag();o[k]=v;window.name=JSON.stringify(o)}catch(e2){}}
 var segKey=SEG[qs.get("s")]?qs.get("s"):((store("gw-seg"))||null);
 if(SEG[qs.get("s")])store("gw-seg",qs.get("s"));
 var ch=qs.get("c")||store("gw-ch")||"";if(qs.get("c"))store("gw-ch",qs.get("c"));
@@ -64,8 +66,9 @@ if(page==="start"){
   var step=0;
   var PROPS=["Office or commercial building","Retail or mixed-use property","Medical facility","Something else"];
   var CONS=["In the next 3 months","In about 4 months","Later than that","No contract","Not sure"];
-  function radios(name,legend,list,get,set){var fs=el("fieldset",null,[el("legend",{text:legend})]);list.forEach(function(o,n){var r=el("input",{type:"radio",name:name,id:name+n});r.checked=get()===(typeof o==="string"?o:n);r.addEventListener("change",function(){set(typeof o==="string"?o:n)});fs.appendChild(el("label",{"class":"opt","for":name+n},[r,typeof o==="string"?o:o.opt]))});return fs}
-  function text(id,type,lab,key,ph,main){var i=el("input",{type:type,id:id,value:a[key]||"",placeholder:ph||"",autocomplete:"off"});i.addEventListener("input",function(){a[key]=i.value});return [el("label",{"for":id,"class":main?"main":"sm",text:lab}),i]}
+  function radios(name,legend,list,get,set){var fs=el("fieldset",null,[el("legend",{text:legend})]);list.forEach(function(o,n){var r=el("input",{type:"radio",name:name,id:name+n});r.checked=get()===(typeof o==="string"?o:n);var lab=el("label",{"class":"opt"+(r.checked?" sel":""),"for":name+n},[r,typeof o==="string"?o:o.opt]);r.addEventListener("change",function(){set(typeof o==="string"?o:n);var all=fs.querySelectorAll(".opt");for(var q=0;q<all.length;q++)all[q].className="opt";lab.className="opt sel"});fs.appendChild(lab)});return fs}
+  var AC={name:"given-name",email:"email",company:"organization",phone:"tel"};
+  function text(id,type,lab,key,ph,main){var i=el("input",{type:type,id:id,name:key,value:a[key]||"",placeholder:ph||"",autocomplete:AC[key]||"off"});if(type==="email"){i.setAttribute("inputmode","email");i.setAttribute("autocapitalize","none")}i.addEventListener("input",function(){a[key]=i.value});return [el("label",{"for":id,"class":main?"main":"sm",text:lab}),i]}
   var Q=[
     function(){return{c:text("f-name","text","What's your first name?","name","",true),ok:function(){return (a.name||"").trim()}}},
     function(){return{c:[radios("prop",(a.name?a.name+", what":"What")+" kind of property?",PROPS,function(){return a.prop},function(v){a.prop=v})],note:s?"We filled this in from the ad you came from. Change it if it's wrong.":"",ok:function(){return a.prop}}},
@@ -74,12 +77,14 @@ if(page==="start"){
     function(){return{c:[radios("con","When does your current contract come up?",CONS,function(){return a.contract},function(v){a.contract=v})],ok:function(){return a.contract}}},
     function(){return{c:[el("div",{"class":"main",style:"font-family:var(--serif);font-weight:800;font-size:22px;letter-spacing:-.01em",text:"Where should we reach you?"})].concat(text("f-email","email","Email","email"),text("f-co","text","Company","company"),text("f-ph","tel","Phone","phone"),[el("p",{"class":"consent",text:"By sending this, you agree that Gateway Security may call and text you at this number about your request. Message and data rates may apply. Reply STOP to opt out."})]),ok:function(){return (a.email||"").trim()&&(a.phone||"").trim()}}}
   ];
+  function fit(){var b=$("book");if(!b)return;b.style.position="";var wide=window.matchMedia&&window.matchMedia("(min-width:901px)").matches;if(wide&&b.offsetHeight>window.innerHeight-48)b.style.position="static"}
+  window.addEventListener("resize",fit);
   function drawForm(focus){
     var box=$("form");box.textContent="";var cur=Q[step](),last=step===Q.length-1;
     var warn=el("p",{"class":"warn",role:"status"});
     var f=el("form",{"class":"card fade",novalidate:""},[el("div",{"class":"count",text:"Question "+(step+1)+" of "+Q.length}),el("div",{"class":"prog"},[el("i",{style:"width:"+Math.round((step+1)/Q.length*100)+"%"})]),el("div",{"class":"q"},cur.c),cur.note?el("p",{"class":"sm",text:cur.note}):null,warn,el("div",{"class":"row"},[step>0?el("button",{type:"button","class":"btn line",text:"Back",on:{click:function(){step--;drawForm(true)}}}):el("span"),el("button",{type:"submit","class":"btn gold",text:last?"Send":"Next"})])]);
     f.addEventListener("submit",function(e){e.preventDefault();if(!cur.ok()){warn.textContent=last?"Add an email and a phone number so we can reach you.":"Answer this one to continue.";return}if(last){store("gw-answers",a);store("gw-booked",null);location.href="../thanks/"}else{step++;drawForm(true)}});
-    box.appendChild(f);if(focus){var first=f.querySelector("input");if(first&&first.type!=="radio")first.focus({preventScroll:true});$("book").scrollIntoView({block:"nearest"})}
+    box.appendChild(f);fit();if(focus){var first=f.querySelector("input");if(first&&first.type!=="radio")first.focus({preventScroll:true});$("book").scrollIntoView({block:"nearest"})}
   }
   drawForm(false);
   $("open").addEventListener("click",function(e){e.preventDefault();clearInterval(vt);$("book").scrollIntoView({behavior:"smooth",block:"start"});var i=$("form").querySelector("input");if(i)setTimeout(function(){i.focus({preventScroll:true})},350)});
