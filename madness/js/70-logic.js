@@ -441,7 +441,7 @@ function scores(){
 // derived from. A player the server has but we do not is either one we removed on purpose (was in
 // knownIds, stays removed) or one another device added since our snapshot (not in knownIds, kept).
 // Without knownIds nobody is dropped: resurrecting a removed player is a redo, losing one is data loss.
-function mergeSharedState(local, remote, knownIds){
+function mergeSharedState(local, remote, knownIds, remoteIsServer){
   const out = Object.assign({}, local);
   if(!remote || !remote.ds || !local || !local.ds) return out;
   // ds.epoch is bumped by every action that moves the draft backwards (start, reset, undo). A higher
@@ -455,6 +455,11 @@ function mergeSharedState(local, remote, knownIds){
     const remoteRosters = {};
     for(const p of (remote.players || [])) remoteRosters[p.id] = p.teamIds || [];
     players = players.map(p => Object.assign({}, p, { teamIds: remoteRosters[p.id] || p.teamIds || [] }));
+  }
+  if(remoteIsServer && knownIds){
+    const kn = new Set(knownIds), there = new Set((remote.players || []).map(p => p && p.id));
+    const kept = players.filter(p => there.has(p.id) || !kn.has(p.id));
+    if(kept.length !== players.length){ players = kept; out.players = players; }
   }
   const have = new Set(players.map(p => p.id));
   const known = knownIds ? new Set(knownIds) : null;
