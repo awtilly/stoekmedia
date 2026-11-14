@@ -292,3 +292,23 @@ test('a player removed on another phone while this phone was adding somebody sta
   deliver(srv.state);
   assert.deepEqual(app.S.players.map(p => p.id), ['p1', 'n7'], 'and this phone shows what the room holds');
 }));
+
+test('six saves of one setting, then a very old update arrives while a seventh change waits: the seventh is still sent', withTimers(async () => {
+  const { app, txs, finish, fire, deliver, set, server, srv } = steppedRoom();
+  const rpWith = n => Object.assign({}, app.S.rp, { 3: n });
+  let afterFirst = null;
+  for (let i = 0; i < 6; i++) {
+    set('rp', rpWith(11 + i));
+    await fire();
+    await finish(i);                                // the save lands; its echo has not reached this phone yet
+    if (i === 0) afterFirst = srv.state;
+  }
+  assert.equal(server().rp[3], 16);
+  set('rp', rpWith(40));                            // the seventh change waits in the debounce
+  deliver(afterFirst);                              // the room as it was after this phone's own first save
+  assert.equal(app.S.rp[3], 40, 'the change being made is still on screen');
+  await fire();
+  assert.equal(txs.length, 7, 'and it is sent');
+  await finish(6);
+  assert.equal(server().rp[3], 40);
+}));

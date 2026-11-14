@@ -176,7 +176,7 @@ function _writeSharedState(){
   _syncBase = localJson; // these edits are now with this write; the next write sends only what changes after this
   _syncedShared = JSON.parse(localJson); // nothing is pending any more: this is what the server is being sent
   _recentSent.push(shared);
-  if(_recentSent.length > 4) _recentSent.shift();
+  if(_recentSent.length > 12) _recentSent.shift();
   const seqAtStart = _snapshotSeq;
   // A later save from this phone that also carries a key makes this one's copy of that key the older one.
   const writeNo = ++_writeSeq;
