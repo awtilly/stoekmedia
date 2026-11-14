@@ -124,4 +124,12 @@
     <priority>0.5</priority>
   </url>
 
+  <!-- Privacy -->
+  <url>
+    <loc>https://stoekmedia.com/privacy/</loc>
+    <lastmod>2026-11-13</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.2</priority>
+  </url>
+
 </urlset>

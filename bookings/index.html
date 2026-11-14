@@ -23,6 +23,11 @@
     window.dataLayer = window.dataLayer || [];
     function gtag(){dataLayer.push(arguments);}
     gtag('js', new Date());
+    // Consent defaults, set before config: no advertising storage anywhere, and no
+    // analytics cookies in the EEA, UK or Switzerland (counted cookieless instead).
+    // /privacy/ describes exactly this, so change the two together.
+    gtag('consent', 'default', { ad_storage: 'denied', ad_user_data: 'denied', ad_personalization: 'denied', analytics_storage: 'granted' });
+    gtag('consent', 'default', { analytics_storage: 'denied', region: ['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','IS','LI','NO','GB','CH'] });
     gtag('config', 'G-B30VB9NW4P');
   </script>
 </head>
@@ -102,6 +107,7 @@
           <li><a href="/software/">Software</a></li>
           <li><a href="/#about">About</a></li>
           <li><a href="/bookings/">Contact</a></li>
+          <li><a href="/privacy/">Privacy</a></li>
         </ul>
       </div>
       <div class="footer-bottom">
