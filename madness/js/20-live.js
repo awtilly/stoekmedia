@@ -18,6 +18,7 @@ let _scoreboardFresh = false; // true while the cached doc is current; direct po
 let _scoreboardSeenAt = 0;    // local clock when the last usable snapshot arrived (freshness is measured from here, so a wrong phone clock cannot defeat the cache)
 let _scoreboardDate = null;   // the scoreboard/{date} doc the listener is on (null = not listening)
 let _liveFallbackTimer = null; // startLiveRefresh's one-shot "cached doc did not arrive" poll
+let _liveScoresDay = null;     // the scoreboard day liveScores was last filled from (null = unknown)
 
 function localDateStr(d) {
   const n = d || new Date();
@@ -38,10 +39,26 @@ function scoreboardIsFresh(data, now) {
 function applyCachedScoreboard(data, fromCache) {
   const usable = fromCache ? scoreboardIsFresh(data) : scoreboardDocValid(data);
   if (!usable) { _scoreboardFresh = false; return false; }
+  // A day's games do not all vanish. An empty doc for the day already on screen is the function having been told
+  // "nothing" by a failing upstream (ncaa-api answers 404 when its own fetch fails, and the function writes that
+  // as an empty day): keep the scores we have and say so. The function is alive (this document just arrived) and
+  // the relay would ask the same upstream, so a direct poll could not do better and every phone polling it would
+  // only add load while the source is struggling: stay on the cache and wait for the next good document.
+  if (data.events.length === 0 && liveScores.length > 0 && _liveScoresDay !== null && _liveScoresDay === _scoreboardDate) {
+    _scoreboardFresh = true;
+    _scoreboardSeenAt = Date.now();
+    liveLastError = true;
+    if (S.phase === 'live') {
+      const c = document.getElementById('c');
+      if (c) renderLive(c);
+    }
+    return true;
+  }
   _scoreboardFresh = true;
   _scoreboardSeenAt = Date.now();
   liveLastError = false;
   liveScores = data.events;
+  _liveScoresDay = _scoreboardDate;
   liveLastRefresh = data.fetchedAt.toMillis();
   checkGameFinals();
   if (S.phase === 'live') {
@@ -85,6 +102,7 @@ async function refreshLiveScores() {
   liveLastError = !data; // fetchScoreboard returns null on any failure
   if (data) {
     liveScores = ncaa.parseScoreboard(data);
+    _liveScoresDay = dateStr;
     liveLastRefresh = Date.now();
     checkGameFinals();
   }
