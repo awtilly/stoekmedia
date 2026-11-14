@@ -254,11 +254,38 @@ async function adminJoinAsPlayer(){
   render();
 }
 
+/* The "Already in this pool?" card: the only part of the join screen that depends on who else has joined. */
+function _joinReturningHTML(players, started){
+  return players.length > 0 ? `
+        ${started ? '' : '<div class="lobby-or">or</div>'}
+        <div class="lobby-card">
+          <h3>Already in this pool?</h3>
+          <p>Tap your name and enter your PIN.</p>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            ${players.map(p => `<button class="btn btn-secondary" style="width:100%;justify-content:center" onclick="claimPlayer('${p.id}')">${escapeHtml(p.name)}</button>`).join('')}
+          </div>
+        </div>
+      ` : '';
+}
+
+let _joinScreenKey = null; // room and form variant (draft started? invite code needed?) whose join form is on the page
+
 function renderJoinScreen(){
   const players = S.players || [];
   const started = !!(S.ds && S.ds.started);
   const needKey = !!S.joinKey && knownJoinKey(roomId) !== S.joinKey;
   const status = !started ? 'Draft not started' : S.ds.complete ? 'Draft complete' : 'Draft in progress';
+  // Every room update redraws this screen (somebody else has just joined). When this room's form is already on
+  // the page only the list of names is refreshed: rebuilding the form wiped the name and PIN being typed and
+  // closed the keyboard, and on join night an update arrives every few seconds. A change to the form itself
+  // (the draft started, an invite code is now needed) still rebuilds it.
+  const screenKey = roomId + '|' + started + '|' + needKey;
+  const list = document.getElementById('join-returning');
+  if(list && _joinScreenKey === screenKey && document.getElementById('join-name')){
+    list.innerHTML = _joinReturningHTML(players, started);
+    return;
+  }
+  _joinScreenKey = screenKey;
   document.getElementById("app").innerHTML = `
     <div class="lobby">
       ${appTitleHTML()}
@@ -277,16 +304,7 @@ function renderJoinScreen(){
           <button class="btn btn-primary" style="width:100%;justify-content:center" onclick="selfRegister()">Join</button>
         </div>
       </div>`}
-      ${players.length > 0 ? `
-        ${started ? '' : '<div class="lobby-or">or</div>'}
-        <div class="lobby-card">
-          <h3>Already in this pool?</h3>
-          <p>Tap your name and enter your PIN.</p>
-          <div style="display:flex;flex-direction:column;gap:6px">
-            ${players.map(p => `<button class="btn btn-secondary" style="width:100%;justify-content:center" onclick="claimPlayer('${p.id}')">${escapeHtml(p.name)}</button>`).join('')}
-          </div>
-        </div>
-      ` : ''}
+      <div id="join-returning">${_joinReturningHTML(players, started)}</div>
       ${!isNativeShell ? `<p class="join-meta" style="margin-top:16px">On iPhone? <a href="${APP_STORE_URL}" target="_blank" rel="noopener">Get the app</a> for draft alerts.</p>` : ''}
       <div style="margin-top:16px;display:flex;gap:8px;justify-content:center">
         <button class="btn btn-secondary btn-sm" onclick="goHome()">Switch Tournament</button>
