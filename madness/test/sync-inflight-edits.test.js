@@ -37,7 +37,7 @@ function steppedRoom() {
   };
   app.roomId = 'AAAA';
   vm.runInThisContext('_firestoreWriteTimer = null; _isRemoteUpdate = false; _lastSyncedState = null; _syncBase = null; _lastSnapshotPlayerIds = null; _syncedShared = null; _sharedAtSync = null; _queuedPlainWrites = {}; _writeRetries = 0;');
-  vm.runInThisContext('_serverSeen = null; _recentSent = []; _snapshotSeq = 0; _writeSeq = 0; _keyWriteNo = {}; _inFlight = {}; _rosterInFlight = {}; _rosterGone = {}; _pendingBase = {}; _echoWriteNo = 0; _lastRoomDoc = null; _pickInFlight = false;');
+  vm.runInThisContext('_serverSeen = null; _recentSent = []; _snapshotSeq = 0; _writeSeq = 0; _keyWriteNo = {}; _inFlight = {}; _rosterInFlight = {}; _rosterGone = {}; _rosterRemovedNo = {}; _pendingBase = {}; _echoWriteNo = 0; _lastRoomDoc = null; _pickInFlight = false;');
   Object.defineProperty(globalThis, 'navigator', { value: { onLine: true }, configurable: true, writable: true });
   const deliver = state => app._applyRoomSnapshot({ exists: true, data: () => ({ state }), metadata: {} });
   const shared = JSON.parse(JSON.stringify(app.S));
@@ -460,4 +460,26 @@ test('a removal waiting to be saved survives a snapshot from before that player 
   await fire();
   for (let i = 1; i < txs.length; i++) await finish(i);
   assert.deepEqual(server().players.map(p => p.id), ['p1'], 'and taken out of the room');
+}));
+
+test('an older save that lands after the newer save which removed a player does not put them back', withTimers(async () => {
+  const { app, txs, finish, fire, set, elsewhere, deliver, server } = steppedRoom();
+  const run = app.db.runTransaction;
+  let confirm = null;
+  app.db.runTransaction = fn => { const p = run(fn); return txs.length === 1 ? p.then(() => new Promise(r => { confirm = r; })) : p; };
+  set('players', app.S.players.concat([NEW]));
+  await fire();
+  await finish(0);                                  // n5 is in the room; the confirmation is still on its way
+  set('players', app.S.players.map(p => p.id === 'p1' ? Object.assign({}, p, { name: 'Anne' }) : p));
+  await fire();                                     // save 2: a rename; it lists n5 and waits
+  confirm();
+  await new Promise(r => setImmediate(r));
+  set('players', app.S.players.filter(p => p.id !== 'n5'));
+  await fire();                                     // save 3: n5 removed
+  await finish(2);                                  // save 3 lands first
+  assert.deepEqual(server().players.map(p => p.id), ['p1']);
+  deliver(elsewhere(r => { r.rp[3] = 9; }));        // another phone's change: this phone now sees a room without n5
+  await finish(1);                                  // save 2 lands after it
+  assert.deepEqual(server().players.map(p => p.id), ['p1'], 'the older save did not put n5 back');
+  assert.equal(server().players[0].name, 'Anne');
 }));

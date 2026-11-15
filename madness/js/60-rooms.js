@@ -39,6 +39,8 @@ let _rosterInFlight = {};
 // Players this phone added and took off again before the room was seen to hold them (id -> how many more times a
 // snapshot bringing them is answered with the removal). The room can still get them from the save that added them.
 let _rosterGone = {};
+// Players a save of this phone removed (id -> that save's number): an older save still on its way leaves them out.
+let _rosterRemovedNo = {};
 // The ids above that `players` (a roster of this phone) does not list: "removed here", whatever the server says.
 function _removedHereIds(players){
   const has = id => (players || []).some(p => p && p.id === id);
@@ -207,6 +209,7 @@ function _writeSharedState(){
   if(mine) for(const k of mine){ if(k !== 'ds' && k !== 'players') _inFlight[k] = { v: JSON.stringify(shared[k]), no: writeNo, sent: false, held: false, acked: false }; }
   const adding = []; // the players this save is adding
   if(mine && mine.includes('players')){
+    for(const p of ((base && base.players) || [])){ if(p && p.id && !(shared.players || []).some(q => q && q.id === p.id)) _rosterRemovedNo[p.id] = writeNo; }
     const had = new Set(((base && base.players) || []).map(p => p.id));
     for(const p of (shared.players || [])){ if(p && p.id && !had.has(p.id)){ _rosterInFlight[p.id] = writeNo; adding.push(p.id); } }
   }
@@ -238,7 +241,8 @@ function _writeSharedState(){
     // already made) that removal, and this one may be landing after it. Not written.
     // (Also one an earlier save of this phone was adding: this save was started while they were still listed.)
     if(roomId && ref.id === roomId){
-      const off = adding.filter(id => !(S.players || []).some(p => p && p.id === id)).concat(_removedHereIds(S.players));
+      const off = adding.filter(id => !(S.players || []).some(p => p && p.id === id)).concat(_removedHereIds(S.players))
+        .concat(Object.keys(_rosterRemovedNo).filter(id => _rosterRemovedNo[id] > writeNo)); // removed by a newer save of this phone
       if(off.length) ours = Object.assign({}, ours, { players: (ours.players || []).filter(p => !(p && off.includes(p.id))) });
     }
     // Players this save lists who have become known since it started (an earlier save of this phone was confirmed):
@@ -451,6 +455,7 @@ function connectToRoom(code){
   _pendingBase = {};
   _rosterInFlight = {};
   _rosterGone = {};
+  _rosterRemovedNo = {};
   _echoWriteNo = 0;
   _lastRoomDoc = null;
   saveRecentRoom(code);
