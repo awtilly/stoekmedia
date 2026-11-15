@@ -37,7 +37,7 @@ function steppedRoom() {
   };
   app.roomId = 'AAAA';
   vm.runInThisContext('_firestoreWriteTimer = null; _isRemoteUpdate = false; _lastSyncedState = null; _syncBase = null; _lastSnapshotPlayerIds = null; _syncedShared = null; _sharedAtSync = null; _queuedPlainWrites = {}; _writeRetries = 0;');
-  vm.runInThisContext('_serverSeen = null; _recentSent = []; _snapshotSeq = 0; _writeSeq = 0; _keyWriteNo = {}; _inFlight = {}; _rosterInFlight = {}; _rosterGone = {}; _rosterRemovedNo = {}; _pendingBase = {}; _echoWriteNo = 0; _lastRoomDoc = null; _pickInFlight = false;');
+  vm.runInThisContext('_serverSeen = null; _recentSent = []; _snapshotSeq = 0; _writeSeq = 0; _keyWriteNo = {}; _inFlight = {}; _rosterInFlight = {}; _rosterGone = {}; _rosterRemovedNo = {}; _rosterRemoving = {}; _pendingBase = {}; _echoWriteNo = 0; _lastRoomDoc = null; _pickInFlight = false;');
   Object.defineProperty(globalThis, 'navigator', { value: { onLine: true }, configurable: true, writable: true });
   const deliver = state => app._applyRoomSnapshot({ exists: true, data: () => ({ state }), metadata: {} });
   const shared = JSON.parse(JSON.stringify(app.S));
@@ -500,4 +500,39 @@ test('a player removed on another phone and no longer shown here is not written 
   assert.equal(app.S.players.some(p => p.id === 'n5'), false, 'off this screen');
   await finish(1);                                  // the waiting save lands
   assert.deepEqual(server().players.map(p => p.id), ['p1'], 'it did not put n5 back');
+}));
+
+test('a player being removed stays off the screen when an older, unrelated change arrives', withTimers(async () => {
+  const { app, finish, fire, set, elsewhere, deliver, server, srv } = steppedRoom();
+  set('players', app.S.players.concat([NEW]));
+  await fire();
+  await finish(0);
+  deliver(srv.state);                               // two players in the room
+  set('players', app.S.players.filter(p => p.id !== 'n5'));
+  await fire();                                     // the removal is on its way
+  deliver(elsewhere(r => { r.rp[3] = 9; }));        // sent before our save landed: it still has n5
+  assert.equal(app.S.rp[3], 9, 'the other change is shown');
+  assert.deepEqual(app.S.players.map(p => p.id), ['p1'], 'the removed player did not pop back');
+  await finish(1);
+  assert.deepEqual(server().players.map(p => p.id), ['p1']);
+  assert.equal(server().rp[3], 9);
+  assert.equal(app.eval('Object.keys(_rosterRemoving).length'), 0);
+}));
+
+test('a save removing a player that is refused after an older snapshot arrived is sent again by the retry', withTimers(async () => {
+  const { app, txs, step, finish, fire, set, elsewhere, deliver, server, srv, failNextSave } = steppedRoom();
+  set('players', app.S.players.concat([NEW]));
+  await fire();
+  await finish(0);
+  deliver(srv.state);
+  set('players', app.S.players.filter(p => p.id !== 'n5'));
+  await fire();
+  deliver(elsewhere(r => { r.rp[3] = 9; }));
+  failNextSave();
+  await step(1);                                    // the server refuses the save
+  assert.deepEqual(app.S.players.map(p => p.id), ['p1'], 'still off this screen');
+  await fire();                                     // the retry
+  assert.equal(txs.length, 3, 'the retry has something to send');
+  await finish(2);
+  assert.deepEqual(server().players.map(p => p.id), ['p1'], 'the removal reached the room');
 }));

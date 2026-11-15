@@ -41,6 +41,9 @@ let _rosterInFlight = {};
 let _rosterGone = {};
 // Players a save of this phone removed (id -> that save's number): an older save still on its way leaves them out.
 let _rosterRemovedNo = {};
+// Players a save of this phone is removing (id -> that save's number) until the save is confirmed or has failed:
+// a snapshot from before that save still has them and must not put them back on this screen.
+let _rosterRemoving = {};
 // The ids above that `players` (a roster of this phone) does not list: "removed here", whatever the server says.
 function _removedHereIds(players){
   const has = id => (players || []).some(p => p && p.id === id);
@@ -195,7 +198,7 @@ function _writeSharedState(){
   if(mine) for(const k of mine){ if(k !== 'ds' && k !== 'players') _keyWriteNo[k] = writeNo; }
   // (One no longer on this screen was removed here in the meantime: remembered, a later snapshot can still bring them.)
   const dropRoster = () => { for(const id of Object.keys(_rosterInFlight)){ if(_rosterInFlight[id] !== writeNo) continue; delete _rosterInFlight[id]; if(roomId && ref.id === roomId && !(S.players || []).some(p => p && p.id === id)) _rosterGone[id] = 3; } };
-  const dropInFlight = () => { dropRoster(); for(const k of Object.keys(_inFlight)){ if(_inFlight[k].no === writeNo) delete _inFlight[k]; } };
+  const dropInFlight = () => { dropRoster(); for(const id of Object.keys(_rosterRemoving)){ if(_rosterRemoving[id] === writeNo) delete _rosterRemoving[id]; } for(const k of Object.keys(_inFlight)){ if(_inFlight[k].no === writeNo) delete _inFlight[k]; } };
   let preState = null; // what the server held when the transaction (its last run) read the room
   let expectSynced = _lastSyncedState; // what _lastSyncedState holds unless a snapshot is applied during the write
   let snapshotDuringWrite = false;
@@ -209,7 +212,7 @@ function _writeSharedState(){
   if(mine) for(const k of mine){ if(k !== 'ds' && k !== 'players') _inFlight[k] = { v: JSON.stringify(shared[k]), no: writeNo, sent: false, held: false, acked: false }; }
   const adding = []; // the players this save is adding
   if(mine && mine.includes('players')){
-    for(const p of ((base && base.players) || [])){ if(p && p.id && !(shared.players || []).some(q => q && q.id === p.id)) _rosterRemovedNo[p.id] = writeNo; }
+    for(const p of ((base && base.players) || [])){ if(p && p.id && !(shared.players || []).some(q => q && q.id === p.id)) { _rosterRemovedNo[p.id] = writeNo; _rosterRemoving[p.id] = writeNo; } }
     const had = new Set(((base && base.players) || []).map(p => p.id));
     for(const p of (shared.players || [])){ if(p && p.id && !had.has(p.id)){ _rosterInFlight[p.id] = writeNo; adding.push(p.id); } }
   }
@@ -287,6 +290,7 @@ function _writeSharedState(){
       const sentIds = new Set((shared.players || []).map(p => p.id));
       _lastSnapshotPlayerIds = Array.from(new Set((_lastSnapshotPlayerIds || []).concat(writtenIds.filter(id => sentIds.has(id) && (!shown || shown.has(id))))));
     }
+    for(const id of Object.keys(_rosterRemoving)){ if(_rosterRemoving[id] === writeNo) delete _rosterRemoving[id]; }
     dropRoster(); // confirmed: its echo brings these players, and a snapshot after it may already have them removed again
     _writeRetries = 0;
     // The server has the save. A key of it that a snapshot was held back for: if that snapshot is not the state
@@ -318,6 +322,7 @@ function _writeSharedState(){
     // was the value in flight: put the server's own value back, so the retry sends them again.
     const failedKeys = Object.keys(_inFlight).filter(k => _inFlight[k].no === writeNo);
     const failedRoster = Object.keys(_rosterInFlight).filter(id => _rosterInFlight[id] === writeNo);
+    const failedRemoving = Object.keys(_rosterRemoving).filter(id => _rosterRemoving[id] === writeNo);
     dropInFlight();
     if(failedKeys.length && _syncBase !== localJson && _serverSeen && roomId && ref.id === roomId){
       try {
@@ -327,10 +332,10 @@ function _writeSharedState(){
         _sharedAtSync = null;
       } catch(err){}
     }
-    if(failedRoster.length && _syncBase !== localJson && _serverSeen && roomId && ref.id === roomId){
+    if((failedRoster.length || failedRemoving.length) && _syncBase !== localJson && _serverSeen && roomId && ref.id === roomId){
       try {
         const server = JSON.parse(_serverSeen), there = new Set((server.players || []).map(p => p && p.id));
-        if(failedRoster.some(id => !there.has(id) && (S.players || []).some(p => p.id === id))){
+        if(failedRoster.some(id => !there.has(id) && (S.players || []).some(p => p.id === id)) || failedRemoving.some(id => there.has(id) && !(S.players || []).some(p => p.id === id))){
           const b = JSON.parse(_syncBase);
           b.players = server.players || [];
           if(_syncedShared) _syncedShared.players = JSON.parse(JSON.stringify(b.players));
@@ -462,6 +467,7 @@ function connectToRoom(code){
   _rosterInFlight = {};
   _rosterGone = {};
   _rosterRemovedNo = {};
+  _rosterRemoving = {};
   _echoWriteNo = 0;
   _lastRoomDoc = null;
   saveRecentRoom(code);
@@ -519,6 +525,7 @@ function _applyRoomSnapshot(doc){
     // The exact echo of a save: everything that save (or an earlier one) carried is on the server now.
     if(_echoWriteNo) for(const k of Object.keys(_inFlight)){ if(_inFlight[k].no <= _echoWriteNo) delete _inFlight[k]; }
     // Its new players are in the room from here on: "known", so removing one before the save is confirmed is a removal.
+    if(_echoWriteNo) for(const id of Object.keys(_rosterRemoving)){ if(_rosterRemoving[id] <= _echoWriteNo) delete _rosterRemoving[id]; }
     if(_echoWriteNo) for(const id of Object.keys(_rosterInFlight)){
       if(_rosterInFlight[id] > _echoWriteNo) continue;
       delete _rosterInFlight[id];
@@ -563,6 +570,9 @@ function _applyRoomSnapshot(doc){
       if((remote.players || []).some(p => p.id === id)){ delete _rosterInFlight[id]; continue; }
       if(!(S.players || []).some(p => p.id === id)){ S.players = (S.players || []).concat([mine]); rosterKept = true; }
     }
+    // A player a save of this phone is removing: this snapshot is older than that save. Kept off the screen.
+    const stillRemoving = Object.keys(_rosterRemoving).filter(id => !shownBefore.some(p => p && p.id === id) && (S.players || []).some(p => p && p.id === id));
+    if(stillRemoving.length){ S.players = S.players.filter(p => !(p && stillRemoving.includes(p.id))); rosterKept = true; }
     // A player removed here before the room showed them, and this snapshot brings them (from the save that added
     // them): the removal stands on this screen and is saved again below. Answered a few times at most.
     for(const id of Object.keys(_rosterGone)){ if(shownBefore.some(p => p && p.id === id)) delete _rosterGone[id]; } // listed here again on purpose
