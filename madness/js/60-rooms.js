@@ -537,6 +537,11 @@ function _applyRoomSnapshot(doc){
     const knownBefore = _lastSnapshotPlayerIds;
     _lastSnapshotPlayerIds = (remote.players || []).map(p => p.id);
     const shownBefore = S.players || [];
+    // A removal still waiting to be saved (in the baseline, off this screen) and this snapshot has no such player
+    // either: it may simply be older than the player. Remembered, in case a newer snapshot brings them (see _rosterGone).
+    if(_firestoreWriteTimer && _syncedShared) for(const p of (_syncedShared.players || [])){
+      if(p && p.id && !shownBefore.some(q => q && q.id === p.id) && !(remote.players || []).some(q => q && q.id === p.id)) _rosterGone[p.id] = 3;
+    }
     Object.assign(S, remote, local, pending || {});
     // Players a save of this phone is still adding: this snapshot is older than that save, not a removal. Kept on
     // screen (as this phone last showed them); one the room now has, or one removed here since, is no longer waited for.

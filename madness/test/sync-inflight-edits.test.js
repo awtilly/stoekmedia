@@ -444,3 +444,20 @@ test('a later save that still lists a player taken off again does not put them i
   assert.deepEqual(app.S.players.map(p => p.id), ['p1']);
   assert.deepEqual(server().players.map(p => p.id), ['p1']);
 }));
+
+test('a removal waiting to be saved survives a snapshot from before that player existed', withTimers(async () => {
+  const { app, txs, finish, fire, set, elsewhere, deliver, server, srv } = steppedRoom();
+  const older = elsewhere(r => { r.rp[3] = 9; });   // another phone's change; its snapshot reaches this phone late
+  set('players', app.S.players.concat([NEW]));
+  await fire();
+  await finish(0);
+  deliver(srv.state);                               // the new player is in the room and shown here
+  assert.deepEqual(app.S.players.map(p => p.id), ['p1', 'n5']);
+  set('players', app.S.players.filter(p => p.id !== 'n5')); // taken off again; the save waits in the debounce
+  deliver(older);                                   // a room without n5: the removal must not become "nothing to send"
+  deliver(srv.state);                               // and the newer room, with n5
+  assert.deepEqual(app.S.players.map(p => p.id), ['p1'], 'not back on this screen');
+  await fire();
+  for (let i = 1; i < txs.length; i++) await finish(i);
+  assert.deepEqual(server().players.map(p => p.id), ['p1'], 'and taken out of the room');
+}));
