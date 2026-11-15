@@ -483,3 +483,21 @@ test('an older save that lands after the newer save which removed a player does 
   assert.deepEqual(server().players.map(p => p.id), ['p1'], 'the older save did not put n5 back');
   assert.equal(server().players[0].name, 'Anne');
 }));
+
+test('a player removed on another phone and no longer shown here is not written back by a save that was still waiting', withTimers(async () => {
+  const { app, txs, finish, fire, set, elsewhere, deliver, server } = steppedRoom();
+  const run = app.db.runTransaction;
+  let confirm = null;
+  app.db.runTransaction = fn => { const p = run(fn); return txs.length === 1 ? p.then(() => new Promise(r => { confirm = r; })) : p; };
+  set('players', app.S.players.concat([NEW]));
+  await fire();
+  await finish(0);                                  // n5 is in the room; the confirmation is still on its way
+  set('players', app.S.players.map(p => p.id === 'p1' ? Object.assign({}, p, { name: 'Anne' }) : p));
+  await fire();                                     // save 2: a rename; it lists n5 and waits
+  confirm();
+  await new Promise(r => setImmediate(r));
+  deliver(elsewhere(r => { r.players = r.players.filter(p => p.id !== 'n5'); })); // removed on another phone, and shown here
+  assert.equal(app.S.players.some(p => p.id === 'n5'), false, 'off this screen');
+  await finish(1);                                  // the waiting save lands
+  assert.deepEqual(server().players.map(p => p.id), ['p1'], 'it did not put n5 back');
+}));

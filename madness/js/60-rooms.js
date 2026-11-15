@@ -245,6 +245,12 @@ function _writeSharedState(){
         .concat(Object.keys(_rosterRemovedNo).filter(id => _rosterRemovedNo[id] > writeNo)); // removed by a newer save of this phone
       if(off.length) ours = Object.assign({}, ours, { players: (ours.players || []).filter(p => !(p && off.includes(p.id))) });
     }
+    // A player this save lists whom the server does not have and this phone no longer shows (removed elsewhere and
+    // taken off this screen by a snapshot while the save was waiting): not written back.
+    if(remote && roomId && ref.id === roomId){
+      const shownNow = new Set((S.players || []).map(p => p && p.id)), there = new Set((remote.players || []).map(p => p && p.id));
+      if((ours.players || []).some(p => p && !shownNow.has(p.id) && !there.has(p.id))) ours = Object.assign({}, ours, { players: ours.players.filter(p => !p || shownNow.has(p.id) || there.has(p.id)) });
+    }
     // Players this save lists who have become known since it started (an earlier save of this phone was confirmed):
     // if the server no longer has them they were removed on another phone, not added by this save.
     let known = knownIds;
