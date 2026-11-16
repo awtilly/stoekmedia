@@ -602,6 +602,8 @@ function _applyRoomSnapshot(doc){
     if(knownBefore){
       const there = new Set(_lastSnapshotPlayerIds);
       for(const p of (S.players || [])){ if(p && !there.has(p.id) && knownBefore.includes(p.id)) _lastSnapshotPlayerIds.push(p.id); }
+      // Taken off this screen with the roster edit still to be saved: this snapshot may simply be older than them.
+      if(pending && 'players' in pending) for(const id of knownBefore){ if(!there.has(id) && !_lastSnapshotPlayerIds.includes(id) && !shownBefore.some(p => p && p.id === id)) _lastSnapshotPlayerIds.push(id); }
     }
     sanitizeSharedState(S);
     if(S.ds && S.ds.pickDeadline && typeof S.ds.pickDeadline === 'object' && S.ds.pickDeadline.seconds){

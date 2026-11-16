@@ -576,3 +576,27 @@ test('a new player waiting to be saved is not taken into the baseline when an ol
   deliver(srv.state);
   assert.deepEqual(ids(), ['p1', 'n1']);
 }));
+
+test('a player taken off while another roster change waits does not come back as a new player after older snapshots', withTimers(async () => {
+  const { app, txs, finish, fire, deliver, set, server, srv } = steppedRoom();
+  const N = id => ({ id, name: id, teamIds: [] });
+  const ids = () => app.S.players.map(p => p.id);
+  const before = server();                          // the room before n1
+  set('players', app.S.players.concat([N('n1')]));
+  await fire();
+  await finish(0);                                  // n1 is in the room
+  deliver(srv.state);
+  set('players', app.S.players.concat([N('n2')]));  // waiting in the debounce
+  const old1 = JSON.parse(JSON.stringify(before)); old1.rp[3] = 9;
+  deliver(JSON.stringify(old1));                    // out of order: from before n1
+  assert.deepEqual(ids(), ['p1', 'n1', 'n2']);
+  set('players', app.S.players.filter(p => p.id !== 'n1')); // n1 taken off: waiting too
+  const old2 = JSON.parse(JSON.stringify(before)); old2.rp[4] = 7;
+  deliver(JSON.stringify(old2));                    // another one from before n1
+  const cur = server(); cur.rp[5] = 5;
+  deliver(JSON.stringify(cur));                     // the room with n1
+  assert.deepEqual(ids(), ['p1', 'n2'], 'n1 is not put back on the screen');
+  await fire();
+  for (let i = 0; i < txs.length; i++) await finish(i);
+  assert.deepEqual(server().players.map(p => p.id), ['p1', 'n2'], 'n1 is out of the room');
+}));
