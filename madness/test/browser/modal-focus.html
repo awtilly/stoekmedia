@@ -33,6 +33,17 @@
   check(document.querySelector('.modal-overlay') !== null && document.querySelector('.modal-input') === null, 'confirm has no input and does not throw');
   document.querySelector('.modal-overlay')._close(false);
   check((await c) === false, 'confirm resolves');
+  await new Promise(r => setTimeout(r, 250));
+  const esc = () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+  const under = appConfirm('Under?'), top = appPrompt('On top');
+  esc();
+  check((await top) === null, 'Escape cancels the modal on top');
+  check(document.querySelectorAll('.modal-overlay').length === 1, 'the modal under it stays open');
+  esc();
+  check((await under) === null, 'Escape then cancels the one under it');
+  await new Promise(r => setTimeout(r, 250));
+  esc();
+  check(document.querySelector('.modal-overlay') === null, 'Escape with no modal open does nothing');
   document.getElementById('out').textContent = out.join(String.fromCharCode(10));
 })().catch(e => { document.getElementById('out').textContent = 'FAIL exception: ' + e.message; });
 </script>

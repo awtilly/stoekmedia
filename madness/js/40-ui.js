@@ -25,11 +25,15 @@ function _showModal(html) {
 
     overlay._resolve = resolve;
     overlay._close = (val) => {
+      document.removeEventListener('keydown', onKey);
       overlay.classList.remove('show');
       setTimeout(() => { overlay.remove(); resolve(val); }, 200);
     };
 
     overlay.addEventListener('click', e => { if (e.target === overlay) overlay._close(null); });
+    // Escape (desktop, iPad keyboard) is the same as a tap outside the box; only the modal on top answers.
+    const onKey = e => { if (e.key !== 'Escape') return; const all = document.querySelectorAll('.modal-overlay'); if (all[all.length - 1] === overlay) overlay._close(null); };
+    document.addEventListener('keydown', onKey);
 
     const input = overlay.querySelector('.modal-input');
     if (input) {
