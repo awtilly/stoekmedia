@@ -60,8 +60,9 @@ function _docAt(data){
   const t = data && data.updatedAt;
   return t && typeof t.seconds === 'number' ? { s: t.seconds, n: t.nanoseconds || 0 } : null;
 }
-// True when both times are known and `at` is not later than `pre`.
-function _notAfter(at, pre){ return !!(at && pre) && (at.s < pre.s || (at.s === pre.s && at.n <= pre.n)); }
+// True when both times are known and `at` is not later than `pre`. Equal times: only when the caller says the
+// document is the very one `pre` was read from (`same`); two different documents with one stamp are not ordered.
+function _notAfter(at, pre, same){ return !!(at && pre) && (at.s < pre.s || (at.s === pre.s && (at.n < pre.n || (at.n === pre.n && same !== false)))); }
 function _pendingLocalEdits(remote, baseRaw, seenRaw, at){
   _pendingBase = {};
   if(!_syncedShared) return null;
@@ -88,7 +89,7 @@ function _pendingLocalEdits(remote, baseRaw, seenRaw, at){
   // A snapshot stamped no later than the room a save was built on is older than that save: never its echo, and
   // never the server's word on a key the save carries, even after the server has confirmed the save (snapshots
   // sent before the commit can still arrive after the confirmation).
-  const older = f => f.sent && _notAfter(at, f.preAt);
+  const older = f => f.sent && _notAfter(at, f.preAt, _serverSeen === f.pre);
   const isEcho = f => f.sent && (f.acked || f.sawPre) && !older(f);
   for(const k of Object.keys(edits)){
     if(k === 'ds' || k === 'players') continue;
@@ -319,7 +320,7 @@ function _writeSharedState(){
       // confirmed, so the baseline stays the value this save sent until its echo or the newer save.
       // Nor when that snapshot is stamped no later than the room this save was built on: it is older than the save,
       // and the save's own snapshot (or a later one) is still to come.
-      if(f.held && _serverSeen !== preState && JSON.stringify(S[k]) === f.v && !_notAfter(_lastRoomDoc && _lastRoomDoc.exists ? _docAt(_lastRoomDoc.data()) : null, f.preAt)){ delete _inFlight[k]; reapply = true; }
+      if(f.held && _serverSeen !== preState && JSON.stringify(S[k]) === f.v && !_notAfter(_lastRoomDoc && _lastRoomDoc.exists ? _docAt(_lastRoomDoc.data()) : null, f.preAt, !!(_lastRoomDoc && _lastRoomDoc.exists) && _lastRoomDoc.data().state === f.pre)){ delete _inFlight[k]; reapply = true; }
     }
     if(reapply && roomId && ref.id === roomId && _lastRoomDoc && !_pickInFlight){
       _lastSyncedState = null;
@@ -540,7 +541,7 @@ function _applyRoomSnapshot(doc){
     // The exact echo of a save: everything that save (or an earlier one) carried is on the server now.
     // (Unless it is stamped no later than the room that save was built on: the same string, but an older state.)
     const echoAt = _docAt(data);
-    if(_echoWriteNo) for(const k of Object.keys(_inFlight)){ const f = _inFlight[k]; if(f.no <= _echoWriteNo && !(f.sent && _notAfter(echoAt, f.preAt))) delete _inFlight[k]; }
+    if(_echoWriteNo) for(const k of Object.keys(_inFlight)){ const f = _inFlight[k]; if(f.no <= _echoWriteNo && !(f.sent && _notAfter(echoAt, f.preAt, data.state === f.pre))) delete _inFlight[k]; }
     // Its new players are in the room from here on: "known", so removing one before the save is confirmed is a removal.
     if(_echoWriteNo) for(const id of Object.keys(_rosterRemoving)){ if(_rosterRemoving[id] <= _echoWriteNo) delete _rosterRemoving[id]; }
     if(_echoWriteNo) for(const id of Object.keys(_rosterInFlight)){
