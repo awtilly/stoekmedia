@@ -555,3 +555,24 @@ test('a player being added stays in the baseline when an older snapshot arrives 
   deliver(srv.state);
   assert.deepEqual(app.S.players.map(p => p.id), ['p1']);
 }));
+
+test('a new player waiting to be saved is not taken into the baseline when an older snapshot brings back a player this phone is removing', withTimers(async () => {
+  const { app, txs, step, finish, fire, elsewhere, deliver, set, server, srv } = steppedRoom();
+  const N = id => ({ id, name: id, teamIds: [] });
+  const ids = () => app.S.players.map(p => p.id);
+  deliver(elsewhere(r => { r.players.push(N('x')); })); // another phone added x
+  set('players', app.S.players.filter(p => p.id !== 'x'));
+  await fire();                                     // save 1 (removing x) starts
+  await step(0);                                    // and has read the room
+  set('players', app.S.players.concat([N('n1')]));  // a new player: waiting in the debounce
+  const before = server(); before.players = before.players.filter(p => p.id !== 'x'); before.rp[3] = 9;
+  deliver(JSON.stringify(before));                  // out of order: the room from before x was added
+  const older = server(); older.rp[4] = 7;
+  deliver(JSON.stringify(older));                   // older than save 1: x is in it
+  assert.deepEqual(ids(), ['p1', 'n1'], 'x stays off the screen, the new player stays on it');
+  await fire();                                     // the debounce: the new player has to be sent
+  for (let i = 0; i < txs.length; i++) await finish(i);
+  assert.deepEqual(server().players.map(p => p.id), ['p1', 'n1'], 'the new player is in the room, x is not');
+  deliver(srv.state);
+  assert.deepEqual(ids(), ['p1', 'n1']);
+}));
