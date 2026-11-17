@@ -87,11 +87,11 @@ function _docAt(data){
 function _notAfter(at, pre, same){ return !!(at && pre) && (at.s < pre.s || (at.s === pre.s && (at.n < pre.n || (at.n === pre.n && same !== false)))); }
 function _pendingLocalEdits(remote, baseRaw, seenRaw, at){
   _pendingBase = {};
-  if(!_syncedShared) return null;
   const flying = Object.keys(_inFlight);
+  if(!_syncedShared && !flying.length) return null;
   if(!_firestoreWriteTimer && !flying.length) return null;
   const edits = {};
-  if(_firestoreWriteTimer) for(const k in S){
+  if(_firestoreWriteTimer && _syncedShared) for(const k in S){
     if(VIEW_LOCAL.includes(k)) continue;
     if(JSON.stringify(S[k]) !== JSON.stringify(_syncedShared[k])) edits[k] = S[k];
   }
@@ -134,7 +134,7 @@ function _pendingLocalEdits(remote, baseRaw, seenRaw, at){
     // that is the server's word), or a value this phone no longer shows: the snapshot wins, as before.
     // (The same value before the save has even been handed over is an older save's echo, not this one's.)
     if(theirs === f.v){ if(isEcho(f)) delete _inFlight[k]; continue; }
-    if(JSON.stringify(S[k]) !== f.v || (!older(f) && (f.acked || !isKnown(k, theirs)))){ delete _inFlight[k]; continue; }
+    if(JSON.stringify(S[k]) !== f.v || (!older(f) && (f.acked || !(isKnown(k, theirs) || (f.carried && !seenRaw))))){ delete _inFlight[k]; continue; }
     edits[k] = S[k];
     _pendingBase[k] = f.v;
     f.held = true;
@@ -373,7 +373,7 @@ function _writeSharedState(){
       // and the save's own snapshot (or a later one) is still to come.
       if(f.held && (_serverSeen !== preState || _laterThan(_lastRoomDoc, f.preAt)) && JSON.stringify(S[k]) === f.v && !_notAfter(_lastRoomDoc && _lastRoomDoc.exists ? _docAt(_lastRoomDoc.data()) : null, f.preAt, !!(_lastRoomDoc && _lastRoomDoc.exists) && _lastRoomDoc.data().state === f.pre)){ delete _inFlight[k]; reapply = true; }
     }
-    if(reapply && here() && _lastRoomDoc && !_pickInFlight){
+    if(reapply && roomId && ref.id === roomId && _lastRoomDoc && !_pickInFlight){
       _lastSyncedState = null;
       _applyRoomSnapshot(_lastRoomDoc);
     }
@@ -538,9 +538,12 @@ function connectToRoom(code){
   _syncedShared = null;
   _serverSeen = null;
   // (_recentSent too: the update that brings a save from the last visit is this phone's own value, not another phone's change.)
-  if(code !== _writeNoRoom){ _recentSent = []; _keyWriteNo = {}; _rosterRemovedNo = {}; _writeNoRoom = code; } // kept for the same room: a save from the last visit may still be on its way
+  const changedRoom = code !== _writeNoRoom;
+  if(changedRoom){ _recentSent = []; _keyWriteNo = {}; _rosterRemovedNo = {}; _writeNoRoom = code; } // kept for the same room: a save from the last visit may still be on its way
   else { for(const id of _removedHereIds(S.players)) _rosterRemovedNo[id] = _writeSeq + 1; } // added and taken off again in the last visit (S is this phone's cached copy of that screen): the save that was adding them leaves them out
-  _inFlight = {};
+  // A setting a save from the last visit to this room is still carrying stays in flight (`carried`): until that save
+  // is seen, the value it sent is this phone's baseline for the setting, as it was before Home.
+  { const kept = {}; if(!changedRoom) for(const k of Object.keys(_inFlight)){ const f = _inFlight[k]; if(!f.acked) kept[k] = Object.assign(f, { held: false, carried: true }); } _inFlight = kept; }
   _pendingBase = {};
   _rosterInFlight = {};
   _rosterGone = {};
