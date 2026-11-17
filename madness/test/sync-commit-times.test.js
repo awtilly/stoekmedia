@@ -373,3 +373,43 @@ test('the same update delivered twice does not count as a newer one', withTimers
   assert.equal(app.S.year, 2029);
   assert.deepEqual(app.eval('Object.keys(_inFlight)'), []);
 }));
+
+test('another phone takes exactly the new player off before this phone has caught up: the player leaves this screen too', withTimers(async () => {
+  const { app, txs, finish, fire, elsewhere, deliver, set, server } = stampedRoom();
+  const N = id => ({ id, name: id, teamIds: [] });
+  const ids = () => app.S.players.map(p => p.id);
+  const pre = elsewhere(r => { r.rp[3] = 9; });     // the room the save will read; its update is still on its way
+  set('players', app.S.players.concat([N('n1')]));
+  await fire();
+  await finish(0);                                  // n1 is in the room, confirmed
+  deliver(pre);                                     // older than the save: n1 stays
+  assert.deepEqual(ids(), ['p1', 'n1']);
+  const gone = elsewhere(r => { r.players = r.players.filter(p => p.id !== 'n1'); });
+  assert.equal(gone.state, pre.state, 'the removal reads exactly like the room before the add');
+  deliver(gone);                                    // only its commit time says it is newer
+  assert.deepEqual(ids(), ['p1'], 'n1 is off this screen');
+  assert.deepEqual(app.eval('Object.keys(_rosterAcked)'), []);
+  assert.deepEqual(app.eval('Object.keys(_rosterInFlight)'), []);
+  set('year', 2029);                                // any later save of this phone
+  await fire();
+  for (let i = 0; i < txs.length; i++) await finish(i);
+  assert.deepEqual(server().players.map(p => p.id), ['p1'], 'n1 was not written back');
+  assert.equal(server().year, 2029);
+}));
+
+test('the room a save read, delivered twice, keeps the confirmed new player on the screen', withTimers(async () => {
+  const { app, finish, fire, elsewhere, deliver, set, now } = stampedRoom();
+  const N = id => ({ id, name: id, teamIds: [] });
+  const ids = () => app.S.players.map(p => p.id);
+  const pre = elsewhere(r => { r.rp[3] = 9; });
+  set('players', app.S.players.concat([N('n1')]));
+  await fire();
+  await finish(0);
+  deliver(pre);
+  deliver(pre);                                     // a repeat: same text, same commit time, not newer
+  assert.deepEqual(ids(), ['p1', 'n1']);
+  assert.deepEqual(app.eval('Object.keys(_rosterAcked)'), ['n1']);
+  deliver(now());                                   // the save's own update
+  assert.deepEqual(ids(), ['p1', 'n1']);
+  assert.deepEqual(app.eval('Object.keys(_rosterAcked)'), []);
+}));

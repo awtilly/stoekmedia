@@ -577,7 +577,8 @@ function _applyRoomSnapshot(doc){
     const echoAt = _docAt(data);
     // The same text as the last update applied, with a later commit time: a newer room that happens to read the same
     // (a value changed and changed back). Nothing to draw, but it is the last word: a save confirmed after it asks.
-    if(_lastRoomDoc && _lastRoomDoc.exists && _lastRoomDoc.data().state === data.state && _laterThan(doc, _docAt(_lastRoomDoc.data()))) _lastRoomDoc = doc;
+    const newer = !!(_lastRoomDoc && _lastRoomDoc.exists && _lastRoomDoc.data().state === data.state && _laterThan(doc, _docAt(_lastRoomDoc.data())));
+    if(newer) _lastRoomDoc = doc;
     if(_echoWriteNo) for(const k of Object.keys(_inFlight)){ const f = _inFlight[k]; if(f.no <= _echoWriteNo && !(f.sent && _notAfter(echoAt, f.preAt, data.state === f.pre))) delete _inFlight[k]; }
     // Its new players are in the room from here on: "known", so removing one before the save is confirmed is a removal.
     if(_echoWriteNo) for(const id of Object.keys(_rosterRemoving)){ if(_rosterRemoving[id] <= _echoWriteNo) delete _rosterRemoving[id]; }
@@ -587,7 +588,9 @@ function _applyRoomSnapshot(doc){
       if(!(S.players || []).some(p => p && p.id === id)) _rosterGone[id] = 3; // taken off again here: see _rosterGone
       if(!(_lastSnapshotPlayerIds || []).includes(id)) _lastSnapshotPlayerIds = (_lastSnapshotPlayerIds || []).concat([id]);
     }
-    return;
+    // Unless it is such a newer room and a player a confirmed save added is still waited for: the room no longer
+    // has them (another phone took exactly that player off), and only applying it ends the wait.
+    if(!(newer && !_echoWriteNo && Object.keys(_rosterAcked).length)) return;
   }
   _lastSyncedState = data.state;
   _echoWriteNo = 0;
