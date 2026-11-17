@@ -35,7 +35,7 @@ function stampedRoom() {
   };
   app.roomId = 'AAAA';
   vm.runInThisContext('_firestoreWriteTimer = null; _isRemoteUpdate = false; _lastSyncedState = null; _syncBase = null; _lastSnapshotPlayerIds = null; _syncedShared = null; _sharedAtSync = null; _queuedPlainWrites = {}; _writeRetries = 0;');
-  vm.runInThisContext('_serverSeen = null; _recentSent = []; _snapshotSeq = 0; _writeSeq = 0; _keyWriteNo = {}; _inFlight = {}; _rosterInFlight = {}; _rosterGone = {}; _rosterAcked = {}; _rosterRemovedNo = {}; _rosterRemoving = {}; _knownAtExit = {}; _writeNoRoom = "AAAA"; _pendingBase = {}; _echoWriteNo = 0; _lastRoomDoc = null; _pickInFlight = false;');
+  vm.runInThisContext('_serverSeen = null; _recentSent = []; _snapshotSeq = 0; _writeSeq = 0; _keyWriteNo = {}; _inFlight = {}; _rosterInFlight = {}; _rosterGone = {}; _rosterAcked = {}; _rosterRemovedNo = {}; _rosterRemoving = {}; _knownAtExit = {}; _knownEver = []; _writeNoRoom = "AAAA"; _pendingBase = {}; _echoWriteNo = 0; _lastRoomDoc = null; _pickInFlight = false;');
   Object.defineProperty(globalThis, 'navigator', { value: { onLine: true }, configurable: true, writable: true });
   /** What the room holds right now, with its commit time: a snapshot to deliver later. */
   const now = () => ({ state: srv.state, v: srv.v });
@@ -710,4 +710,37 @@ test('a player taken off again while the save adding them was being written stay
   await fire();                                     // and the removal is sent
   for (let i = 1; i < txs.length; i++) await finish(i);
   assert.deepEqual(server().players.map(p => p.id), ['p1'], 'n1 is out of the room');
+}));
+
+test('a save that lands after Home does not put back a player its visit saw arrive and saw removed again', withTimers(async () => {
+  const { app, finish, fire, deliver, now, elsewhere, set, server } = stampedRoom();
+  const N = id => ({ id, name: id, teamIds: [] });
+  set('players', app.S.players.concat([N('n1')]));
+  await fire();                                     // save 1 (adding n1) is on its way, and stays there
+  set('players', app.S.players.concat([N('n2')]));
+  await fire();                                     // save 2 lists n1 and n2
+  await finish(1);                                  // and lands first: the room has both
+  deliver(now());
+  elsewhere(r => { r.players = r.players.filter(p => p.id !== 'n1'); }); // another phone takes n1 off
+  deliver(now());                                   // this phone sees it
+  assert.deepEqual(app.S.players.map(p => p.id), ['p1', 'n2']);
+  app.roomId = null;                                // Home
+  await finish(0);                                  // save 1 lands only now
+  assert.deepEqual(server().players.map(p => p.id), ['p1', 'n2'], 'n1 stays removed');
+}));
+
+test('the same after Home and back', withTimers(async () => {
+  const { app, finish, fire, deliver, now, elsewhere, set, server } = stampedRoom();
+  const N = id => ({ id, name: id, teamIds: [] });
+  set('players', app.S.players.concat([N('n1')]));
+  await fire();
+  set('players', app.S.players.concat([N('n2')]));
+  await fire();
+  await finish(1);
+  deliver(now());
+  elsewhere(r => { r.players = r.players.filter(p => p.id !== 'n1'); });
+  deliver(now());
+  comeBack(app);
+  await finish(0);
+  assert.deepEqual(server().players.map(p => p.id), ['p1', 'n2'], 'n1 stays removed');
 }));

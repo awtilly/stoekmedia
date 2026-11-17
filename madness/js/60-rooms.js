@@ -51,6 +51,8 @@ let _rosterRemoving = {};
 // The roster ids known when each of the last few visits ended (visit number -> ids): a save of that visit still on
 // its way asks them. (Not only the last visit's: Home and back twice, and a save from the first visit lands last.)
 let _knownAtExit = {};
+// Every roster id an update or a confirmed save of this visit has shown to be in the room, also one removed since.
+let _knownEver = [];
 // The ids above that `players` (a roster of this phone) does not list: "removed here", whatever the server says.
 function _removedHereIds(players){
   const has = id => (players || []).some(p => p && p.id === id);
@@ -300,7 +302,7 @@ function _writeSharedState(){
     // if the server no longer has them they were removed on another phone, not added by this save.
     let known = knownIds;
     // (After Home, or Home and back: the ids as they were when this save's visit ended.)
-    const knownNow = visit === _roomGeneration ? _lastSnapshotPlayerIds : (_knownAtExit[visit] || null);
+    const knownNow = here() ? _lastSnapshotPlayerIds : (visit === _roomGeneration ? _knownEver.concat(_lastSnapshotPlayerIds || []) : (_knownAtExit[visit] || null)); // away: no screen to ask, so every id the visit saw
     if(knownNow){
       const late = knownNow.filter(id => !(known || []).includes(id) && (shared.players || []).some(p => p && p.id === id));
       if(late.length) known = (known || []).concat(late);
@@ -533,7 +535,8 @@ function joinRoom(){
 
 function connectToRoom(code){
   if(unsubRoom) unsubRoom();
-  if(_lastSnapshotPlayerIds){ _knownAtExit[_roomGeneration] = _lastSnapshotPlayerIds; const old = Object.keys(_knownAtExit); while(old.length > 4) delete _knownAtExit[old.shift()]; }
+  if(_lastSnapshotPlayerIds){ _knownAtExit[_roomGeneration] = Array.from(new Set(_knownEver.concat(_lastSnapshotPlayerIds))); const old = Object.keys(_knownAtExit); while(old.length > 4) delete _knownAtExit[old.shift()]; }
+  _knownEver = [];
   _lastSnapshotPlayerIds = null; // the previous room's roster says nothing about this one
   _syncedShared = null;
   _serverSeen = null;
@@ -648,6 +651,7 @@ function _applyRoomSnapshot(doc){
     for(const k in _inFlight){ if(_inFlight[k].sent && _inFlight[k].pre === data.state) _inFlight[k].sawPre = true; }
     const knownBefore = _lastSnapshotPlayerIds;
     _lastSnapshotPlayerIds = (remote.players || []).map(p => p.id);
+    for(const id of (knownBefore || []).concat(_lastSnapshotPlayerIds)){ if(!_knownEver.includes(id)) _knownEver.push(id); }
     const shownBefore = S.players || [];
     // A removal still waiting to be saved (in the baseline, off this screen) and this snapshot has no such player
     // either: it may simply be older than the player. Remembered, in case a newer snapshot brings them (see _rosterGone).
