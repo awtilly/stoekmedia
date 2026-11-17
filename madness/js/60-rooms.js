@@ -48,6 +48,8 @@ let _rosterRemovedNo = {};
 // Players a save of this phone is removing (id -> that save's number) until the save is confirmed or has failed:
 // a snapshot from before that save still has them and must not put them back on this screen.
 let _rosterRemoving = {};
+// The roster ids known when the last visit ended ({ visit, ids }): a save of that visit still on its way asks them.
+let _knownAtExit = null;
 // The ids above that `players` (a roster of this phone) does not list: "removed here", whatever the server says.
 function _removedHereIds(players){
   const has = id => (players || []).some(p => p && p.id === id);
@@ -295,8 +297,10 @@ function _writeSharedState(){
     // Players this save lists who have become known since it started (an earlier save of this phone was confirmed):
     // if the server no longer has them they were removed on another phone, not added by this save.
     let known = knownIds;
-    if(here() && _lastSnapshotPlayerIds){
-      const late = _lastSnapshotPlayerIds.filter(id => !(known || []).includes(id) && (shared.players || []).some(p => p && p.id === id));
+    // (After Home, or Home and back: the ids as they were when this save's visit ended.)
+    const knownNow = visit === _roomGeneration ? _lastSnapshotPlayerIds : (_knownAtExit && _knownAtExit.visit === visit ? _knownAtExit.ids : null);
+    if(knownNow){
+      const late = knownNow.filter(id => !(known || []).includes(id) && (shared.players || []).some(p => p && p.id === id));
       if(late.length) known = (known || []).concat(late);
     }
     const merged = remote ? mergeSharedState(ours, remote, known, true) : ours;
@@ -423,10 +427,14 @@ function _writeSharedState(){
 /* Send a pending debounced write right away. Call BEFORE roomId or S change (goHome), so the last
  * edit made in a room reaches that room instead of being dropped or landing in the next one. */
 function flushFirestoreWrite(){
-  if(_firestoreWriteTimer === null) return;
-  clearTimeout(_firestoreWriteTimer);
-  _firestoreWriteTimer = null;
-  if(roomId && !_isRemoteUpdate) _writeSharedState();
+  if(_firestoreWriteTimer !== null){
+    clearTimeout(_firestoreWriteTimer);
+    _firestoreWriteTimer = null;
+    if(roomId && !_isRemoteUpdate) _writeSharedState();
+  }
+  // Leaving: a player added and taken off again in this visit stays off. The save that was adding them can still be
+  // on its way while the phone is at Home, where it has no screen to ask.
+  if(roomId) for(const id of _removedHereIds(S.players)) _rosterRemovedNo[id] = _writeSeq + 1;
 }
 
 function saveState(){
@@ -512,6 +520,7 @@ function joinRoom(){
 
 function connectToRoom(code){
   if(unsubRoom) unsubRoom();
+  _knownAtExit = _lastSnapshotPlayerIds ? { visit: _roomGeneration, ids: _lastSnapshotPlayerIds } : null;
   _lastSnapshotPlayerIds = null; // the previous room's roster says nothing about this one
   _syncedShared = null;
   _serverSeen = null;

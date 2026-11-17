@@ -526,3 +526,28 @@ test('entering a different room forgets the saves sent to the last one', withTim
   app.connectToRoom('BBBB');
   assert.equal(app.eval('_recentSent.length'), 0, 'another room: forgotten');
 }));
+
+test('a save still on its way after Home and back does not put back a player another phone has removed since', withTimers(async () => {
+  const { app, finish, fire, elsewhere, set, server } = stampedRoom();
+  const N = id => ({ id, name: id, teamIds: [] });
+  set('players', app.S.players.concat([N('n1')]));
+  await fire();                                     // save 1 (adding n1) is on its way
+  set('players', app.S.players.concat([N('n3')]));
+  await fire();                                     // save 2 (adding n3) as well: it lists n1, not yet confirmed
+  await finish(0);                                  // save 1 is confirmed: n1 is in the room
+  assert.deepEqual(server().players.map(p => p.id), ['p1', 'n1']);
+  comeBack(app);                                    // Home and straight back
+  elsewhere(r => { r.players = r.players.filter(p => p.id !== 'n1'); }); // another phone takes n1 off
+  await finish(1);                                  // save 2 lands only now
+  assert.deepEqual(server().players.map(p => p.id), ['p1', 'n3'], 'n3 is added, n1 stays removed');
+}));
+
+test('leaving the room marks a player added and taken off again in this visit as removed, for the save still adding them', withTimers(async () => {
+  const { app } = stampedRoom();
+  app.eval("_rosterInFlight = { n1: 1 }; _rosterGone = { n2: 3 }; _writeSeq = 4;"); // n1: a save is adding them; n2: taken off before the room showed them
+  assert.deepEqual(app.S.players.map(p => p.id), ['p1']); // neither is on the screen any more
+  app.flushFirestoreWrite();                        // what Home calls first; nothing is waiting to be saved
+  assert.equal(app.eval('_rosterRemovedNo.n1'), 5, 'newer than every save on its way');
+  assert.equal(app.eval('_rosterRemovedNo.n2'), 5);
+  assert.equal(app.eval('_rosterRemovedNo.p1'), undefined, 'a player still on the screen is not marked');
+}));
