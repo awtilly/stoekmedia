@@ -589,8 +589,9 @@ function _applyRoomSnapshot(doc){
       if(!(_lastSnapshotPlayerIds || []).includes(id)) _lastSnapshotPlayerIds = (_lastSnapshotPlayerIds || []).concat([id]);
     }
     // Unless it is such a newer room and a player a confirmed save added is still waited for: the room no longer
-    // has them (another phone took exactly that player off), and only applying it ends the wait.
-    if(!(newer && !_echoWriteNo && Object.keys(_rosterAcked).length)) return;
+    // has them (another phone took exactly that player off), and only applying it ends the wait. The same for a
+    // setting of a confirmed save that an older update was held back for: this is the newer update it waits for.
+    if(!(newer && !_echoWriteNo && (Object.keys(_rosterAcked).length || Object.keys(_inFlight).some(k => _inFlight[k].acked)))) return;
   }
   _lastSyncedState = data.state;
   _echoWriteNo = 0;
