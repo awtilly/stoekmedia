@@ -263,7 +263,8 @@ function _writeSharedState(){
   // are not "added on another phone".
   const goneInFlight = _removedHereIds(shared.players);
   const knownIds = goneInFlight.length ? (_lastSnapshotPlayerIds || []).concat(goneInFlight) : _lastSnapshotPlayerIds;
-  db.runTransaction(async tx => {
+  let awayTries = 0; // see the catch: runs of this save after its visit ended
+  const attempt = () => db.runTransaction(async tx => {
     const snap = await tx.get(ref);
     // Cleaned like every copy this device shows: the merge below reads its roster and draft state.
     const remote = snap.exists && snap.data().state ? sanitizeSharedState(JSON.parse(snap.data().state)) : null;
@@ -379,6 +380,10 @@ function _writeSharedState(){
     }
     // Nothing is on its way any more. Where a snapshot was applied meanwhile, the baseline for this save's keys
     // was the value in flight: put the server's own value back, so the retry sends them again.
+    // The room was busy (the transaction lost every race) and this save's visit is over: inside a visit the retry
+    // below sends the edit again, but that reads the screen, and the screen is no longer this visit's. The save
+    // itself is still good (its own keys over whatever the room holds then), so it is run again, a few times.
+    if(e && e.code === 'aborted' && !here() && ++awayTries <= 5){ attempt(); return; }
     const failedKeys = Object.keys(_inFlight).filter(k => _inFlight[k].no === writeNo);
     const failedRoster = Object.keys(_rosterInFlight).filter(id => _rosterInFlight[id] === writeNo);
     const failedRemoving = Object.keys(_rosterRemoving).filter(id => _rosterRemoving[id] === writeNo);
@@ -422,6 +427,7 @@ function _writeSharedState(){
       showToast("Sync error \u2014 changes saved locally");
     }
   });
+  attempt();
 }
 
 /* Send a pending debounced write right away. Call BEFORE roomId or S change (goHome), so the last
