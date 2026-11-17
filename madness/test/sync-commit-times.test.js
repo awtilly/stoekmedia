@@ -35,7 +35,7 @@ function stampedRoom() {
   };
   app.roomId = 'AAAA';
   vm.runInThisContext('_firestoreWriteTimer = null; _isRemoteUpdate = false; _lastSyncedState = null; _syncBase = null; _lastSnapshotPlayerIds = null; _syncedShared = null; _sharedAtSync = null; _queuedPlainWrites = {}; _writeRetries = 0;');
-  vm.runInThisContext('_serverSeen = null; _recentSent = []; _snapshotSeq = 0; _writeSeq = 0; _keyWriteNo = {}; _inFlight = {}; _rosterInFlight = {}; _rosterGone = {}; _rosterAcked = {}; _rosterRemovedNo = {}; _rosterRemoving = {}; _pendingBase = {}; _echoWriteNo = 0; _lastRoomDoc = null; _pickInFlight = false;');
+  vm.runInThisContext('_serverSeen = null; _recentSent = []; _snapshotSeq = 0; _writeSeq = 0; _keyWriteNo = {}; _inFlight = {}; _rosterInFlight = {}; _rosterGone = {}; _rosterAcked = {}; _rosterRemovedNo = {}; _rosterRemoving = {}; _knownAtExit = {}; _writeNoRoom = "AAAA"; _pendingBase = {}; _echoWriteNo = 0; _lastRoomDoc = null; _pickInFlight = false;');
   Object.defineProperty(globalThis, 'navigator', { value: { onLine: true }, configurable: true, writable: true });
   /** What the room holds right now, with its commit time: a snapshot to deliver later. */
   const now = () => ({ state: srv.state, v: srv.v });
@@ -690,4 +690,24 @@ test('a setting on its way is forgotten on entering a different room', withTimer
   app.db.collection = () => ({ doc: id => ({ id, onSnapshot: () => () => {} }) });
   app.connectToRoom('BBBB');
   assert.deepEqual(app.eval('Object.keys(_inFlight)'), []);
+}));
+
+test('a player taken off again while the save adding them was being written stays off after Home and back', withTimers(async () => {
+  const { app, txs, step, finish, fire, deliver, now, set, server } = stampedRoom();
+  const N = id => ({ id, name: id, teamIds: [] });
+  set('players', app.S.players.concat([N('n1')]));
+  await fire();                                     // the save adding n1
+  await step(0);                                    // has read the room and handed over its roster (with n1)
+  set('players', app.S.players.filter(p => p.id !== 'n1')); // taken off again: too late for that save
+  deliver(now());                                   // an update from before the save: n1 is noted as "gone here"
+  assert.deepEqual(app.eval('Object.keys(_rosterGone)'), ['n1']);
+  await finish(0);                                  // the save lands: the room has n1
+  assert.deepEqual(server().players.map(p => p.id), ['p1', 'n1']);
+  app.flushFirestoreWrite();                        // Home (nothing left to send) ...
+  comeBack(app);                                    // ... and straight back
+  deliver(now());                                   // the first update of the new visit brings n1
+  assert.deepEqual(app.S.players.map(p => p.id), ['p1'], 'n1 stays off this screen');
+  await fire();                                     // and the removal is sent
+  for (let i = 1; i < txs.length; i++) await finish(i);
+  assert.deepEqual(server().players.map(p => p.id), ['p1'], 'n1 is out of the room');
 }));

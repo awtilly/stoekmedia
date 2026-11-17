@@ -539,6 +539,7 @@ function connectToRoom(code){
   _serverSeen = null;
   // (_recentSent too: the update that brings a save from the last visit is this phone's own value, not another phone's change.)
   const changedRoom = code !== _writeNoRoom;
+  const goneAtExit = changedRoom ? [] : _removedHereIds(S.players); // read before the lists below are emptied
   if(changedRoom){ _recentSent = []; _keyWriteNo = {}; _rosterRemovedNo = {}; _writeNoRoom = code; } // kept for the same room: a save from the last visit may still be on its way
   else { for(const id of _removedHereIds(S.players)) _rosterRemovedNo[id] = _writeSeq + 1; } // added and taken off again in the last visit (S is this phone's cached copy of that screen): the save that was adding them leaves them out
   // A setting a save from the last visit to this room is still carrying stays in flight (`carried`): until that save
@@ -547,6 +548,9 @@ function connectToRoom(code){
   _pendingBase = {};
   _rosterInFlight = {};
   _rosterGone = {};
+  // Added and taken off again in the last visit to this room: the save that was adding them may already have
+  // written them. An update of this visit that brings them is answered with the removal, as it was before Home.
+  for(const id of goneAtExit) _rosterGone[id] = 3;
   _rosterAcked = {};
   _rosterRemoving = {};
   _echoWriteNo = 0;
