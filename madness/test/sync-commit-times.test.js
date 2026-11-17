@@ -592,3 +592,32 @@ test('inside the visit a busy room is still handled by the usual retry of the wa
   assert.equal(busy.calls, 2);
   assert.equal(server().year, 2028);
 }));
+
+test('a save confirmed only after Home and back still tells the next save which players are in the room', withTimers(async () => {
+  const { app, finish, fire, elsewhere, set, server } = stampedRoom();
+  const N = id => ({ id, name: id, teamIds: [] });
+  set('players', app.S.players.concat([N('n1')]));
+  await fire();                                     // save 1 (adding n1) is on its way
+  set('players', app.S.players.concat([N('n3')]));
+  await fire();                                     // save 2 (adding n3) as well: it lists n1, not yet confirmed
+  comeBack(app);                                    // Home and straight back, both saves still on their way
+  await finish(0);                                  // save 1 is confirmed only now: n1 is in the room
+  assert.deepEqual(server().players.map(p => p.id), ['p1', 'n1']);
+  elsewhere(r => { r.players = r.players.filter(p => p.id !== 'n1'); }); // another phone takes n1 off
+  await finish(1);                                  // save 2 lands last
+  assert.deepEqual(server().players.map(p => p.id), ['p1', 'n3'], 'n3 is added, n1 stays removed');
+}));
+
+test('the same when the phone is still on the Home screen', withTimers(async () => {
+  const { app, finish, fire, elsewhere, set, server } = stampedRoom();
+  const N = id => ({ id, name: id, teamIds: [] });
+  set('players', app.S.players.concat([N('n1')]));
+  await fire();
+  set('players', app.S.players.concat([N('n3')]));
+  await fire();
+  app.roomId = null;                                // Home: the room is left, nothing else is entered
+  await finish(0);
+  elsewhere(r => { r.players = r.players.filter(p => p.id !== 'n1'); });
+  await finish(1);
+  assert.deepEqual(server().players.map(p => p.id), ['p1', 'n3']);
+}));
