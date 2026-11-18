@@ -53,6 +53,8 @@ let _rosterRemoving = {};
 let _knownAtExit = {};
 // Saves still on their way, counted per visit they were started in: that visit's _knownAtExit entry is kept for them.
 let _visitSaves = {};
+// The saves whose last run is not over yet, by write number.
+let _savesRunning = {};
 // Every roster id an update or a confirmed save of this visit has shown to be in the room, also one removed since.
 let _knownEver = [];
 // The ids above that `players` (a roster of this phone) does not list: "removed here", whatever the server says.
@@ -259,6 +261,9 @@ function _writeSharedState(){
     const had = new Set(((base && base.players) || []).map(p => p.id));
     for(const p of (shared.players || [])){ if(p && p.id && !had.has(p.id)){ _rosterInFlight[p.id] = writeNo; adding.push(p.id); } }
   }
+  // Players this save lists whom an earlier save of this phone was still adding when it started: id -> that save.
+  const earlier = {};
+  for(const p of (shared.players || [])){ const no = p && _rosterInFlight[p.id]; if(no && no !== writeNo) earlier[p.id] = no; }
   // Transaction + mergeSharedState: never roll back a pick that landed since our last snapshot.
   let writtenIds = null;
   // The roster our copy was taken from. Read now, not inside the transaction: a snapshot that arrives while the
@@ -294,6 +299,14 @@ function _writeSharedState(){
       const off = (here() ? adding.filter(id => !(S.players || []).some(p => p && p.id === id)).concat(_removedHereIds(S.players)) : [])
         .concat(Object.keys(_rosterRemovedNo).filter(id => _rosterRemovedNo[id] > writeNo)); // removed by a newer save of this phone
       if(off.length) ours = Object.assign({}, ours, { players: (ours.players || []).filter(p => !(p && off.includes(p.id))) });
+    }
+    // A player an earlier save of this phone is still adding (that save is still running) whom the room does not
+    // have: left to that save. Either it has not landed yet and adds them itself, or it has landed, its confirmation
+    // is still on its way and somebody took the player off since: writing them here would put a removed player back.
+    if(remote){
+      const there = new Set((remote.players || []).map(p => p && p.id));
+      const early = (ours.players || []).filter(p => p && earlier[p.id] && _savesRunning[earlier[p.id]] && !there.has(p.id)).map(p => p.id);
+      if(early.length) ours = Object.assign({}, ours, { players: ours.players.filter(p => !(p && early.includes(p.id))) });
     }
     // A player this save lists whom the server does not have and this phone no longer shows (removed elsewhere and
     // taken off this screen by a snapshot while the save was waiting): not written back.
@@ -441,7 +454,8 @@ function _writeSharedState(){
   });
   // Counted until its last run is over: connectToRoom keeps what this save's visit knew for as long as it runs.
   _visitSaves[visit] = (_visitSaves[visit] || 0) + 1;
-  const over = () => { if(again){ again = false; run(); return; } if(--_visitSaves[visit] <= 0) delete _visitSaves[visit]; };
+  _savesRunning[writeNo] = true;
+  const over = () => { if(again){ again = false; run(); return; } delete _savesRunning[writeNo]; if(--_visitSaves[visit] <= 0) delete _visitSaves[visit]; };
   const run = () => attempt().then(over, over);
   run();
 }
