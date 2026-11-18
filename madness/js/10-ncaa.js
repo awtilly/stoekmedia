@@ -19,7 +19,19 @@ const ncaa = {
    * another request that never settled. After this long the request is abandoned and treated as a failure. */
   timeoutMs: 15000,
 
+  /* The service worker answers any GET it has seen before from its own cache, for good, and a page cannot ask
+   * it not to. For the relay that meant the first scoreboard of the day, or a bracket asked for before Selection
+   * Sunday, was all this browser ever got. Remove the stored answer first so the request reaches the network.
+   * Never waits long and never fails the request: at worst this one request gets the stored answer again. */
+  async _dropStoredAnswer(url) {
+    if (typeof caches === 'undefined') return;
+    const drop = (async () => { for (const name of await caches.keys()) await (await caches.open(name)).delete(url, { ignoreVary: true }); })();
+    try { await Promise.race([drop, new Promise(r => setTimeout(r, 1000))]); } catch (e) {}
+    drop.catch(() => {});
+  },
+
   async _get(path) {
+    await this._dropStoredAnswer(NCAA_API_BASE + path);
     const ctl = typeof AbortController === 'function' ? new AbortController() : null;
     const timer = ctl ? setTimeout(() => ctl.abort(), this.timeoutMs) : null;
     try {
