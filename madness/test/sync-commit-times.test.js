@@ -413,3 +413,21 @@ test('the room a save read, delivered twice, keeps the confirmed new player on t
   assert.deepEqual(ids(), ['p1', 'n1']);
   assert.deepEqual(app.eval('Object.keys(_rosterAcked)'), []);
 }));
+
+test('a setting set back on another phone after the save was confirmed is shown, though that update reads like the last one', withTimers(async () => {
+  const { app, step, fire, elsewhere, deliver, set, finish, server } = stampedRoom();
+  const read = elsewhere(r => { r.rp[3] = 9; });   // another phone's change: the room this phone's save will read
+  set('ub', false);
+  await fire();
+  await step(0);                                    // the transaction has read that room (ub true)
+  deliver(read);                                    // the phone is shown it: older than the save, "off" stays
+  await finish(0);                                  // the save lands and is confirmed; its own update is still to come
+  assert.equal(server().ub, false);
+  assert.equal(app.S.ub, false);
+  // Another phone sets the value back. This phone is behind and is sent only that newest room, never its own save.
+  const back = elsewhere(r => { r.ub = true; });
+  assert.equal(back.state, read.state, 'it reads exactly like the last update this phone applied');
+  deliver(back);
+  assert.equal(app.S.ub, true, 'this phone shows what the room holds');
+  assert.deepEqual(app.eval('Object.keys(_inFlight)'), []);
+}));
