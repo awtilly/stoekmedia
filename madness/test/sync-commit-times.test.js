@@ -551,3 +551,44 @@ test('leaving the room marks a player added and taken off again in this visit as
   assert.equal(app.eval('_rosterRemovedNo.n2'), 5);
   assert.equal(app.eval('_rosterRemovedNo.p1'), undefined, 'a player still on the screen is not marked');
 }));
+
+/** A room so busy that a save's first run gives up ('aborted', as Firestore reports a transaction that lost every race); later runs go through. */
+function busyOnce(app, srv) {
+  const st = { calls: 0, release: null };
+  app.db.runTransaction = async fn => {
+    st.calls++;
+    if (st.calls === 1) { await new Promise(r => { st.release = r; }); const e = new Error('busy'); e.code = 'aborted'; throw e; }
+    let out = null;
+    await fn({ get: async () => ({ exists: true, data: () => ({ state: srv.state, updatedAt: { seconds: 1000 + srv.v, nanoseconds: 0 } }) }), set: (ref, data) => { out = data.state; } });
+    srv.state = out; srv.v++;
+  };
+  return st;
+}
+const settle = async () => { for (let i = 0; i < 6; i++) await new Promise(r => setImmediate(r)); };
+
+test('a save that finds the room busy after Home and back is run again, not dropped', withTimers(async () => {
+  const { app, srv, fire, set, server } = stampedRoom();
+  const busy = busyOnce(app, srv);
+  set('year', 2028);
+  await fire();                                     // the save is on its way
+  comeBack(app);                                    // Home and straight back: its visit is over
+  busy.release();                                   // ... and only now does it give up: the room was busy
+  await settle();
+  assert.equal(busy.calls, 2, 'run once more');
+  assert.equal(server().year, 2028, 'the change is in the room');
+}));
+
+test('inside the visit a busy room is still handled by the usual retry of the waiting edit', withTimers(async () => {
+  const { app, srv, fire, set, server } = stampedRoom();
+  const busy = busyOnce(app, srv);
+  set('year', 2028);
+  await fire();
+  busy.release();
+  await settle();
+  assert.equal(busy.calls, 1, 'not run again on the spot');
+  assert.equal(server().year, 2027);
+  await fire();                                     // the retry armed by the failure
+  await settle();
+  assert.equal(busy.calls, 2);
+  assert.equal(server().year, 2028);
+}));
