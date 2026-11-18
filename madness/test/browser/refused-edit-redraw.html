@@ -1,0 +1,73 @@
+<!doctype html>
+<!--
+  Browser check for refused Settings edits (js/80-pages.js changeScoring / changeYear). The year field and the six
+  round-point fields are plain inputs: the typed value is already in the field when onchange runs, so a handler that
+  returns without redrawing after a cancelled PIN prompt leaves a value on screen that the room does not have.
+  Run (from repo root):
+    python -m http.server 8787 --bind 127.0.0.1
+    chrome --headless=new --dump-dom --virtual-time-budget=5000 http://127.0.0.1:8787/madness/test/browser/refused-edit-redraw.html | grep -A12 'id="out"'
+  (or `node madness/scripts/browser-check.js refused-edit` where that runner exists). Every line in #out must start with "ok".
+-->
+<meta charset="utf-8">
+<div id="c"></div>
+<pre id="out"></pre>
+<script>
+  const fakeFirestore = () => ({ enablePersistence: () => Promise.resolve(), collection: () => ({ doc: () => ({}) }) });
+  fakeFirestore.FieldValue = { serverTimestamp: () => 0 };
+  window.firebase = { initializeApp() {}, firestore: fakeFirestore, messaging: () => ({}) };
+</script>
+<script src="../../js/00-constants.js"></script>
+<script src="../../js/10-ncaa.js"></script>
+<script src="../../js/20-live.js"></script>
+<script src="../../js/30-state.js"></script>
+<script src="../../js/40-ui.js"></script>
+<script src="../../js/50-auth.js"></script>
+<script src="../../js/60-rooms.js"></script>
+<script src="../../js/70-logic.js"></script>
+<script src="../../js/80-pages.js"></script>
+<script>
+  const out = [];
+  const check = (cond, label) => out.push((cond ? 'ok   ' : 'FAIL ') + label);
+  const finish = () => { document.getElementById('out').textContent = out.join('\n'); };
+
+  (async () => {
+    try {
+      const c = document.getElementById('c');
+      let saves = 0;
+      saveState = () => { saves++; };
+      render = () => renderSettings(c);            // what render() does for the Settings tab, without the rest of the shell
+      const pointsField = r => c.querySelector('input[onchange="changeScoring(' + r + ',this.value)"]');
+      const yearField = () => c.querySelector('input[onchange="changeYear(this.value)"]');
+
+      S.players = []; S.teams = [];
+      S.rp = { 1: 1, 2: 2, 3: 4, 4: 8, 5: 16, 6: 32 };
+      S.year = 2027;
+      renderSettings(c);
+      check(pointsField(3) && pointsField(3).value === '4' && yearField() && yearField().value === '2027', 'Settings draws the round-3 points (4) and the year (2027)');
+
+      // 1. Refused: the PIN prompt was cancelled. The field must go back to what the room has.
+      requireAdmin = async () => false;
+      pointsField(3).value = '99';                 // what the browser has done by the time onchange fires
+      await changeScoring(3, '99');
+      check(S.rp[3] === 4 && saves === 0, 'a refused points edit changes and saves nothing');
+      check(pointsField(3).value === '4', 'after a refused points edit the field shows 4 again, not 99');
+
+      yearField().value = '2030';
+      await changeYear('2030');
+      check(S.year === 2027 && saves === 0, 'a refused year edit changes and saves nothing');
+      check(yearField().value === '2027', 'after a refused year edit the field shows 2027 again, not 2030');
+
+      // 2. Allowed: unchanged behaviour.
+      requireAdmin = async () => true;
+      pointsField(3).value = '5';
+      await changeScoring(3, '5');
+      check(S.rp[3] === 5 && saves === 1 && pointsField(3).value === '5', 'an allowed points edit is applied, saved once and drawn');
+      yearField().value = '2028';
+      await changeYear('2028');
+      check(S.year === 2028 && saves === 2 && yearField().value === '2028', 'an allowed year edit is applied, saved once and drawn');
+    } catch (e) {
+      out.push('FAIL exception: ' + (e && e.stack || e));
+    }
+    finish();
+  })();
+</script>

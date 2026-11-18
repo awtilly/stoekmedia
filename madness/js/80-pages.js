@@ -1399,7 +1399,7 @@ function renderSettings(c){
 }
 
 async function changeYear(v){
-  if(!await requireAdmin()) return;
+  if(!await requireAdmin()){ render(); return; } // redraw so the field shows the value the room has again, not the refused edit
   S.year = Number(v) || tournamentYear();
   saveState();
   render();
@@ -1416,7 +1416,7 @@ async function clearAllTeams(){
 }
 
 async function changeScoring(r, v){
-  if(!await requireAdmin()) return;
+  if(!await requireAdmin()){ render(); return; } // redraw so the field shows the value the room has again, not the refused edit
   S.rp[r] = Number(v) || 0;
   saveState();
   render();
