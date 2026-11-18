@@ -27,6 +27,11 @@ const ROUND_SHORT = {1:'R64', 2:'R32', 3:'S16', 4:'E8', 5:'F4', 6:'CH'};
 /* ── Go Home (back to lobby) ── */
 function goHome() {
   stopLiveRefresh();
+  // The 250 ms draft tick and the autopick retry belong to the room being left. render() is what normally stops
+  // the tick, and the lobby never calls render(), so both kept running (as no-ops against the default state)
+  // for as long as the lobby stayed open.
+  stopDraftClock();
+  if(_autoPickRetry){ clearTimeout(_autoPickRetry); _autoPickRetry = null; }
   flushFirestoreWrite(); // last edit in this room goes to this room, before roomId is cleared
   if(unsubRoom) { unsubRoom(); unsubRoom = null; }
   roomId = null;
