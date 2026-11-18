@@ -14,14 +14,23 @@ const ncaa = {
     return d.slice(0, 4) + '/' + d.slice(4, 6) + '/' + d.slice(6, 8);
   },
 
+  /* A stalled connection (a phone that has just lost signal, iOS Safari waking up) can leave fetch pending for
+   * minutes: the bracket import stayed on 'Importing...' with its button disabled, and every 30 s poll started
+   * another request that never settled. After this long the request is abandoned and treated as a failure. */
+  timeoutMs: 15000,
+
   async _get(path) {
+    const ctl = typeof AbortController === 'function' ? new AbortController() : null;
+    const timer = ctl ? setTimeout(() => ctl.abort(), this.timeoutMs) : null;
     try {
-      const r = await fetch(NCAA_API_BASE + path);
+      const r = await fetch(NCAA_API_BASE + path, ctl ? { signal: ctl.signal } : undefined);
       if (!r.ok) throw new Error(r.status);
       return await r.json();
     } catch (e) {
       console.warn('NCAA fetch failed:', path, e);
       return null;
+    } finally {
+      if (timer) clearTimeout(timer);
     }
   },
 
