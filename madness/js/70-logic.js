@@ -58,9 +58,16 @@ async function resolvePlayIn(teamId, winnerIdx) {
 
 let _lastAutoResolve = 0;
 let _autoResolveFetching = false; // a bracket fetch is in flight: a second call must not start another
+/* The throttle only spaces out the bracket requests while a slot is waiting for its First Four game. It used to
+ * be an hour for the whole session: a game that ended ten minutes after a check left its "A / B" slot open for
+ * the rest of that hour, and a second pool opened in that hour was not checked at all. */
+const PLAYIN_RECHECK_MS = 5 * 60 * 1000;
+let _autoResolveRoom = null; // the room the throttle was armed in: another pool has its own slots
+let _playInRecheck = null;   // timer: the Live tab is open and a slot is still waiting for its game
 async function autoResolvePlayIns() {
   const now = Date.now();
-  if (now - _lastAutoResolve < 3600000 || _autoResolveFetching) return; // once per hour max, one fetch at a time
+  const room = roomId || '';
+  if ((now - _lastAutoResolve < PLAYIN_RECHECK_MS && _autoResolveRoom === room) || _autoResolveFetching) return; // every few minutes at most, one fetch at a time
   const unresolved = S.teams.filter(t => t.playIn && !t.playInResolved);
   if (unresolved.length === 0) return;
   // One bracket fetch: the First Four games there carry isWinner once they are final.
@@ -70,7 +77,9 @@ async function autoResolvePlayIns() {
   // Only arm the hourly throttle once the bracket actually answered; a dead network on First Four
   // night must not lock auto-resolve out for an hour.
   if (!data) return false; // the request failed: the manual check says so instead of "not final yet"
+  if ((roomId || '') !== room) return; // another pool was opened while the request was out: its own check settles its slots
   _lastAutoResolve = now;
+  _autoResolveRoom = room;
   const decided = ncaa.firstFourWinners(data);
   for (const ff of decided) {
     for (const ut of unresolved) {
@@ -80,6 +89,11 @@ async function autoResolvePlayIns() {
       const winnerIdx = ids.indexOf(ff.winner);
       if (winnerIdx >= 0) await resolvePlayIn(ut.id, winnerIdx);
     }
+  }
+  // A slot is still open: its game is not final yet. The Live tab only asks when it is opened or the app comes
+  // to the front, so while it stays open, look again in a few minutes.
+  if (!_playInRecheck && liveRefreshTimer && S.teams.some(t => t.playIn && !t.playInResolved)) {
+    _playInRecheck = setTimeout(() => { _playInRecheck = null; if (liveRefreshTimer) autoResolvePlayIns(); }, PLAYIN_RECHECK_MS);
   }
 }
 

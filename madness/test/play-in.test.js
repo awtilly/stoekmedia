@@ -73,7 +73,7 @@ test('resolvePlayIn: ignores unknown teams, non-play-in teams, out-of-range inde
   assert.equal(app.__calls.render, 0);
 });
 
-test('autoResolvePlayIns: settles the slot from the real 2026 bracket with one fetch, then arms the hourly throttle', async () => {
+test('autoResolvePlayIns: settles the slot from the real 2026 bracket with one fetch, then arms the throttle', async () => {
   const app = appWithPlayIn();
   const calls = bracketFetch(app, bracket2026());
   await app.autoResolvePlayIns();
@@ -84,7 +84,7 @@ test('autoResolvePlayIns: settles the slot from the real 2026 bracket with one f
   assert.equal(t.name, 'Howard');
   assert.ok(throttle() > 0, 'throttle armed after a successful fetch');
   await app.autoResolvePlayIns();
-  assert.equal(calls.length, 1, 'second call within the hour does not fetch');
+  assert.equal(calls.length, 1, 'a second call right away does not fetch');
 });
 
 test('autoResolvePlayIns: a failed fetch leaves the throttle unarmed so the next call tries again', async () => {
