@@ -35,7 +35,7 @@ function stampedRoom() {
   };
   app.roomId = 'AAAA';
   vm.runInThisContext('_firestoreWriteTimer = null; _isRemoteUpdate = false; _lastSyncedState = null; _syncBase = null; _lastSnapshotPlayerIds = null; _syncedShared = null; _sharedAtSync = null; _queuedPlainWrites = {}; _writeRetries = 0;');
-  vm.runInThisContext('_serverSeen = null; _recentSent = []; _snapshotSeq = 0; _writeSeq = 0; _keyWriteNo = {}; _inFlight = {}; _rosterInFlight = {}; _rosterGone = {}; _rosterRemovedNo = {}; _rosterRemoving = {}; _pendingBase = {}; _echoWriteNo = 0; _lastRoomDoc = null; _pickInFlight = false;');
+  vm.runInThisContext('_serverSeen = null; _recentSent = []; _snapshotSeq = 0; _writeSeq = 0; _keyWriteNo = {}; _inFlight = {}; _rosterInFlight = {}; _rosterGone = {}; _rosterAcked = {}; _rosterRemovedNo = {}; _rosterRemoving = {}; _pendingBase = {}; _echoWriteNo = 0; _lastRoomDoc = null; _pickInFlight = false;');
   Object.defineProperty(globalThis, 'navigator', { value: { onLine: true }, configurable: true, writable: true });
   /** What the room holds right now, with its commit time: a snapshot to deliver later. */
   const now = () => ({ state: srv.state, v: srv.v });
@@ -173,4 +173,23 @@ test('the room a save was built on, arriving after the confirmation with its own
   deliver(now());
   assert.equal(app.S.year, 2029);
   assert.deepEqual(app.eval('Object.keys(_inFlight)'), []);
+}));
+
+test('a player added by a confirmed save and taken off again after an older snapshot stays off: the removal is sent', withTimers(async () => {
+  const { app, txs, finish, fire, elsewhere, deliver, now, set, server } = stampedRoom();
+  const N = id => ({ id, name: id, teamIds: [] });
+  const ids = () => app.S.players.map(p => p.id);
+  const older = elsewhere(r => { r.rp[3] = 9; });   // the room the save will read; its snapshot is still on its way
+  set('players', app.S.players.concat([N('n1')]));
+  await fire();
+  await finish(0);                                  // n1 is in the room, confirmed
+  set('players', app.S.players.concat([N('n2')]));  // another new player: waiting in the debounce
+  deliver(older);                                   // older than the save: no n1 in it
+  assert.deepEqual(ids(), ['p1', 'n1', 'n2']);
+  set('players', app.S.players.filter(p => p.id === 'p1')); // both taken off again
+  deliver(now());                                   // the room with n1
+  assert.deepEqual(ids(), ['p1'], 'n1 is not put back on the screen');
+  await fire();
+  for (let i = 0; i < txs.length; i++) await finish(i);
+  assert.deepEqual(server().players.map(p => p.id), ['p1'], 'n1 is out of the room');
 }));
