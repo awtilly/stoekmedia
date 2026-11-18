@@ -35,7 +35,7 @@ function stampedRoom() {
   };
   app.roomId = 'AAAA';
   vm.runInThisContext('_firestoreWriteTimer = null; _isRemoteUpdate = false; _lastSyncedState = null; _syncBase = null; _lastSnapshotPlayerIds = null; _syncedShared = null; _sharedAtSync = null; _queuedPlainWrites = {}; _writeRetries = 0;');
-  vm.runInThisContext('_serverSeen = null; _recentSent = []; _snapshotSeq = 0; _writeSeq = 0; _keyWriteNo = {}; _inFlight = {}; _rosterInFlight = {}; _rosterGone = {}; _rosterAcked = {}; _rosterRemovedNo = {}; _rosterRemoving = {}; _knownAtExit = {}; _knownEver = []; _writeNoRoom = "AAAA"; _pendingBase = {}; _echoWriteNo = 0; _lastRoomDoc = null; _pickInFlight = false;');
+  vm.runInThisContext('_serverSeen = null; _recentSent = []; _snapshotSeq = 0; _writeSeq = 0; _keyWriteNo = {}; _inFlight = {}; _rosterInFlight = {}; _rosterGone = {}; _rosterAcked = {}; _rosterRemovedNo = {}; _rosterRemoving = {}; _knownAtExit = {}; _visitSaves = {}; _knownEver = []; _writeNoRoom = "AAAA"; _pendingBase = {}; _echoWriteNo = 0; _lastRoomDoc = null; _pickInFlight = false;');
   Object.defineProperty(globalThis, 'navigator', { value: { onLine: true }, configurable: true, writable: true });
   /** What the room holds right now, with its commit time: a snapshot to deliver later. */
   const now = () => ({ state: srv.state, v: srv.v });
@@ -743,4 +743,26 @@ test('the same after Home and back', withTimers(async () => {
   comeBack(app);
   await finish(0);
   assert.deepEqual(server().players.map(p => p.id), ['p1', 'n2'], 'n1 stays removed');
+}));
+
+test('Home and back six times: a save from the first visit still knows which players were in the room', withTimers(async () => {
+  const { app, finish, fire, deliver, now, elsewhere, set, server } = stampedRoom();
+  const N = id => ({ id, name: id, teamIds: [] });
+  set('players', app.S.players.concat([N('n1')]));
+  await fire();                                     // save 1 (adding n1) is on its way
+  set('players', app.S.players.concat([N('n3')]));
+  await fire();                                     // save 2 (adding n3) as well: it lists n1, not yet confirmed
+  comeBack(app);                                    // Home and straight back
+  await finish(0);                                  // save 1 is confirmed in the second visit: n1 is in the room
+  for (let i = 0; i < 6; i++) { deliver(now()); comeBack(app); } // six more visits, each one sees the room
+  elsewhere(r => { r.players = r.players.filter(p => p.id !== 'n1'); }); // another phone takes n1 off
+  await finish(1);                                  // save 2, from the first visit, lands last
+  assert.deepEqual(server().players.map(p => p.id), ['p1', 'n3'], 'n3 is added, n1 stays removed');
+  assert.deepEqual(app.eval('Object.keys(_visitSaves)'), [], 'no save is counted as running any more');
+}));
+
+test('what a visit knew is dropped once no save of it is running and four newer visits have ended', withTimers(async () => {
+  const { app, deliver, now } = stampedRoom();
+  for (let i = 0; i < 7; i++) { deliver(now()); comeBack(app); }
+  assert.equal(app.eval('Object.keys(_knownAtExit).length'), 4);
 }));
