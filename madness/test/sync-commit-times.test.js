@@ -193,3 +193,94 @@ test('a player added by a confirmed save and taken off again after an older snap
   for (let i = 0; i < txs.length; i++) await finish(i);
   assert.deepEqual(server().players.map(p => p.id), ['p1'], 'n1 is out of the room');
 }));
+
+/** A snapshot whose document carries no commit time (written by a phone still on the previous version of the app). */
+const bare = (app, snap) => app._applyRoomSnapshot({ exists: true, data: () => ({ state: snap.state, updatedAt: null }), metadata: {} });
+
+test('an older snapshot that carries no commit time does not undo a confirmed added player: taking them off is still sent', withTimers(async () => {
+  const { app, txs, finish, fire, elsewhere, deliver, now, set, server } = stampedRoom();
+  const N = id => ({ id, name: id, teamIds: [] });
+  const ids = () => app.S.players.map(p => p.id);
+  const older = elsewhere(r => { r.rp[3] = 9; });   // an older room; its snapshot is still on its way
+  elsewhere(r => { r.rp[4] = 9; });                 // the (stamped) room the save will read
+  set('players', app.S.players.concat([N('n1')]));
+  await fire();
+  await finish(0);                                  // n1 is in the room, confirmed
+  set('players', app.S.players.concat([N('n2')]));  // another new player: waiting in the debounce
+  bare(app, older);                                 // no n1 in it, and no commit time to place it by
+  assert.deepEqual(ids(), ['p1', 'n1', 'n2']);
+  set('players', app.S.players.filter(p => p.id === 'p1')); // both taken off again
+  deliver(now());                                   // the room with n1
+  assert.deepEqual(ids(), ['p1'], 'n1 is not put back on the screen');
+  await fire();
+  for (let i = 0; i < txs.length; i++) await finish(i);
+  assert.deepEqual(server().players.map(p => p.id), ['p1'], 'n1 is out of the room');
+}));
+
+test('a snapshot with no commit time that has the confirmed player ends the wait for them', withTimers(async () => {
+  const { app, finish, fire, elsewhere, set, srv } = stampedRoom();
+  const N = id => ({ id, name: id, teamIds: [] });
+  elsewhere(r => { r.rp[3] = 9; });
+  set('players', app.S.players.concat([N('n1')]));
+  await fire();
+  await finish(0);
+  assert.deepEqual(app.eval('Object.keys(_rosterAcked)'), ['n1']);
+  bare(app, { state: srv.state });
+  assert.deepEqual(app.eval('Object.keys(_rosterAcked)'), []);
+  assert.deepEqual(app.eval('Object.keys(_rosterInFlight)'), []);
+}));
+
+test('another phone taking a confirmed player off is believed even when none of its snapshots carries a commit time', withTimers(async () => {
+  const { app, txs, finish, fire, elsewhere, set, server } = stampedRoom();
+  const N = id => ({ id, name: id, teamIds: [] });
+  const ids = () => app.S.players.map(p => p.id);
+  elsewhere(r => { r.rp[3] = 9; });
+  set('players', app.S.players.concat([N('n1')]));
+  await fire();
+  await finish(0);                                  // n1 is in the room, confirmed; this phone has not seen it come back yet
+  const gone = elsewhere(r => { r.players = r.players.filter(p => p.id !== 'n1'); }); // a phone on the old version removes n1
+  bare(app, gone);
+  const again = elsewhere(r => { r.rp[5] = 9; });
+  bare(app, again);
+  const third = elsewhere(r => { r.rp[6] = 9; });
+  bare(app, third);
+  assert.deepEqual(ids(), ['p1'], 'n1 is off this screen too');
+  set('year', 2029);                                // any later save of this phone
+  await fire();
+  for (let i = 0; i < txs.length; i++) await finish(i);
+  assert.deepEqual(server().players.map(p => p.id), ['p1'], 'n1 was not written back');
+  assert.equal(server().year, 2029);
+}));
+
+test('once the room the save read has been seen, the first snapshot without the player ends the wait, commit time or not', withTimers(async () => {
+  const { app, txs, finish, fire, elsewhere, deliver, set, server } = stampedRoom();
+  const N = id => ({ id, name: id, teamIds: [] });
+  const pre = elsewhere(r => { r.rp[3] = 9; });
+  deliver(pre);                                     // this phone is up to date before it saves
+  set('players', app.S.players.concat([N('n1')]));
+  await fire();
+  await finish(0);
+  assert.deepEqual(app.eval('Object.keys(_rosterAcked)'), ['n1']);
+  bare(app, elsewhere(r => { r.players = r.players.filter(p => p.id !== 'n1'); })); // removed on a phone with the old version
+  assert.deepEqual(app.S.players.map(p => p.id), ['p1'], 'n1 is off this screen at once');
+  assert.deepEqual(app.eval('Object.keys(_rosterInFlight)'), []);
+  set('year', 2029);
+  await fire();
+  for (let i = 0; i < txs.length; i++) await finish(i);
+  assert.deepEqual(server().players.map(p => p.id), ['p1'], 'n1 was not written back');
+}));
+
+test('the room the save read, arriving late without a commit time, keeps the wait; the next snapshot ends it', withTimers(async () => {
+  const { app, finish, fire, elsewhere, set } = stampedRoom();
+  const N = id => ({ id, name: id, teamIds: [] });
+  const pre = elsewhere(r => { r.rp[3] = 9; });
+  set('players', app.S.players.concat([N('n1')]));
+  await fire();
+  await finish(0);
+  bare(app, pre);                                   // the very room the save read: older than the save
+  assert.deepEqual(app.S.players.map(p => p.id), ['p1', 'n1'], 'n1 stays on the screen');
+  assert.deepEqual(app.eval('Object.keys(_rosterAcked)'), ['n1']);
+  bare(app, elsewhere(r => { r.players = r.players.filter(p => p.id !== 'n1'); r.rp[4] = 9; })); // (alone it would read exactly like the room before)
+  assert.deepEqual(app.S.players.map(p => p.id), ['p1'], 'a removal after it is believed');
+  assert.deepEqual(app.eval('Object.keys(_rosterAcked)'), []);
+}));
