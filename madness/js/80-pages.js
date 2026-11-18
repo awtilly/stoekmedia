@@ -656,9 +656,10 @@ async function confirmPick(tid){
   const t = S.teams.find(x => x.id === tid);
   if(!t) return;
   const rec = teamRecordDisplay(t);
+  const seenCp = S.ds ? S.ds.cp : null; // the pick this tap is for: see pickTeam
   // appConfirm escapes its text, so the message is built as plain text.
   const ok = await appConfirm(t.seed + ' seed \u00b7 ' + t.region + (rec ? ' \u00b7 ' + rec : ''), { title: teamDisplayName(t), confirmLabel: 'Draft ' + teamDisplayName(t) });
-  if(ok) pickTeam(tid);
+  if(ok) pickTeam(tid, seenCp);
 }
 
 /* ── My Teams (after the draft) ── */
@@ -769,7 +770,7 @@ async function startDraft(){
 // Eliminates the "two clients pick at once" race that broke the live draft last year.
 // Server-state is the source of truth; local S updates via the snapshot listener.
 let _pickInFlight = false;
-async function pickTeam(tid){
+async function pickTeam(tid, seenCp){
   if(_pickInFlight) return; // ignore re-entrant taps while a pick is settling
   const myId = getMyPlayerId();
   // No-room (solo/offline) mode: simple local mutation
@@ -786,6 +787,10 @@ async function pickTeam(tid){
       const ds = remote.ds || {};
       if(ds.complete) throw { code: 'complete', msg: 'Draft already complete' };
       if(!ds.started) throw { code: 'not-started', msg: 'Draft has not started' };
+      // An unlocked commissioner may pick for whoever is on the clock, so the turn check below does not apply. If
+      // the draft has moved on since the tap (that player, or the auto-pick, picked at the same moment), this team
+      // would go to the NEXT player: refuse, and let the commissioner look again.
+      if(adminUnlocked && seenCp != null && ds.cp !== seenCp) throw { code: 'moved', msg: 'Another pick just came in. Check who is on the clock, then pick again.' };
       if(!adminUnlocked && myId !== ds.order[ds.cp]){
         throw { code: 'not-turn', msg: "It's not your turn anymore" };
       }
