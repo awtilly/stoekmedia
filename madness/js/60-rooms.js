@@ -62,6 +62,14 @@ let _lastRoomDoc = null;
 // later one is newer than the save (even one that reads the same: the player added and taken off again). Before
 // that only one that has the player is; the third without it ends the wait anyway (updates can be merged on the way).
 function _bareEndsWait(a, state, has){ if(has || a.seen) return true; if(state === a.pre){ a.seen = true; return false; } return ++a.bare >= 3; }
+// The player ids of the last applied snapshot when its commit time is later than `preAt` (the room a save read), else
+// null: such a snapshot is the save itself or newer, so a player the save added and it lacks was removed since.
+function _laterRosterIds(preAt, preState){
+  if(!_lastRoomDoc || !_lastRoomDoc.exists) return null;
+  const d = _lastRoomDoc.data(), at = _docAt(d);
+  if(!at || !preAt || _notAfter(at, preAt, d.state === preState)) return null;
+  try { return new Set((JSON.parse(d.state).players || []).map(p => p && p.id)); } catch(e){ return null; }
+}
 // The commit time a room document carries (every write sends updatedAt: serverTimestamp()), or null: a snapshot
 // of a write of this phone that the server has not stamped yet, or a document from before the field existed.
 function _docAt(data){
@@ -315,13 +323,25 @@ function _writeSharedState(){
       _lastSnapshotPlayerIds = Array.from(new Set((_lastSnapshotPlayerIds || []).concat(writtenIds.filter(id => sentIds.has(id) && (!shown || shown.has(id))))));
     }
     for(const id of Object.keys(_rosterRemoving)){ if(_rosterRemoving[id] === writeNo) delete _rosterRemoving[id]; }
-    if(preAtSaved && roomId && ref.id === roomId){ for(const id of Object.keys(_rosterInFlight)){ if(_rosterInFlight[id] === writeNo && (S.players || []).some(p => p && p.id === id)) _rosterAcked[id] = { no: writeNo, at: preAtSaved, pre: preState, seen: _serverSeen === preState, bare: 0 }; } }
+    // Unless an update later than the room this save read has already been applied and does not have the player:
+    // another phone took them off after this save. Nothing newer is promised, so there is nothing to wait for;
+    // that update is shown again below, now that the player is no longer on their way.
+    let rosterReapply = false;
+    if(preAtSaved && roomId && ref.id === roomId){
+      let lastIds = null; // the players of the last applied update, when it is later than the room this save read
+      for(const id of Object.keys(_rosterInFlight)){
+        if(_rosterInFlight[id] !== writeNo || !(S.players || []).some(p => p && p.id === id)) continue;
+        if(lastIds === null) lastIds = _laterRosterIds(preAtSaved, preState) || false;
+        if(lastIds && !lastIds.has(id)) rosterReapply = true;
+        else _rosterAcked[id] = { no: writeNo, at: preAtSaved, pre: preState, seen: _serverSeen === preState, bare: 0 };
+      }
+    }
     for(const id of Object.keys(_rosterInFlight)){ if(_rosterInFlight[id] === writeNo && !(_rosterAcked[id] && _rosterAcked[id].no === writeNo)){ delete _rosterInFlight[id]; if(roomId && ref.id === roomId && !(S.players || []).some(p => p && p.id === id)) _rosterGone[id] = 3; } } // confirmed: its echo brings these players, and a snapshot after it may already have them removed again
     _writeRetries = 0;
     // The server has the save. A key of it that a snapshot was held back for: if that snapshot is not the state
     // the transaction read (so it may already be newer than this save, with another phone's change on top), show
     // what it said after all. Otherwise the echo is still to come; from here on any snapshot is taken at its word.
-    let reapply = false;
+    let reapply = rosterReapply;
     for(const k of Object.keys(_inFlight)){
       const f = _inFlight[k];
       if(f.no !== writeNo) continue;
