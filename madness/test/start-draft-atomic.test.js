@@ -60,7 +60,7 @@ test('room: a stale lobby cannot restart a draft that already has picks', async 
 
 test('room: refuses when the server copy has too few players or teams', async () => {
   const { app, calls } = draftApp({ players: [twoPlayers()[0]], teams: fourTeams(), ds: { started: false } });
-  app.S.players = twoPlayers();
+  app.S.players = [twoPlayers()[0]];
   app.S.teams = fourTeams();
   await app.startDraft();
   assert.equal(calls.update, 0);
@@ -94,4 +94,51 @@ test('locally started draft is refused a second time; solo rooms still start loc
   assert.equal(app.S.ds.order.length, 4);
   assert.equal(app.__calls.saveState, 1);
   assert.equal(calls.update, 0);
+});
+
+/* The start reads the server copy. What this phone changed a moment ago (a player added, a bracket imported) may
+ * not be there yet: the edit waits 0.8 s before it is sent, and then travels. Started in that gap, the draft order
+ * was built without that player, who then arrived in the room with no turn. */
+test('room: a player added on this phone a moment ago is not left out: the start waits for the save', async () => {
+  const { app, calls } = draftApp({ players: twoPlayers(), teams: fourTeams(), ds: { started: false } });
+  app.S.players = [...twoPlayers(), { id: 'c', name: 'Cy', teamIds: [] }]; // Cy was added here, not saved yet
+  app.S.teams = fourTeams();
+  await app.startDraft();
+  assert.equal(calls.update, 0, 'the draft is not started');
+  assert.match(calls.toasts.join('|'), /Still saving your last change/);
+});
+
+test('room: a bracket imported on this phone a moment ago is not replaced by the old teams under the draft', async () => {
+  const { app, calls } = draftApp({ players: twoPlayers(), teams: fourTeams(), ds: { started: false } });
+  app.S.players = twoPlayers();
+  app.S.teams = [5, 6, 7, 8].map(i => ({ id: 'n' + i, name: 'N' + i, seed: i, region: 'East' })); // just imported here
+  await app.startDraft();
+  assert.equal(calls.update, 0);
+  assert.match(calls.toasts.join('|'), /Still saving your last change/);
+});
+
+test('room: a team the room has and this screen does not yet also holds the start back', async () => {
+  const { app, calls } = draftApp({ players: twoPlayers(), teams: fourTeams(), ds: { started: false } });
+  app.S.players = twoPlayers();
+  app.S.teams = fourTeams().slice(0, 3);
+  await app.startDraft();
+  assert.equal(calls.update, 0);
+});
+
+test('room: a team record this screen never showed (an id the app does not accept) does not hold the start back', async () => {
+  const { app, calls } = draftApp({ players: twoPlayers(), teams: [...fourTeams(), { id: "x');alert(1", name: 'Bad', seed: 5, region: 'South' }], ds: { started: false } });
+  app.S.players = twoPlayers();
+  app.S.teams = fourTeams();
+  await app.startDraft();
+  assert.equal(calls.update, 1);
+});
+
+test('room: once the room has what this screen shows, the same tap starts the draft', async () => {
+  const withCy = () => [...twoPlayers(), { id: 'c', name: 'Cy', teamIds: [] }];
+  const { app, calls } = draftApp({ players: withCy(), teams: fourTeams(), ds: { started: false } });
+  app.S.players = withCy();
+  app.S.teams = fourTeams();
+  await app.startDraft();
+  assert.equal(calls.update, 1);
+  assert.deepEqual(calls.written.ds.order.slice(0, 3), ['a', 'b', 'c']);
 });

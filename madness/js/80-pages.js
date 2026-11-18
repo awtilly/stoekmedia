@@ -713,6 +713,15 @@ function _freshDraftState(players, teams, duration){
   };
 }
 
+/* True when this screen shows a player the room's copy does not have, or a different set of teams. */
+function _startWouldMissLocal(players, teams){
+  const has = (list, id) => list.some(x => x && x.id === id);
+  const mine = S.teams || [];
+  // Counted the way this screen got them: a record with an id the app does not accept was never shown here.
+  const theirs = teams.filter(t => t && isSafeId(t.id));
+  return (S.players || []).some(p => !has(players, p.id)) || mine.length !== theirs.length || mine.some(t => !has(theirs, t.id));
+}
+
 async function startDraft(){
   if(!await requireAdmin()) return;
   if(S.ds && S.ds.started){ showToast('The draft has already started'); return; }
@@ -728,6 +737,10 @@ async function startDraft(){
         const remote = JSON.parse(snap.data().state || '{}');
         if(remote.ds && remote.ds.started) throw { code: 'started', msg: 'The draft was already started on another device' };
         const players = remote.players || [], teams = remote.teams || [];
+        // Everything this screen shows must already be in the room. A player added or a bracket imported here a moment
+        // ago may still be on its way: started now, that player has no turn, or the draft is built on the old teams.
+        // (Players the room has and this screen does not yet, joined a second ago elsewhere, are in the draft as before.)
+        if(_startWouldMissLocal(players, teams)) throw { code: 'unsaved', msg: 'Still saving your last change. Tap Start Draft again in a moment.' };
         if(players.length < 2 || teams.length < players.length) throw { code: 'not-ready', msg: 'Need 2+ players and at least one team per player' };
         remote.ds = _freshDraftState(players, teams, duration);
         players.forEach(p => p.teamIds = []);
@@ -738,6 +751,7 @@ async function startDraft(){
       });
       _beeped = false; // the snapshot listener applies the started draft and render() starts the clock
     } catch(err){
+      if(err && err.code === 'unsaved') flushFirestoreWrite(); // send what is waiting now, not after the pause
       if(err && err.msg) showToast(err.msg);
       else { console.warn('Start draft failed:', err); showToast('Start failed \u2014 try again'); }
     }
