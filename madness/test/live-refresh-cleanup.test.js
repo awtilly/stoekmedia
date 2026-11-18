@@ -57,6 +57,7 @@ test('the fallback poll runs when the cached doc has not arrived, and polls noth
     app.db = d.db;
     let fetches = 0;
     app.fetch = async () => { fetches++; return { ok: true, json: async () => ({ games: [] }) }; };
+    app.eval('_catchUpDone = "|" + dayBefore(scoreboardDay())'); // the overnight catch-up (its own test file) already ran: count only the shown day's poll
     app.startLiveRefresh();
     d.listener({ exists: true, metadata: { fromCache: false }, data: () => ({ events: [], fetchedAt: ts(Date.now()) }) });
     t.timeouts.find(x => x.ms === 1500).fn();
