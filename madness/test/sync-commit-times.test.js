@@ -494,3 +494,35 @@ test('a player added and taken off again before going Home and back is not writt
   for (let i = 0; i < txs.length; i++) await finish(i);
   assert.deepEqual(server().players.map(p => p.id), ['p1'], 'n1 is not in the room');
 }));
+
+test('a setting changed again after Home and back is not dropped when the save from before arrives', withTimers(async () => {
+  const { app, finish, fire, deliver, now, set, server } = stampedRoom();
+  app.eval("_writeNoRoom = 'AAAA'");               // the room this phone has been saving to
+  set('year', 2028);
+  await fire();                                     // save 1 is on its way (it has not read the room yet)
+  comeBack(app);
+  deliver(now());                                   // the first update of the new visit: the room still says 2027
+  set('year', 2029);                                // changed again, waiting to be saved
+  await finish(0);                                  // save 1 lands only now
+  assert.equal(server().year, 2028);
+  deliver(now());                                   // ...and its update arrives: this phone's own older value
+  assert.equal(app.S.year, 2029, 'the newer choice stays on the screen');
+  await fire();
+  await finish(1);
+  assert.equal(server().year, 2029, 'and is saved');
+  deliver(now());
+  assert.equal(app.S.year, 2029);
+}));
+
+test('entering a different room forgets the saves sent to the last one', withTimers(async () => {
+  const { app, fire, set } = stampedRoom();
+  app.eval("_writeNoRoom = 'AAAA'");
+  set('year', 2028);
+  await fire();
+  assert.equal(app.eval('_recentSent.length'), 1);
+  comeBack(app);
+  assert.equal(app.eval('_recentSent.length'), 1, 'same room: kept');
+  app.db.collection = () => ({ doc: id => ({ id, onSnapshot: () => () => {} }) });
+  app.connectToRoom('BBBB');
+  assert.equal(app.eval('_recentSent.length'), 0, 'another room: forgotten');
+}));

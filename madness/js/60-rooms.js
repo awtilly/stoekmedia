@@ -522,8 +522,8 @@ function connectToRoom(code){
   _lastSnapshotPlayerIds = null; // the previous room's roster says nothing about this one
   _syncedShared = null;
   _serverSeen = null;
-  _recentSent = [];
-  if(code !== _writeNoRoom){ _keyWriteNo = {}; _rosterRemovedNo = {}; _writeNoRoom = code; } // kept for the same room: a save from the last visit may still be on its way
+  // (_recentSent too: the update that brings a save from the last visit is this phone's own value, not another phone's change.)
+  if(code !== _writeNoRoom){ _recentSent = []; _keyWriteNo = {}; _rosterRemovedNo = {}; _writeNoRoom = code; } // kept for the same room: a save from the last visit may still be on its way
   else { for(const id of _removedHereIds(S.players)) _rosterRemovedNo[id] = _writeSeq + 1; } // added and taken off again in the last visit (S is this phone's cached copy of that screen): the save that was adding them leaves them out
   _inFlight = {};
   _pendingBase = {};
