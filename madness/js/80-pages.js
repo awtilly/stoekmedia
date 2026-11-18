@@ -849,10 +849,16 @@ function _pickTeamLocal(tid, myId){
   updateAppBadge();
 }
 
+let _undoInFlight = false; // an undo is being written: a second tap must not take back a second pick
 async function undoDraft(){
+  if(_undoInFlight) return;
   if(!await requireAdmin()) return;
+  // The pick being taken back is the last one this screen shows: if the room is already further on (a pick
+  // this phone has not shown yet), the undo is refused instead of taking back a pick nobody here has seen.
+  const seenCp = S.ds ? S.ds.cp : null;
   // Multiplayer: do it transactionally so concurrent picks can't sneak past
   if(roomId){
+    _undoInFlight = true;
     try {
       await db.runTransaction(async (tx) => {
         const ref = db.collection("rooms").doc(roomId);
@@ -861,6 +867,7 @@ async function undoDraft(){
         const remote = JSON.parse(snap.data().state || '{}');
         const ds = remote.ds || {};
         if(!ds.order || ds.cp === 0) return;
+        if(seenCp != null && ds.cp !== seenCp) throw { code: 'moved', msg: 'The draft just moved on. Check the last pick, then tap Undo again.' };
         ds.cp--;
         ds.complete = false;
         ds.epoch = (ds.epoch || 0) + 1;
@@ -878,7 +885,8 @@ async function undoDraft(){
         });
       });
       _beeped = false;
-    } catch(err){ console.warn('Undo failed:', err); showToast('Undo failed \u2014 try again'); }
+    } catch(err){ if(err && err.msg) showToast(err.msg); else { console.warn('Undo failed:', err); showToast('Undo failed \u2014 try again'); } }
+    finally { _undoInFlight = false; }
     return;
   }
   const ds = S.ds;
