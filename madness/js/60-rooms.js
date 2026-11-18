@@ -7,6 +7,16 @@ let _firestoreWriteTimer = null;
 // same string has nothing new (it is the echo of our own write, or a metadata-only change), so
 // _applyRoomSnapshot skips the JSON.parse + full render for it.
 let _lastSyncedState = null;
+// The shared part of S, serialised from S itself, as of the last snapshot applied or write sent. A save that
+// finds it unchanged (a tab switch, a Live filter: view-only keys) has nothing to send. Writing anyway cost a
+// document write plus a snapshot on every phone in the room, and it sent this phone's whole copy of the room:
+// a phone that was behind (offline, just woken) rolled everyone back to its old copy by switching tabs.
+let _sharedAtSync = null;
+function _sharedJson(){
+  const shared = {};
+  for(const k in S){ if(!VIEW_LOCAL.includes(k)) shared[k] = S[k]; }
+  return JSON.stringify(shared);
+}
 // Newest snapshot that arrived while a pick transaction was in flight ({gen, doc}); see replayDroppedSnapshot.
 let _droppedDuringPick = null;
 function _debouncedFirestoreWrite(){
@@ -24,14 +34,15 @@ function _debouncedFirestoreWrite(){
 
 /* Write the shared (non-view) part of S to the current room's document now. */
 function _writeSharedState(){
-  const shared = {};
-  for(const k in S){ if(!VIEW_LOCAL.includes(k)) shared[k] = S[k]; }
-  const json = JSON.stringify(shared);
+  const json = _sharedJson();
+  if(json === _sharedAtSync) return; // nothing shared changed since the last sync
+  _sharedAtSync = json;
   _lastSyncedState = json;
   db.collection("rooms").doc(roomId).set({
     state: json,
     updatedAt: firebase.firestore.FieldValue.serverTimestamp()
   }, {merge: true}).catch(e => {
+    if(_sharedAtSync === json) _sharedAtSync = null; // not written: the next save sends it again
     console.warn("Firestore write error:", e);
     showToast("Sync error \u2014 changes saved locally");
   });
@@ -132,6 +143,9 @@ function connectToRoom(code){
   saveRecentRoom(code);
   const gen = ++_roomGeneration;
   _lastSyncedState = null; // never let the previous room's string suppress this room's first snapshot
+  // What this phone holds on entering a room is its cached copy of that room (or the state createRoom has just
+  // written), not an edit: with no snapshot yet (offline, nothing in Firestore's cache) a tab switch must not send it.
+  _sharedAtSync = _sharedJson();
   _droppedDuringPick = null;
   unsubRoom = db.collection("rooms").doc(code).onSnapshot(doc => {
     if(gen !== _roomGeneration) return; // stale listener
@@ -187,6 +201,7 @@ function _applyRoomSnapshot(doc){
     if(S.ds && S.ds.pickDeadline && typeof S.ds.pickDeadline === 'object' && S.ds.pickDeadline.seconds){
       S.ds.pickDeadline = new firebase.firestore.Timestamp(S.ds.pickDeadline.seconds, S.ds.pickDeadline.nanoseconds || 0);
     }
+    _sharedAtSync = _sharedJson(); // taken from S (after sanitising), so it compares cleanly against S later
     localStorage.setItem(stateKey(), JSON.stringify(S));
     render();
     updateAppBadge();
