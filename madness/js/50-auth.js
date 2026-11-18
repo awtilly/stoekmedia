@@ -57,7 +57,8 @@ function checkAdminSession(){
 function unlockAdmin(){
   adminUnlocked = true;
   const k = adminSessionKey();
-  if(k) localStorage.setItem(k, String(Date.now()));
+  // Storage full: stay unlocked in memory for this page; the PIN is simply asked again after a reload.
+  if(k){ try { localStorage.setItem(k, String(Date.now())); } catch(e){} }
 }
 
 function lockAdmin(){
@@ -68,6 +69,14 @@ function lockAdmin(){
 }
 
 let _pinFailCount = 0;
+
+/* Store a room PIN from an older format in the current one. Not awaited: with no connection set() only settles
+ * once the server has the write, so waiting for it left a correct PIN hanging on a spinner-less screen, and a
+ * refused write threw away a correct entry. The old format keeps working until the upgrade lands. */
+function _upgradeStoredPin(hashed){
+  db.collection("rooms").doc(roomId).set({ adminPin: hashed, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true })
+    .catch(e => console.warn('requireAdmin: PIN format upgrade not saved', e));
+}
 
 /* True only when a stored session exists and is older than the 4 h window. */
 function adminSessionExpired(){
@@ -134,8 +143,7 @@ async function requireAdmin(){
   /* Legacy plaintext PIN migration (no colon, not 64 hex chars) */
   if(!data.adminPin.includes(':') && data.adminPin.length !== 64){
     if(entry.trim() === data.adminPin){
-      const hashed = await hashPin(entry.trim());
-      await db.collection("rooms").doc(roomId).set({ adminPin: hashed, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+      _upgradeStoredPin(await hashPin(entry.trim()));
       _pinFailCount = 0;
       unlockAdmin();
       return true;
@@ -149,8 +157,7 @@ async function requireAdmin(){
   if(ok){
     // Migrate unsalted hash to salted on successful verify
     if(!data.adminPin.includes(':')){
-      const salted = await migratePin(entry.trim());
-      await db.collection("rooms").doc(roomId).set({ adminPin: salted, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+      _upgradeStoredPin(await migratePin(entry.trim()));
     }
     _pinFailCount = 0;
     unlockAdmin();
@@ -162,8 +169,17 @@ async function requireAdmin(){
 }
 
 /* ── Player Identity ── */
-function getMyPlayerId(){ return roomId ? localStorage.getItem('mm4_me_' + roomId) : null; }
-function setMyPlayerId(id){ if(roomId) localStorage.setItem('mm4_me_' + roomId, id); }
+// Seat remembered for this page when localStorage refuses the write (storage full): without it the next render
+// found no id, showed the join screen again, and the person claimed the same seat in a loop.
+let _myIdFallback = {}; // room -> player id
+function getMyPlayerId(){
+  if(!roomId) return null;
+  try { return localStorage.getItem('mm4_me_' + roomId) || _myIdFallback[roomId] || null; } catch(e){ return _myIdFallback[roomId] || null; }
+}
+function setMyPlayerId(id){
+  if(!roomId) return;
+  try { localStorage.setItem('mm4_me_' + roomId, id); } catch(e){ _myIdFallback[roomId] = id; }
+}
 
 /* The seat `id` as the room has it now, or null when it is gone or its PIN / passphrase is no longer the one `was`
  * had. claimPlayer waits on prompts, and every room update replaces S.players with new objects: the player it
@@ -225,7 +241,15 @@ async function claimPlayer(id){
   render();
 }
 
+// True from entering a room (connectToRoom) until its document has arrived, from the server or from Firestore's
+// own cache (_applyRoomSnapshot). Until then S is only this device's blank default. Declared here, with the join
+// screen that reads it; 60-rooms.js sets it.
+let _awaitingRoom = false;
+
 async function selfRegister(){
+  // The room has not loaded yet (slow or no connection on a first visit): S is a blank default, and joining now
+  // would save a room with one player and no teams over everybody else's.
+  if(roomId && _awaitingRoom){ showToast('Still loading the room. Check your connection and try again in a moment.'); return; }
   // ds.order was fixed when the draft started; a player added now has no turn and no teams (removePlayer has the same guard).
   if(S.ds && S.ds.started){ showToast('The draft has started. Ask the commissioner to reset it before new players join.'); return; }
   const name = document.getElementById('join-name').value.trim();
@@ -242,13 +266,20 @@ async function selfRegister(){
     showToast('That name is taken. Tap your name below to rejoin.');
     return;
   }
-  const pinHash = await hashPin(pin);
+  if(_joinInFlight) return; // a second tap while the first is being handled
+  let pinHash;
+  _joinInFlight = true;
+  try { pinHash = await hashPin(pin); } finally { _joinInFlight = false; }
   const player = { id: generateId(), name, pinHash, teamIds: [] };
   S.players.push(player);
   setMyPlayerId(player.id);
   saveState();
   render();
 }
+
+// A Join tap is being handled (selfRegister). Hashing the PIN takes a moment, and a second tap in that moment
+// passed the "name taken" check too: the same person was in the room twice, and this phone held the second seat.
+let _joinInFlight = false;
 
 async function adminJoinAsPlayer(){
   if(!adminUnlocked) return;
@@ -269,17 +300,47 @@ async function adminJoinAsPlayer(){
   render();
 }
 
+/* The "Already in this pool?" card: the only part of the join screen that depends on who else has joined. */
+function _joinReturningHTML(players, started){
+  return players.length > 0 ? `
+        ${started ? '' : '<div class="lobby-or">or</div>'}
+        <div class="lobby-card">
+          <h3>Already in this pool?</h3>
+          <p>Tap your name and enter your PIN.</p>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            ${players.map(p => `<button class="btn btn-secondary" style="width:100%;justify-content:center" onclick="claimPlayer('${p.id}')">${escapeHtml(p.name)}</button>`).join('')}
+          </div>
+        </div>
+      ` : '';
+}
+
+let _joinScreenKey = null; // room and form variant (draft started? invite code needed?) whose join form is on the page
+
 function renderJoinScreen(){
+  const loading = !!roomId && _awaitingRoom; // no join form until the room is here: see selfRegister
   const players = S.players || [];
   const started = !!(S.ds && S.ds.started);
   const needKey = !!S.joinKey && knownJoinKey(roomId) !== S.joinKey;
   const status = !started ? 'Draft not started' : S.ds.complete ? 'Draft complete' : 'Draft in progress';
+  // Every room update redraws this screen (somebody else has just joined). When this room's form is already on
+  // the page only the list of names is refreshed: rebuilding the form wiped the name and PIN being typed and
+  // closed the keyboard, and on join night an update arrives every few seconds. A change to the form itself
+  // (the draft started, an invite code is now needed) still rebuilds it.
+  const screenKey = roomId + '|' + started + '|' + needKey;
+  const list = document.getElementById('join-returning');
+  if(list && _joinScreenKey === screenKey && document.getElementById('join-name')){
+    list.innerHTML = _joinReturningHTML(players, started);
+    return;
+  }
+  _joinScreenKey = screenKey;
   document.getElementById("app").innerHTML = `
     <div class="lobby">
       ${appTitleHTML()}
       <p class="lobby-sub">You're invited to <strong>${escapeHtml(roomId)}</strong></p>
-      <p class="join-meta">${players.length} player${players.length !== 1 ? 's' : ''} \u00b7 ${status}${S.year ? ' \u00b7 ' + escapeHtml(S.year) + ' tournament' : ''}</p>
-      ${started ? `<div class="lobby-card">
+      <p class="join-meta">${loading ? 'Loading the room\u2026' : `${players.length} player${players.length !== 1 ? 's' : ''} \u00b7 ${status}${S.year ? ' \u00b7 ' + escapeHtml(S.year) + ' tournament' : ''}`}</p>
+      ${loading ? `<div class="lobby-card">
+        <p>Getting the players and settings. If this takes more than a few seconds, check your connection.</p>
+      </div>` : started ? `<div class="lobby-card">
         <h3>${S.ds.complete ? "This draft is finished" : "The draft has started"}</h3>
         <p>New players can't join now. If you're already in this pool, tap your name below. Otherwise ask the commissioner to add you before the next draft.</p>
       </div>` : `<div class="lobby-card">
@@ -292,16 +353,7 @@ function renderJoinScreen(){
           <button class="btn btn-primary" style="width:100%;justify-content:center" onclick="selfRegister()">Join</button>
         </div>
       </div>`}
-      ${players.length > 0 ? `
-        ${started ? '' : '<div class="lobby-or">or</div>'}
-        <div class="lobby-card">
-          <h3>Already in this pool?</h3>
-          <p>Tap your name and enter your PIN.</p>
-          <div style="display:flex;flex-direction:column;gap:6px">
-            ${players.map(p => `<button class="btn btn-secondary" style="width:100%;justify-content:center" onclick="claimPlayer('${p.id}')">${escapeHtml(p.name)}</button>`).join('')}
-          </div>
-        </div>
-      ` : ''}
+      <div id="join-returning">${_joinReturningHTML(players, started)}</div>
       ${!isNativeShell ? `<p class="join-meta" style="margin-top:16px">On iPhone? <a href="${APP_STORE_URL}" target="_blank" rel="noopener">Get the app</a> for draft alerts.</p>` : ''}
       <div style="margin-top:16px;display:flex;gap:8px;justify-content:center">
         <button class="btn btn-secondary btn-sm" onclick="goHome()">Switch Tournament</button>

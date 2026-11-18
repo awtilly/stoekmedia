@@ -45,6 +45,22 @@ test('resetAll waits for the Firestore write to settle, then clears local state 
   assert.equal(calls.unsub, 1);
 });
 
+test('New Tournament in a room kept from last year moves the year on; a year set ahead stays', async () => {
+  const thisYear = createApp().tournamentYear();
+  let r = resetApp(() => Promise.resolve());
+  r.app.S.year = thisYear - 1;
+  await r.app.resetAll();
+  assert.equal(r.calls.written.year, thisYear);
+  r = resetApp(() => Promise.resolve());
+  r.app.S.year = thisYear + 1;
+  await r.app.resetAll();
+  assert.equal(r.calls.written.year, thisYear + 1);
+  r = resetApp(() => Promise.resolve());
+  r.app.S.year = String(thisYear - 1); // an older save stored it as text
+  await r.app.resetAll();
+  assert.equal(r.calls.written.year, thisYear);
+});
+
 test('a rejected write still reloads (the SDK keeps the queued write)', async () => {
   const { app, calls } = resetApp(() => Promise.reject(new Error('offline')));
   await app.resetAll();

@@ -43,7 +43,8 @@ function teamRecordDisplay(t) {
 async function resolvePlayIn(teamId, winnerIdx) {
   const team = S.teams.find(t => t.id === teamId);
   if (!team || !team.playIn) return;
-  const winner = team.playInTeams[winnerIdx];
+  const winner = team.playInTeams && team.playInTeams[winnerIdx];
+  if (!winner) return; // bad index or a slot with no play-in pair: leave it for the admin
   team.name = winner.name;
   team.logo = '';
   team.abbr = winner.abbr || '';
@@ -56,14 +57,21 @@ async function resolvePlayIn(teamId, winnerIdx) {
 }
 
 let _lastAutoResolve = 0;
+let _autoResolveFetching = false; // a bracket fetch is in flight: a second call must not start another
 async function autoResolvePlayIns() {
   const now = Date.now();
-  if (now - _lastAutoResolve < 3600000) return; // once per hour max
+  if (now - _lastAutoResolve < 3600000 || _autoResolveFetching) return; // once per hour max, one fetch at a time
   const unresolved = S.teams.filter(t => t.playIn && !t.playInResolved);
   if (unresolved.length === 0) return;
-  _lastAutoResolve = now;
   // One bracket fetch: the First Four games there carry isWinner once they are final.
-  const decided = ncaa.firstFourWinners(await ncaa.fetchBracket(S.year));
+  let data;
+  _autoResolveFetching = true;
+  try { data = await ncaa.fetchBracket(S.year); } finally { _autoResolveFetching = false; }
+  // Only arm the hourly throttle once the bracket actually answered; a dead network on First Four
+  // night must not lock auto-resolve out for an hour.
+  if (!data) return false; // the request failed: the manual check says so instead of "not final yet"
+  _lastAutoResolve = now;
+  const decided = ncaa.firstFourWinners(data);
   for (const ff of decided) {
     for (const ut of unresolved) {
       if (ut.playInResolved) continue;
@@ -109,8 +117,18 @@ function getTeamForSlot(region, gameIdx, slotIdx){
   return winnerId ? S.teams.find(t => t.id === winnerId) : null;
 }
 
+/* The tapped team is the one the page showed BEFORE the admin check; that check can be a PIN prompt, and another
+ * admin may have changed an earlier result meanwhile so the game now holds other teams. Only a team the game still
+ * shows may win it. A game with no team known yet (both feeders open) is left alone: nothing was shown to tap. */
+function teamNoLongerInGame(region, gameIdx, teamId){
+  const t0 = getTeamForSlot(region, gameIdx, 0), t1 = getTeamForSlot(region, gameIdx, 1);
+  if(!t0 && !t1) return false;
+  return (!t0 || t0.id !== teamId) && (!t1 || t1.id !== teamId);
+}
+
 async function advanceTeam(region, gameIdx, teamId){
   if(!await requireAdmin()) return;
+  if(teamNoLongerInGame(region, gameIdx, teamId)){ showToast('That game changed while the PIN prompt was open. Tap the winner again.'); return; }
   const b = S.bracket[region];
   const oldWinner = b[gameIdx];
   if(oldWinner === teamId) return; // no-op, skip Firestore write
@@ -134,8 +152,24 @@ function clearDownstream(region, changedGame){
   }
 }
 
+/* The same check for the Final Four. A semifinal is between the champions of its two regions (the room's pairing,
+ * which an admin can also change), the title game between the two semifinal winners. Read after the admin check,
+ * so a regional final, a semifinal or the pairing changed by another admin meanwhile is seen. */
+function teamNoLongerInFFGame(ffIdx, teamId){
+  let a, b;
+  if(ffIdx < 2){
+    const pair = ffPairs()[ffIdx];
+    a = S.bracket[pair[0]][14]; b = S.bracket[pair[1]][14];
+  } else {
+    a = S.bracket.ff[0]; b = S.bracket.ff[1];
+  }
+  if(!a && !b) return false;
+  return a !== teamId && b !== teamId;
+}
+
 async function advanceFF(ffIdx, teamId){
   if(!await requireAdmin()) return;
+  if(teamNoLongerInFFGame(ffIdx, teamId)){ showToast('That game changed while the PIN prompt was open. Tap the winner again.'); return; }
   if(S.bracket.ff[ffIdx] === teamId) return;
   S.bracket.ff[ffIdx] = teamId;
   if(ffIdx < 2){
@@ -152,6 +186,7 @@ let _longPressTimer = null;
 let _longPressTriggered = false;
 
 function startLongPress(fn){
+  clearTimeout(_longPressTimer); // never two timers: a second touchstart must not leave the first one running with nothing able to cancel it
   _longPressTriggered = false;
   _longPressTimer = setTimeout(() => { _longPressTriggered = true; fn(); }, 500);
 }
@@ -162,6 +197,38 @@ function endLongPress(event){
 function cancelLongPress(){
   clearTimeout(_longPressTimer);
   _longPressTriggered = false;
+}
+
+/* Bracket slots carry data-lp="r:<region>:<game>" or data-lp="ff:<idx>" instead of
+   inline touch handlers. One passive touchstart/touchmove listener per page keeps
+   horizontal bracket scrolling smooth on iOS; touchend stays non-passive so the
+   ghost click after a long press can still be cancelled. */
+function longPressAction(lp){
+  const p = String(lp || '').split(':');
+  if(p[0] === 'r' && p.length === 3 && p[1] !== '' && p[2] !== '' && !isNaN(p[2])) return () => clearBracketGame(p[1], Number(p[2]));
+  if(p[0] === 'ff' && p.length === 2 && p[1] !== '' && !isNaN(p[1])) return () => clearFFGame(Number(p[1]));
+  return null;
+}
+function longPressTarget(e){
+  const t = e && e.target;
+  return t && typeof t.closest === 'function' ? t.closest('[data-lp]') : null;
+}
+function onBracketTouchStart(e){
+  // A second finger down is a gesture (two-finger scroll, a stray palm), not a long press: drop what the first finger started.
+  if(e && e.touches && e.touches.length > 1){ cancelLongPress(); return; }
+  const el = longPressTarget(e);
+  if(!el) return;
+  const act = longPressAction(el.getAttribute('data-lp'));
+  if(act) startLongPress(act);
+}
+function onBracketTouchEnd(e){
+  if(longPressTarget(e)) endLongPress(e); else cancelLongPress();
+}
+if(typeof document !== 'undefined' && document && typeof document.addEventListener === 'function'){
+  document.addEventListener('touchstart', onBracketTouchStart, { passive: true });
+  document.addEventListener('touchmove', cancelLongPress, { passive: true });
+  document.addEventListener('touchcancel', cancelLongPress, { passive: true });
+  document.addEventListener('touchend', onBracketTouchEnd, { passive: false });
 }
 
 async function clearBracketGame(region, gameIdx, event){
@@ -188,11 +255,46 @@ async function clearFFGame(ffIdx, event){
   render();
 }
 
+/* ── Final Four pairing ──
+ * Which two regional champions meet in each national semifinal changes every year (2025: South-West and
+ * East-Midwest; 2026: East-South and West-Midwest). S.ffPairs holds the room's pairing as [[r, r], [r, r]];
+ * importFromNCAA reads it from the bracket feed, Settings lets an admin pick it for a hand-built room, and rooms
+ * from before this field existed keep the pairing the app always assumed. bracket.ff[0] is the winner of pair 0. */
+const FF_PAIRINGS = [
+  [['South', 'East'], ['Midwest', 'West']],
+  [['South', 'West'], ['East', 'Midwest']],
+  [['South', 'Midwest'], ['East', 'West']]
+];
+function ffPairsValid(p){
+  return Array.isArray(p) && p.length === 2 && p.every(x => Array.isArray(x) && x.length === 2 && x.every(r => REGIONS.includes(r)))
+    && new Set(p.flat()).size === 4;
+}
+function ffPairs(){
+  return ffPairsValid(S.ffPairs) ? S.ffPairs : FF_PAIRINGS[0];
+}
+/** Index into FF_PAIRINGS of the room's pairing (pairs compared as sets), for the Settings control. */
+function ffPairingIndex(){
+  const key = p => p.map(x => x.slice().sort().join('+')).sort().join('|');
+  const cur = key(ffPairs());
+  const i = FF_PAIRINGS.findIndex(p => key(p) === cur);
+  return i < 0 ? 0 : i;
+}
+async function setFinalFourPairing(v){
+  if(!await requireAdmin()){ render(); return; } // redraw so the select shows the room's pairing again, not the refused choice
+  const next = FF_PAIRINGS[Number(v)];
+  if(!next || ffPairingIndex() === Number(v)) return;
+  S.ffPairs = next;
+  cascadeFF(); // a semifinal winner that no longer belongs to its pair is cleared, and the title game with it
+  syncGames();
+  saveState();
+  render();
+}
+
 function cascadeFF(){
-  const ffPairs = [[0,1],[2,3]];
+  const pairs = ffPairs();
   for(let fi = 0; fi < 2; fi++){
-    const rw0 = S.bracket[REGIONS[ffPairs[fi][0]]][14];
-    const rw1 = S.bracket[REGIONS[ffPairs[fi][1]]][14];
+    const rw0 = S.bracket[pairs[fi][0]][14];
+    const rw1 = S.bracket[pairs[fi][1]][14];
     const ffWinner = S.bracket.ff[fi];
     if(ffWinner && ffWinner !== rw0 && ffWinner !== rw1){
       S.bracket.ff[fi] = null;
@@ -220,12 +322,12 @@ function syncGames(){
       games.push({id:`${region}_${gi}`, round, t1:t0.id, t2:t1.id, wid});
     }
   }
-  const ffPairs = [[0,1],[2,3]];
+  const pairs = ffPairs();
   for(let fi = 0; fi < 2; fi++){
     const wid = S.bracket.ff[fi];
     if(!wid) continue;
-    const t0id = S.bracket[REGIONS[ffPairs[fi][0]]][14];
-    const t1id = S.bracket[REGIONS[ffPairs[fi][1]]][14];
+    const t0id = S.bracket[pairs[fi][0]][14];
+    const t1id = S.bracket[pairs[fi][1]][14];
     if(t0id && t1id) games.push({id:`ff_${fi}`, round:5, t1:t0id, t2:t1id, wid});
   }
   if(S.bracket.ff[2]){
@@ -257,19 +359,51 @@ function inviteUrl(code, key){ return SITE_URL + '?room=' + encodeURIComponent(c
  * so anything outside [A-Za-z0-9_-] is dropped at the data boundary (snapshot apply + local load). */
 const SAFE_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
 function isSafeId(id){ return typeof id === 'string' && SAFE_ID_RE.test(id); }
+const BRACKET_KEYS = ['South', 'East', 'Midwest', 'West', 'ff'];
 function sanitizeSharedState(s){
   if(!s || typeof s !== 'object') return s;
+  // Shape first: the page reads these containers without checking them, so a damaged room document must
+  // not stop every phone in the pool from drawing the room. Only a key that is present is repaired.
+  const isObj = v => !!v && typeof v === 'object' && !Array.isArray(v);
+  for(const k of ['players', 'teams', 'games']) if(k in s && !Array.isArray(s[k])) s[k] = [];
+  if(Array.isArray(s.games)) s.games = s.games.filter(isObj);
+  if('ds' in s){
+    if(!isObj(s.ds)) s.ds = {order:[], cp:0, started:false, complete:false};
+    if(!Array.isArray(s.ds.order)) s.ds.order = [];
+  }
+  if('bracket' in s){
+    if(!isObj(s.bracket)) s.bracket = {};
+    for(const k of BRACKET_KEYS) if(!Array.isArray(s.bracket[k])) s.bracket[k] = Array(k === 'ff' ? 3 : 15).fill(null);
+  }
   if(Array.isArray(s.players)) s.players = s.players.filter(p => p && isSafeId(p.id));
   if(Array.isArray(s.teams)) s.teams = s.teams.filter(t => t && isSafeId(t.id));
   for(const t of (s.teams || [])) if(t.seed != null && typeof t.seed !== 'number'){ const n = Number(t.seed); t.seed = Number.isFinite(n) ? n : 0; }
   for(const p of (s.players || [])) p.teamIds = (Array.isArray(p.teamIds) ? p.teamIds : []).filter(isSafeId);
   if(s.ds && Array.isArray(s.ds.order)) s.ds.order = s.ds.order.filter(isSafeId);
+  // A First Four slot is drawn from its pair of teams (name, record, Live tab lookup): the pair must be a list of
+  // records. A slot left with no pair is an ordinary team again and shows its own name.
+  for(const t of (s.teams || [])) if(t.playIn || 'playInTeams' in t){
+    t.playInTeams = (Array.isArray(t.playInTeams) ? t.playInTeams : []).filter(isObj);
+    if(!t.playInTeams.length){ delete t.playInTeams; if(!t.playInResolved) delete t.playIn; }
+  }
+  // Names are compared and matched as text (name already taken?, Live tab team lookup): make sure they are text.
+  for(const r of (s.players || []).concat(s.teams || [])) if(typeof r.name !== 'string') r.name = r.name == null ? '' : String(r.name);
   if(s.joinKey != null){ const k = sanitizeJoinKey(s.joinKey); if(k) s.joinKey = k; else delete s.joinKey; }
   if(s.bracket && typeof s.bracket === 'object'){
     for(const k of Object.keys(s.bracket)){
       if(Array.isArray(s.bracket[k])) s.bracket[k] = s.bracket[k].map(id => (id == null || isSafeId(id)) ? id : null);
     }
   }
+  // Settings the page prints as numbers (footer scoring line, Settings tab) must arrive as numbers too.
+  const num = (v, fallback) => { const n = Number(v); return Number.isFinite(n) ? n : fallback; };
+  if('year' in s) s.year = Math.trunc(num(s.year, new Date().getFullYear()));
+  if('rp' in s){
+    const rp = (s.rp && typeof s.rp === 'object') ? s.rp : {};
+    s.rp = {};
+    for(const r of [1,2,3,4,5,6]) s.rp[r] = num(rp[r], 0);
+  }
+  if('ub' in s) s.ub = !!s.ub;
+  if('draftClockDuration' in s) s.draftClockDuration = Math.max(0, num(s.draftClockDuration, 0));
   return s;
 }
 
@@ -303,6 +437,47 @@ function scores(){
   }).sort((a,b) => b.tot - a.tot);
 }
 
+
+/* ── Shared-state merge (guards the debounced whole-state write) ──
+ * Picks are committed by transactions; everything else is written as the whole state blob after a
+ * debounce. If a pick landed between our last snapshot and that write, our copy of ds/rosters is
+ * stale and would roll the pick back. Draft progress only ever moves forward, so when the server
+ * is further along we keep the server's ds and rosters and layer our other edits on top. */
+// knownIds: ids of the players in the last snapshot we applied, i.e. the server state `local` was
+// derived from. A player the server has but we do not is either one we removed on purpose (was in
+// knownIds, stays removed) or one another device added since our snapshot (not in knownIds, kept).
+// Without knownIds nobody is dropped: resurrecting a removed player is a redo, losing one is data loss.
+function mergeSharedState(local, remote, knownIds, remoteIsServer){
+  const out = Object.assign({}, local);
+  if(!remote || !remote.ds || !local || !local.ds) return out;
+  // ds.epoch is bumped by every action that moves the draft backwards (start, reset, undo). A higher
+  // epoch always wins; only within the same epoch does "further along" (higher cp) mean "newer".
+  const remoteEpoch = remote.ds.epoch || 0, localEpoch = local.ds.epoch || 0;
+  const remoteCp = remote.ds.cp || 0, localCp = local.ds.cp || 0;
+  const remoteWins = remoteEpoch > localEpoch || (remoteEpoch === localEpoch && remoteCp > localCp);
+  let players = local.players || [];
+  if(remoteWins){
+    out.ds = remote.ds;
+    const remoteRosters = {};
+    for(const p of (remote.players || [])) remoteRosters[p.id] = p.teamIds || [];
+    players = players.map(p => Object.assign({}, p, { teamIds: remoteRosters[p.id] || p.teamIds || [] }));
+  }
+  if(remoteIsServer && knownIds){
+    const kn = new Set(knownIds), there = new Set((remote.players || []).map(p => p && p.id));
+    const kept = players.filter(p => there.has(p.id) || !kn.has(p.id));
+    if(kept.length !== players.length){ players = kept; out.players = players; }
+  }
+  const have = new Set(players.map(p => p.id));
+  const known = knownIds ? new Set(knownIds) : null;
+  const added = (remote.players || []).filter(p => p && p.id && !have.has(p.id) && !(known && known.has(p.id)));
+  if(added.length){
+    // A newcomer has no picks in a draft they were not part of: when our draft state wins, start them empty.
+    out.players = players.concat(added.map(p => Object.assign({}, p, remoteWins ? {} : { teamIds: [] })));
+  } else if(remoteWins){
+    out.players = players;
+  }
+  return out;
+}
 // Standard competition ranking over scores(): players level on points share a rank (and a medal),
 // and the next rank skips (1, 2, 2, 4).
 function withRanks(sc){ return sc.map(s => ({...s, rank: 1 + sc.filter(o => o.tot > s.tot).length})); }

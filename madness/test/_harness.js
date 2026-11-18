@@ -115,6 +115,8 @@ function createApp(stateOverrides) {
   const calls = { saveState: 0, render: 0, toasts: [], alerts: [], requireAdmin: 0, goHome: 0 };
   globalThis.S = freshState(stateOverrides);
   globalThis.roomId = null;
+  globalThis._roomGeneration = 0; // declared in 30-state.js (not loaded here): the visit counter connectToRoom and saves read
+  globalThis.unsubRoom = null;
   globalThis.db = null;
   globalThis.firebase = null;
   globalThis.requireAdmin = async () => { calls.requireAdmin++; return true; };

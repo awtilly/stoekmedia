@@ -1,0 +1,602 @@
+const { test, mock } = require('node:test');
+const assert = require('node:assert/strict');
+const vm = require('node:vm');
+const { createApp } = require('./_harness');
+
+/* A save that is on its way (the 800 ms debounce has fired, the server has not echoed it yet) and a snapshot
+ * from another phone that predates it. The snapshot used to take the edit off the screen until the echo, and it
+ * made the server's older value the baseline: a second edit to the same setting in that window was judged
+ * "nothing to send" and the first save then landed on top of it.
+ * Same hand-stepped fake server as sync-overlapping-saves.test.js. */
+function steppedRoom() {
+  const app = createApp();
+  const srv = { state: null, v: 0 };
+  const txs = [];
+  const flush = () => new Promise(r => setImmediate(r));
+  let failNext = null;
+  app.firebase = { firestore: { FieldValue: { serverTimestamp: () => 'ts' }, Timestamp: function () {} } };
+  app.db = {
+    collection: () => ({ doc: id => ({ id }) }),
+    runTransaction: async fn => {
+      const t = { go: null, done: false, runs: 0 };
+      txs.push(t);
+      const gate = () => new Promise(r => { t.go = r; });
+      for (;;) {
+        await gate();
+        if (failNext) { const e = failNext; failNext = null; throw e; }
+        const read = srv.state, v = srv.v;
+        let out = null;
+        t.runs++;
+        await fn({ get: async () => ({ exists: true, data: () => ({ state: read }) }), set: (ref, data) => { out = data.state; } });
+        await gate();
+        if (srv.v !== v) continue;
+        srv.state = out; srv.v++; t.done = true;
+        return;
+      }
+    }
+  };
+  app.roomId = 'AAAA';
+  vm.runInThisContext('_firestoreWriteTimer = null; _isRemoteUpdate = false; _lastSyncedState = null; _syncBase = null; _lastSnapshotPlayerIds = null; _syncedShared = null; _sharedAtSync = null; _queuedPlainWrites = {}; _writeRetries = 0;');
+  vm.runInThisContext('_serverSeen = null; _recentSent = []; _snapshotSeq = 0; _writeSeq = 0; _keyWriteNo = {}; _inFlight = {}; _rosterInFlight = {}; _rosterGone = {}; _rosterAcked = {}; _rosterRemovedNo = {}; _rosterRemoving = {}; _pendingBase = {}; _echoWriteNo = 0; _lastRoomDoc = null; _pickInFlight = false;');
+  Object.defineProperty(globalThis, 'navigator', { value: { onLine: true }, configurable: true, writable: true });
+  const deliver = state => app._applyRoomSnapshot({ exists: true, data: () => ({ state }), metadata: {} });
+  const shared = JSON.parse(JSON.stringify(app.S));
+  for (const k of app.eval('VIEW_LOCAL')) delete shared[k];
+  shared.players = [{ id: 'p1', name: 'Ann', teamIds: [] }];
+  shared.ub = true;
+  srv.state = JSON.stringify(shared);
+  deliver(srv.state); // the snapshot this device joined with
+  return {
+    app, srv, txs, deliver,
+    server: () => JSON.parse(srv.state),
+    /** Lets transaction i take its next step (read + compute, or commit). */
+    step: async i => { txs[i].go(); await flush(); },
+    /** Runs transaction i to its end, re-runs included. */
+    finish: async i => { for (let n = 0; n < 8 && !txs[i].done; n++) { txs[i].go(); await flush(); } assert.equal(txs[i].done, true); },
+    /** The 800 ms debounce runs out: the save starts and waits before its read. */
+    fire: async () => { mock.timers.tick(800); await flush(); },
+    /** Another phone changes the room; nothing reaches this device until deliver(). Returns the new state. */
+    elsewhere: fn => { const r = JSON.parse(srv.state); fn(r); srv.state = JSON.stringify(r); srv.v++; return srv.state; },
+    set: (k, v) => { app.S[k] = v; app._debouncedFirestoreWrite(); },
+    failNextSave: () => { failNext = Object.assign(new Error('refused'), { code: 'aborted' }); }
+  };
+}
+const withTimers = fn => async () => { mock.timers.enable({ apis: ['setTimeout'] }); try { await fn(); } finally { mock.timers.reset(); } };
+
+test('a setting being saved stays on screen when an older, unrelated change arrives', withTimers(async () => {
+  const { app, finish, fire, elsewhere, deliver, set, server, srv } = steppedRoom();
+  set('ub', false);
+  await fire();                                     // the save is on its way
+  deliver(elsewhere(r => { r.rp[3] = 9; }));        // another phone's scoring change, sent before our save landed
+  assert.equal(app.S.rp[3], 9, 'the other phone\'s change is shown');
+  assert.equal(app.S.ub, false, 'our own change did not flick back');
+  await finish(0);
+  deliver(srv.state);                               // the echo
+  assert.equal(app.S.ub, false);
+  assert.equal(server().ub, false);
+  assert.equal(server().rp[3], 9, 'and the other phone\'s change was not overwritten');
+  assert.deepEqual(app.eval('Object.keys(_inFlight)'), [], 'nothing is held once the echo is in');
+}));
+
+test('toggled off, then on again while the first save is on its way and an older snapshot arrives: "on" reaches the server', withTimers(async () => {
+  const { app, txs, finish, fire, elsewhere, deliver, set, server, srv } = steppedRoom();
+  set('ub', false);
+  await fire();                                     // save 1 (off) waits before its read
+  set('ub', true);                                  // changed back: waiting in the debounce
+  deliver(elsewhere(r => { r.rp[3] = 9; }));        // an older snapshot: the server still says "on"
+  assert.equal(app.S.ub, true);
+  await fire();                                     // used to be "nothing to send": the snapshot agreed with the screen
+  assert.equal(txs.length, 2, 'the second change is sent');
+  await finish(0);                                  // save 1 lands "off"
+  await finish(1);                                  // save 2 lands "on"
+  assert.equal(server().ub, true, 'the last thing this phone chose is what the server holds');
+  deliver(srv.state);
+  assert.equal(app.S.ub, true);
+}));
+
+test('another phone changing the same setting still wins over a save in flight, as before', withTimers(async () => {
+  const { app, fire, elsewhere, deliver, set } = steppedRoom();
+  set('rp', Object.assign({}, app.S.rp, { 3: 9 }));
+  await fire();
+  deliver(elsewhere(r => { r.rp[3] = 7; }));        // new to this phone: not an older copy
+  assert.equal(app.S.rp[3], 7, 'the snapshot is shown');
+  assert.deepEqual(app.eval('Object.keys(_inFlight)'), []);
+}));
+
+test('once the server has confirmed the save, a held-back snapshot that was not the state the save was built on is shown after all', withTimers(async () => {
+  const { app, finish, fire, elsewhere, deliver, set, srv } = steppedRoom();
+  set('ub', false);
+  await fire();
+  deliver(elsewhere(r => { r.rp[3] = 9; }));        // held back for ub
+  assert.equal(app.S.ub, false);
+  elsewhere(r => { r.rp[4] = 11; });                // the room moves on again; that snapshot has not arrived yet
+  await finish(0);                                  // the save commits on top of it and is confirmed
+  // The phone cannot tell whether the snapshot it held back was older or newer than its save: it shows it, and
+  // from here on takes every snapshot at its word. The echo then brings its own value back.
+  assert.deepEqual(app.eval('Object.keys(_inFlight)'), []);
+  deliver(srv.state);
+  assert.equal(app.S.ub, false);
+  assert.equal(app.S.rp[4], 11);
+  assert.equal(JSON.stringify(app.eval('_sharedCopyOfS()').ub), JSON.stringify(JSON.parse(srv.state).ub), 'phone and server agree');
+}));
+
+test('a save that fails after a snapshot was held back for it is sent again by the retry', withTimers(async () => {
+  const { app, txs, step, finish, fire, elsewhere, deliver, set, server, failNextSave } = steppedRoom();
+  set('ub', false);
+  await fire();
+  deliver(elsewhere(r => { r.rp[3] = 9; }));        // held back: the baseline for ub is now the value in flight
+  failNextSave();
+  await step(0);                                    // the server refuses the save
+  assert.equal(app.S.ub, false, 'the edit is still on screen');
+  await fire();                                     // the retry
+  assert.equal(txs.length, 2, 'the retry has something to send');
+  await finish(1);
+  assert.equal(server().ub, false);
+  assert.equal(server().rp[3], 9);
+}));
+
+test('the echo never arrives on its own (another phone changed the same setting right after): the phone still ends on what the server holds', withTimers(async () => {
+  const { app, finish, fire, elsewhere, deliver, set, server } = steppedRoom();
+  set('ub', false);
+  await fire();
+  deliver(elsewhere(r => { r.rp[3] = 9; }));        // held back for ub; it is the state the save will be built on
+  await finish(0);                                  // committed and confirmed: the server says "off"
+  assert.equal(server().ub, false);
+  const later = elsewhere(r => { r.ub = true; });   // another phone turns it on again before our echo is delivered
+  deliver(later);                                   // one snapshot carrying both
+  assert.equal(app.S.ub, true, 'after the save is confirmed a snapshot is taken at its word');
+  assert.equal(app.S.ub, server().ub);
+  assert.deepEqual(app.eval('Object.keys(_inFlight)'), []);
+}));
+
+test('toggled back while the first save is being retried: the confirmation of that save does not make the newer tap "nothing to send"', withTimers(async () => {
+  const { app, step, finish, fire, elsewhere, deliver, set, server, srv } = steppedRoom();
+  set('ub', false);
+  await fire();                                     // save 1 is on its way
+  deliver(elsewhere(r => { r.rp[3] = 9; }));        // an older, unrelated change: held back for "ub"
+  await step(0);                                    // save 1 has read the room
+  const later = elsewhere(r => { r.year = 2031; }); // another phone commits first: save 1 will be run again
+  set('ub', true);                                  // tapped back; this edit waits in the debounce
+  await finish(0);                                  // save 1 lands ("off") and is confirmed
+  assert.equal(server().ub, false);
+  assert.equal(app.S.ub, true, 'the newer tap stays on screen');
+  await fire();                                     // the debounce runs out
+  await finish(1);
+  assert.equal(server().ub, true, 'the newer tap reached the server');
+  deliver(later);
+  deliver(srv.state);
+  assert.equal(app.S.ub, true);
+  assert.equal(app.S.year, 2031);
+  assert.equal(app.S.rp[3], 9);
+}));
+
+test('a player who joined on another phone while a save was on its way is not removed by the next roster change made here', withTimers(async () => {
+  const { app, finish, fire, elsewhere, deliver, set, server, srv } = steppedRoom();
+  set('ub', false);
+  await fire();                                     // save 1 is on its way
+  const joined = elsewhere(r => { r.players.push({ id: 'n1', name: 'New', teamIds: [] }); }); // not shown here yet
+  await finish(0);                                  // save 1 lands on top of it and keeps the new player
+  assert.deepEqual(server().players.map(p => p.id), ['p1', 'n1']);
+  set('players', app.S.players.concat([{ id: 'n2', name: 'Mine', teamIds: [] }])); // this phone adds somebody
+  deliver(joined);                                  // only now does the other phone's join arrive
+  assert.deepEqual(app.S.players.map(p => p.id).sort(), ['n1', 'n2', 'p1'], 'both the join and the local add are shown');
+  await fire();
+  await finish(1);
+  assert.deepEqual(server().players.map(p => p.id).sort(), ['n1', 'n2', 'p1'], 'nobody was taken out of the room');
+  deliver(srv.state);
+  assert.deepEqual(app.S.players.map(p => p.id).sort(), ['n1', 'n2', 'p1']);
+}));
+
+test('a player this phone added and removed again before the save was confirmed stays removed', withTimers(async () => {
+  const { app, txs, finish, fire, deliver, set, server, srv } = steppedRoom();
+  set('players', app.S.players.concat([{ id: 'n3', name: 'Oops', teamIds: [] }]));
+  await fire();                                     // the save with the new player is on its way
+  set('players', app.S.players.filter(p => p.id !== 'n3')); // removed again straight away
+  await finish(0);
+  assert.deepEqual(server().players.map(p => p.id), ['p1'], 'the save no longer writes a player taken off again');
+  deliver(srv.state);                               // the first save's snapshot arrives while the removal waits
+  await fire();
+  if (txs[1]) await finish(1);
+  assert.deepEqual(server().players.map(p => p.id), ['p1'], 'the removal reached the server');
+  deliver(srv.state);
+  assert.deepEqual(app.S.players.map(p => p.id), ['p1']);
+}));
+
+test('off, on, off in quick succession with two saves on their way: the room a save was built on is not taken for its confirmation', withTimers(async () => {
+  const { app, step, finish, fire, elsewhere, deliver, set, server, srv, txs } = steppedRoom();
+  const before = elsewhere(r => { r.rp[3] = 9; }); // another phone changed the scoring; not shown here yet
+  set('ub', false);
+  await fire();                                     // save 1 ("off") starts
+  await step(0);                                    // ... and has read the room
+  set('ub', true);
+  await fire();                                     // save 2 ("on") starts
+  await step(1);                                    // ... and has read the same room
+  set('ub', false);                                 // tapped off again: waits in the debounce
+  await finish(0);                                  // save 1 lands: the room says "off"
+  const afterFirst = srv.state;
+  deliver(before);                                  // the room both saves were built on ("on", like save 2)
+  deliver(afterFirst);                              // save 1 as the server has it
+  assert.equal(app.S.ub, false, 'the last tap stays on screen');
+  await fire();                                     // the debounce runs out: the last tap has to be sent
+  await finish(1);                                  // save 2 is run again and must not put "on" back
+  if (txs[2]) await finish(2);
+  assert.equal(server().ub, false, 'the last tap is what the room ends on');
+  deliver(srv.state);
+  assert.equal(app.S.ub, false);
+  assert.equal(app.S.rp[3], 9);
+}));
+
+const NEW = { id: 'n5', name: 'Late', teamIds: [] };
+test('a player being added stays on screen when an older, unrelated change arrives', withTimers(async () => {
+  const { app, finish, fire, elsewhere, deliver, set, server, srv } = steppedRoom();
+  set('players', app.S.players.concat([NEW]));
+  await fire();                                     // the save is on its way
+  deliver(elsewhere(r => { r.rp[3] = 9; }));        // sent before our save landed: it has no such player
+  assert.equal(app.S.rp[3], 9, 'the other change is shown');
+  assert.deepEqual(app.S.players.map(p => p.id), ['p1', 'n5'], 'the new player did not drop off the list');
+  await finish(0);
+  assert.deepEqual(server().players.map(p => p.id), ['p1', 'n5']);
+  deliver(srv.state);                               // the echo
+  assert.deepEqual(app.S.players.map(p => p.id), ['p1', 'n5']);
+  assert.equal(app.eval('Object.keys(_rosterInFlight).length'), 0);
+}));
+
+test('a save adding a player that fails after an older snapshot arrived is sent again by the retry', withTimers(async () => {
+  const { app, txs, step, finish, fire, elsewhere, deliver, set, server, failNextSave } = steppedRoom();
+  set('players', app.S.players.concat([NEW]));
+  await fire();
+  deliver(elsewhere(r => { r.rp[3] = 9; }));
+  failNextSave();
+  await step(0);                                    // the server refuses the save
+  assert.deepEqual(app.S.players.map(p => p.id), ['p1', 'n5'], 'the new player is still on screen');
+  await fire();                                     // the retry
+  assert.equal(txs.length, 2, 'the retry has something to send');
+  await finish(1);
+  assert.deepEqual(server().players.map(p => p.id), ['p1', 'n5'], 'the player reached the room');
+  assert.equal(server().rp[3], 9);
+}));
+
+test('a player kept on screen that way does not make the next save for something else send the roster again', withTimers(async () => {
+  const { app, finish, fire, elsewhere, deliver, set, server } = steppedRoom();
+  set('players', app.S.players.concat([NEW]));
+  await fire();
+  deliver(elsewhere(r => { r.rp[3] = 9; }));        // older snapshot: the new player is kept
+  await finish(0);                                  // the player is in the room
+  elsewhere(r => { r.players = r.players.filter(p => p.id !== 'p1'); }); // another phone removes Ann; not shown here yet
+  set('ub', false);                                 // an unrelated tap on this phone
+  await fire();
+  await finish(1);
+  assert.equal(server().ub, false);
+  assert.deepEqual(server().players.map(p => p.id), ['n5'], 'the removal made elsewhere was not undone');
+}));
+
+test('a player removed here again while the save adding them is on its way is not put back by an older snapshot', withTimers(async () => {
+  const { app, fire, elsewhere, deliver, set } = steppedRoom();
+  set('players', app.S.players.concat([NEW]));
+  await fire();
+  app.S.players = app.S.players.filter(p => p.id !== 'n5'); // removed on this phone; the debounce is not armed in this test
+  deliver(elsewhere(r => { r.rp[3] = 9; }));
+  assert.deepEqual(app.S.players.map(p => p.id), ['p1']);
+  assert.equal(app.eval('Object.keys(_rosterInFlight).length'), 0);
+}));
+
+test('a player removed on another phone while this phone was adding somebody stays removed', withTimers(async () => {
+  const { app, finish, fire, elsewhere, deliver, set, server, srv } = steppedRoom();
+  const second = elsewhere(r => { r.players.push({ id: 'p2', name: 'Bob', teamIds: [] }); });
+  deliver(second);                                  // this phone lists Ann and Bob
+  set('players', app.S.players.concat([{ id: 'n7', name: 'Mine', teamIds: [] }])); // adds somebody; waits in the debounce
+  deliver(elsewhere(r => { r.players = r.players.filter(p => p.id !== 'p2'); })); // another phone removes Bob
+  await fire();
+  await finish(0);
+  assert.deepEqual(server().players.map(p => p.id), ['p1', 'n7'], 'Bob was not written back; the new player is in');
+  deliver(srv.state);
+  assert.deepEqual(app.S.players.map(p => p.id), ['p1', 'n7'], 'and this phone shows what the room holds');
+}));
+
+test('six saves of one setting, then a very old update arrives while a seventh change waits: the seventh is still sent', withTimers(async () => {
+  const { app, txs, finish, fire, deliver, set, server, srv } = steppedRoom();
+  const rpWith = n => Object.assign({}, app.S.rp, { 3: n });
+  let afterFirst = null;
+  for (let i = 0; i < 6; i++) {
+    set('rp', rpWith(11 + i));
+    await fire();
+    await finish(i);                                // the save lands; its echo has not reached this phone yet
+    if (i === 0) afterFirst = srv.state;
+  }
+  assert.equal(server().rp[3], 16);
+  set('rp', rpWith(40));                            // the seventh change waits in the debounce
+  deliver(afterFirst);                              // the room as it was after this phone's own first save
+  assert.equal(app.S.rp[3], 40, 'the change being made is still on screen');
+  await fire();
+  assert.equal(txs.length, 7, 'and it is sent');
+  await finish(6);
+  assert.equal(server().rp[3], 40);
+}));
+
+test('a player removed again before the save adding them is confirmed stays removed', withTimers(async () => {
+  const { app, step, finish, fire, set, server } = steppedRoom();
+  set('players', app.S.players.concat([NEW]));
+  await fire();                                     // save 1 (the add) is on its way
+  await step(0);                                    // it has read the room and is about to commit, new player included
+  set('players', app.S.players.filter(p => p.id !== 'n5'));
+  await fire();                                     // save 2 (the removal) starts before save 1 is confirmed
+  await finish(0);
+  assert.deepEqual(server().players.map(p => p.id), ['p1', 'n5'], 'save 1 put the player in the room');
+  await finish(1);
+  assert.deepEqual(server().players.map(p => p.id), ['p1'], 'save 2 took them out again');
+  assert.deepEqual(app.S.players.map(p => p.id), ['p1']);
+}));
+
+test('a player removed after the echo of the save adding them, but before its confirmation, stays removed', withTimers(async () => {
+  const { app, txs, finish, fire, set, deliver, server, srv } = steppedRoom();
+  // The server's confirmation of a save can reach the phone after the snapshot that shows the save.
+  const run = app.db.runTransaction;
+  let confirm = null;
+  app.db.runTransaction = fn => { const p = run(fn); return txs.length === 1 ? p.then(() => new Promise(r => { confirm = r; })) : p; };
+  set('players', app.S.players.concat([NEW]));
+  await fire();
+  await finish(0);                                  // committed; the confirmation is still on its way
+  assert.deepEqual(server().players.map(p => p.id), ['p1', 'n5']);
+  set('players', app.S.players.filter(p => p.id !== 'n5'));
+  deliver(srv.state);                               // the echo of the add
+  assert.deepEqual(app.S.players.map(p => p.id), ['p1'], 'the removal waiting to be saved is kept on screen');
+  await fire();                                     // the removal is saved
+  confirm();
+  await new Promise(r => setImmediate(r));
+  await finish(1);
+  assert.deepEqual(server().players.map(p => p.id), ['p1'], 'the removed player did not come back');
+}));
+
+test('a player added here and still listed is written by a later save even though the first save has not landed', withTimers(async () => {
+  const { app, finish, fire, set, server } = steppedRoom();
+  set('players', app.S.players.concat([NEW]));
+  await fire();                                     // save 1 (the add) waits
+  set('ub', false);
+  await fire();                                     // save 2, something else
+  await finish(1);                                  // save 2 lands first
+  await finish(0);
+  assert.deepEqual(server().players.map(p => p.id), ['p1', 'n5']);
+  assert.equal(server().ub, false);
+}));
+
+test('a save that has not read the room yet leaves out a player taken off again in the meantime', withTimers(async () => {
+  const { app, txs, finish, fire, set, server } = steppedRoom();
+  set('players', app.S.players.concat([NEW]));
+  set('ub', false);
+  await fire();                                     // the save (new player + a setting) waits
+  set('players', app.S.players.filter(p => p.id !== 'n5'));
+  await finish(0);
+  assert.deepEqual(server().players.map(p => p.id), ['p1'], 'the player never reached the room');
+  assert.equal(server().ub, false, 'the rest of the save did');
+  await fire();
+  if (txs[1]) await finish(1);
+  assert.deepEqual(server().players.map(p => p.id), ['p1']);
+}));
+
+test('the save adding a player lands after the save that removed them: the player does not stay in the room', withTimers(async () => {
+  const { app, txs, step, finish, fire, set, deliver, server, srv } = steppedRoom();
+  set('players', app.S.players.concat([NEW]));
+  await fire();
+  await step(0);                                    // save 1 has read the room; its commit is delayed
+  set('players', app.S.players.filter(p => p.id !== 'n5'));
+  await fire();
+  await finish(1);                                  // save 2 (the removal) lands first: nothing to remove yet
+  deliver(srv.state);
+  await finish(0);                                  // save 1 lands late (re-run, or with the player)
+  deliver(srv.state);
+  assert.deepEqual(app.S.players.map(p => p.id), ['p1'], 'not back on this screen');
+  await fire();
+  for (let i = 2; i < txs.length; i++) await finish(i);
+  assert.deepEqual(server().players.map(p => p.id), ['p1'], 'and not left in the room');
+}));
+
+test('an older snapshot between the add and its removal does not make the removal "nothing to send"', withTimers(async () => {
+  const { app, txs, step, finish, fire, set, elsewhere, deliver, server, srv } = steppedRoom();
+  set('players', app.S.players.concat([NEW]));
+  await fire();
+  await step(0);                                    // save 1 is about to commit with the new player
+  set('players', app.S.players.filter(p => p.id !== 'n5'));
+  const older = elsewhere(r => { r.rp[3] = 9; });   // another phone's change, from before save 1 lands
+  deliver(older);                                   // has no such player: the baseline moves to a room without them
+  await finish(0);                                  // save 1 lands (re-run on the changed room)
+  await fire();
+  deliver(srv.state);
+  assert.deepEqual(app.S.players.map(p => p.id), ['p1'], 'the removed player is not put back on this screen');
+  await fire();
+  for (let i = 1; i < txs.length; i++) await finish(i);
+  assert.deepEqual(server().players.map(p => p.id), ['p1'], 'and is taken out of the room');
+  assert.equal(server().rp[3], 9);
+}));
+
+test('a player added here one save ago and removed on another phone before this phone heard its save was confirmed is not written back', withTimers(async () => {
+  const { app, txs, finish, fire, set, elsewhere, server } = steppedRoom();
+  const run = app.db.runTransaction;
+  let confirm = null;
+  app.db.runTransaction = fn => { const p = run(fn); return txs.length === 1 ? p.then(() => new Promise(r => { confirm = r; })) : p; };
+  set('players', app.S.players.concat([NEW]));
+  await fire();
+  await finish(0);                                  // in the room; the confirmation is still on its way
+  set('players', app.S.players.concat([{ id: 'n6', name: 'Later', teamIds: [] }]));
+  await fire();                                     // the next save starts: it lists n5, who is not "known" yet
+  confirm();
+  await new Promise(r => setImmediate(r));
+  elsewhere(r => { r.players = r.players.filter(p => p.id !== 'n5'); }); // the commissioner's other phone removes n5
+  await finish(1);
+  assert.deepEqual(server().players.map(p => p.id), ['p1', 'n6'], 'n5 stays removed, the newer player is added');
+}));
+
+test('a later save that still lists a player taken off again does not put them into the room', withTimers(async () => {
+  const { app, txs, finish, fire, set, deliver, server, srv } = steppedRoom();
+  set('players', app.S.players.concat([NEW]));
+  await fire();                                     // save 1: the add
+  set('players', app.S.players.map(p => p.id === 'p1' ? Object.assign({}, p, { name: 'Anne' }) : p));
+  await fire();                                     // save 2: a rename; its copy of the roster lists n5
+  set('players', app.S.players.filter(p => p.id !== 'n5'));
+  await fire();                                     // save 3: n5 taken off again
+  await finish(0);
+  await finish(2);
+  await finish(1);                                  // save 2 lands last
+  assert.deepEqual(server().players.map(p => p.id), ['p1'], 'n5 is not in the room');
+  assert.equal(server().players[0].name, 'Anne', 'the rename is');
+  deliver(srv.state);
+  await fire();
+  for (let i = 3; i < txs.length; i++) await finish(i);
+  assert.deepEqual(app.S.players.map(p => p.id), ['p1']);
+  assert.deepEqual(server().players.map(p => p.id), ['p1']);
+}));
+
+test('a removal waiting to be saved survives a snapshot from before that player existed', withTimers(async () => {
+  const { app, txs, finish, fire, set, elsewhere, deliver, server, srv } = steppedRoom();
+  const older = elsewhere(r => { r.rp[3] = 9; });   // another phone's change; its snapshot reaches this phone late
+  set('players', app.S.players.concat([NEW]));
+  await fire();
+  await finish(0);
+  deliver(srv.state);                               // the new player is in the room and shown here
+  assert.deepEqual(app.S.players.map(p => p.id), ['p1', 'n5']);
+  set('players', app.S.players.filter(p => p.id !== 'n5')); // taken off again; the save waits in the debounce
+  deliver(older);                                   // a room without n5: the removal must not become "nothing to send"
+  deliver(srv.state);                               // and the newer room, with n5
+  assert.deepEqual(app.S.players.map(p => p.id), ['p1'], 'not back on this screen');
+  await fire();
+  for (let i = 1; i < txs.length; i++) await finish(i);
+  assert.deepEqual(server().players.map(p => p.id), ['p1'], 'and taken out of the room');
+}));
+
+test('an older save that lands after the newer save which removed a player does not put them back', withTimers(async () => {
+  const { app, txs, finish, fire, set, elsewhere, deliver, server } = steppedRoom();
+  const run = app.db.runTransaction;
+  let confirm = null;
+  app.db.runTransaction = fn => { const p = run(fn); return txs.length === 1 ? p.then(() => new Promise(r => { confirm = r; })) : p; };
+  set('players', app.S.players.concat([NEW]));
+  await fire();
+  await finish(0);                                  // n5 is in the room; the confirmation is still on its way
+  set('players', app.S.players.map(p => p.id === 'p1' ? Object.assign({}, p, { name: 'Anne' }) : p));
+  await fire();                                     // save 2: a rename; it lists n5 and waits
+  confirm();
+  await new Promise(r => setImmediate(r));
+  set('players', app.S.players.filter(p => p.id !== 'n5'));
+  await fire();                                     // save 3: n5 removed
+  await finish(2);                                  // save 3 lands first
+  assert.deepEqual(server().players.map(p => p.id), ['p1']);
+  deliver(elsewhere(r => { r.rp[3] = 9; }));        // another phone's change: this phone now sees a room without n5
+  await finish(1);                                  // save 2 lands after it
+  assert.deepEqual(server().players.map(p => p.id), ['p1'], 'the older save did not put n5 back');
+  assert.equal(server().players[0].name, 'Anne');
+}));
+
+test('a player removed on another phone and no longer shown here is not written back by a save that was still waiting', withTimers(async () => {
+  const { app, txs, finish, fire, set, elsewhere, deliver, server } = steppedRoom();
+  const run = app.db.runTransaction;
+  let confirm = null;
+  app.db.runTransaction = fn => { const p = run(fn); return txs.length === 1 ? p.then(() => new Promise(r => { confirm = r; })) : p; };
+  set('players', app.S.players.concat([NEW]));
+  await fire();
+  await finish(0);                                  // n5 is in the room; the confirmation is still on its way
+  set('players', app.S.players.map(p => p.id === 'p1' ? Object.assign({}, p, { name: 'Anne' }) : p));
+  await fire();                                     // save 2: a rename; it lists n5 and waits
+  confirm();
+  await new Promise(r => setImmediate(r));
+  deliver(elsewhere(r => { r.players = r.players.filter(p => p.id !== 'n5'); })); // removed on another phone, and shown here
+  assert.equal(app.S.players.some(p => p.id === 'n5'), false, 'off this screen');
+  await finish(1);                                  // the waiting save lands
+  assert.deepEqual(server().players.map(p => p.id), ['p1'], 'it did not put n5 back');
+}));
+
+test('a player being removed stays off the screen when an older, unrelated change arrives', withTimers(async () => {
+  const { app, finish, fire, set, elsewhere, deliver, server, srv } = steppedRoom();
+  set('players', app.S.players.concat([NEW]));
+  await fire();
+  await finish(0);
+  deliver(srv.state);                               // two players in the room
+  set('players', app.S.players.filter(p => p.id !== 'n5'));
+  await fire();                                     // the removal is on its way
+  deliver(elsewhere(r => { r.rp[3] = 9; }));        // sent before our save landed: it still has n5
+  assert.equal(app.S.rp[3], 9, 'the other change is shown');
+  assert.deepEqual(app.S.players.map(p => p.id), ['p1'], 'the removed player did not pop back');
+  await finish(1);
+  assert.deepEqual(server().players.map(p => p.id), ['p1']);
+  assert.equal(server().rp[3], 9);
+  assert.equal(app.eval('Object.keys(_rosterRemoving).length'), 0);
+}));
+
+test('a save removing a player that is refused after an older snapshot arrived is sent again by the retry', withTimers(async () => {
+  const { app, txs, step, finish, fire, set, elsewhere, deliver, server, srv, failNextSave } = steppedRoom();
+  set('players', app.S.players.concat([NEW]));
+  await fire();
+  await finish(0);
+  deliver(srv.state);
+  set('players', app.S.players.filter(p => p.id !== 'n5'));
+  await fire();
+  deliver(elsewhere(r => { r.rp[3] = 9; }));
+  failNextSave();
+  await step(1);                                    // the server refuses the save
+  assert.deepEqual(app.S.players.map(p => p.id), ['p1'], 'still off this screen');
+  await fire();                                     // the retry
+  assert.equal(txs.length, 3, 'the retry has something to send');
+  await finish(2);
+  assert.deepEqual(server().players.map(p => p.id), ['p1'], 'the removal reached the room');
+}));
+
+test('a player being added stays in the baseline when an older snapshot arrives during another roster change, and is taken off again: the removal is sent', withTimers(async () => {
+  const { app, txs, step, finish, fire, elsewhere, deliver, set, server, srv } = steppedRoom();
+  const N = id => ({ id, name: id, teamIds: [] });
+  const older = elsewhere(r => { r.rp[3] = 9; });   // another phone's change: its snapshot is still on its way
+  set('players', app.S.players.concat([N('n1'), N('n2')]));
+  await fire();                                     // save 1 (adding n1 and n2) waits before its read
+  set('players', app.S.players.filter(p => p.id !== 'n2')); // n2 taken off again: waiting in the debounce
+  await step(0);                                    // save 1 has read the room
+  deliver(older);                                   // older than save 1: no n1 in it
+  assert.deepEqual(app.S.players.map(p => p.id), ['p1', 'n1'], 'the player being added stays on screen');
+  for (let i = 0; i < txs.length; i++) await finish(i);
+  set('players', app.S.players.filter(p => p.id !== 'n1')); // added by mistake: taken off again
+  await fire();
+  for (let i = 0; i < txs.length; i++) await finish(i);
+  assert.deepEqual(server().players.map(p => p.id), ['p1'], 'the player is out of the room');
+  deliver(srv.state);
+  assert.deepEqual(app.S.players.map(p => p.id), ['p1']);
+}));
+
+test('a new player waiting to be saved is not taken into the baseline when an older snapshot brings back a player this phone is removing', withTimers(async () => {
+  const { app, txs, step, finish, fire, elsewhere, deliver, set, server, srv } = steppedRoom();
+  const N = id => ({ id, name: id, teamIds: [] });
+  const ids = () => app.S.players.map(p => p.id);
+  deliver(elsewhere(r => { r.players.push(N('x')); })); // another phone added x
+  set('players', app.S.players.filter(p => p.id !== 'x'));
+  await fire();                                     // save 1 (removing x) starts
+  await step(0);                                    // and has read the room
+  set('players', app.S.players.concat([N('n1')]));  // a new player: waiting in the debounce
+  const before = server(); before.players = before.players.filter(p => p.id !== 'x'); before.rp[3] = 9;
+  deliver(JSON.stringify(before));                  // out of order: the room from before x was added
+  const older = server(); older.rp[4] = 7;
+  deliver(JSON.stringify(older));                   // older than save 1: x is in it
+  assert.deepEqual(ids(), ['p1', 'n1'], 'x stays off the screen, the new player stays on it');
+  await fire();                                     // the debounce: the new player has to be sent
+  for (let i = 0; i < txs.length; i++) await finish(i);
+  assert.deepEqual(server().players.map(p => p.id), ['p1', 'n1'], 'the new player is in the room, x is not');
+  deliver(srv.state);
+  assert.deepEqual(ids(), ['p1', 'n1']);
+}));
+
+test('a player taken off while another roster change waits does not come back as a new player after older snapshots', withTimers(async () => {
+  const { app, txs, finish, fire, deliver, set, server, srv } = steppedRoom();
+  const N = id => ({ id, name: id, teamIds: [] });
+  const ids = () => app.S.players.map(p => p.id);
+  const before = server();                          // the room before n1
+  set('players', app.S.players.concat([N('n1')]));
+  await fire();
+  await finish(0);                                  // n1 is in the room
+  deliver(srv.state);
+  set('players', app.S.players.concat([N('n2')]));  // waiting in the debounce
+  const old1 = JSON.parse(JSON.stringify(before)); old1.rp[3] = 9;
+  deliver(JSON.stringify(old1));                    // out of order: from before n1
+  assert.deepEqual(ids(), ['p1', 'n1', 'n2']);
+  set('players', app.S.players.filter(p => p.id !== 'n1')); // n1 taken off: waiting too
+  const old2 = JSON.parse(JSON.stringify(before)); old2.rp[4] = 7;
+  deliver(JSON.stringify(old2));                    // another one from before n1
+  const cur = server(); cur.rp[5] = 5;
+  deliver(JSON.stringify(cur));                     // the room with n1
+  assert.deepEqual(ids(), ['p1', 'n2'], 'n1 is not put back on the screen');
+  await fire();
+  for (let i = 0; i < txs.length; i++) await finish(i);
+  assert.deepEqual(server().players.map(p => p.id), ['p1', 'n2'], 'n1 is out of the room');
+}));

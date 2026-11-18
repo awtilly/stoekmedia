@@ -1,0 +1,295 @@
+{
+ "inputMD5Sum": "fixture",
+ "instanceId": "fixture",
+ "updated_at": "2026-03-17",
+ "games": [
+  {
+   "game": {
+    "gameID": "6593746",
+    "away": {
+     "score": "91",
+     "names": {
+      "char6": "VANDY",
+      "short": "Vanderbilt",
+      "seo": "vanderbilt",
+      "full": ""
+     },
+     "winner": true,
+     "seed": "4",
+     "description": "",
+     "rank": "",
+     "conferences": [
+      {
+       "conferenceName": "",
+       "conferenceSeo": "sec"
+      }
+     ]
+    },
+    "finalMessage": "FINAL",
+    "title": "Vanderbilt Florida",
+    "url": "/game/6593746",
+    "network": "ESPN",
+    "home": {
+     "score": "74",
+     "names": {
+      "char6": "FLA",
+      "short": "Florida",
+      "seo": "florida",
+      "full": ""
+     },
+     "winner": false,
+     "seed": "1",
+     "description": "",
+     "rank": "",
+     "conferences": [
+      {
+       "conferenceName": "",
+       "conferenceSeo": "sec"
+      }
+     ]
+    },
+    "liveVideoEnabled": false,
+    "startTime": "1:00 PM ET",
+    "startTimeEpoch": "1773507600",
+    "gameState": "final",
+    "startDate": "03/14/2026",
+    "currentPeriod": "FINAL",
+    "contestClock": "0:00",
+    "bracketId": "",
+    "bracketRound": 4
+   }
+  },
+  {
+   "game": {
+    "gameID": "6593973",
+    "away": {
+     "score": "65",
+     "names": {
+      "char6": "WISC",
+      "short": "Wisconsin",
+      "seo": "wisconsin",
+      "full": ""
+     },
+     "winner": false,
+     "seed": "5",
+     "description": "",
+     "rank": "",
+     "conferences": [
+      {
+       "conferenceName": "",
+       "conferenceSeo": "big-ten"
+      }
+     ]
+    },
+    "finalMessage": "FINAL",
+    "title": "Wisconsin Michigan",
+    "url": "/game/6593973",
+    "network": "BIGTEN",
+    "home": {
+     "score": "68",
+     "names": {
+      "char6": "MICH",
+      "short": "Michigan",
+      "seo": "michigan",
+      "full": ""
+     },
+     "winner": true,
+     "seed": "1",
+     "description": "",
+     "rank": "",
+     "conferences": [
+      {
+       "conferenceName": "",
+       "conferenceSeo": "big-ten"
+      }
+     ]
+    },
+    "liveVideoEnabled": false,
+    "startTime": "1:00 PM ET",
+    "startTimeEpoch": "1773507600",
+    "gameState": "final",
+    "startDate": "03/14/2026",
+    "currentPeriod": "FINAL",
+    "contestClock": "0:00",
+    "bracketId": "",
+    "bracketRound": 5
+   }
+  },
+  {
+   "game": {
+    "gameID": "6593955",
+    "away": {
+     "score": "73",
+     "names": {
+      "char6": "PURDUE",
+      "short": "Purdue",
+      "seo": "purdue",
+      "full": ""
+     },
+     "winner": true,
+     "seed": "7",
+     "description": "",
+     "rank": "",
+     "conferences": [
+      {
+       "conferenceName": "",
+       "conferenceSeo": "big-ten"
+      }
+     ]
+    },
+    "finalMessage": "FINAL",
+    "title": "Purdue UCLA",
+    "url": "/game/6593955",
+    "network": "CBS",
+    "home": {
+     "score": "66",
+     "names": {
+      "char6": "UCLA",
+      "short": "UCLA",
+      "seo": "ucla",
+      "full": ""
+     },
+     "winner": false,
+     "seed": "6",
+     "description": "",
+     "rank": "",
+     "conferences": [
+      {
+       "conferenceName": "",
+       "conferenceSeo": "big-ten"
+      }
+     ]
+    },
+    "liveVideoEnabled": false,
+    "startTime": "3:30 PM ET",
+    "startTimeEpoch": "1773516600",
+    "gameState": "final",
+    "startDate": "03/14/2026",
+    "currentPeriod": "FINAL",
+    "contestClock": "0:00",
+    "bracketId": "",
+    "bracketRound": 5
+   }
+  },
+  {
+   "game": {
+    "gameID": "6593954",
+    "away": {
+     "score": "80",
+     "names": {
+      "char6": "PURDUE",
+      "short": "Purdue",
+      "seo": "purdue",
+      "full": ""
+     },
+     "winner": true,
+     "seed": "7",
+     "description": "",
+     "rank": "",
+     "conferences": [
+      {
+       "conferenceName": "",
+       "conferenceSeo": "big-ten"
+      }
+     ]
+    },
+    "finalMessage": "FINAL",
+    "title": "Purdue Michigan",
+    "url": "/game/6593954",
+    "network": "CBS",
+    "home": {
+     "score": "72",
+     "names": {
+      "char6": "MICH",
+      "short": "Michigan",
+      "seo": "michigan",
+      "full": ""
+     },
+     "winner": false,
+     "seed": "1",
+     "description": "",
+     "rank": "",
+     "conferences": [
+      {
+       "conferenceName": "",
+       "conferenceSeo": "big-ten"
+      }
+     ]
+    },
+    "liveVideoEnabled": false,
+    "startTime": "3:30 PM ET",
+    "startTimeEpoch": "1773603000",
+    "gameState": "final",
+    "startDate": "03/15/2026",
+    "currentPeriod": "FINAL",
+    "contestClock": "0:00",
+    "bracketId": "",
+    "bracketRound": 6
+   }
+  },
+  {
+   "game": {
+    "gameID": "6534592",
+    "away": {
+     "score": "83",
+     "names": {
+      "char6": "UMBC",
+      "short": "UMBC",
+      "seo": "umbc",
+      "full": ""
+     },
+     "winner": false,
+     "seed": "16",
+     "description": "",
+     "rank": "",
+     "conferences": [
+      {
+       "conferenceName": "",
+       "conferenceSeo": "america-east"
+      }
+     ]
+    },
+    "finalMessage": "FINAL",
+    "title": "UMBC Howard",
+    "url": "/game/6534592",
+    "network": "truTV",
+    "home": {
+     "score": "86",
+     "names": {
+      "char6": "HOWARD",
+      "short": "Howard",
+      "seo": "howard",
+      "full": ""
+     },
+     "winner": true,
+     "seed": "16",
+     "description": "",
+     "rank": "",
+     "conferences": [
+      {
+       "conferenceName": "",
+       "conferenceSeo": "meac"
+      }
+     ]
+    },
+    "liveVideoEnabled": true,
+    "startTime": "6:40 PM ET",
+    "startTimeEpoch": "1773787200",
+    "gameState": "final",
+    "startDate": "03/17/2026",
+    "currentPeriod": "FINAL",
+    "contestClock": "0:00",
+    "bracketId": 101,
+    "bracketRound": 1,
+    "championshipId": 6393,
+    "championshipGame": {
+     "round": {
+      "roundNumber": 1,
+      "title": "First Four&#174;",
+      "subtitle": "3/17-3/18"
+     }
+    }
+   }
+  }
+ ]
+}

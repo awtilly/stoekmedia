@@ -14,14 +14,35 @@ const ncaa = {
     return d.slice(0, 4) + '/' + d.slice(4, 6) + '/' + d.slice(6, 8);
   },
 
+  /* A stalled connection (a phone that has just lost signal, iOS Safari waking up) can leave fetch pending for
+   * minutes: the bracket import stayed on 'Importing...' with its button disabled, and every 30 s poll started
+   * another request that never settled. After this long the request is abandoned and treated as a failure. */
+  timeoutMs: 15000,
+
+  /* The service worker answers any GET it has seen before from its own cache, for good, and a page cannot ask
+   * it not to. For the relay that meant the first scoreboard of the day, or a bracket asked for before Selection
+   * Sunday, was all this browser ever got. Remove the stored answer first so the request reaches the network.
+   * Never waits long and never fails the request: at worst this one request gets the stored answer again. */
+  async _dropStoredAnswer(url) {
+    if (typeof caches === 'undefined') return;
+    const drop = (async () => { for (const name of await caches.keys()) await (await caches.open(name)).delete(url, { ignoreVary: true }); })();
+    try { await Promise.race([drop, new Promise(r => setTimeout(r, 1000))]); } catch (e) {}
+    drop.catch(() => {});
+  },
+
   async _get(path) {
+    await this._dropStoredAnswer(NCAA_API_BASE + path);
+    const ctl = typeof AbortController === 'function' ? new AbortController() : null;
+    const timer = ctl ? setTimeout(() => ctl.abort(), this.timeoutMs) : null;
     try {
-      const r = await fetch(NCAA_API_BASE + path);
+      const r = await fetch(NCAA_API_BASE + path, ctl ? { signal: ctl.signal } : undefined);
       if (!r.ok) throw new Error(r.status);
       return await r.json();
     } catch (e) {
       console.warn('NCAA fetch failed:', path, e);
       return null;
+    } finally {
+      if (timer) clearTimeout(timer);
     }
   },
 
@@ -29,7 +50,11 @@ const ncaa = {
   async fetchScoreboard(date) {
     const n = new Date();
     const dateStr = date || (n.getFullYear() + String(n.getMonth()+1).padStart(2,'0') + String(n.getDate()).padStart(2,'0'));
-    return this._get('/scoreboard/basketball-men/d1/' + this.datePath(dateStr));
+    const data = await this._get('/scoreboard/basketball-men/d1/' + this.datePath(dateStr));
+    // The relay answers 200 { games: [], upstreamStatus } when ncaa-api itself answered 403/404. For the current
+    // season that is a failed upstream fetch, not a day without games (that is a plain 200 with an empty list):
+    // report it as a failure, so the Live tab keeps the last scores and says so instead of "No games found".
+    return (data && data.upstreamStatus) ? null : data;
   },
 
   /** Tournament bracket for a year. Returns the raw payload ({ championships: [...] }) or null. */
@@ -67,7 +92,33 @@ const ncaa = {
   /** All 64 first-round slots with seed and region; a slot still waiting on a First Four game becomes one
    * unresolved play-in entry carrying both teams. [] when the bracket is not published yet. */
   async fetchTournamentTeams() {
-    const champ = this.bracketGames(await this.fetchBracket(S.year));
+    return this.tournamentTeams(await this.fetchBracket(S.year));
+  },
+
+  /** Which regional champions meet in each national semifinal, read from the bracket feed: each regional final
+   * (bracketId 5xx) names the semifinal it feeds in victorBracketPositionId (601 or 602). The committee changes
+   * this pairing every year, so it must not be assumed. Returns [[regionA, regionB], [regionC, regionD]] in the
+   * canonical order ffPairs() uses (each pair and the pair list sorted by REGIONS order), or null when the feed
+   * does not carry a complete pairing (then the app keeps its default). */
+  finalFourPairs(data) {
+    const champ = this.bracketGames(data);
+    if (!champ) return null;
+    const regionOf = this.regionBySection(champ);
+    const semis = champ.games.filter(g => Math.floor(g.bracketId / 100) === 6).sort((a, b) => a.bracketId - b.bracketId);
+    if (semis.length !== 2) return null;
+    const pairs = semis.map(s => champ.games
+      .filter(g => Math.floor(g.bracketId / 100) === 5 && g.victorBracketPositionId === s.bracketPositionId)
+      .map(g => regionOf[g.sectionId]).filter(Boolean));
+    if (pairs.some(p => p.length !== 2) || new Set(pairs.flat()).size !== 4) return null;
+    const ri = r => REGIONS.indexOf(r);
+    pairs.forEach(p => p.sort((a, b) => ri(a) - ri(b)));
+    pairs.sort((a, b) => ri(a[0]) - ri(b[0]));
+    return pairs;
+  },
+
+  /** Pure half of fetchTournamentTeams: `data` is the bracket payload. */
+  tournamentTeams(data) {
+    const champ = this.bracketGames(data);
     if (!champ) return [];
     const regionOf = this.regionBySection(champ);
     const firstFour = champ.games.filter(g => Math.floor(g.bracketId / 100) === 1);
@@ -124,8 +175,9 @@ const ncaa = {
 
   /* Identical to functions/ncaa-parse.js (a test keeps them in sync). Input is the ncaa-api scoreboard payload;
    * output is one event per game in the shape the rest of the app has always consumed: state 'pre'|'in'|'post',
-   * completed, away/home with name/abbr/score/seed/winner/ncaaId. Only NCAA tournament games carry
-   * bracketId/championshipId; `tournament` is the flag checkGameFinals keys off. */
+   * completed, away/home with name/abbr/score/seed/winner/ncaaId. Only NCAA tournament games carry a numeric
+   * bracketId; `tournament` is the flag checkGameFinals keys off. Conference tournament games on Selection Sunday
+   * weekend come with a bracketRound (and no bracketId), so bracketRound/championshipId must not count. */
   parseScoreboard(data) {
     if (!data || !Array.isArray(data.games)) return [];
     return data.games.map(w => {
@@ -168,8 +220,9 @@ const ncaa = {
       }
       if (!completed) { away.winner = undefined; home.winner = undefined; }
 
-      const tournament = !!(g.bracketId || g.bracketRound || g.championshipId);
-      const roundTitle = g.championshipGame && g.championshipGame.round && g.championshipGame.round.title || '';
+      const tournament = parseInt(g.bracketId, 10) > 0;
+      // ncaa.com writes "First Four&#174;"; the Live tab escapes the note, so strip the entity rather than print it.
+      const roundTitle = String(g.championshipGame && g.championshipGame.round && g.championshipGame.round.title || '').replace(/&#174;|&reg;|\u00ae/g, '').trim();
       const periodNum = parseInt(String(g.currentPeriod || ''), 10);
       const epoch = parseInt(g.startTimeEpoch, 10);
       const liveDetail = [g.currentPeriod, g.contestClock].filter(Boolean).join(' ').trim();

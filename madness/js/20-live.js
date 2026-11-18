@@ -18,9 +18,29 @@ let _scoreboardFresh = false; // true while the cached doc is current; direct po
 let _scoreboardSeenAt = 0;    // local clock when the last usable snapshot arrived (freshness is measured from here, so a wrong phone clock cannot defeat the cache)
 let _scoreboardDate = null;   // the scoreboard/{date} doc the listener is on (null = not listening)
 let _liveFallbackTimer = null; // startLiveRefresh's one-shot "cached doc did not arrive" poll
+let _liveScoresDay = null;     // the scoreboard day liveScores was last filled from (null = unknown)
 
-function localDateStr(d) {
-  const n = d || new Date();
+/* NCAA.com files every game under its Eastern-time date, and the pollScoreboard function writes the Eastern day
+ * (plus the day before until 4 am ET, see functions/scoreboard-logic.js datesToPoll). The phone's own calendar
+ * date is the wrong key: on an East-coast phone it turned over at midnight while the late West-coast game was
+ * still playing, so the Live tab went blank and that game's final was never seen by this device. */
+const SCOREBOARD_TZ = 'America/New_York';
+const SCOREBOARD_ROLLOVER_HOUR = 4; // the scoreboard day ends at 4 am ET, after the last final of the night
+
+/** YYYYMMDD of the scoreboard day the instant `d` (default now) belongs to. Same rule as the function's
+ * datesToPoll: the Eastern date, or the Eastern date of 24 h earlier while the Eastern hour is before 4. (Not
+ * "now minus four hours": on the March clock-change Sunday that day is 23 hours long and the two rules disagree
+ * for an hour.) */
+function scoreboardDay(d) {
+  const now = d || new Date();
+  try {
+    const fmt = new Intl.DateTimeFormat('en-US', { timeZone: SCOREBOARD_TZ, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', hour12: false });
+    const read = (t) => { const p = {}; for (const x of fmt.formatToParts(t)) p[x.type] = x.value; return p; };
+    let p = read(now);
+    if (Number(p.hour) % 24 < SCOREBOARD_ROLLOVER_HOUR) p = read(new Date(now.getTime() - 86400000)); // some engines print midnight as "24"
+    if (/^\d{4}$/.test(p.year) && /^\d{2}$/.test(p.month) && /^\d{2}$/.test(p.day)) return p.year + p.month + p.day;
+  } catch (e) { /* no time-zone data: fall through to the device clock */ }
+  const n = new Date(now.getTime() - SCOREBOARD_ROLLOVER_HOUR * 3600000);
   return n.getFullYear() + String(n.getMonth()+1).padStart(2,'0') + String(n.getDate()).padStart(2,'0');
 }
 
@@ -38,17 +58,88 @@ function scoreboardIsFresh(data, now) {
 function applyCachedScoreboard(data, fromCache) {
   const usable = fromCache ? scoreboardIsFresh(data) : scoreboardDocValid(data);
   if (!usable) { _scoreboardFresh = false; return false; }
+  // A day's games do not all vanish. An empty doc for the day already on screen is the function having been told
+  // "nothing" by a failing upstream (ncaa-api answers 404 when its own fetch fails, and the function writes that
+  // as an empty day): keep the scores we have and say so. The function is alive (this document just arrived) and
+  // the relay would ask the same upstream, so a direct poll could not do better and every phone polling it would
+  // only add load while the source is struggling: stay on the cache and wait for the next good document.
+  if (data.events.length === 0 && liveScores.length > 0 && _liveScoresDay !== null && _liveScoresDay === _scoreboardDate) {
+    _scoreboardFresh = true;
+    _scoreboardSeenAt = Date.now();
+    liveLastError = true;
+    if (S.phase === 'live') {
+      const c = document.getElementById('c');
+      if (c) renderLive(c);
+    }
+    return true;
+  }
+  const empty = data.events.length === 0;
   _scoreboardFresh = true;
   _scoreboardSeenAt = Date.now();
-  liveLastError = false;
+  if (!empty && _emptyDayUnconfirmed === _scoreboardDate) _emptyDayUnconfirmed = null;
+  liveLastError = empty && _emptyDayUnconfirmed === _scoreboardDate; // an empty day the relay could not confirm stays "unavailable"
   liveScores = data.events;
+  _liveScoresDay = _scoreboardDate;
   liveLastRefresh = data.fetchedAt.toMillis();
   checkGameFinals();
+  if (empty) confirmEmptyDay(_scoreboardDate);
   if (S.phase === 'live') {
     const c = document.getElementById('c');
     if (c) renderLive(c);
   }
   return true;
+}
+
+/* ── Empty-day confirmation ──
+ * The guard above only protects a phone that already has the day's games. A phone that opens the Live tab while
+ * the source is failing gets the empty document FIRST and showed "No games found" in the middle of a game day.
+ * The first empty document for a day is therefore confirmed once through the relay:
+ *   - the relay says "no games" (a plain 200): a real off day, remembered for the session, nothing changes;
+ *   - the relay has games: they are shown (later empty documents then run into the guard above);
+ *   - the relay reports the upstream failing, or cannot be reached: "Scores unavailable" instead of "No games
+ *     found", and it is asked again at most every two minutes while empty documents keep arriving.
+ * Cost: one relay request per session for each real off day the Live tab is opened on. */
+const EMPTY_DAY_RECHECK_MS = 2 * 60 * 1000;
+const _emptyDaysConfirmed = new Set(); // days the relay confirmed as having no games
+let _emptyDayUnconfirmed = null;       // the day whose empty document the relay could not confirm
+let _emptyDayCheckedAt = 0;
+const _emptyDaysChecking = new Set(); // days with a relay request in flight
+
+async function confirmEmptyDay(day) {
+  if (!day || _emptyDaysChecking.has(day) || _emptyDaysConfirmed.has(day)) return;
+  if (_emptyDayUnconfirmed === day && Date.now() - _emptyDayCheckedAt < EMPTY_DAY_RECHECK_MS) return;
+  _emptyDaysChecking.add(day);
+  _emptyDayCheckedAt = Date.now();
+  let games = null;
+  try {
+    const data = await ncaa.fetchScoreboard(day); // null on any failure, incl. the relay's "upstream answered 404"
+    if (data) games = ncaa.parseScoreboard(data);
+  } catch (e) {
+    games = null;
+  } finally {
+    _emptyDaysChecking.delete(day);
+  }
+  if (games && games.length === 0) _emptyDaysConfirmed.add(day); // true whichever screen is showing by now
+  if (day !== _scoreboardDate) return;                            // left the Live tab or moved to another day meanwhile
+  if (liveScores.length > 0) return;                              // a good document landed while the request was out
+  if (games && games.length > 0) {
+    _emptyDayUnconfirmed = null;
+    liveLastError = false;
+    liveScores = games;
+    _liveScoresDay = day;
+    liveLastRefresh = Date.now();
+    checkGameFinals();
+  } else if (games) {
+    if (_emptyDayUnconfirmed === day) _emptyDayUnconfirmed = null;
+    liveLastError = false;
+  } else {
+    _emptyDayUnconfirmed = day;
+    liveLastError = true;
+  }
+  if (S.phase === 'live') {
+    const c = document.getElementById('c');
+    if (c) renderLive(c);
+  }
 }
 
 function subscribeScoreboard(dateStr) {
@@ -58,13 +149,19 @@ function subscribeScoreboard(dateStr) {
   _scoreboardUnsub = db.collection(SCOREBOARD_COLLECTION).doc(dateStr).onSnapshot(doc => {
     if (!doc.exists || !applyCachedScoreboard(doc.data(), !!(doc.metadata && doc.metadata.fromCache))) {
       _scoreboardFresh = false;
+      _cancelLiveFallback(); // this poll is the one the fallback timer was waiting to make
       refreshLiveScores();
     }
   }, err => {
     console.warn('Scoreboard cache unavailable, polling the scoreboard directly:', err && err.code || err);
     _scoreboardFresh = false;
+    _cancelLiveFallback();
     refreshLiveScores();
   });
+}
+
+function _cancelLiveFallback() {
+  if (_liveFallbackTimer) { clearTimeout(_liveFallbackTimer); _liveFallbackTimer = null; }
 }
 
 function unsubscribeScoreboard() {
@@ -76,15 +173,22 @@ function unsubscribeScoreboard() {
 async function refreshLiveScores() {
   // Cached doc is current: the Cloud Function is doing the polling for everyone.
   if (_scoreboardFresh && (Date.now() - _scoreboardSeenAt) < SCOREBOARD_MAX_AGE_MS) return;
-  _scoreboardFresh = false;
-  const dateStr = S.liveScoresDate || localDateStr();
+  const dateStr = S.liveScoresDate || scoreboardDay();
   // "Today" rolled over while the tab stayed open: the function stops writing yesterday's doc, so without this
   // the device would sit on direct polling for the rest of the day. Move the listener to the new day's doc.
-  if (_scoreboardUnsub && dateStr !== _scoreboardDate) subscribeScoreboard(dateStr);
+  // This comes BEFORE the finished-day check below: yesterday's games are all final by then, and a screen left
+  // on the Live tab overnight (the wake lock keeps it visible) would otherwise stay quiet on yesterday for good.
+  if (_scoreboardUnsub && dateStr !== _scoreboardDate) subscribeScoreboard(dateStr); // clears _scoreboardFresh
+  // The cached doc showed every game of the shown day final (a past day in the picker, or tonight after the last
+  // game): polling the relay every 30 s for the rest of the day would find nothing new. The listener stays on
+  // the doc, so a correction or a late-added game still arrives.
+  if (_scoreboardFresh && liveScores.length > 0 && liveScores.every(g => g.state === 'post')) return;
+  _scoreboardFresh = false;
   const data = await ncaa.fetchScoreboard(dateStr);
   liveLastError = !data; // fetchScoreboard returns null on any failure
   if (data) {
     liveScores = ncaa.parseScoreboard(data);
+    _liveScoresDay = dateStr;
     liveLastRefresh = Date.now();
     checkGameFinals();
   }
@@ -149,7 +253,20 @@ function retryPendingAdvances() {
   return any;
 }
 
-async function checkGameFinals() {
+/* Runs are serialised. The scoreboard listener delivers Firestore's cached copy and then the server's back to back,
+ * and the 30 s poll can land while a run is inside its Firestore reads below. Two runs over the same new final
+ * (not yet in _reportedFinals when the second started) both wrote the gameResult, the second with the post-game
+ * order as rankingsBefore, and whichever finished first could park the game in _pendingAdvance for good. */
+let _checkFinalsChain = Promise.resolve();
+function checkGameFinals(games, quiet) {
+  const run = _checkFinalsChain.then(() => _checkGameFinalsNow(games, quiet));
+  _checkFinalsChain = run.catch(() => {}); // one failed run must not block the next
+  return run;
+}
+
+/* games: the list to walk (default: the day on screen). quiet: the overnight catch-up; a final nobody reported
+ * is advanced and saved like a first report but no gameResult is written, so no push goes out hours late. */
+async function _checkGameFinalsNow(games, quiet) {
   if (!S.teams || S.teams.length === 0) return;
 
   // Build a set of NCAA.com team slugs (ncaaId) for teams in this room
@@ -160,7 +277,7 @@ async function checkGameFinals() {
   if (retryPendingAdvances()) { advanced = true; shouldSync = true; }
   { const r = await retryUnsyncedAdvances(true); if (r) advanced = true; if (r === 2) shouldSync = true; }
 
-  for (const game of liveScores) {
+  for (const game of (games || liveScores)) {
     if (game.state !== 'post' || !game.completed) continue;
     // Only NCAA tournament games count: ncaa.com tags those (and only those) with a bracketId, which the parser
     // turns into `tournament`. A conference final between two bracket teams on Selection Sunday, or an NIT game,
@@ -199,7 +316,7 @@ async function checkGameFinals() {
           .collection('gameResults').doc(game.id);
         const existing = await resultRef.get();
         if (!existing.exists) {
-          await resultRef.set({
+          if (!quiet) await resultRef.set({
             awayName: game.away.name,
             awayScore: game.away.score,
             awaySeed: game.away.seed || null,
@@ -232,6 +349,11 @@ async function checkGameFinals() {
         const winnerTeam = S.teams.find(t => t.ncaaId === winner.ncaaId);
         _unsyncedAdvances.set(game.id, { game, teamId: winnerTeam && winnerTeam.id, since: Date.now() });
       }
+    } else if (isFirstReporter && _advancedFinals.has(game.id)) {
+      // This device filled the slot on an earlier poll whose report threw (the advance only reached localStorage) and
+      // the retry made it the first reporter after all. Save now: nothing else on this device would, and the other
+      // devices only repair the room through their 30 s unsynced-advance check.
+      advanced = true; shouldSync = true;
     } else if (reported && awayInRoom && homeInRoom && !_advancedFinals.has(game.id)) {
       // Both teams are ours but no slot matched: a feeder is still undecided. Keep it for the next poll.
       _pendingAdvance.set(game.id, game);
@@ -273,12 +395,12 @@ function autoAdvanceBracket(game) {
     }
   }
 
-  // Check Final Four semis (ff[0], ff[1])
-  const ffPairs = [[0,1],[2,3]];
+  // Check Final Four semis (ff[0], ff[1]); the pairing is the room's (ffPairs), not a fixed South-East / Midwest-West
+  const pairs = ffPairs();
   for (let fi = 0; fi < 2; fi++) {
     if (S.bracket.ff[fi]) continue;
-    const t0id = S.bracket[REGIONS[ffPairs[fi][0]]][14];
-    const t1id = S.bracket[REGIONS[ffPairs[fi][1]]][14];
+    const t0id = S.bracket[pairs[fi][0]][14];
+    const t1id = S.bracket[pairs[fi][1]][14];
     if (!t0id || !t1id) continue;
     const t0 = S.teams.find(t => t.id === t0id);
     const t1 = S.teams.find(t => t.id === t1id);
@@ -305,13 +427,75 @@ function autoAdvanceBracket(game) {
   return false;
 }
 
+/* ── Overnight catch-up ──
+ * checkGameFinals only walks the day on screen. A game that went final after every phone in the room was closed
+ * (the late West-coast game ends around 12:30 am ET) was therefore never processed: by morning the Live tab
+ * opens on the new day and the bracket slot stayed empty until somebody tapped back a day. With no day picked,
+ * the Live tab now also reads the day before once per room and session and runs the same check over it. */
+let _catchUpDone = null;  // roomId + '|' + day already walked this session
+let _catchUpBusy = false;
+let _catchUpRelayAt = 0;  // when the relay was last asked to confirm an empty day-before document
+
+function dayBefore(dateStr) {
+  const d = new Date(Date.UTC(Number(dateStr.slice(0, 4)), Number(dateStr.slice(4, 6)) - 1, Number(dateStr.slice(6, 8))) - 86400000);
+  return d.getUTCFullYear() + String(d.getUTCMonth() + 1).padStart(2, '0') + String(d.getUTCDate()).padStart(2, '0');
+}
+
+async function catchUpYesterdaysFinals() {
+  if (S.liveScoresDate) return;                         // a picked day is walked by the normal check
+  if (!S.teams || S.teams.length === 0) return;
+  if (S.bracket && S.bracket.ff && S.bracket.ff[2]) return; // champion crowned: nothing left to catch up
+  // The room document has not arrived yet: advancing and saving now would write this phone's stored copy of
+  // the room. The 30 s tick comes back.
+  if (roomId && typeof _lastSyncedState !== 'undefined' && _lastSyncedState === null) return;
+  const day = dayBefore(scoreboardDay());
+  const key = (roomId || '') + '|' + day;
+  if (_catchUpDone === key || _catchUpBusy) return;
+  _catchUpBusy = true;
+  try {
+    let games = null;
+    let settled = true; // false = read from the on-device copy, which may predate the final: look again later
+    try {
+      if (typeof db !== 'undefined' && db) {
+        const doc = await db.collection(SCOREBOARD_COLLECTION).doc(day).get();
+        const data = doc.exists ? doc.data() : null;
+        if (scoreboardDocValid(data)) { games = data.events; settled = !(doc.metadata && doc.metadata.fromCache); }
+      }
+    } catch (e) { /* unreadable (rules, offline): ask the relay below */ }
+    // An empty document for the day before can be the function's last poll of that night having been told "nothing"
+    // by a failing upstream; nothing rewrites it afterwards. Like the Live tab's own day (confirmEmptyDay), it is
+    // confirmed once through the relay, and a relay that cannot say is asked again every two minutes at most.
+    const unconfirmedEmpty = !!games && games.length === 0 && !_emptyDaysConfirmed.has(day);
+    if (unconfirmedEmpty) {
+      if (Date.now() - _catchUpRelayAt < EMPTY_DAY_RECHECK_MS) return;
+      _catchUpRelayAt = Date.now();
+    }
+    if (!games || unconfirmedEmpty) {
+      const data = await ncaa.fetchScoreboard(day);
+      games = data ? ncaa.parseScoreboard(data) : null;
+      if (games && games.length === 0) _emptyDaysConfirmed.add(day);
+      if (games && unconfirmedEmpty) settled = true;     // the relay's answer is current, whatever the document's age
+    }
+    if (!games) return;                                  // nothing readable: the next tick tries again
+    if ((roomId || '') + '|' + day !== key) return;      // the room changed while the read was out
+    if (!liveRefreshTimer || S.liveScoresDate) return;   // left the Live tab, or picked a day, meanwhile: next visit
+    await checkGameFinals(games, true);
+    if (settled) _catchUpDone = key;
+  } catch (e) {
+    console.warn('Overnight catch-up failed:', e);
+  } finally {
+    _catchUpBusy = false;
+  }
+}
+
 function startLiveRefresh() {
   stopLiveRefresh();
   autoResolvePlayIns();
-  subscribeScoreboard(S.liveScoresDate || localDateStr());
+  catchUpYesterdaysFinals();
+  subscribeScoreboard(S.liveScoresDate || scoreboardDay());
   // Give the cached doc a moment to arrive; if it hasn't, poll the scoreboard directly.
   _liveFallbackTimer = setTimeout(() => { _liveFallbackTimer = null; if (!_scoreboardFresh) refreshLiveScores(); }, 1500);
-  liveRefreshTimer = setInterval(refreshLiveScores, 30000); // every 30s (no-op while cache is fresh)
+  liveRefreshTimer = setInterval(() => { refreshLiveScores(); catchUpYesterdaysFinals(); }, 30000); // every 30s (both are no-ops once current)
   requestWakeLock();
 }
 
@@ -327,28 +511,46 @@ function stopLiveRefresh() {
 
 let wakeLock = null;
 
+// Bumped by every releaseWakeLock(). A request that resolves after a newer release (or after a
+// second request) lets its lock go again, so at most one screen lock is ever held and leaving the
+// Live tab while the request is still pending does not leave the screen pinned awake.
+let _wakeLockReq = 0;
+
 async function requestWakeLock() {
-  if (!('wakeLock' in navigator)) return;
+  if (!('wakeLock' in navigator) || wakeLock) return;
+  const req = ++_wakeLockReq;
   try {
-    wakeLock = await navigator.wakeLock.request('screen');
-    wakeLock.addEventListener('release', () => { wakeLock = null; });
+    const lock = await navigator.wakeLock.request('screen');
+    if (req !== _wakeLockReq || wakeLock) { lock.release(); return; }
+    wakeLock = lock;
+    lock.addEventListener('release', () => { if (wakeLock === lock) wakeLock = null; });
   } catch (err) {
     console.warn('Wake Lock failed:', err.message);
   }
 }
 
 function releaseWakeLock() {
+  _wakeLockReq++;
   if (wakeLock) {
     wakeLock.release();
     wakeLock = null;
   }
 }
 
-document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') {
+/* An installed app is rarely reloaded: it comes back from the background with its state intact, so a day picked
+ * on the Live tab last night would still be picked this morning. After this long away, show today again. */
+const LIVE_PICKED_DAY_MAX_AWAY_MS = 4 * 60 * 60 * 1000;
+let _liveHiddenAt = 0; // when the app last went to the background (0 = it has not)
+
+function liveVisibilityChanged(visible) {
+  if (visible) {
+    if (S.liveScoresDate && _liveHiddenAt && Date.now() - _liveHiddenAt > LIVE_PICKED_DAY_MAX_AWAY_MS) S.liveScoresDate = '';
     if (S.phase === 'live') startLiveRefresh();
   } else {
+    _liveHiddenAt = Date.now();
     stopLiveRefresh();
   }
-});
+}
+
+document.addEventListener('visibilitychange', () => liveVisibilityChanged(document.visibilityState === 'visible'));
 

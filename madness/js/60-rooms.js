@@ -1,5 +1,159 @@
 /* ── State Persistence ── */
 const VIEW_LOCAL = ['phase','bracketRegion','fr','fs','liveScoresDate','liveScoresFilter'];
+// Player ids in the last room snapshot we applied; lets mergeSharedState tell "removed here" from "added elsewhere".
+let _lastSnapshotPlayerIds = null;
+// The shared part of S as this device last received it from, or sent it to, Firestore (taken from S itself, so
+// it compares cleanly against S). Baseline for _pendingLocalEdits().
+let _syncedShared = null;
+
+function _sharedCopyOfS(){
+  const shared = {};
+  for(const k in S){ if(!VIEW_LOCAL.includes(k)) shared[k] = S[k]; }
+  return JSON.parse(JSON.stringify(shared));
+}
+
+/* Shared keys this device has changed since the last sync while that change is still waiting in the 800 ms
+ * debounce. A snapshot arriving in that window used to replace S wholesale: the edit vanished from the screen and
+ * the debounce then wrote the server's own state back, so it never reached anyone. Returns {key: value to keep}
+ * or null. ds and players follow the same rules as the write (mergeSharedState): the server's draft progress
+ * wins, local roster changes are kept. */
+// What the server held in the last snapshot this device applied (a JSON string), and the shared states this
+// device's last few saves sent. _pendingLocalEdits() uses both to tell another phone's change to a key from this
+// phone's own save of it that the snapshot does not show yet, or shows for the first time.
+let _serverSeen = null;
+let _recentSent = [];
+// Counts snapshots applied; _writeSharedState uses it to see that one was applied while its write was in flight.
+let _snapshotSeq = 0;
+// Saves are numbered; _keyWriteNo[key] is the number of the newest save that sent that key.
+let _writeSeq = 0;
+let _keyWriteNo = {};
+let _writeNoRoom = null; // the room _keyWriteNo and _rosterRemovedNo are about
+// Keys a save of this phone is carrying whose echo has not been seen yet: key -> { v: the value sent (JSON),
+// no: the save's number, sent: the transaction has run, held: a snapshot without it was applied meanwhile, acked: the server confirmed the save }.
+// Until the echo, a snapshot that shows nothing new for such a key (it is simply older than the save) must not
+// take the value off the screen, and must not make the server's older value the baseline for the next save:
+// an edit made in that window was built on a view without the first one, or was judged "nothing to send".
+let _inFlight = {};
+// Players a save of this phone is adding (id -> that save's number) until the room shows them or the save ends.
+// A snapshot from before that save has no such player: it must not take them off this screen (see _applyRoomSnapshot).
+let _rosterInFlight = {};
+// Players this phone added and took off again before the room was seen to hold them (id -> how many more times a
+// snapshot bringing them is answered with the removal). The room can still get them from the save that added them.
+let _rosterGone = {};
+// Players a confirmed save added → { no: that save's number, at: commit time of the room it read, pre: that room's state }:
+// they stay in _rosterInFlight until a snapshot later than that room arrives (one older than the save has no say).
+let _rosterAcked = {};
+// Players a save of this phone removed (id -> that save's number): an older save still on its way leaves them out.
+let _rosterRemovedNo = {};
+// Players a save of this phone is removing (id -> that save's number) until the save is confirmed or has failed:
+// a snapshot from before that save still has them and must not put them back on this screen.
+let _rosterRemoving = {};
+// The roster ids known when each of the last few visits ended (visit number -> ids): a save of that visit still on
+// its way asks them. (Not only the last visit's: Home and back twice, and a save from the first visit lands last.)
+let _knownAtExit = {};
+// Saves still on their way, counted per visit they were started in: that visit's _knownAtExit entry is kept for them.
+let _visitSaves = {};
+// The saves whose last run is not over yet, by write number.
+let _savesRunning = {};
+// Every roster id an update or a confirmed save of this visit has shown to be in the room, also one removed since.
+let _knownEver = [];
+// The ids above that `players` (a roster of this phone) does not list: "removed here", whatever the server says.
+function _removedHereIds(players){
+  const has = id => (players || []).some(p => p && p.id === id);
+  return Object.keys(_rosterInFlight).concat(Object.keys(_rosterGone)).filter(id => !has(id));
+}
+// Set by _pendingLocalEdits(): kept keys whose baseline is the value in flight, not the snapshot's (key -> JSON).
+let _pendingBase = {};
+// The save whose exact echo _lastSyncedState is waiting for (0: none), and the last snapshot applied.
+let _echoWriteNo = 0;
+let _lastRoomDoc = null;
+// A snapshot with no commit time (a room last written by the previous version of the app), while a confirmed save's
+// added player is waited for: snapshots arrive in server order, so once the room that save read has been seen every
+// later one is newer than the save (even one that reads the same: the player added and taken off again). Before
+// that only one that has the player is; the third without it ends the wait anyway (updates can be merged on the way).
+function _bareEndsWait(a, state, has){ if(has || a.seen) return true; if(state === a.pre){ a.seen = true; return false; } return ++a.bare >= 3; }
+// The player ids of the last applied snapshot when its commit time is later than `preAt` (the room a save read), else
+// null: such a snapshot is the save itself or newer, so a player the save added and it lacks was removed since.
+function _laterRosterIds(preAt, preState){
+  if(!_lastRoomDoc || !_lastRoomDoc.exists) return null;
+  const d = _lastRoomDoc.data(), at = _docAt(d);
+  if(!at || !preAt || _notAfter(at, preAt, d.state === preState)) return null;
+  try { return new Set((JSON.parse(d.state).players || []).map(p => p && p.id)); } catch(e){ return null; }
+}
+// True when the snapshot carries a commit time strictly later than `preAt` (so it is not the room a save read, even if it reads the same).
+function _laterThan(doc, preAt){ const at = doc && doc.exists ? _docAt(doc.data()) : null; return !!(at && preAt) && (at.s > preAt.s || (at.s === preAt.s && at.n > preAt.n)); }
+// The commit time a room document carries (every write sends updatedAt: serverTimestamp()), or null: a snapshot
+// of a write of this phone that the server has not stamped yet, or a document from before the field existed.
+function _docAt(data){
+  const t = data && data.updatedAt;
+  return t && typeof t.seconds === 'number' ? { s: t.seconds, n: t.nanoseconds || 0 } : null;
+}
+// True when both times are known and `at` is not later than `pre`. Equal times: only when the caller says the
+// document is the very one `pre` was read from (`same`); two different documents with one stamp are not ordered.
+function _notAfter(at, pre, same){ return !!(at && pre) && (at.s < pre.s || (at.s === pre.s && (at.n < pre.n || (at.n === pre.n && same !== false)))); }
+function _pendingLocalEdits(remote, baseRaw, seenRaw, at){
+  _pendingBase = {};
+  const flying = Object.keys(_inFlight);
+  if(!_syncedShared && !flying.length) return null;
+  if(!_firestoreWriteTimer && !flying.length) return null;
+  const edits = {};
+  if(_firestoreWriteTimer && _syncedShared) for(const k in S){
+    if(VIEW_LOCAL.includes(k)) continue;
+    if(JSON.stringify(S[k]) !== JSON.stringify(_syncedShared[k])) edits[k] = S[k];
+  }
+  // A key the snapshot changed as well is a real conflict: the snapshot wins, as it always has (another phone
+  // may have advanced more of the bracket than this one). ds and players have a proper merge below instead.
+  let raw = null, seen = null;
+  try { raw = baseRaw ? JSON.parse(baseRaw) : null; } catch(e){} // baseRaw: _syncBase as it was before this snapshot
+  try { seen = seenRaw ? JSON.parse(seenRaw) : null; } catch(e){} // seenRaw: the previous snapshot applied
+  // The snapshot changed a key only if its value is new to this device. It is not new when it is what the server
+  // already held (the snapshot is another phone's change to something else, sent before this phone's save in
+  // flight landed) or what one of this phone's own recent saves put there (the echo of that save). Without
+  // these two, a second tap made while the first tap's save was on its way was dropped by either snapshot.
+  const isKnown = (k, theirs) => !!(raw && (theirs === JSON.stringify(raw[k]) || (seen && theirs === JSON.stringify(seen[k]))
+      || _recentSent.some(sent => theirs === JSON.stringify(sent[k]))));
+  // The same value in a snapshot is this save's echo only once the server has confirmed the save, or this phone
+  // has been shown the room the save was built on: before that it can be an older snapshot of an older value.
+  // A snapshot stamped no later than the room a save was built on is older than that save: never its echo, and
+  // never the server's word on a key the save carries, even after the server has confirmed the save (snapshots
+  // sent before the commit can still arrive after the confirmation).
+  const older = f => f.sent && _notAfter(at, f.preAt, _serverSeen === f.pre);
+  const isEcho = f => f.sent && (f.acked || f.sawPre) && !older(f);
+  for(const k of Object.keys(edits)){
+    if(k === 'ds' || k === 'players') continue;
+    const theirs = JSON.stringify(remote[k]);
+    const f = _inFlight[k];
+    if(!isKnown(k, theirs) && !(f && older(f))){ delete edits[k]; delete _inFlight[k]; continue; }
+    if(!f) continue;
+    // Edited again while the earlier save of this key is still on its way. If the snapshot does not show that
+    // save yet, the baseline is the value in flight: the newer edit may equal what the snapshot shows and still
+    // has to be sent, or the save in flight lands after it and undoes it.
+    // (Also after the server has confirmed that save: a snapshot from before it can still arrive.)
+    if(theirs === f.v && isEcho(f)) delete _inFlight[k]; else _pendingBase[k] = f.v;
+  }
+  // Keys in flight with no newer edit: keep them on screen while the snapshot is merely older than the save.
+  for(const k of flying){
+    const f = _inFlight[k];
+    if(!f || k in edits) continue;
+    const theirs = JSON.stringify(remote[k]);
+    // Its echo, something new from another phone, a save the server has already confirmed (a snapshot after
+    // that is the server's word), or a value this phone no longer shows: the snapshot wins, as before.
+    // (The same value before the save has even been handed over is an older save's echo, not this one's.)
+    if(theirs === f.v){ if(isEcho(f)) delete _inFlight[k]; continue; }
+    if(JSON.stringify(S[k]) !== f.v || (!older(f) && (f.acked || !(isKnown(k, theirs) || (f.carried && !seenRaw))))){ delete _inFlight[k]; continue; }
+    edits[k] = S[k];
+    _pendingBase[k] = f.v;
+    f.held = true;
+  }
+  if(!Object.keys(edits).length) return null;
+  if('ds' in edits || 'players' in edits){
+    const gone = _removedHereIds(S.players);
+    const merged = mergeSharedState({ ds: S.ds, players: S.players }, remote, gone.length ? (_lastSnapshotPlayerIds || []).concat(gone) : _lastSnapshotPlayerIds);
+    if('ds' in edits) edits.ds = merged.ds;
+    if('players' in edits) edits.players = merged.players;
+  }
+  return edits;
+}
 
 let _isRemoteUpdate = false;
 let _firestoreWriteTimer = null;
@@ -7,6 +161,19 @@ let _firestoreWriteTimer = null;
 // same string has nothing new (it is the echo of our own write, or a metadata-only change), so
 // _applyRoomSnapshot skips the JSON.parse + full render for it.
 let _lastSyncedState = null;
+// The shared state as this device last received it from, or handed it to, Firestore (a JSON string). What S
+// differs from it by is what this device has edited since: the base of the merge in _writeSharedState.
+let _syncBase = null;
+// The shared part of S, serialised from S itself, as of the last snapshot applied or write sent. A save that
+// finds it unchanged (a tab switch, a Live filter: view-only keys) has nothing to send. Writing anyway cost a
+// document write plus a snapshot on every phone in the room, and it sent this phone's whole copy of the room:
+// a phone that was behind (offline, just woken) rolled everyone back to its old copy by switching tabs.
+let _sharedAtSync = null;
+function _sharedJson(){
+  const shared = {};
+  for(const k in S){ if(!VIEW_LOCAL.includes(k)) shared[k] = S[k]; }
+  return JSON.stringify(shared);
+}
 // Newest snapshot that arrived while a pick transaction was in flight ({gen, doc}); see replayDroppedSnapshot.
 let _droppedDuringPick = null;
 function _debouncedFirestoreWrite(){
@@ -22,28 +189,288 @@ function _debouncedFirestoreWrite(){
   }, 800);
 }
 
+/* The plain merge write (what every write was before the transaction): Firestore queues it offline and
+ * flushes it on reconnect. While still in that room it sends what the device holds NOW, so two fallbacks
+ * that finish out of order cannot put an older edit on top of a newer one; `json` is only used for a room
+ * that has been left in the meantime. set() resolves once the server has the write (it stays pending while
+ * offline), which is how _writeSharedState knows a queued write is still on its way. */
+let _queuedPlainWrites = {}; // room id -> plain writes handed to Firestore and not yet acknowledged by the server
+// Saves retried after a write failed outright (not offline: see the catch in _writeSharedState). Reset by a write
+// that gets through and on entering a room.
+let _writeRetries = 0;
+function _plainSharedWrite(ref, json, left){ // left: the visit this save was made in is over (see here() in _writeSharedState)
+  const id = ref.id;
+  _queuedPlainWrites[id] = (_queuedPlainWrites[id] || 0) + 1;
+  const settled = () => { if(--_queuedPlainWrites[id] <= 0) delete _queuedPlainWrites[id]; };
+  if(!left && roomId && ref.id === roomId){
+    const cur = {};
+    for(const k in S){ if(!VIEW_LOCAL.includes(k)) cur[k] = S[k]; }
+    json = JSON.stringify(cur);
+    _lastSyncedState = json;
+    _syncBase = json;
+    _sharedAtSync = json;
+  }
+  ref.set({ state: json, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, {merge: true})
+    .then(settled, err => { settled(); console.warn("Firestore offline write error:", err); });
+}
+
 /* Write the shared (non-view) part of S to the current room's document now. */
 function _writeSharedState(){
-  const shared = {};
-  for(const k in S){ if(!VIEW_LOCAL.includes(k)) shared[k] = S[k]; }
-  const json = JSON.stringify(shared);
-  _lastSyncedState = json;
-  db.collection("rooms").doc(roomId).set({
-    state: json,
-    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-  }, {merge: true}).catch(e => {
+  const localJson = _sharedJson();
+  if(localJson === _sharedAtSync) return; // nothing shared changed since the last sync
+  _sharedAtSync = localJson;
+  // A private copy: S can move on (a snapshot, another edit) while the transaction below is retried.
+  const shared = JSON.parse(localJson);
+  // The server state this device last synced with. Only the keys edited since then are ours to send; every
+  // other key goes out as the server holds it at commit time, so a change another device made in the meantime
+  // (even one that lands while this write is in flight) is not overwritten with our older copy of it.
+  const baseAtStart = _syncBase;
+  let base = null;
+  try { base = baseAtStart ? JSON.parse(baseAtStart) : null; } catch(e){}
+  const mine = base && Object.keys(shared).filter(k => JSON.stringify(shared[k]) !== JSON.stringify(base[k]));
+  _syncBase = localJson; // these edits are now with this write; the next write sends only what changes after this
+  _syncedShared = JSON.parse(localJson); // nothing is pending any more: this is what the server is being sent
+  _recentSent.push(shared);
+  if(_recentSent.length > 12) _recentSent.shift();
+  const seqAtStart = _snapshotSeq;
+  // A later save from this phone that also carries a key makes this one's copy of that key the older one.
+  const writeNo = ++_writeSeq;
+  // (Not ds and players: those are merged with the server's copy below, never sent as a whole.)
+  if(mine) for(const k of mine){ if(k !== 'ds' && k !== 'players') _keyWriteNo[k] = writeNo; }
+  // (One no longer on this screen was removed here in the meantime: remembered, a later snapshot can still bring them.)
+  const dropRoster = () => { for(const id of Object.keys(_rosterInFlight)){ if(_rosterInFlight[id] !== writeNo) continue; delete _rosterInFlight[id]; if(here() && !(S.players || []).some(p => p && p.id === id)) _rosterGone[id] = 3; } };
+  const dropInFlight = () => { dropRoster(); for(const id of Object.keys(_rosterRemoving)){ if(_rosterRemoving[id] === writeNo) delete _rosterRemoving[id]; } for(const k of Object.keys(_inFlight)){ if(_inFlight[k].no === writeNo) delete _inFlight[k]; } };
+  let preAtSaved = null;
+  let preState = null; // what the server held when the transaction (its last run) read the room
+  let expectSynced = _lastSyncedState; // what _lastSyncedState holds unless a snapshot is applied during the write
+  let snapshotDuringWrite = false;
+  const ref = db.collection("rooms").doc(roomId);
+  // Still the visit of the room this save was started in. After Home and back into the same room the save still
+  // lands, but the bookkeeping and the screen belong to the new visit: it must not read or change them.
+  const visit = _roomGeneration, here = () => !!roomId && ref.id === roomId && visit === _roomGeneration;
+  // A transaction needs the network and only gives up after several retries. Known offline: queue the plain
+  // write at once, so the edit is already in Firestore's offline queue if the tab is closed a second later.
+  // Same while an earlier plain write for this room is still waiting in that queue (the connection has only just
+  // come back): Firestore sends its queue in order, but a transaction does not wait for it. The transaction would
+  // commit first and the older queued copy of the room would then land on top of it, undoing this edit.
+  if((typeof navigator !== 'undefined' && navigator.onLine === false) || _queuedPlainWrites[roomId]){ _plainSharedWrite(ref, localJson); return; }
+  if(mine) for(const k of mine){ if(k !== 'ds' && k !== 'players') _inFlight[k] = { v: JSON.stringify(shared[k]), no: writeNo, sent: false, held: false, acked: false }; }
+  const adding = []; // the players this save is adding
+  if(mine && mine.includes('players')){
+    for(const p of ((base && base.players) || [])){ if(p && p.id && !(shared.players || []).some(q => q && q.id === p.id)) { _rosterRemovedNo[p.id] = writeNo; _rosterRemoving[p.id] = writeNo; } }
+    const had = new Set(((base && base.players) || []).map(p => p.id));
+    for(const p of (shared.players || [])){ if(p && p.id && !had.has(p.id)){ _rosterInFlight[p.id] = writeNo; adding.push(p.id); } }
+  }
+  // Players this save lists whom an earlier save of this phone was still adding when it started: id -> that save.
+  const earlier = {};
+  for(const p of (shared.players || [])){ const no = p && _rosterInFlight[p.id]; if(no && no !== writeNo) earlier[p.id] = no; }
+  // Transaction + mergeSharedState: never roll back a pick that landed since our last snapshot.
+  let writtenIds = null;
+  // The roster our copy was taken from. Read now, not inside the transaction: a snapshot that arrives while the
+  // write is being retried would otherwise make a player somebody else has just added look like one we removed.
+  // Plus the players an earlier save of this phone is still adding and this copy no longer has: they were removed
+  // here before that save was confirmed. The server may hold them by the time this save reads the room, and they
+  // are not "added on another phone".
+  const goneInFlight = _removedHereIds(shared.players);
+  const knownIds = goneInFlight.length ? (_lastSnapshotPlayerIds || []).concat(goneInFlight) : _lastSnapshotPlayerIds;
+  let awayTries = 0; // see the catch: runs of this save after its visit ended
+  let again = false; // set by the catch when the save is to be run once more
+  const attempt = () => db.runTransaction(async tx => {
+    const snap = await tx.get(ref);
+    // Cleaned like every copy this device shows: the merge below reads its roster and draft state.
+    const remote = snap.exists && snap.data().state ? sanitizeSharedState(JSON.parse(snap.data().state)) : null;
+    preState = snap.exists ? snap.data().state : null;
+    const preAt = snap.exists ? _docAt(snap.data()) : null;
+    preAtSaved = preAt;
+    for(const k in _inFlight){ if(_inFlight[k].no === writeNo){ _inFlight[k].sent = true; _inFlight[k].pre = preState; _inFlight[k].preAt = preAt; _inFlight[k].sawPre = _serverSeen === preState; } }
+    let ours = shared;
+    if(remote && mine){
+      // Same key order as our own copy, so an untouched server gives back exactly localJson.
+      ours = {};
+      // Firestore re-runs this function when the document changed under it, which can be after a newer save from
+      // this phone has landed: a key that newer save carries is left as the server holds it, not put back.
+      for(const k in shared) ours[k] = ((mine.includes(k) && !(_keyWriteNo[k] > writeNo)) || !(k in remote)) ? shared[k] : remote[k];
+      for(const k in remote){ if(!(k in ours) && !VIEW_LOCAL.includes(k)) ours[k] = remote[k]; }
+    }
+    // A player this save was adding who has been taken off this phone again since: a later save carries (or has
+    // already made) that removal, and this one may be landing after it. Not written.
+    // (Also one an earlier save of this phone was adding: this save was started while they were still listed.)
+    {
+      const off = (here() ? adding.filter(id => !(S.players || []).some(p => p && p.id === id)).concat(_removedHereIds(S.players)) : [])
+        .concat(Object.keys(_rosterRemovedNo).filter(id => _rosterRemovedNo[id] > writeNo)); // removed by a newer save of this phone
+      if(off.length) ours = Object.assign({}, ours, { players: (ours.players || []).filter(p => !(p && off.includes(p.id))) });
+    }
+    // A player an earlier save of this phone is still adding (that save is still running) whom the room does not
+    // have: left to that save. Either it has not landed yet and adds them itself, or it has landed, its confirmation
+    // is still on its way and somebody took the player off since: writing them here would put a removed player back.
+    if(remote){
+      const there = new Set((remote.players || []).map(p => p && p.id));
+      const early = (ours.players || []).filter(p => p && earlier[p.id] && _savesRunning[earlier[p.id]] && !there.has(p.id)).map(p => p.id);
+      if(early.length) ours = Object.assign({}, ours, { players: ours.players.filter(p => !(p && early.includes(p.id))) });
+    }
+    // A player this save lists whom the server does not have and this phone no longer shows (removed elsewhere and
+    // taken off this screen by a snapshot while the save was waiting): not written back.
+    if(remote && here()){
+      const shownNow = new Set((S.players || []).map(p => p && p.id)), there = new Set((remote.players || []).map(p => p && p.id));
+      if((ours.players || []).some(p => p && !shownNow.has(p.id) && !there.has(p.id))) ours = Object.assign({}, ours, { players: ours.players.filter(p => !p || shownNow.has(p.id) || there.has(p.id)) });
+    }
+    // Players this save lists who have become known since it started (an earlier save of this phone was confirmed):
+    // if the server no longer has them they were removed on another phone, not added by this save.
+    let known = knownIds;
+    // (After Home, or Home and back: the ids as they were when this save's visit ended.)
+    const knownNow = here() ? _lastSnapshotPlayerIds : (visit === _roomGeneration ? _knownEver.concat(_lastSnapshotPlayerIds || []) : (_knownAtExit[visit] || null)); // away: no screen to ask, so every id the visit saw
+    if(knownNow){
+      const late = knownNow.filter(id => !(known || []).includes(id) && (shared.players || []).some(p => p && p.id === id));
+      if(late.length) known = (known || []).concat(late);
+    }
+    const merged = remote ? mergeSharedState(ours, remote, known, true) : ours;
+    const json = JSON.stringify(merged);
+    writtenIds = (merged.players || []).map(p => p.id);
+    for(const id of Object.keys(_rosterInFlight)){ if(_rosterInFlight[id] === writeNo && !writtenIds.includes(id)){ delete _rosterInFlight[id]; if(here() && !(S.players || []).some(p => p && p.id === id)) _rosterGone[id] = 3; } }
+    // The echo of this write is skipped by _applyRoomSnapshot only when it carries exactly what we
+    // sent from. If the merge took anything from the server (draft progress, another device's edit), or
+    // a snapshot replaced S while the write was in flight, leave the echo to be applied so this device
+    // ends up showing what the server holds.
+    if(visit === _roomGeneration){ // (not here(): at Home, between visits, this is as it always was)
+    if(_lastSyncedState !== expectSynced || _snapshotSeq !== seqAtStart) snapshotDuringWrite = true; // the count: two snapshots can end on the string we started from
+    _lastSyncedState = expectSynced = (json === localJson && !snapshotDuringWrite) ? json : null;
+    if(_lastSyncedState !== null) _echoWriteNo = writeNo;
+    }
+    tx.set(ref, {
+      state: json,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    }, {merge: true});
+  }).then(() => {
+    // The server now holds the roster we just wrote, and our own echo is skipped by _applyRoomSnapshot, so
+    // record it here. Otherwise a player added on this device and then removed on this device would look
+    // like "added elsewhere" to the next merge and come straight back.
+    if(writtenIds && here()){
+      // Unless a snapshot was applied while this save was on its way: it put the server's roster on screen, without
+      // the players this save was adding. Calling those "known" made the next roster edit from this phone read
+      // "known, but not here" as "removed here" and delete them on the server. Only the ones still shown count.
+      const shown = _snapshotSeq === seqAtStart ? null : new Set((S.players || []).map(p => p.id));
+      // And only the ones this phone sent: a player the merge took from the server (added on another phone while this
+      // save was on its way) is not on this screen yet. Known-but-not-here reads as "removed here" in the next merge.
+      const sentIds = new Set((shared.players || []).map(p => p.id));
+      _lastSnapshotPlayerIds = Array.from(new Set((_lastSnapshotPlayerIds || []).concat(writtenIds.filter(id => sentIds.has(id) && (!shown || shown.has(id))))));
+    }
+    // Confirmed after its visit ended: the players it sent and wrote are known to the saves of that visit still on their way.
+    if(writtenIds && !here()){
+      const sent = new Set((shared.players || []).map(p => p.id)), ids = writtenIds.filter(id => sent.has(id));
+      if(visit === _roomGeneration) _lastSnapshotPlayerIds = Array.from(new Set((_lastSnapshotPlayerIds || []).concat(ids)));
+      else if(_knownAtExit[visit]) _knownAtExit[visit] = Array.from(new Set(_knownAtExit[visit].concat(ids)));
+    }
+    for(const id of Object.keys(_rosterRemoving)){ if(_rosterRemoving[id] === writeNo) delete _rosterRemoving[id]; }
+    // Unless an update later than the room this save read has already been applied and does not have the player:
+    // another phone took them off after this save. Nothing newer is promised, so there is nothing to wait for;
+    // that update is shown again below, now that the player is no longer on their way.
+    let rosterReapply = false;
+    if(preAtSaved && here()){
+      let lastIds = null; // the players of the last applied update, when it is later than the room this save read
+      for(const id of Object.keys(_rosterInFlight)){
+        if(_rosterInFlight[id] !== writeNo || !(S.players || []).some(p => p && p.id === id)) continue;
+        if(lastIds === null) lastIds = _laterRosterIds(preAtSaved, preState) || false;
+        if(lastIds && !lastIds.has(id)) rosterReapply = true;
+        else _rosterAcked[id] = { no: writeNo, at: preAtSaved, pre: preState, seen: _serverSeen === preState, bare: 0 };
+      }
+    }
+    for(const id of Object.keys(_rosterInFlight)){ if(_rosterInFlight[id] === writeNo && !(_rosterAcked[id] && _rosterAcked[id].no === writeNo)){ delete _rosterInFlight[id]; if(here() && !(S.players || []).some(p => p && p.id === id)) _rosterGone[id] = 3; } } // confirmed: its echo brings these players, and a snapshot after it may already have them removed again
+    _writeRetries = 0;
+    // The server has the save. A key of it that a snapshot was held back for: if that snapshot is not the state
+    // the transaction read (so it may already be newer than this save, with another phone's change on top), show
+    // what it said after all. Otherwise the echo is still to come; from here on any snapshot is taken at its word.
+    let reapply = rosterReapply;
+    for(const k of Object.keys(_inFlight)){
+      const f = _inFlight[k];
+      if(f.no !== writeNo) continue;
+      f.acked = true;
+      // Not a key edited again since (that edit is waiting in the debounce): the older snapshot's value would become
+      // its baseline, and where the two are equal the newer edit was judged "nothing to send". It stays in flight,
+      // confirmed, so the baseline stays the value this save sent until its echo or the newer save.
+      // Nor when that snapshot is stamped no later than the room this save was built on: it is older than the save,
+      // and the save's own snapshot (or a later one) is still to come.
+      if(f.held && (_serverSeen !== preState || _laterThan(_lastRoomDoc, f.preAt)) && JSON.stringify(S[k]) === f.v && !_notAfter(_lastRoomDoc && _lastRoomDoc.exists ? _docAt(_lastRoomDoc.data()) : null, f.preAt, !!(_lastRoomDoc && _lastRoomDoc.exists) && _lastRoomDoc.data().state === f.pre)){ delete _inFlight[k]; reapply = true; }
+    }
+    if(reapply && roomId && ref.id === roomId && _lastRoomDoc && !_pickInFlight){
+      _lastSyncedState = null;
+      _applyRoomSnapshot(_lastRoomDoc);
+    }
+  }).catch(e => {
+    // Transactions need the network. Offline, fall back to the plain merge write, which Firestore
+    // queues and flushes on reconnect (the pre-transaction behaviour).
+    if(e && (e.code === 'unavailable' || e.code === 'failed-precondition' || (typeof navigator !== 'undefined' && navigator.onLine === false))){
+      dropInFlight();
+      _plainSharedWrite(ref, localJson, !here());
+      return;
+    }
+    // Nothing is on its way any more. Where a snapshot was applied meanwhile, the baseline for this save's keys
+    // was the value in flight: put the server's own value back, so the retry sends them again.
+    // The room was busy (the transaction lost every race) and this save's visit is over: inside a visit the retry
+    // below sends the edit again, but that reads the screen, and the screen is no longer this visit's. The save
+    // itself is still good (its own keys over whatever the room holds then), so it is run again, a few times.
+    if(e && e.code === 'aborted' && !here() && ++awayTries <= 5){ again = true; return; }
+    const failedKeys = Object.keys(_inFlight).filter(k => _inFlight[k].no === writeNo);
+    const failedRoster = Object.keys(_rosterInFlight).filter(id => _rosterInFlight[id] === writeNo);
+    const failedRemoving = Object.keys(_rosterRemoving).filter(id => _rosterRemoving[id] === writeNo);
+    dropInFlight();
+    if(failedKeys.length && _syncBase !== localJson && _serverSeen && here()){
+      try {
+        const server = JSON.parse(_serverSeen), b = JSON.parse(_syncBase);
+        for(const k of failedKeys){ b[k] = server[k]; if(_syncedShared) _syncedShared[k] = server[k]; }
+        _syncBase = JSON.stringify(b);
+        _sharedAtSync = null;
+      } catch(err){}
+    }
+    if((failedRoster.length || failedRemoving.length) && _syncBase !== localJson && _serverSeen && here()){
+      try {
+        const server = JSON.parse(_serverSeen), there = new Set((server.players || []).map(p => p && p.id));
+        if(failedRoster.some(id => !there.has(id) && (S.players || []).some(p => p.id === id)) || failedRemoving.some(id => there.has(id) && !(S.players || []).some(p => p.id === id))){
+          const b = JSON.parse(_syncBase);
+          b.players = server.players || [];
+          if(_syncedShared) _syncedShared.players = JSON.parse(JSON.stringify(b.players));
+          _syncBase = JSON.stringify(b);
+          _sharedAtSync = null;
+        }
+      } catch(err){}
+    }
+    // Nothing was written: go back to the earlier base, so the next write still carries these edits. The
+    // pending-edit baseline goes back too (unless a snapshot moved it on during the write): until the save is
+    // retried, a snapshot from another phone must keep these edits the way it keeps an edit in the debounce.
+    if(here() && _syncBase === localJson){
+      _syncBase = baseAtStart;
+      try { _syncedShared = baseAtStart ? JSON.parse(baseAtStart) : null; } catch(err){}
+    }
+    if(here() && _sharedAtSync === localJson) _sharedAtSync = null;
     console.warn("Firestore write error:", e);
-    showToast("Sync error \u2014 changes saved locally");
+    // Try again shortly rather than waiting for the next save: the toast used to promise "saved locally", but
+    // the next snapshot replaced S and the local copy and nothing was armed to send the edit again. A few tries,
+    // then give up: a write the server refuses for good would otherwise loop every 800 ms while the tab is open.
+    if(here() && ++_writeRetries <= 5){
+      _debouncedFirestoreWrite();
+      showToast("Sync error \u2014 trying again");
+    } else {
+      showToast("Sync error \u2014 changes saved locally");
+    }
   });
+  // Counted until its last run is over: connectToRoom keeps what this save's visit knew for as long as it runs.
+  _visitSaves[visit] = (_visitSaves[visit] || 0) + 1;
+  _savesRunning[writeNo] = true;
+  const over = () => { if(again){ again = false; run(); return; } delete _savesRunning[writeNo]; if(--_visitSaves[visit] <= 0) delete _visitSaves[visit]; };
+  const run = () => attempt().then(over, over);
+  run();
 }
 
 /* Send a pending debounced write right away. Call BEFORE roomId or S change (goHome), so the last
  * edit made in a room reaches that room instead of being dropped or landing in the next one. */
 function flushFirestoreWrite(){
-  if(_firestoreWriteTimer === null) return;
-  clearTimeout(_firestoreWriteTimer);
-  _firestoreWriteTimer = null;
-  if(roomId && !_isRemoteUpdate) _writeSharedState();
+  if(_firestoreWriteTimer !== null){
+    clearTimeout(_firestoreWriteTimer);
+    _firestoreWriteTimer = null;
+    if(roomId && !_isRemoteUpdate) _writeSharedState();
+  }
+  // Leaving: a player added and taken off again in this visit stays off. The save that was adding them can still be
+  // on its way while the phone is at Home, where it has no screen to ask.
+  if(roomId) for(const id of _removedHereIds(S.players)) _rosterRemovedNo[id] = _writeSeq + 1;
 }
 
 function saveState(){
@@ -58,6 +485,10 @@ function loadState(){
     const s = localStorage.getItem(stateKey());
     if(s) Object.assign(S, JSON.parse(s));
     sanitizeSharedState(S);
+    // A day picked on the Live tab is a look back, not a setting. It is stored with the rest of the view state,
+    // and restoring it opened the Live tab on that old day in every later session (and this phone then never
+    // processed today's finals). A new session starts on today; the filter and the tab are still remembered.
+    S.liveScoresDate = '';
     // Reconstruct Firestore Timestamp from serialized JSON
     if(S.ds && S.ds.pickDeadline && typeof S.ds.pickDeadline === 'object' && S.ds.pickDeadline.seconds){
       S.ds.pickDeadline = new firebase.firestore.Timestamp(S.ds.pickDeadline.seconds, S.ds.pickDeadline.nanoseconds || 0);
@@ -82,7 +513,10 @@ async function createRoom(){
   const url = new URL(window.location);
   url.searchParams.set("room", code);
   window.history.replaceState({}, "", url);
-  loadState();
+  // A new room starts blank. loadState() brought back whatever this phone had cached under the same code (last
+  // year's pool of that name, since removed from the server) and created the "new" room with its players, picks
+  // and finished draft.
+  S = defaultState();
   if(!S.bracket) S.bracket = {South:Array(15).fill(null), East:Array(15).fill(null), Midwest:Array(15).fill(null), West:Array(15).fill(null), ff:Array(3).fill(null)};
   if(!S.bracketRegion) S.bracketRegion = "South";
   if(!S.games) S.games = [];
@@ -129,10 +563,39 @@ function joinRoom(){
 
 function connectToRoom(code){
   if(unsubRoom) unsubRoom();
+  if(_lastSnapshotPlayerIds){ _knownAtExit[_roomGeneration] = Array.from(new Set(_knownEver.concat(_lastSnapshotPlayerIds))); const old = Object.keys(_knownAtExit).filter(v => !_visitSaves[v]); while(old.length > 4) delete _knownAtExit[old.shift()]; }
+  _knownEver = [];
+  _lastSnapshotPlayerIds = null; // the previous room's roster says nothing about this one
+  _syncedShared = null;
+  _serverSeen = null;
+  // (_recentSent too: the update that brings a save from the last visit is this phone's own value, not another phone's change.)
+  const changedRoom = code !== _writeNoRoom;
+  const goneAtExit = changedRoom ? [] : _removedHereIds(S.players); // read before the lists below are emptied
+  if(changedRoom){ _recentSent = []; _keyWriteNo = {}; _rosterRemovedNo = {}; _writeNoRoom = code; } // kept for the same room: a save from the last visit may still be on its way
+  else { for(const id of _removedHereIds(S.players)) _rosterRemovedNo[id] = _writeSeq + 1; } // added and taken off again in the last visit (S is this phone's cached copy of that screen): the save that was adding them leaves them out
+  // A setting a save from the last visit to this room is still carrying stays in flight (`carried`): until that save
+  // is seen, the value it sent is this phone's baseline for the setting, as it was before Home.
+  { const kept = {}; if(!changedRoom) for(const k of Object.keys(_inFlight)){ const f = _inFlight[k]; if(!f.acked) kept[k] = Object.assign(f, { held: false, carried: true }); } _inFlight = kept; }
+  _pendingBase = {};
+  _rosterInFlight = {};
+  _rosterGone = {};
+  // Added and taken off again in the last visit to this room: the save that was adding them may already have
+  // written them. An update of this visit that brings them is answered with the removal, as it was before Home.
+  for(const id of goneAtExit) _rosterGone[id] = 3;
+  _rosterAcked = {};
+  _rosterRemoving = {};
+  _echoWriteNo = 0;
+  _lastRoomDoc = null;
   saveRecentRoom(code);
   const gen = ++_roomGeneration;
+  _awaitingRoom = true;
   _lastSyncedState = null; // never let the previous room's string suppress this room's first snapshot
+  _syncBase = null;
+  // What this phone holds on entering a room is its cached copy of that room (or the state createRoom has just
+  // written), not an edit: with no snapshot yet (offline, nothing in Firestore's cache) a tab switch must not send it.
+  _sharedAtSync = _sharedJson();
   _droppedDuringPick = null;
+  _writeRetries = 0;
   unsubRoom = db.collection("rooms").doc(code).onSnapshot(doc => {
     if(gen !== _roomGeneration) return; // stale listener
     // Calibrate the draft clock against Firestore's clock (defined in 80-pages.js; unit tests load this file alone).
@@ -171,29 +634,148 @@ function _applyRoomSnapshot(doc){
     showToast('Room ' + code + ' not found');
     return;
   }
+  _awaitingRoom = false;
   const data = doc.data();
   if(!data || !data.state) return;
   // Firestore delivers our own write back twice (latency-compensated, then server-acked with the
   // real updatedAt). Both carry the exact string we wrote, so neither needs a parse or a redraw.
-  if(data.state === _lastSyncedState) return;
+  if(data.state === _lastSyncedState){
+    // The exact echo of a save: everything that save (or an earlier one) carried is on the server now.
+    // (Unless it is stamped no later than the room that save was built on: the same string, but an older state.)
+    const echoAt = _docAt(data);
+    // The same text as the last update applied, with a later commit time: a newer room that happens to read the same
+    // (a value changed and changed back). Nothing to draw, but it is the last word: a save confirmed after it asks.
+    const newer = !!(_lastRoomDoc && _lastRoomDoc.exists && _lastRoomDoc.data().state === data.state && _laterThan(doc, _docAt(_lastRoomDoc.data())));
+    if(newer) _lastRoomDoc = doc;
+    if(_echoWriteNo) for(const k of Object.keys(_inFlight)){ const f = _inFlight[k]; if(f.no <= _echoWriteNo && !(f.sent && _notAfter(echoAt, f.preAt, data.state === f.pre))) delete _inFlight[k]; }
+    // Its new players are in the room from here on: "known", so removing one before the save is confirmed is a removal.
+    if(_echoWriteNo) for(const id of Object.keys(_rosterRemoving)){ if(_rosterRemoving[id] <= _echoWriteNo) delete _rosterRemoving[id]; }
+    if(_echoWriteNo) for(const id of Object.keys(_rosterInFlight)){
+      if(_rosterInFlight[id] > _echoWriteNo) continue;
+      delete _rosterInFlight[id];
+      if(!(S.players || []).some(p => p && p.id === id)) _rosterGone[id] = 3; // taken off again here: see _rosterGone
+      if(!(_lastSnapshotPlayerIds || []).includes(id)) _lastSnapshotPlayerIds = (_lastSnapshotPlayerIds || []).concat([id]);
+    }
+    // Unless it is such a newer room and a player a confirmed save added is still waited for: the room no longer
+    // has them (another phone took exactly that player off), and only applying it ends the wait. The same for a
+    // setting of a confirmed save that an older update was held back for: this is the newer update it waits for.
+    if(!(newer && !_echoWriteNo && (Object.keys(_rosterAcked).length || Object.keys(_inFlight).some(k => _inFlight[k].acked)))) return;
+  }
   _lastSyncedState = data.state;
+  _echoWriteNo = 0;
+  _lastRoomDoc = doc;
+  const baseBefore = _syncBase; // what this device had synced before this snapshot (a string: nothing in S can alias it)
+  const seenBefore = _serverSeen;
+  _syncBase = data.state;
+  _serverSeen = data.state;
+  _snapshotSeq++;
+  let goneBack = [];
   _isRemoteUpdate = true; // gates saveState's Firestore write; MUST clear even if the parse or render throws
   try {
     const local = {};
     for(const k of VIEW_LOCAL) local[k] = S[k];
-    const remote = JSON.parse(data.state);
-    Object.assign(S, remote, local);
+    const remote = sanitizeSharedState(JSON.parse(data.state)); // cleaned before the roster and the pending-edit merge read it
+    const pending = _pendingLocalEdits(remote, baseBefore, seenBefore, _docAt(data)); // before the roster ids and S move on to this snapshot
+    // From the next snapshot on, the same value is the save's echo. Not for this one: it is the room the save was
+    // built on, and it can already hold that value while an older save of this phone is about to change it.
+    for(const k in _inFlight){ if(_inFlight[k].sent && _inFlight[k].pre === data.state) _inFlight[k].sawPre = true; }
+    const knownBefore = _lastSnapshotPlayerIds;
+    _lastSnapshotPlayerIds = (remote.players || []).map(p => p.id);
+    for(const id of (knownBefore || []).concat(_lastSnapshotPlayerIds)){ if(!_knownEver.includes(id)) _knownEver.push(id); }
+    const shownBefore = S.players || [];
+    // A removal still waiting to be saved (in the baseline, off this screen) and this snapshot has no such player
+    // either: it may simply be older than the player. Remembered, in case a newer snapshot brings them (see _rosterGone).
+    if(_firestoreWriteTimer && _syncedShared) for(const p of (_syncedShared.players || [])){
+      if(p && p.id && !shownBefore.some(q => q && q.id === p.id) && !(remote.players || []).some(q => q && q.id === p.id)) _rosterGone[p.id] = 3;
+    }
+    Object.assign(S, remote, local, pending || {});
+    // Players a save of this phone is still adding: this snapshot is older than that save, not a removal. Kept on
+    // screen (as this phone last showed them); one the room now has, or one removed here since, is no longer waited for.
+    // A player a confirmed save added is waited for until a snapshot later than the room that save read.
+    { const at = _docAt(data); for(const id of Object.keys(_rosterAcked)){ const a = _rosterAcked[id]; if(_rosterInFlight[id] !== a.no){ delete _rosterAcked[id]; continue; } if(at ? !_notAfter(at, a.at, data.state === a.pre) : _bareEndsWait(a, data.state, (remote.players || []).some(p => p && p.id === id))){ delete _rosterAcked[id]; delete _rosterInFlight[id]; } else if(data.state === a.pre) a.seen = true; } }
+    let rosterKept = false;
+    for(const id of Object.keys(_rosterInFlight)){
+      const mine = shownBefore.find(p => p && p.id === id);
+      if(!mine){ delete _rosterInFlight[id]; _rosterGone[id] = 3; continue; }
+      if((remote.players || []).some(p => p.id === id)){ delete _rosterInFlight[id]; continue; }
+      if(!(S.players || []).some(p => p.id === id)){ S.players = (S.players || []).concat([mine]); rosterKept = true; }
+    }
+    // A player a save of this phone is removing: this snapshot is older than that save. Kept off the screen.
+    const stillRemoving = Object.keys(_rosterRemoving).filter(id => !shownBefore.some(p => p && p.id === id) && (S.players || []).some(p => p && p.id === id));
+    if(stillRemoving.length){ S.players = S.players.filter(p => !(p && stillRemoving.includes(p.id))); rosterKept = true; }
+    // A player removed here before the room showed them, and this snapshot brings them (from the save that added
+    // them): the removal stands on this screen and is saved again below. Answered a few times at most.
+    for(const id of Object.keys(_rosterGone)){ if(shownBefore.some(p => p && p.id === id)) delete _rosterGone[id]; } // listed here again on purpose
+    goneBack = Object.keys(_rosterGone).filter(id => (S.players || []).some(p => p && p.id === id));
+    if(goneBack.length){
+      S.players = S.players.filter(p => !(p && goneBack.includes(p.id)));
+      for(const id of goneBack){ if(--_rosterGone[id] <= 0) delete _rosterGone[id]; }
+    }
+    if(knownBefore){
+      const there = new Set(_lastSnapshotPlayerIds);
+      for(const p of (S.players || [])){ if(p && !there.has(p.id) && knownBefore.includes(p.id)) _lastSnapshotPlayerIds.push(p.id); }
+      // Taken off this screen with the roster edit still to be saved: this snapshot may simply be older than them.
+      if(pending && 'players' in pending) for(const id of knownBefore){ if(!there.has(id) && !_lastSnapshotPlayerIds.includes(id) && !shownBefore.some(p => p && p.id === id)) _lastSnapshotPlayerIds.push(id); }
+    }
     sanitizeSharedState(S);
     if(S.ds && S.ds.pickDeadline && typeof S.ds.pickDeadline === 'object' && S.ds.pickDeadline.seconds){
       S.ds.pickDeadline = new firebase.firestore.Timestamp(S.ds.pickDeadline.seconds, S.ds.pickDeadline.nanoseconds || 0);
     }
-    localStorage.setItem(stateKey(), JSON.stringify(S));
+    // Baseline = what the server holds. Keys kept from a pending edit stay "edited" (the debounce is still
+    // running and will send them), so a second snapshot in the same window does not wipe them either.
+    _syncedShared = _sharedCopyOfS();
+    if(pending) for(const k in pending) _syncedShared[k] = remote[k] === undefined ? undefined : JSON.parse(JSON.stringify(remote[k])); // a copy: S may hold the same object
+    // Except a key whose earlier value is still in flight: this phone's baseline for it is that value (see _inFlight).
+    const flyingBase = Object.keys(_pendingBase);
+    if(flyingBase.length){
+      const b = JSON.parse(data.state);
+      for(const k of flyingBase){
+        const v = _pendingBase[k] === undefined ? undefined : JSON.parse(_pendingBase[k]);
+        _syncedShared[k] = v;
+        b[k] = v === undefined ? undefined : JSON.parse(_pendingBase[k]);
+      }
+      _syncBase = JSON.stringify(b);
+    }
+    if(rosterKept){
+      const b = JSON.parse(_syncBase);
+      // With a roster edit of this phone still waiting to be saved, the screen holds players the room has never
+      // been sent: the baseline must not take them, or the save would find nothing of its own in the roster.
+      if(pending && 'players' in pending) b.players = (b.players || []).filter(p => !(p && stillRemoving.includes(p.id)));
+      else b.players = JSON.parse(JSON.stringify(S.players));
+      _syncBase = JSON.stringify(b);
+    }
+    // Players a save in flight is adding, still shown here, that this (older) snapshot does not have: they stay in
+    // the baseline too. Where another roster change was pending they were kept on screen by that merge, and the
+    // baseline became the snapshot's roster: taking them off again was then "nothing to send".
+    const flyingKept = Object.keys(_rosterInFlight).filter(id => (S.players || []).some(p => p && p.id === id) && !(remote.players || []).some(p => p && p.id === id));
+    if(flyingKept.length){
+      const b = JSON.parse(_syncBase);
+      const missing = S.players.filter(p => p && flyingKept.includes(p.id) && !(b.players || []).some(q => q && q.id === p.id));
+      if(missing.length){
+        b.players = (b.players || []).concat(JSON.parse(JSON.stringify(missing)));
+        _syncBase = JSON.stringify(b);
+        if(!(_syncedShared.players || []).some(q => q && missing.some(m => m.id === q.id))) _syncedShared.players = (_syncedShared.players || []).concat(JSON.parse(JSON.stringify(missing)));
+      }
+    }
+    if(goneBack.length){
+      // The baseline keeps them, so the roster counts as edited and the save takes them out of the room.
+      const b = JSON.parse(_syncBase);
+      const back = (remote.players || []).filter(p => p && goneBack.includes(p.id) && !(b.players || []).some(q => q && q.id === p.id));
+      if(back.length){ b.players = (b.players || []).concat(back); _syncBase = JSON.stringify(b); }
+      if(!(pending && 'players' in pending)) _syncedShared.players = JSON.parse(JSON.stringify(b.players || []));
+    }
+    // The no-change baseline is the server's state in S's key order, not S itself: a pending edit kept above
+    // still has to count as a change when the debounce fires.
+    _sharedAtSync = JSON.stringify(_syncedShared);
+    // The offline copy is a convenience; a full storage must not stop the screen from updating.
+    try { localStorage.setItem(stateKey(), JSON.stringify(S)); } catch(e){}
     render();
     updateAppBadge();
     if('Notification' in window && Notification.permission === 'granted') initFCM().catch(() => {});
   } finally {
     _isRemoteUpdate = false;
   }
+  if(goneBack.length) _debouncedFirestoreWrite();
 }
 
 function getRecentRooms(){

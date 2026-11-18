@@ -25,23 +25,47 @@ function _showModal(html) {
 
     overlay._resolve = resolve;
     overlay._close = (val) => {
+      document.removeEventListener('keydown', onKey);
       overlay.classList.remove('show');
       setTimeout(() => { overlay.remove(); resolve(val); }, 200);
     };
 
     overlay.addEventListener('click', e => { if (e.target === overlay) overlay._close(null); });
+    // Escape (desktop, iPad keyboard) is the same as a tap outside the box; only the modal on top answers.
+    const onKey = e => { if (e.key !== 'Escape') return; const all = document.querySelectorAll('.modal-overlay'); if (all[all.length - 1] === overlay) overlay._close(null); };
+    document.addEventListener('keydown', onKey);
 
     const input = overlay.querySelector('.modal-input');
-    if (input) setTimeout(() => input.focus(), 100);
+    if (input) {
+      // Focus synchronously: iOS Safari only opens the keyboard for a focus() that runs inside the
+      // user's tap, so a delayed focus leaves the PIN/name box without a keyboard until it is tapped.
+      try { input.focus({ preventScroll: true }); } catch (e) { input.focus(); }
+      setTimeout(() => { if (document.activeElement !== input) input.focus(); }, 100);
+    }
   });
 }
 
-function appPrompt(message, { title = '', placeholder = '', defaultValue = '' } = {}) {
+/* Attributes for appPrompt's <input>. PIN prompts (the message says "4-digit", or the caller passes
+   inputmode: 'numeric') are masked like the join screen's PIN box (a commissioner unlocking admin on a
+   screen cast to the TV must not show the PIN) and get the phone number pad, a 4-character cap and no
+   autocorrect/suggestions; every other prompt keeps exactly the attributes it had.
+   A PIN that is being chosen ("Set a 4-digit PIN...") stays visible: there is no type-it-again step, so a
+   masked typo would leave the room's admin, or a seat, behind a PIN nobody knows. */
+function promptInputAttrs(message, { placeholder = '', defaultValue = '', inputmode = '' } = {}) {
+  const numeric = inputmode === 'numeric' || /(^|[^0-9a-z])4-digit([^0-9a-z]|$)/i.test(message || '');
+  let attrs = `placeholder="${escapeHtml(placeholder)}" value="${escapeHtml(defaultValue)}"`;
+  const choosing = /(^|[^a-z])set([^a-z]|$)/i.test(message || '');
+  if (numeric) attrs += (choosing ? '' : ' type="password"') + ' inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="done"';
+  else if (inputmode) attrs += ` inputmode="${escapeHtml(inputmode)}"`;
+  return attrs;
+}
+
+function appPrompt(message, { title = '', placeholder = '', defaultValue = '', inputmode = '' } = {}) {
   const id = 'mp_' + Date.now();
   const html = `
     ${title ? `<div class="modal-title">${escapeHtml(title)}</div>` : ''}
     <div class="modal-msg">${escapeHtml(message)}</div>
-    <input class="modal-input" id="${id}" placeholder="${escapeHtml(placeholder)}" value="${escapeHtml(defaultValue)}">
+    <input class="modal-input" id="${id}" ${promptInputAttrs(message, { placeholder, defaultValue, inputmode })}>
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="this.closest('.modal-overlay')._close(null)">Cancel</button>
       <button class="btn btn-primary" onclick="this.closest('.modal-overlay')._close(document.getElementById('${id}').value)">OK</button>

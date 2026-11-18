@@ -27,6 +27,11 @@ const ROUND_SHORT = {1:'R64', 2:'R32', 3:'S16', 4:'E8', 5:'F4', 6:'CH'};
 /* ── Go Home (back to lobby) ── */
 function goHome() {
   stopLiveRefresh();
+  // The 250 ms draft tick and the autopick retry belong to the room being left. render() is what normally stops
+  // the tick, and the lobby never calls render(), so both kept running (as no-ops against the default state)
+  // for as long as the lobby stayed open.
+  stopDraftClock();
+  if(_autoPickRetry){ clearTimeout(_autoPickRetry); _autoPickRetry = null; }
   flushFirestoreWrite(); // last edit in this room goes to this room, before roomId is cleared
   if(unsubRoom) { unsubRoom(); unsubRoom = null; }
   roomId = null;
@@ -128,7 +133,7 @@ function navigate(p){
   if (S.phase === 'live' && p !== 'live') { stopLiveRefresh(); releaseWakeLock(); }
   S.phase = p;
   saveState();
-  if (p === 'live') { startLiveRefresh(); requestWakeLock(); }
+  if (p === 'live') startLiveRefresh(); // startLiveRefresh() requests the wake lock itself
   render();
   // Page transition + scroll to top
   requestAnimationFrame(() => {
@@ -143,13 +148,8 @@ async function shareRoomLink() {
   const shareUrl = inviteUrl(roomId, S.joinKey);
   const text = 'Join my ' + APP_NAME + ' pool' + (S.year ? ' for the ' + S.year + ' tournament' : '') + '. Room ' + roomId
     + (S.joinKey ? ', invite code ' + S.joinKey : '') + '.\nOn iPhone, get the app: ' + APP_STORE_URL;
-  // The app shell has the native share sheet plugin; WKWebView's navigator.share is not dependable.
-  const nativeShare = isNativeShell && window.Capacitor.Plugins && window.Capacitor.Plugins.Share;
-  if (nativeShare) {
-    try { await nativeShare.share({ title: APP_NAME, text, url: shareUrl, dialogTitle: 'Invite players' }); return; }
-    catch (err) { if (/cancel/i.test(String(err && err.message))) return; }
-  }
   const shareData = { title: APP_NAME, text, url: shareUrl };
+  if (await nativeShare(shareData)) return;
   if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
     try {
       await navigator.share(shareData);
@@ -200,6 +200,7 @@ async function shareLeaderboard() {
     text += prefix + ' ' + s.name + ' - ' + s.tot + ' pts\n';
   });
   const shareData = { title: 'Madness Draft Leaderboard', text: text };
+  if (await nativeShare(shareData)) return;
   if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
     try {
       await navigator.share(shareData);
@@ -227,11 +228,14 @@ async function resetAll(){
     // Reset to defaults but keep year
     Object.assign(freshState, {
       phase: 'draft', players: [], teams: [],
-      ds: {order:[], cp:0, started:false, complete:false},
+      ds: {order:[], cp:0, started:false, complete:false, epoch: ((S.ds && S.ds.epoch) || 0) + 1},
       rp: {1:1, 2:2, 3:4, 4:8, 5:16, 6:32}, ub: true,
       bracket: {South:Array(15).fill(null), East:Array(15).fill(null), Midwest:Array(15).fill(null), West:Array(15).fill(null), ff:Array(3).fill(null)},
       bracketRegion:'South', fr:'All', fs:'All', liveScoresDate:'', liveScoresFilter:'all'
     });
+    // A room kept from last March is being reused for the next tournament: move the year on, so the invite text,
+    // the join screen and the import button name the tournament people are joining for. A year set ahead stays.
+    freshState.year = Math.max(Number(S.year) || 0, tournamentYear());
     const shared = {};
     for(const k in freshState){ if(!VIEW_LOCAL.includes(k)) shared[k] = freshState[k]; }
     // Wait for the reset to reach Firestore before reloading: an unawaited write followed by an
@@ -279,7 +283,12 @@ async function removePlayer(id){
 }
 
 async function movePlayer(i, d){
+  // The row index comes from the button that was tapped. requireAdmin() can be a PIN prompt, and a snapshot
+  // that lands meanwhile may reorder or remove players: find the tapped player again afterwards.
+  const tapped = S.players[i] && S.players[i].id;
   if(!await requireAdmin()) return;
+  i = S.players.findIndex(p => p.id === tapped);
+  if(i < 0) return;
   const s = i + d;
   if(s < 0 || s >= S.players.length) return;
   [S.players[i], S.players[s]] = [S.players[s], S.players[i]];
@@ -338,9 +347,18 @@ async function importFromNCAA(){
   showToast('Fetching the bracket from NCAA.com...');
 
   try {
-    const teams = await ncaa.fetchTournamentTeams();
+    const bracketData = await ncaa.fetchBracket(S.year);
+    if(!bracketData){
+      // The request itself failed (offline, relay error, timeout). That is not "no bracket yet".
+      showToast('Could not reach NCAA.com. Check your connection and try again.');
+      if(btn){ btn.textContent = origText; btn.disabled = false; }
+      return;
+    }
+    const teams = ncaa.tournamentTeams(bracketData);
     if(teams.length === 0){
-      showToast('Tournament bracket not available yet. Try after Selection Sunday.');
+      // The source answers "no bracket" both before Selection Sunday and when its own request to NCAA fails,
+      // so do not tell the commissioner to wait for a day that may already be here.
+      showToast('NCAA.com has no ' + Number(S.year) + ' bracket yet. If it was just announced, try again in a few minutes.');
       if(btn){ btn.textContent = origText; btn.disabled = false; }
       return;
     }
@@ -359,6 +377,14 @@ async function importFromNCAA(){
       }
     }
 
+    // The confirm dialogs above and the fetch can stay open for minutes; another admin phone may have started
+    // the draft or made picks meanwhile (the room snapshot keeps S current). Check the lock again before replacing.
+    const lockedNow = teamEditBlockedReason();
+    if(lockedNow){
+      showToast(lockedNow);
+      if(btn){ btn.textContent = origText; btn.disabled = false; }
+      return;
+    }
     S.teams = teams.map(t => ({
       id: generateId(),
       name: t.name,
@@ -371,6 +397,8 @@ async function importFromNCAA(){
       record: t.record || '',
       ...(t.playIn ? { playIn: true, playInResolved: false, playInTeams: t.playInTeams } : {})
     }));
+    // The feed says which regions meet in each national semifinal; it changes every year.
+    S.ffPairs = ncaa.finalFourPairs(bracketData) || FF_PAIRINGS[0];
 
     showToast(`Imported ${S.teams.length} teams from NCAA.com!`);
     saveState();
@@ -390,7 +418,7 @@ async function checkPlayIns(){
   showToast('Checking First Four results...');
   try {
     _lastAutoResolve = 0; // the hourly throttle must not swallow an explicit check
-    await autoResolvePlayIns();
+    if(await autoResolvePlayIns() === false){ showToast('Could not reach NCAA.com. Check your connection and try again.'); return; }
     const left = S.teams.filter(t => t.playIn && !t.playInResolved).length;
     showToast(left ? `${left} play-in game${left === 1 ? '' : 's'} not final yet.` : 'Play-in slots settled!');
   } catch(e) {
@@ -401,9 +429,7 @@ async function checkPlayIns(){
 /* ── Live Scores Page ── */
 function renderLive(c){
   const hasLive = liveScores.some(g => g.state === 'in');
-  const now = new Date();
-  const todayStr = now.getFullYear() + String(now.getMonth()+1).padStart(2,'0') + String(now.getDate()).padStart(2,'0');
-  const currentDate = S.liveScoresDate || todayStr;
+  const currentDate = S.liveScoresDate || scoreboardDay();
   const displayDate = new Date(+currentDate.slice(0,4), +currentDate.slice(4,6) - 1, +currentDate.slice(6,8)).toLocaleDateString([], {weekday:'short', month:'short', day:'numeric'});
 
   let filtered = liveScores.slice(); // copy: the sort below must not reorder the shared liveScores array
@@ -500,14 +526,14 @@ function renderLive(c){
             <div class="score-team-row ${awayWon?'winner':''} ${isFinal&&!awayWon?'loser':''}">
               <span class="team-seed">${game.away.seed && game.away.seed <= 16 ? game.away.seed : ''}</span>
               <span class="team-name">${escapeHtml(game.away.name)}</span>${ownerTag(awayOwner)}
-              <span class="team-record">${game.away.record || ''}</span>
-              <span class="team-score">${game.away.score || (isPre ? '' : '0')}</span>
+              <span class="team-record">${escapeHtml(game.away.record || '')}</span>
+              <span class="team-score">${escapeHtml(String(game.away.score || (isPre ? '' : '0')))}</span>
             </div>
             <div class="score-team-row ${homeWon?'winner':''} ${isFinal&&!homeWon?'loser':''}">
               <span class="team-seed">${game.home.seed && game.home.seed <= 16 ? game.home.seed : ''}</span>
               <span class="team-name">${escapeHtml(game.home.name)}</span>${ownerTag(homeOwner)}
-              <span class="team-record">${game.home.record || ''}</span>
-              <span class="team-score">${game.home.score || (isPre ? '' : '0')}</span>
+              <span class="team-record">${escapeHtml(game.home.record || '')}</span>
+              <span class="team-score">${escapeHtml(String(game.home.score || (isPre ? '' : '0')))}</span>
             </div>
           </div>
           <div class="score-meta">
@@ -545,8 +571,7 @@ function renderLiveInPlace(){
 }
 
 function changeLiveDate(delta){
-  const n = new Date();
-  const current = S.liveScoresDate || (n.getFullYear() + String(n.getMonth()+1).padStart(2,'0') + String(n.getDate()).padStart(2,'0'));
+  const current = S.liveScoresDate || scoreboardDay();
   const y = parseInt(current.slice(0,4));
   const m = parseInt(current.slice(4,6)) - 1;
   const d = parseInt(current.slice(6,8));
@@ -631,9 +656,10 @@ async function confirmPick(tid){
   const t = S.teams.find(x => x.id === tid);
   if(!t) return;
   const rec = teamRecordDisplay(t);
+  const seenCp = S.ds ? S.ds.cp : null; // the pick this tap is for: see pickTeam
   // appConfirm escapes its text, so the message is built as plain text.
   const ok = await appConfirm(t.seed + ' seed \u00b7 ' + t.region + (rec ? ' \u00b7 ' + rec : ''), { title: teamDisplayName(t), confirmLabel: 'Draft ' + teamDisplayName(t) });
-  if(ok) pickTeam(tid);
+  if(ok) pickTeam(tid, seenCp);
 }
 
 /* ── My Teams (after the draft) ── */
@@ -680,11 +706,21 @@ function _freshDraftState(players, teams, duration){
   return {
     order: snakeOrder(players.map(p => p.id), teams.length),
     cp: 0, started: true, complete: false,
+    epoch: ((S.ds && S.ds.epoch) || 0) + 1, // draft went backwards: outranks any in-flight stale write
     timerDuration: duration,
     pickDeadline: duration > 0 ? firebase.firestore.Timestamp.fromDate(new Date(serverNow() + duration * 1000)) : null,
     timerPaused: false,
     pausedRemaining: null
   };
+}
+
+/* True when this screen shows a player the room's copy does not have, or a different set of teams. */
+function _startWouldMissLocal(players, teams){
+  const has = (list, id) => list.some(x => x && x.id === id);
+  const mine = S.teams || [];
+  // Counted the way this screen got them: a record with an id the app does not accept was never shown here.
+  const theirs = teams.filter(t => t && isSafeId(t.id));
+  return (S.players || []).some(p => !has(players, p.id)) || mine.length !== theirs.length || mine.some(t => !has(theirs, t.id));
 }
 
 async function startDraft(){
@@ -702,6 +738,10 @@ async function startDraft(){
         const remote = JSON.parse(snap.data().state || '{}');
         if(remote.ds && remote.ds.started) throw { code: 'started', msg: 'The draft was already started on another device' };
         const players = remote.players || [], teams = remote.teams || [];
+        // Everything this screen shows must already be in the room. A player added or a bracket imported here a moment
+        // ago may still be on its way: started now, that player has no turn, or the draft is built on the old teams.
+        // (Players the room has and this screen does not yet, joined a second ago elsewhere, are in the draft as before.)
+        if(_startWouldMissLocal(players, teams)) throw { code: 'unsaved', msg: 'Still saving your last change. Tap Start Draft again in a moment.' };
         if(players.length < 2 || teams.length < players.length) throw { code: 'not-ready', msg: 'Need 2+ players and at least one team per player' };
         remote.ds = _freshDraftState(players, teams, duration);
         players.forEach(p => p.teamIds = []);
@@ -712,6 +752,7 @@ async function startDraft(){
       });
       _beeped = false; // the snapshot listener applies the started draft and render() starts the clock
     } catch(err){
+      if(err && err.code === 'unsaved') flushFirestoreWrite(); // send what is waiting now, not after the pause
       if(err && err.msg) showToast(err.msg);
       else { console.warn('Start draft failed:', err); showToast('Start failed \u2014 try again'); }
     }
@@ -729,7 +770,7 @@ async function startDraft(){
 // Eliminates the "two clients pick at once" race that broke the live draft last year.
 // Server-state is the source of truth; local S updates via the snapshot listener.
 let _pickInFlight = false;
-async function pickTeam(tid){
+async function pickTeam(tid, seenCp){
   if(_pickInFlight) return; // ignore re-entrant taps while a pick is settling
   const myId = getMyPlayerId();
   // No-room (solo/offline) mode: simple local mutation
@@ -746,6 +787,10 @@ async function pickTeam(tid){
       const ds = remote.ds || {};
       if(ds.complete) throw { code: 'complete', msg: 'Draft already complete' };
       if(!ds.started) throw { code: 'not-started', msg: 'Draft has not started' };
+      // An unlocked commissioner may pick for whoever is on the clock, so the turn check below does not apply. If
+      // the draft has moved on since the tap (that player, or the auto-pick, picked at the same moment), this team
+      // would go to the NEXT player: refuse, and let the commissioner look again.
+      if(adminUnlocked && seenCp != null && ds.cp !== seenCp) throw { code: 'moved', msg: 'Another pick just came in. Check who is on the clock, then pick again.' };
       if(!adminUnlocked && myId !== ds.order[ds.cp]){
         throw { code: 'not-turn', msg: "It's not your turn anymore" };
       }
@@ -809,10 +854,16 @@ function _pickTeamLocal(tid, myId){
   updateAppBadge();
 }
 
+let _undoInFlight = false; // an undo is being written: a second tap must not take back a second pick
 async function undoDraft(){
+  if(_undoInFlight) return;
   if(!await requireAdmin()) return;
+  // The pick being taken back is the last one this screen shows: if the room is already further on (a pick
+  // this phone has not shown yet), the undo is refused instead of taking back a pick nobody here has seen.
+  const seenCp = S.ds ? S.ds.cp : null;
   // Multiplayer: do it transactionally so concurrent picks can't sneak past
   if(roomId){
+    _undoInFlight = true;
     try {
       await db.runTransaction(async (tx) => {
         const ref = db.collection("rooms").doc(roomId);
@@ -821,8 +872,10 @@ async function undoDraft(){
         const remote = JSON.parse(snap.data().state || '{}');
         const ds = remote.ds || {};
         if(!ds.order || ds.cp === 0) return;
+        if(seenCp != null && ds.cp !== seenCp) throw { code: 'moved', msg: 'The draft just moved on. Check the last pick, then tap Undo again.' };
         ds.cp--;
         ds.complete = false;
+        ds.epoch = (ds.epoch || 0) + 1;
         const pl = (remote.players || []).find(p => p.id === ds.order[ds.cp]);
         if(pl && pl.teamIds && pl.teamIds.length){ pl.teamIds.pop(); }
         if(ds.timerDuration && ds.timerDuration > 0){
@@ -837,7 +890,8 @@ async function undoDraft(){
         });
       });
       _beeped = false;
-    } catch(err){ console.warn('Undo failed:', err); showToast('Undo failed \u2014 try again'); }
+    } catch(err){ if(err && err.msg) showToast(err.msg); else { console.warn('Undo failed:', err); showToast('Undo failed \u2014 try again'); } }
+    finally { _undoInFlight = false; }
     return;
   }
   const ds = S.ds;
@@ -845,6 +899,7 @@ async function undoDraft(){
   _beeped = false;
   ds.cp--;
   ds.complete = false;
+  ds.epoch = (ds.epoch || 0) + 1;
   const pl = S.players.find(p => p.id === ds.order[ds.cp]);
   if(pl) pl.teamIds.pop();
   if(ds.timerDuration && ds.timerDuration > 0){
@@ -860,7 +915,7 @@ async function resetDraft(){
   if(!await requireAdmin()) return;
   if(!await appConfirm("Reset the entire draft? All picks will be lost.", { title: 'Reset Draft', danger: true, confirmLabel: 'Reset' })) return;
   stopDraftClock();
-  S.ds = {order:[], cp:0, started:false, complete:false};
+  S.ds = {order:[], cp:0, started:false, complete:false, epoch: ((S.ds && S.ds.epoch) || 0) + 1};
   S.players.forEach(p => p.teamIds = []);
   saveState();
   render();
@@ -902,7 +957,26 @@ function playTimerBeep(){
   }
 }
 
+/* Capacitor shell: WKWebView does not expose navigator.share, so the Share plugin opens the iOS share
+ * sheet instead. Returns true when the plugin handled it (shared or cancelled), false to use the web path. */
+async function nativeShare(shareData) {
+  const Sh = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Share;
+  if (!Sh) return false; // the plugin wins whenever it is present: WKWebView's navigator.share is not dependable
+  try {
+    await Sh.share({ title: shareData.title, text: shareData.text, url: shareData.url, dialogTitle: shareData.title });
+    return true;
+  } catch (err) {
+    return /cancel/i.test((err && err.message) || ''); // cancelled: done; any other failure falls back to the clipboard
+  }
+}
+
 function triggerHaptic(){
+  // Capacitor shell: the Haptics plugin drives the Taptic Engine (the switch trick below is Safari-only)
+  const H = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Haptics;
+  if(H){
+    H.impact({ style: 'MEDIUM' }).catch(() => {});
+    return;
+  }
   // Android: standard Vibration API
   if(navigator.vibrate){
     navigator.vibrate(50);
@@ -1225,20 +1299,18 @@ function slotHTML(region, gi, team, winnerId){
   return `<div class="slot ${isWinner?'winner':''} ${isLoser?'loser':''} ${isMine?'mine':''}"
     onclick="advanceTeam('${region}',${gi},'${team.id}')"
     oncontextmenu="clearBracketGame('${region}',${gi},event)"
-    ontouchstart="startLongPress(()=>clearBracketGame('${region}',${gi}))"
-    ontouchend="endLongPress(event)"
-    ontouchmove="cancelLongPress()">
+    data-lp="r:${region}:${gi}">
     ${teamLogoHTML(team, 16)}<span class="sd">${escapeHtml(team.seed)}</span><span class="tn">${escapeHtml(teamDisplayName(team))}</span>${ow ? `<span class="ow" style="color:${isMine ? 'var(--gold)' : playerColor(ow.id)}">${escapeHtml(ownerCode(ow.name))}</span>` : ''}
   </div>`;
 }
 
 function renderFF(){
   const area = document.getElementById("bracket-area");
-  const pairs = [[0,1],[2,3]];
-  const pairLabels = [`${REGIONS[0]} vs ${REGIONS[1]}`, `${REGIONS[2]} vs ${REGIONS[3]}`];
+  const pairs = ffPairs();
+  const pairLabels = pairs.map(p => `${p[0]} vs ${p[1]}`);
 
-  const s1t0id = S.bracket[REGIONS[0]][14], s1t1id = S.bracket[REGIONS[1]][14];
-  const s2t0id = S.bracket[REGIONS[2]][14], s2t1id = S.bracket[REGIONS[3]][14];
+  const s1t0id = S.bracket[pairs[0][0]][14], s1t1id = S.bracket[pairs[0][1]][14];
+  const s2t0id = S.bracket[pairs[1][0]][14], s2t1id = S.bracket[pairs[1][1]][14];
   const s1t0 = s1t0id ? S.teams.find(t => t.id === s1t0id) : null;
   const s1t1 = s1t1id ? S.teams.find(t => t.id === s1t1id) : null;
   const s2t0 = s2t0id ? S.teams.find(t => t.id === s2t0id) : null;
@@ -1255,9 +1327,7 @@ function renderFF(){
     return `<div class="ff-slot ${isW?'winner':''} ${isL?'loser':''} ${_isMine?'mine':''}"
       onclick="advanceFF(${ffIdx},'${team.id}')"
       oncontextmenu="clearFFGame(${ffIdx},event)"
-      ontouchstart="startLongPress(()=>clearFFGame(${ffIdx}))"
-      ontouchend="endLongPress(event)"
-      ontouchmove="cancelLongPress()">
+      data-lp="ff:${ffIdx}">
       ${teamLogoHTML(team, 20)}<span class="sd">${escapeHtml(team.seed)}</span>${escapeHtml(teamDisplayName(team))}<span style="margin-left:auto;font-size:10px;color:var(--g400)">${escapeHtml(owner(team.id))}</span></div>`;
   }
 
@@ -1280,16 +1350,12 @@ function renderFF(){
           ${ff0t ? `<div class="ff-slot ${champ===ff0?'winner':''} ${champ&&champ!==ff0?'loser':''}"
             onclick="advanceFF(2,'${ff0}')"
             oncontextmenu="clearFFGame(2,event)"
-            ontouchstart="startLongPress(()=>clearFFGame(2))"
-            ontouchend="endLongPress(event)"
-            ontouchmove="cancelLongPress()">
+            data-lp="ff:2">
             <span class="sd">${ff0t.seed}</span>${escapeHtml(teamDisplayName(ff0t))}</div>` : '<div class="ff-slot empty">TBD</div>'}
           ${ff1t ? `<div class="ff-slot ${champ===ff1?'winner':''} ${champ&&champ!==ff1?'loser':''}"
             onclick="advanceFF(2,'${ff1}')"
             oncontextmenu="clearFFGame(2,event)"
-            ontouchstart="startLongPress(()=>clearFFGame(2))"
-            ontouchend="endLongPress(event)"
-            ontouchmove="cancelLongPress()">
+            data-lp="ff:2">
             <span class="sd">${ff1t.seed}</span>${escapeHtml(teamDisplayName(ff1t))}</div>` : '<div class="ff-slot empty">TBD</div>'}
         </div>
         <div class="champ-box">
@@ -1361,6 +1427,10 @@ function renderSettings(c){
       <div style="margin-bottom:14px;display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-secondary btn-sm" id="ncaa-import-btn" onclick="importFromNCAA()">Re-Import from NCAA.com</button>
         <button class="btn btn-secondary btn-sm" onclick="checkPlayIns()">Check Play-in Results</button>
+      </div>
+      <div class="row" style="align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px">
+        <div style="flex:1;min-width:160px"><div style="font-weight:700;font-size:13px">Final Four pairing</div><div style="font-size:12px;color:var(--g500)">Set from the NCAA.com bracket on import; it changes every year.</div></div>
+        <select style="width:190px" onchange="setFinalFourPairing(this.value)">${FF_PAIRINGS.map((p, i) => `<option value="${i}" ${ffPairingIndex()===i?'selected':''}>${p[0][0]}–${p[0][1]} / ${p[1][0]}–${p[1][1]}</option>`).join('')}</select>
       </div>`}
     <div style="margin-bottom:14px"><span class="label">Bulk Import (Team, Seed, Region per line)</span>
       <textarea id="bt" rows="4" placeholder="Duke, 1, East\nAuburn, 1, South" style="width:100%"></textarea>
@@ -1382,7 +1452,7 @@ function renderSettings(c){
 }
 
 async function changeYear(v){
-  if(!await requireAdmin()) return;
+  if(!await requireAdmin()){ render(); return; } // redraw so the field shows the value the room has again, not the refused edit
   S.year = Number(v) || tournamentYear();
   saveState();
   render();
@@ -1393,13 +1463,15 @@ async function clearAllTeams(){
   const locked = teamEditBlockedReason();
   if(locked){ showToast(locked); return; }
   if(!await appConfirm('Clear all teams?', { title: 'Clear Teams', danger: true, confirmLabel: 'Clear All' })) return;
+  const lockedNow = teamEditBlockedReason(); // the dialog may have sat open while the draft started elsewhere
+  if(lockedNow){ showToast(lockedNow); return; }
   S.teams = [];
   saveState();
   render();
 }
 
 async function changeScoring(r, v){
-  if(!await requireAdmin()) return;
+  if(!await requireAdmin()){ render(); return; } // redraw so the field shows the value the room has again, not the refused edit
   S.rp[r] = Number(v) || 0;
   saveState();
   render();

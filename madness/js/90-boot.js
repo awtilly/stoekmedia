@@ -9,6 +9,13 @@ if(urlRoom && params.get("key")){
   url.searchParams.delete("key");
   window.history.replaceState({}, "", url);
 }
+// The tab a home-screen shortcut asks for is used once, below. Left in the address it sent every later reload
+// (the "new version" Refresh button, New Tournament) back to that tab, whichever tab the person was on.
+if(tabParam){
+  const url = new URL(window.location);
+  url.searchParams.delete("tab");
+  window.history.replaceState({}, "", url);
+}
 
 // Home-screen shortcuts (manifest.json) open ./?tab=... with no room param.
 // Fall back to the most recently used room so they land in the right tournament.
@@ -35,6 +42,10 @@ if(urlRoom){
     S.phase = tabParam;
   }
   render();
+  // Opened straight onto the Live tab: the tab is remembered per device, and the home-screen shortcut asks for it.
+  // navigate() is what normally starts the score updates and it has not run, so the tab sat empty until the
+  // person left it and came back. Only once the app shell is up (not behind the join screen).
+  if(S.phase === 'live' && document.getElementById('c')) startLiveRefresh();
 } else {
   if (tabParam === 'live') {
     // No room known at all: render the app shell first, otherwise refreshLiveScores()
