@@ -1,5 +1,7 @@
 /* ── State Persistence ── */
 const VIEW_LOCAL = ['phase','bracketRegion','fr','fs','liveScoresDate','liveScoresFilter'];
+// Player ids in the last room snapshot we applied; lets mergeSharedState tell "removed here" from "added elsewhere".
+let _lastSnapshotPlayerIds = null;
 
 let _isRemoteUpdate = false;
 let _firestoreWriteTimer = null;
@@ -74,6 +76,10 @@ function _writeSharedState(){
   // write at once, so the edit is already in Firestore's offline queue if the tab is closed a second later.
   if(typeof navigator !== 'undefined' && navigator.onLine === false){ _plainSharedWrite(ref, localJson); return; }
   // Transaction + mergeSharedState: never roll back a pick that landed since our last snapshot.
+  let writtenIds = null;
+  // The roster our copy was taken from. Read now, not inside the transaction: a snapshot that arrives while the
+  // write is being retried would otherwise make a player somebody else has just added look like one we removed.
+  const knownIds = _lastSnapshotPlayerIds;
   db.runTransaction(async tx => {
     const snap = await tx.get(ref);
     const remote = snap.exists && snap.data().state ? JSON.parse(snap.data().state) : null;
@@ -84,8 +90,9 @@ function _writeSharedState(){
       for(const k in shared) ours[k] = (mine.includes(k) || !(k in remote)) ? shared[k] : remote[k];
       for(const k in remote){ if(!(k in ours) && !VIEW_LOCAL.includes(k)) ours[k] = remote[k]; }
     }
-    const merged = remote ? mergeSharedState(ours, remote) : ours;
+    const merged = remote ? mergeSharedState(ours, remote, knownIds) : ours;
     const json = JSON.stringify(merged);
+    writtenIds = (merged.players || []).map(p => p.id);
     // The echo of this write is skipped by _applyRoomSnapshot only when it carries exactly what we
     // sent from. If the merge took anything from the server (draft progress, another device's edit), or
     // a snapshot replaced S while the write was in flight, leave the echo to be applied so this device
@@ -96,6 +103,11 @@ function _writeSharedState(){
       state: json,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     }, {merge: true});
+  }).then(() => {
+    // The server now holds the roster we just wrote, and our own echo is skipped by _applyRoomSnapshot, so
+    // record it here. Otherwise a player added on this device and then removed on this device would look
+    // like "added elsewhere" to the next merge and come straight back.
+    if(writtenIds && roomId && ref.id === roomId) _lastSnapshotPlayerIds = Array.from(new Set((_lastSnapshotPlayerIds || []).concat(writtenIds)));
   }).catch(e => {
     // Transactions need the network. Offline, fall back to the plain merge write, which Firestore
     // queues and flushes on reconnect (the pre-transaction behaviour).
@@ -203,6 +215,7 @@ function joinRoom(){
 
 function connectToRoom(code){
   if(unsubRoom) unsubRoom();
+  _lastSnapshotPlayerIds = null; // the previous room's roster says nothing about this one
   saveRecentRoom(code);
   const gen = ++_roomGeneration;
   _lastSyncedState = null; // never let the previous room's string suppress this room's first snapshot
@@ -261,6 +274,7 @@ function _applyRoomSnapshot(doc){
     const local = {};
     for(const k of VIEW_LOCAL) local[k] = S[k];
     const remote = JSON.parse(data.state);
+    _lastSnapshotPlayerIds = (remote.players || []).map(p => p.id);
     Object.assign(S, remote, local);
     sanitizeSharedState(S);
     if(S.ds && S.ds.pickDeadline && typeof S.ds.pickDeadline === 'object' && S.ds.pickDeadline.seconds){
