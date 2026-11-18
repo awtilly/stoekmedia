@@ -431,3 +431,66 @@ test('a setting set back on another phone after the save was confirmed is shown,
   assert.equal(app.S.ub, true, 'this phone shows what the room holds');
   assert.deepEqual(app.eval('Object.keys(_inFlight)'), []);
 }));
+
+/** The phone goes Home and comes straight back into the same room: a new visit (connectToRoom), same screen copy. */
+const comeBack = app => {
+  app.db.collection = () => ({ doc: id => ({ id, onSnapshot: () => () => {} }) });
+  app.connectToRoom('AAAA');
+};
+
+test('a player added just before the phone goes Home and comes straight back is still written to the room', withTimers(async () => {
+  const { app, finish, fire, deliver, now, set, server } = stampedRoom();
+  const N = id => ({ id, name: id, teamIds: [] });
+  set('players', app.S.players.concat([N('n1')]));
+  await fire();                                     // the save is on its way (it has not read the room yet)
+  comeBack(app);
+  deliver(now());                                   // the first update of the new visit: the room has no n1 yet
+  await finish(0);                                  // the save from before now runs
+  assert.deepEqual(server().players.map(p => p.id), ['p1', 'n1'], 'n1 is in the room');
+  deliver(now());
+  assert.deepEqual(app.S.players.map(p => p.id), ['p1', 'n1']);
+  assert.deepEqual(app.eval('Object.keys(_rosterInFlight)'), []);
+}));
+
+test('an older save still retrying after Home and back does not put its value on top of a newer save of this phone', withTimers(async () => {
+  const { app, finish, fire, deliver, now, set, server } = stampedRoom();
+  set('year', 2028);
+  await fire();                                     // save 1 is on its way
+  set('year', 2029);
+  await fire();                                     // save 2 as well
+  await finish(1);                                  // save 2 lands first
+  assert.equal(server().year, 2029);
+  comeBack(app);
+  deliver(now());
+  await finish(0);                                  // save 1 runs only now
+  assert.equal(server().year, 2029, 'the newer value stays');
+  deliver(now());
+  assert.equal(app.S.year, 2029);
+}));
+
+test('a save from before Home and back does not make the new visit skip an update as its own echo', withTimers(async () => {
+  const { app, finish, fire, deliver, now, set, server } = stampedRoom();
+  set('year', 2029);
+  await fire();
+  comeBack(app);                                    // nothing has arrived in the new visit yet
+  await finish(0);                                  // the save lands and is confirmed
+  assert.equal(server().year, 2029);
+  deliver(now());                                   // the first update of the visit is that very room
+  assert.notEqual(app.eval('_lastSnapshotPlayerIds'), null, 'the first update of the visit was applied: the room has loaded');
+  assert.equal(app.eval('_syncBase'), now().state);
+}));
+
+test('a player added and taken off again before going Home and back is not written by the save that was adding them', withTimers(async () => {
+  const { app, txs, finish, fire, elsewhere, deliver, now, set, server } = stampedRoom();
+  const N = id => ({ id, name: id, teamIds: [] });
+  set('players', app.S.players.concat([N('n1')]));
+  await fire();                                     // the save adding n1 is on its way
+  deliver(elsewhere(r => { r.rp[3] = 9; }));        // another phone's change arrives: n1 stays on the screen
+  assert.deepEqual(app.S.players.map(p => p.id), ['p1', 'n1']);
+  set('players', app.S.players.filter(p => p.id !== 'n1')); // taken off again
+  app.flushFirestoreWrite();                        // Home sends what is waiting ...
+  comeBack(app);                                    // ... and the phone comes straight back
+  deliver(now());
+  for (let i = 0; i < txs.length; i++) await finish(i);
+  assert.deepEqual(server().players.map(p => p.id), ['p1'], 'n1 is not in the room');
+}));
