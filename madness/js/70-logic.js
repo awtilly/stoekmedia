@@ -366,6 +366,8 @@ function sanitizeSharedState(s){
   for(const t of (s.teams || [])) if(t.seed != null && typeof t.seed !== 'number'){ const n = Number(t.seed); t.seed = Number.isFinite(n) ? n : 0; }
   for(const p of (s.players || [])) p.teamIds = (Array.isArray(p.teamIds) ? p.teamIds : []).filter(isSafeId);
   if(s.ds && Array.isArray(s.ds.order)) s.ds.order = s.ds.order.filter(isSafeId);
+  // Names are compared and matched as text (name already taken?, Live tab team lookup): make sure they are text.
+  for(const r of (s.players || []).concat(s.teams || [])) if(typeof r.name !== 'string') r.name = r.name == null ? '' : String(r.name);
   if(s.joinKey != null){ const k = sanitizeJoinKey(s.joinKey); if(k) s.joinKey = k; else delete s.joinKey; }
   if(s.bracket && typeof s.bracket === 'object'){
     for(const k of Object.keys(s.bracket)){
