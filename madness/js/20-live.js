@@ -245,6 +245,17 @@ async function retryUnsyncedAdvances(verify) {
   return r;
 }
 
+/* The four lists above say what THIS room has had reported and advanced. The page is not reloaded between rooms
+ * (Home, then another pool), so a final seen in one pool was skipped in the next one: no bracket advance and no
+ * report from this phone until the app was restarted. They start empty for every room. */
+let _finalsRoom; // the room the lists belong to (undefined until the first check)
+function _finalsForRoom(room) {
+  if (_finalsRoom !== undefined && _finalsRoom !== room) {
+    _reportedFinals.clear(); _advancedFinals.clear(); _pendingAdvance.clear(); _unsyncedAdvances.clear();
+  }
+  _finalsRoom = room;
+}
+
 function retryPendingAdvances() {
   let any = false;
   for (const [id, g] of _pendingAdvance) {
@@ -273,6 +284,8 @@ async function _checkGameFinalsNow(games, quiet) {
   const roomNcaaIds = new Set(S.teams.map(t => t.ncaaId).filter(Boolean));
   let advanced = false;
   let shouldSync = false;
+  const room = roomId || '';
+  _finalsForRoom(room);
 
   if (retryPendingAdvances()) { advanced = true; shouldSync = true; }
   { const r = await retryUnsyncedAdvances(true); if (r) advanced = true; if (r === 2) shouldSync = true; }
@@ -341,6 +354,7 @@ async function _checkGameFinalsNow(games, quiet) {
         console.warn('Failed to report game final:', game.id, err);
       }
     }
+    if ((roomId || '') !== room) return; // the room was left while the report was out: nothing here is about the room on screen
     if (reported) _reportedFinals.add(game.id);
     if (didAdvance) {
       _advancedFinals.add(game.id);
