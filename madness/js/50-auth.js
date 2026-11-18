@@ -165,6 +165,14 @@ async function requireAdmin(){
 function getMyPlayerId(){ return roomId ? localStorage.getItem('mm4_me_' + roomId) : null; }
 function setMyPlayerId(id){ if(roomId) localStorage.setItem('mm4_me_' + roomId, id); }
 
+/* The seat `id` as the room has it now, or null when it is gone or its PIN / passphrase is no longer the one `was`
+ * had. claimPlayer waits on prompts, and every room update replaces S.players with new objects: the player it
+ * looked up before a prompt is by then usually a copy that is no longer part of S. */
+function _seatNow(id, was){
+  const now = (S.players || []).find(p => p && p.id === id);
+  return now && now.pinHash === was.pinHash && now.passphraseHash === was.passphraseHash ? now : null;
+}
+
 async function claimPlayer(id){
   const player = S.players.find(p => p.id === id);
   if(!player) return;
@@ -179,8 +187,9 @@ async function claimPlayer(id){
     }
     // Migrate unsalted to salted
     if(!player.pinHash.includes(':')){
-      player.pinHash = await migratePin(pin.trim());
-      saveState();
+      const upgraded = await migratePin(pin.trim());
+      const now = _seatNow(id, player);
+      if(now){ now.pinHash = upgraded; saveState(); }
     }
   } else if(player.passphraseHash){
     // Legacy passphrase support: prompt, verify, then migrate to PIN
@@ -194,18 +203,24 @@ async function claimPlayer(id){
     // Migrate: prompt for new PIN
     const newPin = await appPrompt('Set a 4-digit PIN to replace your passphrase:', { title: 'Upgrade to PIN', placeholder: '4-digit PIN' });
     if(newPin && /^\d{4}$/.test(newPin.trim())){
-      player.pinHash = await hashPin(newPin.trim());
-      delete player.passphraseHash;
-      saveState();
+      const hashed = await hashPin(newPin.trim());
+      const now = _seatNow(id, player);
+      if(now){ now.pinHash = hashed; delete now.passphraseHash; saveState(); }
+      else if((S.players || []).some(p => p && p.id === id)) showToast('Your new PIN was not saved. You can set it the next time you sign in.');
     }
   } else {
     // No credential at all (a 2026 room from before PINs, or a state edited by hand). Every
     // creation path sets a PIN, so instead of letting any tap take the seat, lock it now.
     const newPin = await appPrompt('This seat has no PIN yet. Set a 4-digit PIN to claim it:', { title: 'Set your PIN', placeholder: '4-digit PIN' });
     if(!newPin || !/^\d{4}$/.test(newPin.trim())){ showToast('PIN must be 4 digits'); return; }
-    player.pinHash = await hashPin(newPin.trim());
-    saveState();
+    const hashed = await hashPin(newPin.trim());
+    // The seat as it is now: a PIN set on another phone while this prompt was open stands, and is asked for.
+    const now = _seatNow(id, player);
+    if(!now && (S.players || []).some(p => p && p.id === id)){ showToast('This seat just got a PIN on another phone. Tap your name again and enter it.'); return; }
+    if(now){ now.pinHash = hashed; saveState(); }
   }
+  // Removed from the pool while a prompt was open: there is no seat to take.
+  if(!(S.players || []).some(p => p && p.id === id)){ showToast('That player is no longer in this pool.'); return; }
   setMyPlayerId(id);
   render();
 }
