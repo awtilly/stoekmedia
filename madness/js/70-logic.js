@@ -152,6 +152,7 @@ let _longPressTimer = null;
 let _longPressTriggered = false;
 
 function startLongPress(fn){
+  clearTimeout(_longPressTimer); // never two timers: a second touchstart must not leave the first one running with nothing able to cancel it
   _longPressTriggered = false;
   _longPressTimer = setTimeout(() => { _longPressTriggered = true; fn(); }, 500);
 }
@@ -162,6 +163,38 @@ function endLongPress(event){
 function cancelLongPress(){
   clearTimeout(_longPressTimer);
   _longPressTriggered = false;
+}
+
+/* Bracket slots carry data-lp="r:<region>:<game>" or data-lp="ff:<idx>" instead of
+   inline touch handlers. One passive touchstart/touchmove listener per page keeps
+   horizontal bracket scrolling smooth on iOS; touchend stays non-passive so the
+   ghost click after a long press can still be cancelled. */
+function longPressAction(lp){
+  const p = String(lp || '').split(':');
+  if(p[0] === 'r' && p.length === 3 && p[1] !== '' && p[2] !== '' && !isNaN(p[2])) return () => clearBracketGame(p[1], Number(p[2]));
+  if(p[0] === 'ff' && p.length === 2 && p[1] !== '' && !isNaN(p[1])) return () => clearFFGame(Number(p[1]));
+  return null;
+}
+function longPressTarget(e){
+  const t = e && e.target;
+  return t && typeof t.closest === 'function' ? t.closest('[data-lp]') : null;
+}
+function onBracketTouchStart(e){
+  // A second finger down is a gesture (two-finger scroll, a stray palm), not a long press: drop what the first finger started.
+  if(e && e.touches && e.touches.length > 1){ cancelLongPress(); return; }
+  const el = longPressTarget(e);
+  if(!el) return;
+  const act = longPressAction(el.getAttribute('data-lp'));
+  if(act) startLongPress(act);
+}
+function onBracketTouchEnd(e){
+  if(longPressTarget(e)) endLongPress(e); else cancelLongPress();
+}
+if(typeof document !== 'undefined' && document && typeof document.addEventListener === 'function'){
+  document.addEventListener('touchstart', onBracketTouchStart, { passive: true });
+  document.addEventListener('touchmove', cancelLongPress, { passive: true });
+  document.addEventListener('touchcancel', cancelLongPress, { passive: true });
+  document.addEventListener('touchend', onBracketTouchEnd, { passive: false });
 }
 
 async function clearBracketGame(region, gameIdx, event){
