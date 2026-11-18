@@ -303,12 +303,6 @@ textarea {
   flex-wrap: wrap;
 }
 
-.grid-2 {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 12px;
-}
-
 .grid-3 {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
@@ -337,14 +331,6 @@ textarea {
   width: 28px;
 }
 
-.team-item {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  padding: 3px 0;
-}
-
 /* ── Leaderboard ── */
 table {
   width: 100%;
@@ -370,11 +356,6 @@ td.pts {
   color: var(--gold);
   text-align: center;
   font-size: 15px;
-}
-
-td.dim {
-  color: var(--g300);
-  text-align: center;
 }
 
 td.val {
@@ -509,13 +490,6 @@ td.val {
   gap: 8px;
 }
 
-.team-logo-sm {
-  width: 20px;
-  height: 20px;
-  object-fit: contain;
-  flex-shrink: 0;
-}
-
 .import-card {
   background: linear-gradient(135deg, var(--gold-bg) 0%, var(--white) 100%);
   border: 2px dashed var(--gold);
@@ -642,35 +616,6 @@ td.val {
   color: var(--g500);
   font-size: 14px;
   margin-bottom: 20px;
-}
-
-.round-tab {
-  padding: 7px 14px;
-  border-radius: 6px;
-  border: none;
-  background: none;
-  font-weight: 700;
-  font-size: 12px;
-  cursor: pointer;
-  font-family: inherit;
-  color: var(--g400);
-}
-
-.round-tab.active {
-  background: var(--gold-bg);
-  color: var(--gold);
-}
-
-.round-tab:hover {
-  color: var(--gold);
-}
-
-.footer {
-  margin-top: 28px;
-  padding: 12px 0;
-  border-top: 1px solid var(--g200);
-  font-size: 12px;
-  color: var(--g400);
 }
 
 /* ── Bracket Styles ── */
@@ -811,18 +756,6 @@ td.val {
 .bracket .conn-bot {
   flex: 1;
   border-right: 1px solid var(--g300);
-  border-top: 1px solid var(--g300);
-}
-
-.bracket .conn-line {
-  display: flex;
-  flex: 1;
-  align-items: center;
-}
-
-.bracket .conn-line::after {
-  content: '';
-  width: 100%;
   border-top: 1px solid var(--g300);
 }
 
@@ -1246,10 +1179,6 @@ td.val {
     gap: 8px;
   }
 
-  .grid-2 {
-    grid-template-columns: 1fr;
-  }
-
   .grid-3 {
     grid-template-columns: repeat(3, 1fr);
     gap: 6px;
@@ -1290,10 +1219,6 @@ td.val {
   .room-badge {
     font-size: 11px;
     padding: 3px 8px;
-  }
-
-  .footer {
-    font-size: 11px;
   }
 
   .bracket .round {
@@ -1357,12 +1282,6 @@ td.val {
     font-size: 16px;
   }
 
-  .round-tab {
-    padding: 8px 12px;
-    font-size: 12px;
-    min-height: 44px;
-  }
-
   .scores-grid {
     grid-template-columns: 1fr;
   }
@@ -1392,7 +1311,7 @@ td.val {
 }
 
 /* ── Tap States ── */
-button, a, .preset-btn, .round-tab, .live-filter-btn, .icon-btn {
+button, a, .preset-btn, .live-filter-btn, .icon-btn {
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -1400,7 +1319,7 @@ button, a, .preset-btn, .round-tab, .live-filter-btn, .icon-btn {
   transform: scale(.97);
 }
 
-.preset-btn:active, .round-tab:active, .live-filter-btn:active {
+.preset-btn:active, .live-filter-btn:active {
   transform: scale(.97);
 }
 
@@ -1960,7 +1879,7 @@ tr.out .wins { opacity: .6; }
 .btn-primary { background: var(--black); border-color: var(--black); }
 .btn-primary:not(:disabled):hover { background: #333; }
 .seed-top, .seed-mid { background: var(--black); }
-.round-tab.active, .preset-btn.active { background: var(--black); color: #fff; }
+.preset-btn.active { background: var(--black); color: #fff; }
 .toggle.on { background: var(--navy2); }
 
 /* bottom nav */
