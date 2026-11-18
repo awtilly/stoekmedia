@@ -51,6 +51,8 @@ let _rosterRemoving = {};
 // The roster ids known when each of the last few visits ended (visit number -> ids): a save of that visit still on
 // its way asks them. (Not only the last visit's: Home and back twice, and a save from the first visit lands last.)
 let _knownAtExit = {};
+// Saves still on their way, counted per visit they were started in: that visit's _knownAtExit entry is kept for them.
+let _visitSaves = {};
 // Every roster id an update or a confirmed save of this visit has shown to be in the room, also one removed since.
 let _knownEver = [];
 // The ids above that `players` (a roster of this phone) does not list: "removed here", whatever the server says.
@@ -267,6 +269,7 @@ function _writeSharedState(){
   const goneInFlight = _removedHereIds(shared.players);
   const knownIds = goneInFlight.length ? (_lastSnapshotPlayerIds || []).concat(goneInFlight) : _lastSnapshotPlayerIds;
   let awayTries = 0; // see the catch: runs of this save after its visit ended
+  let again = false; // set by the catch when the save is to be run once more
   const attempt = () => db.runTransaction(async tx => {
     const snap = await tx.get(ref);
     // Cleaned like every copy this device shows: the merge below reads its roster and draft state.
@@ -392,7 +395,7 @@ function _writeSharedState(){
     // The room was busy (the transaction lost every race) and this save's visit is over: inside a visit the retry
     // below sends the edit again, but that reads the screen, and the screen is no longer this visit's. The save
     // itself is still good (its own keys over whatever the room holds then), so it is run again, a few times.
-    if(e && e.code === 'aborted' && !here() && ++awayTries <= 5){ attempt(); return; }
+    if(e && e.code === 'aborted' && !here() && ++awayTries <= 5){ again = true; return; }
     const failedKeys = Object.keys(_inFlight).filter(k => _inFlight[k].no === writeNo);
     const failedRoster = Object.keys(_rosterInFlight).filter(id => _rosterInFlight[id] === writeNo);
     const failedRemoving = Object.keys(_rosterRemoving).filter(id => _rosterRemoving[id] === writeNo);
@@ -436,7 +439,11 @@ function _writeSharedState(){
       showToast("Sync error \u2014 changes saved locally");
     }
   });
-  attempt();
+  // Counted until its last run is over: connectToRoom keeps what this save's visit knew for as long as it runs.
+  _visitSaves[visit] = (_visitSaves[visit] || 0) + 1;
+  const over = () => { if(again){ again = false; run(); return; } if(--_visitSaves[visit] <= 0) delete _visitSaves[visit]; };
+  const run = () => attempt().then(over, over);
+  run();
 }
 
 /* Send a pending debounced write right away. Call BEFORE roomId or S change (goHome), so the last
@@ -535,7 +542,7 @@ function joinRoom(){
 
 function connectToRoom(code){
   if(unsubRoom) unsubRoom();
-  if(_lastSnapshotPlayerIds){ _knownAtExit[_roomGeneration] = Array.from(new Set(_knownEver.concat(_lastSnapshotPlayerIds))); const old = Object.keys(_knownAtExit); while(old.length > 4) delete _knownAtExit[old.shift()]; }
+  if(_lastSnapshotPlayerIds){ _knownAtExit[_roomGeneration] = Array.from(new Set(_knownEver.concat(_lastSnapshotPlayerIds))); const old = Object.keys(_knownAtExit).filter(v => !_visitSaves[v]); while(old.length > 4) delete _knownAtExit[old.shift()]; }
   _knownEver = [];
   _lastSnapshotPlayerIds = null; // the previous room's roster says nothing about this one
   _syncedShared = null;
