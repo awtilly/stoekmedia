@@ -335,6 +335,12 @@ function _writeSharedState(){
       const sentIds = new Set((shared.players || []).map(p => p.id));
       _lastSnapshotPlayerIds = Array.from(new Set((_lastSnapshotPlayerIds || []).concat(writtenIds.filter(id => sentIds.has(id) && (!shown || shown.has(id))))));
     }
+    // Confirmed after its visit ended: the players it sent and wrote are known to the saves of that visit still on their way.
+    if(writtenIds && !here()){
+      const sent = new Set((shared.players || []).map(p => p.id)), ids = writtenIds.filter(id => sent.has(id));
+      if(visit === _roomGeneration) _lastSnapshotPlayerIds = Array.from(new Set((_lastSnapshotPlayerIds || []).concat(ids)));
+      else if(_knownAtExit && _knownAtExit.visit === visit) _knownAtExit.ids = Array.from(new Set(_knownAtExit.ids.concat(ids)));
+    }
     for(const id of Object.keys(_rosterRemoving)){ if(_rosterRemoving[id] === writeNo) delete _rosterRemoving[id]; }
     // Unless an update later than the room this save read has already been applied and does not have the player:
     // another phone took them off after this save. Nothing newer is promised, so there is nothing to wait for;
