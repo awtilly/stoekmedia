@@ -7,7 +7,7 @@ const vm = require('node:vm');
 /*
  * js/30-state.js initialises Firebase at top level, so only the slice from `let _fcmRegistered`
  * through the end of initFCM() is evaluated here, in its own context with stubs for the globals it
- * reads (window/Notification, navigator.serviceWorker, firebase.messaging, db, roomId, getMyPlayerId).
+ * reads (window/Notification, navigator.serviceWorker, firebase.messaging, db, roomId, getMyPlayerId, S.players).
  */
 function fcmSandbox({ token = 'tok-1', failWrite = false } = {}) {
   const src = fs.readFileSync(path.join(__dirname, '..', 'js', '30-state.js'), 'utf8');
@@ -30,6 +30,7 @@ function fcmSandbox({ token = 'tok-1', failWrite = false } = {}) {
       set(data, opts) { writes.push({ id, data, opts }); return failWrite ? Promise.reject(new Error('offline')) : Promise.resolve(); }
     }) }) }) }) },
     roomId: 'ROOM1',
+    S: { players: [{ id: 'p1' }, { id: 'p2' }] },
     getMyPlayerId: () => 'p1',
     VAPID_KEY: 'k',
     __token: token
@@ -70,4 +71,20 @@ test('no write without a room or a claimed player', async () => {
   ctx.roomId = null; await initFCM();
   ctx.roomId = 'ROOM1'; ctx.getMyPlayerId = () => null; await initFCM();
   assert.equal(writes.length, 0);
+});
+
+test('a player id that is no longer in the room (reset, removed) writes no token document', async () => {
+  const { ctx, initFCM, writes } = fcmSandbox();
+  ctx.getMyPlayerId = () => 'gone'; await initFCM(); await initFCM();
+  ctx.S = { players: [] }; await initFCM();
+  ctx.S = {}; await initFCM();
+  assert.equal(writes.length, 0);
+});
+
+test('once the phone holds a seat that is in the room, the token is written under that seat', async () => {
+  const { ctx, initFCM, writes } = fcmSandbox();
+  ctx.getMyPlayerId = () => 'gone'; await initFCM();
+  ctx.getMyPlayerId = () => 'p2'; await initFCM(); await initFCM();
+  assert.equal(writes.length, 1);
+  assert.equal(writes[0].id, 'p2');
 });

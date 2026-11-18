@@ -57,7 +57,7 @@ function sandbox({ native = true, receive = 'prompt', plugin: withPlugin = true 
     getMyPlayerId: () => 'p1',
     showToast: m => toasts.push(m),
     navigate: p => { navs.push(p); ctx.S.phase = p; },
-    S: { phase: 'draft' },
+    S: { phase: 'draft', players: [{ id: 'p1' }, { id: 'p2' }] },
     URLSearchParams
   };
   vm.createContext(ctx);
@@ -93,6 +93,17 @@ test('a cached native token follows the person into another room or seat', async
   ctx.getMyPlayerId = () => 'p2'; await run('initNativePush({ prompt: false })');
   await run('initNativePush({ prompt: false })');
   assert.equal(JSON.stringify(writes.map(w => w.id)), JSON.stringify(['p1', 'p1', 'p2'])); // ROOM1/p1, ROOM2/p1, ROOM2/p2; the repeat call writes nothing
+});
+
+test('a native token is not written under a seat that is no longer in the room', async () => {
+  const { run, ctx, plugin, writes } = sandbox({ receive: 'granted' });
+  ctx.getMyPlayerId = () => 'gone';
+  await run('initNativePush({ prompt: false })');
+  plugin.fire('registration', { value: 'fcm-native-1' });
+  await run('initNativePush({ prompt: false })');
+  assert.equal(writes.length, 0);
+  ctx.getMyPlayerId = () => 'p1'; await run('initNativePush({ prompt: false })');
+  assert.equal(JSON.stringify(writes.map(w => w.id)), JSON.stringify(['p1']));
 });
 
 test('prompt not yet answered: the banner appears after the permission check and prompt:false never asks iOS', async () => {

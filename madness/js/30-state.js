@@ -54,8 +54,14 @@ let _fcmRegistered = null;
 function writeFcmToken(token){
   if (!token || !roomId) return false;
   const myId = getMyPlayerId();
+  // Only a seat that is still in the room gets a token document. localStorage keeps the player id per room for
+  // good, so after the commissioner's "new tournament" reset (or after this player was removed) the id is stale:
+  // the join screen shows, but every snapshot would still write fcmTokens/<old id>. That document keeps the phone
+  // on the room's "Game Final" list under a seat nobody holds, and once the player rejoins under a new id the same
+  // token sits in two documents (two sends per final).
+  const seated = Array.isArray(S.players) && S.players.some(p => p && p.id === myId);
   const key = roomId + '/' + myId + '/' + token;
-  if (!myId || _fcmRegistered === key) return false;
+  if (!myId || !seated || _fcmRegistered === key) return false;
   _fcmRegistered = key;
   db.collection('rooms').doc(roomId).collection('fcmTokens').doc(myId).set({
     tokens: firebase.firestore.FieldValue.arrayUnion(token),
