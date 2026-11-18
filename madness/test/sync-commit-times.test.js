@@ -338,3 +338,38 @@ test('a newer update that reads exactly like the room the save was built on is s
   assert.equal(app.S.ub, true, 'this phone shows what the room holds: no later update is coming to say so');
   assert.deepEqual(app.eval('Object.keys(_inFlight)'), []);
 }));
+
+test('a newer update skipped because it reads like the last one is still shown once the save is confirmed', withTimers(async () => {
+  const { app, srv, step, fire, elsewhere, deliver, set, finish, server } = stampedRoom();
+  const read = elsewhere(r => { r.rp[3] = 9; });   // another phone's change: the room this phone's save will read
+  set('year', 2029);
+  await fire();
+  await step(0);                                    // the transaction has read that room (year 2027)
+  deliver(read);                                    // and now the phone is shown it: older than the save, 2029 stays
+  assert.equal(app.S.year, 2029);
+  // The moment the save lands another phone sets the year back. This phone was behind and is sent only that newest
+  // room, before the save's confirmation. Letter for letter it is the update just applied: nothing to draw.
+  let v = srv.v, after = () => { after = null; deliver(elsewhere(r => { r.year = 2027; })); };
+  Object.defineProperty(srv, 'v', { get: () => v, set: x => { v = x; if (after) after(); }, configurable: true });
+  await finish(0);
+  assert.equal(server().year, 2027);
+  assert.equal(srv.state, read.state, 'the newest room reads exactly like the one the save was built on');
+  assert.equal(app.S.year, 2027, 'this phone shows what the room holds: no later update is coming to say so');
+  assert.deepEqual(app.eval('Object.keys(_inFlight)'), []);
+}));
+
+test('the same update delivered twice does not count as a newer one', withTimers(async () => {
+  const { app, step, fire, elsewhere, deliver, set, finish, now, server } = stampedRoom();
+  const read = elsewhere(r => { r.rp[3] = 9; });
+  set('year', 2029);
+  await fire();
+  await step(0);
+  deliver(read);
+  deliver(read);                                    // a repeat of the room the save read: same text, same commit time
+  await finish(0);
+  assert.equal(server().year, 2029);
+  assert.equal(app.S.year, 2029, 'the save stays on screen: its own update is still to come');
+  deliver(now());
+  assert.equal(app.S.year, 2029);
+  assert.deepEqual(app.eval('Object.keys(_inFlight)'), []);
+}));
