@@ -35,7 +35,7 @@ function stampedRoom() {
   };
   app.roomId = 'AAAA';
   vm.runInThisContext('_firestoreWriteTimer = null; _isRemoteUpdate = false; _lastSyncedState = null; _syncBase = null; _lastSnapshotPlayerIds = null; _syncedShared = null; _sharedAtSync = null; _queuedPlainWrites = {}; _writeRetries = 0;');
-  vm.runInThisContext('_serverSeen = null; _recentSent = []; _snapshotSeq = 0; _writeSeq = 0; _keyWriteNo = {}; _inFlight = {}; _rosterInFlight = {}; _rosterGone = {}; _rosterAcked = {}; _rosterRemovedNo = {}; _rosterRemoving = {}; _knownAtExit = {}; _visitSaves = {}; _knownEver = []; _writeNoRoom = "AAAA"; _pendingBase = {}; _echoWriteNo = 0; _lastRoomDoc = null; _pickInFlight = false;');
+  vm.runInThisContext('_serverSeen = null; _recentSent = []; _snapshotSeq = 0; _writeSeq = 0; _keyWriteNo = {}; _inFlight = {}; _rosterInFlight = {}; _rosterGone = {}; _rosterAcked = {}; _rosterRemovedNo = {}; _rosterRemoving = {}; _knownAtExit = {}; _visitSaves = {}; _savesRunning = {}; _knownEver = []; _writeNoRoom = "AAAA"; _pendingBase = {}; _echoWriteNo = 0; _lastRoomDoc = null; _pickInFlight = false;');
   Object.defineProperty(globalThis, 'navigator', { value: { onLine: true }, configurable: true, writable: true });
   /** What the room holds right now, with its commit time: a snapshot to deliver later. */
   const now = () => ({ state: srv.state, v: srv.v });
@@ -712,37 +712,65 @@ test('a player taken off again while the save adding them was being written stay
   assert.deepEqual(server().players.map(p => p.id), ['p1'], 'n1 is out of the room');
 }));
 
-test('a save that lands after Home does not put back a player its visit saw arrive and saw removed again', withTimers(async () => {
-  const { app, finish, fire, deliver, now, elsewhere, set, server } = stampedRoom();
+/* Two saves on their way, the later one listing a player the earlier one is still adding. The room the later save
+ * reads does not have that player: the earlier save has not landed yet, or it has landed (its confirmation still on
+ * its way) and another phone took the player off since. The later save cannot tell, so it leaves the player to the
+ * earlier save, which adds them when it lands. Before, the later save wrote the player in both cases. */
+test('a later save leaves a player an earlier save is still adding to that save', withTimers(async () => {
+  const { app, finish, fire, deliver, now, set, server } = stampedRoom();
   const N = id => ({ id, name: id, teamIds: [] });
   set('players', app.S.players.concat([N('n1')]));
   await fire();                                     // save 1 (adding n1) is on its way, and stays there
   set('players', app.S.players.concat([N('n2')]));
   await fire();                                     // save 2 lists n1 and n2
-  await finish(1);                                  // and lands first: the room has both
+  await finish(1);                                  // and lands first: n2 is in the room, n1 is save 1's to add
+  assert.deepEqual(server().players.map(p => p.id), ['p1', 'n2']);
   deliver(now());
-  elsewhere(r => { r.players = r.players.filter(p => p.id !== 'n1'); }); // another phone takes n1 off
-  deliver(now());                                   // this phone sees it
-  assert.deepEqual(app.S.players.map(p => p.id), ['p1', 'n2']);
-  app.roomId = null;                                // Home
-  await finish(0);                                  // save 1 lands only now
-  assert.deepEqual(server().players.map(p => p.id), ['p1', 'n2'], 'n1 stays removed');
+  assert.deepEqual(app.S.players.map(p => p.id).sort(), ['n1', 'n2', 'p1'], 'n1 is still on this screen, on its way');
+  await finish(0);                                  // save 1 lands
+  assert.deepEqual(server().players.map(p => p.id).sort(), ['n1', 'n2', 'p1'], 'both are in the room');
+  assert.deepEqual(app.eval('Object.keys(_savesRunning)'), []);
 }));
 
-test('the same after Home and back', withTimers(async () => {
-  const { app, finish, fire, deliver, now, elsewhere, set, server } = stampedRoom();
+test('the same when the earlier save lands after Home, and after Home and back', withTimers(async () => {
+  for (const leave of [app => { app.roomId = null; }, app => comeBack(app)]) {
+    const { app, finish, fire, deliver, now, set, server } = stampedRoom();
+    const N = id => ({ id, name: id, teamIds: [] });
+    set('players', app.S.players.concat([N('n1')]));
+    await fire();
+    set('players', app.S.players.concat([N('n2')]));
+    await fire();
+    await finish(1);
+    deliver(now());
+    leave(app);
+    await finish(0);
+    assert.deepEqual(server().players.map(p => p.id).sort(), ['n1', 'n2', 'p1']);
+  }
+}));
+
+test('a later save that lands after the earlier one writes nothing twice and loses nobody', withTimers(async () => {
+  const { app, finish, fire, set, server } = stampedRoom();
   const N = id => ({ id, name: id, teamIds: [] });
   set('players', app.S.players.concat([N('n1')]));
   await fire();
   set('players', app.S.players.concat([N('n2')]));
   await fire();
+  await finish(0);                                  // the usual order
   await finish(1);
-  deliver(now());
-  elsewhere(r => { r.players = r.players.filter(p => p.id !== 'n1'); });
-  deliver(now());
-  comeBack(app);
-  await finish(0);
-  assert.deepEqual(server().players.map(p => p.id), ['p1', 'n2'], 'n1 stays removed');
+  assert.deepEqual(server().players.map(p => p.id).sort(), ['n1', 'n2', 'p1']);
+}));
+
+test('an earlier save that is over no longer holds a player back: the later save adds them', withTimers(async () => {
+  const { app, txs, finish, fire, set, server } = stampedRoom();
+  const N = id => ({ id, name: id, teamIds: [] });
+  set('players', app.S.players.concat([N('n1')]));
+  await fire();                                     // save 1 (adding n1) is on its way
+  set('players', app.S.players.concat([N('n2')]));
+  await fire();                                     // save 2 lists n1 and n2
+  app.eval('_savesRunning = {}');                   // save 1 is over without having landed (given up)
+  await finish(1);
+  assert.deepEqual(server().players.map(p => p.id).sort(), ['n1', 'n2', 'p1'], 'nobody else will add n1: save 2 does');
+  assert.equal(txs.length >= 2, true);
 }));
 
 test('Home and back six times: a save from the first visit still knows which players were in the room', withTimers(async () => {
