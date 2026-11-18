@@ -500,14 +500,14 @@ function renderLive(c){
             <div class="score-team-row ${awayWon?'winner':''} ${isFinal&&!awayWon?'loser':''}">
               <span class="team-seed">${game.away.seed && game.away.seed <= 16 ? game.away.seed : ''}</span>
               <span class="team-name">${escapeHtml(game.away.name)}</span>${ownerTag(awayOwner)}
-              <span class="team-record">${game.away.record || ''}</span>
-              <span class="team-score">${game.away.score || (isPre ? '' : '0')}</span>
+              <span class="team-record">${escapeHtml(game.away.record || '')}</span>
+              <span class="team-score">${escapeHtml(String(game.away.score || (isPre ? '' : '0')))}</span>
             </div>
             <div class="score-team-row ${homeWon?'winner':''} ${isFinal&&!homeWon?'loser':''}">
               <span class="team-seed">${game.home.seed && game.home.seed <= 16 ? game.home.seed : ''}</span>
               <span class="team-name">${escapeHtml(game.home.name)}</span>${ownerTag(homeOwner)}
-              <span class="team-record">${game.home.record || ''}</span>
-              <span class="team-score">${game.home.score || (isPre ? '' : '0')}</span>
+              <span class="team-record">${escapeHtml(game.home.record || '')}</span>
+              <span class="team-score">${escapeHtml(String(game.home.score || (isPre ? '' : '0')))}</span>
             </div>
           </div>
           <div class="score-meta">
