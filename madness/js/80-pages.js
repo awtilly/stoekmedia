@@ -345,9 +345,17 @@ async function importFromNCAA(){
 
   try {
     const bracketData = await ncaa.fetchBracket(S.year);
+    if(!bracketData){
+      // The request itself failed (offline, relay error, timeout). That is not "no bracket yet".
+      showToast('Could not reach NCAA.com. Check your connection and try again.');
+      if(btn){ btn.textContent = origText; btn.disabled = false; }
+      return;
+    }
     const teams = ncaa.tournamentTeams(bracketData);
     if(teams.length === 0){
-      showToast('Tournament bracket not available yet. Try after Selection Sunday.');
+      // The source answers "no bracket" both before Selection Sunday and when its own request to NCAA fails,
+      // so do not tell the commissioner to wait for a day that may already be here.
+      showToast('NCAA.com has no ' + Number(S.year) + ' bracket yet. If it was just announced, try again in a few minutes.');
       if(btn){ btn.textContent = origText; btn.disabled = false; }
       return;
     }
