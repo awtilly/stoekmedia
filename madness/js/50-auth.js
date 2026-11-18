@@ -292,6 +292,8 @@ async function adminJoinAsPlayer(){
   }
   const pin = await appPrompt('Set a 4-digit PIN for ' + n + ':', { title: 'Player PIN', placeholder: '4-digit PIN' });
   if(!pin || !/^\d{4}$/.test(pin.trim())){ showToast('PIN must be 4 digits'); return; }
+  // The PIN box above can stay open for a while, and the person being added may have joined by themselves meanwhile.
+  if(S.players.some(p => p.name.toLowerCase() === n.toLowerCase())){ showToast(n + ' has just joined. No second entry was added.'); return; }
   const pinHash = await hashPin(pin.trim());
   const player = { id: generateId(), name: n, pinHash, teamIds: [] };
   S.players.push(player);
