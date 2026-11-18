@@ -621,3 +621,34 @@ test('the same when the phone is still on the Home screen', withTimers(async () 
   await finish(1);
   assert.deepEqual(server().players.map(p => p.id), ['p1', 'n3']);
 }));
+
+test('Home and back twice: a save from the first visit still knows which players were in the room', withTimers(async () => {
+  const { app, finish, fire, deliver, now, elsewhere, set, server } = stampedRoom();
+  const N = id => ({ id, name: id, teamIds: [] });
+  set('players', app.S.players.concat([N('n1')]));
+  await fire();                                     // save 1 (adding n1) is on its way
+  set('players', app.S.players.concat([N('n3')]));
+  await fire();                                     // save 2 (adding n3) as well: it lists n1, not yet confirmed
+  comeBack(app);                                    // Home and straight back
+  await finish(0);                                  // save 1 is confirmed in the second visit: n1 is in the room
+  deliver(now());                                   // and the second visit sees the room
+  comeBack(app);                                    // Home and back again: the third visit
+  elsewhere(r => { r.players = r.players.filter(p => p.id !== 'n1'); }); // another phone takes n1 off
+  await finish(1);                                  // save 2, from the first visit, lands last
+  assert.deepEqual(server().players.map(p => p.id), ['p1', 'n3'], 'n3 is added, n1 stays removed');
+}));
+
+test('the same when the visit in between never saw the room', withTimers(async () => {
+  const { app, finish, fire, elsewhere, set, server } = stampedRoom();
+  const N = id => ({ id, name: id, teamIds: [] });
+  set('players', app.S.players.concat([N('n1')]));
+  await fire();
+  set('players', app.S.players.concat([N('n3')]));
+  await fire();
+  comeBack(app);
+  await finish(0);
+  comeBack(app);                                    // no update arrived in the second visit
+  elsewhere(r => { r.players = r.players.filter(p => p.id !== 'n1'); });
+  await finish(1);
+  assert.deepEqual(server().players.map(p => p.id), ['p1', 'n3']);
+}));

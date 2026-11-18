@@ -48,8 +48,9 @@ let _rosterRemovedNo = {};
 // Players a save of this phone is removing (id -> that save's number) until the save is confirmed or has failed:
 // a snapshot from before that save still has them and must not put them back on this screen.
 let _rosterRemoving = {};
-// The roster ids known when the last visit ended ({ visit, ids }): a save of that visit still on its way asks them.
-let _knownAtExit = null;
+// The roster ids known when each of the last few visits ended (visit number -> ids): a save of that visit still on
+// its way asks them. (Not only the last visit's: Home and back twice, and a save from the first visit lands last.)
+let _knownAtExit = {};
 // The ids above that `players` (a roster of this phone) does not list: "removed here", whatever the server says.
 function _removedHereIds(players){
   const has = id => (players || []).some(p => p && p.id === id);
@@ -299,7 +300,7 @@ function _writeSharedState(){
     // if the server no longer has them they were removed on another phone, not added by this save.
     let known = knownIds;
     // (After Home, or Home and back: the ids as they were when this save's visit ended.)
-    const knownNow = visit === _roomGeneration ? _lastSnapshotPlayerIds : (_knownAtExit && _knownAtExit.visit === visit ? _knownAtExit.ids : null);
+    const knownNow = visit === _roomGeneration ? _lastSnapshotPlayerIds : (_knownAtExit[visit] || null);
     if(knownNow){
       const late = knownNow.filter(id => !(known || []).includes(id) && (shared.players || []).some(p => p && p.id === id));
       if(late.length) known = (known || []).concat(late);
@@ -339,7 +340,7 @@ function _writeSharedState(){
     if(writtenIds && !here()){
       const sent = new Set((shared.players || []).map(p => p.id)), ids = writtenIds.filter(id => sent.has(id));
       if(visit === _roomGeneration) _lastSnapshotPlayerIds = Array.from(new Set((_lastSnapshotPlayerIds || []).concat(ids)));
-      else if(_knownAtExit && _knownAtExit.visit === visit) _knownAtExit.ids = Array.from(new Set(_knownAtExit.ids.concat(ids)));
+      else if(_knownAtExit[visit]) _knownAtExit[visit] = Array.from(new Set(_knownAtExit[visit].concat(ids)));
     }
     for(const id of Object.keys(_rosterRemoving)){ if(_rosterRemoving[id] === writeNo) delete _rosterRemoving[id]; }
     // Unless an update later than the room this save read has already been applied and does not have the player:
@@ -539,7 +540,7 @@ function joinRoom(){
 
 function connectToRoom(code){
   if(unsubRoom) unsubRoom();
-  _knownAtExit = _lastSnapshotPlayerIds ? { visit: _roomGeneration, ids: _lastSnapshotPlayerIds } : null;
+  if(_lastSnapshotPlayerIds){ _knownAtExit[_roomGeneration] = _lastSnapshotPlayerIds; const old = Object.keys(_knownAtExit); while(old.length > 4) delete _knownAtExit[old.shift()]; }
   _lastSnapshotPlayerIds = null; // the previous room's roster says nothing about this one
   _syncedShared = null;
   _serverSeen = null;
