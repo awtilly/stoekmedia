@@ -1,0 +1,38 @@
+<!doctype html>
+<!--
+  Browser check: appPrompt focuses its input synchronously (js/40-ui.js), which is what iOS Safari
+  needs to open the keyboard from the tap that opened the modal.
+  Run (from repo root):
+    python -m http.server 8787 --bind 127.0.0.1
+    chrome --headless=new --dump-dom --virtual-time-budget=3000 http://127.0.0.1:8787/madness/test/browser/modal-focus.html | grep -A10 'id="out"'
+  Every line in #out must start with "ok".
+-->
+<meta charset="utf-8">
+<pre id="out"></pre>
+<script>
+  function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+</script>
+<script src="../../js/40-ui.js"></script>
+<script>
+(async () => {
+  const out = [];
+  const check = (cond, label) => out.push((cond ? 'ok   ' : 'FAIL ') + label);
+  const p = appPrompt('Enter PIN', { title: 'Admin', placeholder: '4 digits' });
+  const input = document.querySelector('.modal-input');
+  check(input !== null, 'prompt rendered an input');
+  check(document.activeElement === input, 'input is focused synchronously, before any timer');
+  await new Promise(r => setTimeout(r, 150));
+  check(document.activeElement === input, 'input still focused after the fallback timer');
+  input.value = '1234';
+  input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  const val = await p;
+  check(val === '1234', 'Enter submits the typed value');
+  await new Promise(r => setTimeout(r, 250));
+  check(document.querySelector('.modal-overlay') === null, 'overlay removed after close');
+  const c = appConfirm('Sure?');
+  check(document.querySelector('.modal-overlay') !== null && document.querySelector('.modal-input') === null, 'confirm has no input and does not throw');
+  document.querySelector('.modal-overlay')._close(false);
+  check((await c) === false, 'confirm resolves');
+  document.getElementById('out').textContent = out.join(String.fromCharCode(10));
+})().catch(e => { document.getElementById('out').textContent = 'FAIL exception: ' + e.message; });
+</script>
