@@ -149,7 +149,18 @@ function retryPendingAdvances() {
   return any;
 }
 
-async function checkGameFinals() {
+/* Runs are serialised. The scoreboard listener delivers Firestore's cached copy and then the server's back to back,
+ * and the 30 s poll can land while a run is inside its Firestore reads below. Two runs over the same new final
+ * (not yet in _reportedFinals when the second started) both wrote the gameResult, the second with the post-game
+ * order as rankingsBefore, and whichever finished first could park the game in _pendingAdvance for good. */
+let _checkFinalsChain = Promise.resolve();
+function checkGameFinals() {
+  const run = _checkFinalsChain.then(_checkGameFinalsNow);
+  _checkFinalsChain = run.catch(() => {}); // one failed run must not block the next
+  return run;
+}
+
+async function _checkGameFinalsNow() {
   if (!S.teams || S.teams.length === 0) return;
 
   // Build a set of NCAA.com team slugs (ncaaId) for teams in this room
