@@ -38,7 +38,11 @@ const ncaa = {
   async fetchScoreboard(date) {
     const n = new Date();
     const dateStr = date || (n.getFullYear() + String(n.getMonth()+1).padStart(2,'0') + String(n.getDate()).padStart(2,'0'));
-    return this._get('/scoreboard/basketball-men/d1/' + this.datePath(dateStr));
+    const data = await this._get('/scoreboard/basketball-men/d1/' + this.datePath(dateStr));
+    // The relay answers 200 { games: [], upstreamStatus } when ncaa-api itself answered 403/404. For the current
+    // season that is a failed upstream fetch, not a day without games (that is a plain 200 with an empty list):
+    // report it as a failure, so the Live tab keeps the last scores and says so instead of "No games found".
+    return (data && data.upstreamStatus) ? null : data;
   },
 
   /** Tournament bracket for a year. Returns the raw payload ({ championships: [...] }) or null. */
