@@ -32,11 +32,12 @@ test('sanitizeSharedState drops players and teams with hostile ids and scrubs re
   assert.deepEqual(s.ds.order, ['p1', 'p1']);
   assert.deepEqual(s.bracket.South, ['t1', null, null]);
   assert.deepEqual(s.bracket.ff, [null, null, null]);
+  assert.equal(s.bracket.East.length, 15, 'a missing region is filled in');
 });
 
 test('sanitizeSharedState leaves a well-formed state untouched and tolerates missing fields', () => {
   const app = createApp();
-  const good = { players: [{ id: 'p1', name: 'A', teamIds: ['South-1'] }], teams: [{ id: 'South-1', name: 'Duke' }], ds: { order: ['p1'] }, bracket: { South: ['South-1'], ff: [null] } };
+  const good = { players: [{ id: 'p1', name: 'A', teamIds: ['South-1'] }], teams: [{ id: 'South-1', name: 'Duke' }], ds: { order: ['p1'] }, bracket: { South: ['South-1'], East: [], Midwest: [], West: [], ff: [null] } };
   const before = JSON.stringify(good);
   app.sanitizeSharedState(good);
   assert.equal(JSON.stringify(good), before);
