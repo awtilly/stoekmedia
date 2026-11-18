@@ -652,3 +652,42 @@ test('the same when the visit in between never saw the room', withTimers(async (
   await finish(1);
   assert.deepEqual(server().players.map(p => p.id), ['p1', 'n3']);
 }));
+
+test('a setting changed back after Home and back is sent, though the room still shows the older value', withTimers(async () => {
+  const { app, finish, fire, deliver, now, set, server } = stampedRoom();
+  set('ub', false);
+  await fire();                                     // save 1 (off) is on its way
+  comeBack(app);
+  deliver(now());                                   // the first update of the new visit: the room still says on
+  assert.equal(app.S.ub, false, 'the value on its way stays on the screen');
+  assert.deepEqual(app.eval('Object.keys(_inFlight)'), ['ub']);
+  set('ub', true);                                  // changed back: exactly what the room shows
+  await fire();                                     // save 2 carries it all the same
+  await finish(1);
+  await finish(0);                                  // save 1 lands last
+  assert.equal(server().ub, true, 'the newer choice stays');
+  deliver(now());
+  assert.equal(app.S.ub, true);
+}));
+
+test('a setting on its way through Home and back is shown again once its save has landed', withTimers(async () => {
+  const { app, finish, fire, deliver, now, set, server } = stampedRoom();
+  set('ub', false);
+  await fire();
+  comeBack(app);
+  deliver(now());                                   // the room still says on
+  await finish(0);                                  // the save lands, confirmed in the new visit
+  assert.equal(server().ub, false);
+  deliver(now());                                   // its own update
+  assert.equal(app.S.ub, false);
+  assert.deepEqual(app.eval('Object.keys(_inFlight)'), []);
+}));
+
+test('a setting on its way is forgotten on entering a different room', withTimers(async () => {
+  const { app, fire, set } = stampedRoom();
+  set('ub', false);
+  await fire();
+  app.db.collection = () => ({ doc: id => ({ id, onSnapshot: () => () => {} }) });
+  app.connectToRoom('BBBB');
+  assert.deepEqual(app.eval('Object.keys(_inFlight)'), []);
+}));
