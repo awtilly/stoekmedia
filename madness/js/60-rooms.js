@@ -237,7 +237,10 @@ async function createRoom(){
   const url = new URL(window.location);
   url.searchParams.set("room", code);
   window.history.replaceState({}, "", url);
-  loadState();
+  // A new room starts blank. loadState() brought back whatever this phone had cached under the same code (last
+  // year's pool of that name, since removed from the server) and created the "new" room with its players, picks
+  // and finished draft.
+  S = defaultState();
   if(!S.bracket) S.bracket = {South:Array(15).fill(null), East:Array(15).fill(null), Midwest:Array(15).fill(null), West:Array(15).fill(null), ff:Array(3).fill(null)};
   if(!S.bracketRegion) S.bracketRegion = "South";
   if(!S.games) S.games = [];

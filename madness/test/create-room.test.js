@@ -52,6 +52,24 @@ test('createRoom writes the new room inside a transaction, unlocks admin and con
   assert.equal(app.__calls.render, 1);
 });
 
+test('createRoom starts blank even when this phone has an old cached room under the same code', async () => {
+  const { app, writes } = creatorApp({});
+  app.localStorage.setItem('mm4_state_MYROOM1', JSON.stringify({
+    year: 2026,
+    players: [{ id: 'p1', name: 'Ann', pinHash: 'h', teamIds: ['South-1'] }],
+    ds: { order: ['p1'], cp: 1, started: true, complete: true },
+    joinKey: 'OLDKEY'
+  }));
+  await app.createRoom();
+  assert.equal(writes.length, 1);
+  const written = JSON.parse(writes[0].state);
+  assert.deepEqual(written.players, [], 'no players carried over from the cached room');
+  assert.ok(!(written.ds && written.ds.started), 'the draft has not started');
+  assert.notEqual(written.joinKey, 'OLDKEY');
+  assert.match(written.joinKey, /^[A-Z0-9]{6}$/);
+  assert.deepEqual(app.S.players, []);
+});
+
 test('createRoom refuses a code the courtesy check already sees', async () => {
   const { app, writes, alerts, state } = creatorApp({ taken: true });
   await app.createRoom();
