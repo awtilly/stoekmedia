@@ -410,7 +410,7 @@ async function importFromNCAA(){
   }
 }
 
-/* Settles any "A / B" play-in slot whose First Four game is final (also runs on its own once an hour from the Live tab). */
+/* Settles any "A / B" play-in slot whose First Four game is final (also runs on its own from the Live tab, every few minutes while a slot is open). */
 async function checkPlayIns(){
   if(!await requireAdmin()) return;
   const unresolved = S.teams.filter(t => t.playIn && !t.playInResolved).length;

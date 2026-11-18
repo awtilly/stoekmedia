@@ -34,7 +34,7 @@ test('checkPlayIns: a failed request says "could not reach", not "not final yet"
   assert.equal(fetches, 2);
 });
 
-test('checkPlayIns: the bracket answers but the game is not decided: "not final yet", and the hourly wait applies', async () => {
+test('checkPlayIns: the bracket answers but the game is not decided: "not final yet", and the wait between checks applies', async () => {
   const app = playInApp();
   let fetches = 0;
   app.fetch = async () => { fetches++; return { ok: true, json: async () => ({ championships: [{ games: [] }] }) }; };
