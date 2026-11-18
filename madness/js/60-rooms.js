@@ -70,6 +70,8 @@ function _laterRosterIds(preAt, preState){
   if(!at || !preAt || _notAfter(at, preAt, d.state === preState)) return null;
   try { return new Set((JSON.parse(d.state).players || []).map(p => p && p.id)); } catch(e){ return null; }
 }
+// True when the snapshot carries a commit time strictly later than `preAt` (so it is not the room a save read, even if it reads the same).
+function _laterThan(doc, preAt){ const at = doc && doc.exists ? _docAt(doc.data()) : null; return !!(at && preAt) && (at.s > preAt.s || (at.s === preAt.s && at.n > preAt.n)); }
 // The commit time a room document carries (every write sends updatedAt: serverTimestamp()), or null: a snapshot
 // of a write of this phone that the server has not stamped yet, or a document from before the field existed.
 function _docAt(data){
@@ -351,7 +353,7 @@ function _writeSharedState(){
       // confirmed, so the baseline stays the value this save sent until its echo or the newer save.
       // Nor when that snapshot is stamped no later than the room this save was built on: it is older than the save,
       // and the save's own snapshot (or a later one) is still to come.
-      if(f.held && _serverSeen !== preState && JSON.stringify(S[k]) === f.v && !_notAfter(_lastRoomDoc && _lastRoomDoc.exists ? _docAt(_lastRoomDoc.data()) : null, f.preAt, !!(_lastRoomDoc && _lastRoomDoc.exists) && _lastRoomDoc.data().state === f.pre)){ delete _inFlight[k]; reapply = true; }
+      if(f.held && (_serverSeen !== preState || _laterThan(_lastRoomDoc, f.preAt)) && JSON.stringify(S[k]) === f.v && !_notAfter(_lastRoomDoc && _lastRoomDoc.exists ? _docAt(_lastRoomDoc.data()) : null, f.preAt, !!(_lastRoomDoc && _lastRoomDoc.exists) && _lastRoomDoc.data().state === f.pre)){ delete _inFlight[k]; reapply = true; }
     }
     if(reapply && roomId && ref.id === roomId && _lastRoomDoc && !_pickInFlight){
       _lastSyncedState = null;

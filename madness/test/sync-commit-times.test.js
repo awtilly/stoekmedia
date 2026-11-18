@@ -321,3 +321,20 @@ test('a save confirmed after a newer update that still has its new player keeps 
   assert.deepEqual(app.eval('Object.keys(_rosterAcked)'), []);
   assert.deepEqual(app.eval('Object.keys(_rosterInFlight)'), []);
 }));
+
+test('a newer update that reads exactly like the room the save was built on is shown once the save is confirmed', withTimers(async () => {
+  const { app, srv, step, fire, elsewhere, deliver, set, finish, server } = stampedRoom();
+  assert.equal(app.S.ub, true);
+  set('ub', false);
+  await fire();
+  await step(0);                                    // the transaction has read the room (ub true)
+  // The moment the save lands another phone sets the value back, and that update reaches this phone before the
+  // save's confirmation (the phone was behind: it never sees its own save come back). Letter for letter it is the
+  // room the save read; only its commit time says it is newer.
+  let v = srv.v, after = () => { after = null; deliver(elsewhere(r => { r.ub = true; })); };
+  Object.defineProperty(srv, 'v', { get: () => v, set: x => { v = x; if (after) after(); }, configurable: true });
+  await finish(0);
+  assert.equal(server().ub, true);
+  assert.equal(app.S.ub, true, 'this phone shows what the room holds: no later update is coming to say so');
+  assert.deepEqual(app.eval('Object.keys(_inFlight)'), []);
+}));
