@@ -117,3 +117,19 @@ test('an older save that is re-run after a newer one from this phone landed does
   assert.equal(server().bracket.South[0], 'South-1');
   assert.equal(server().bracket.South[1], 'South-8', 'the newer result is still there');
 }));
+
+test('a player added while a change from another phone arrives is not deleted by the next player this phone adds', withTimers(async () => {
+  const { app, txs, step, fire, elsewhere, deliver, server, srv } = steppedRoom();
+  const add = (id, name) => { app.S.players.push({ id, name, teamIds: [] }); app._debouncedFirestoreWrite(); };
+  add('n1', 'Cal');
+  await fire();                                   // the save that adds Cal is on its way
+  deliver(elsewhere(r => { r.rp[3] = 9; }));      // another phone's change arrives: its roster has no Cal yet
+  await step(0); await step(0);                   // the save lands: the server has Cal
+  assert.equal(txs[0].done, true);
+  assert.ok(server().players.some(p => p.id === 'n1'));
+  add('n2', 'Dee');                               // the next player, added before Cal is back on this screen
+  deliver(srv.state);                             // the first save's echo
+  assert.deepEqual(app.S.players.map(p => p.id).sort(), ['n1', 'n2', 'p1'], 'both are shown');
+  await fire(); await step(1); await step(1);
+  assert.deepEqual(server().players.map(p => p.id).sort(), ['n1', 'n2', 'p1'], 'and both are on the server');
+}));

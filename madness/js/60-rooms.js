@@ -186,7 +186,13 @@ function _writeSharedState(){
     // The server now holds the roster we just wrote, and our own echo is skipped by _applyRoomSnapshot, so
     // record it here. Otherwise a player added on this device and then removed on this device would look
     // like "added elsewhere" to the next merge and come straight back.
-    if(writtenIds && roomId && ref.id === roomId) _lastSnapshotPlayerIds = Array.from(new Set((_lastSnapshotPlayerIds || []).concat(writtenIds)));
+    if(writtenIds && roomId && ref.id === roomId){
+      // Unless a snapshot was applied while this save was on its way: it put the server's roster on screen, without
+      // the players this save was adding. Calling those "known" made the next roster edit from this phone read
+      // "known, but not here" as "removed here" and delete them on the server. Only the ones still shown count.
+      const shown = _snapshotSeq === seqAtStart ? null : new Set((S.players || []).map(p => p.id));
+      _lastSnapshotPlayerIds = Array.from(new Set((_lastSnapshotPlayerIds || []).concat(shown ? writtenIds.filter(id => shown.has(id)) : writtenIds)));
+    }
     _writeRetries = 0;
   }).catch(e => {
     // Transactions need the network. Offline, fall back to the plain merge write, which Firestore
