@@ -336,6 +336,7 @@ async function importFromNCAA(){
   const origText = btn?.textContent;
   if(btn){ btn.textContent = 'Importing...'; btn.disabled = true; }
   showToast('Fetching the bracket from NCAA.com...');
+  const importRoom = roomId; // the pool this import was asked and confirmed for
 
   try {
     const teams = await ncaa.fetchTournamentTeams();
@@ -359,6 +360,9 @@ async function importFromNCAA(){
       }
     }
 
+    // The download has no dialog on screen, so the pool can be left meanwhile (Home, another pool opened). The
+    // bracket was asked for, and the PIN checked, in the pool that was on screen then: it goes nowhere else.
+    if(roomId !== importRoom) return;
     // The confirm dialogs above and the fetch can stay open for minutes; another admin phone may have started
     // the draft or made picks meanwhile (the room snapshot keeps S current). Check the lock again before replacing.
     const lockedNow = teamEditBlockedReason();
