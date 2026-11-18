@@ -559,6 +559,7 @@ function joinRoom(){
   checkAdminSession();
   connectToRoom(code);
   render();
+  startLiveIfShown();
 }
 
 function connectToRoom(code){
@@ -822,6 +823,13 @@ function forgetRecentRoom(code){
   } catch(e){}
 }
 
+/* A room entered from the lobby opens on the tab this phone last used in it. When that is the Live tab, start
+ * its score updates: navigate() normally does, and entering a room does not go through navigate(). Only once
+ * the app shell is up (not behind the join screen), like the same step at page load (90-boot.js). */
+function startLiveIfShown(){
+  if(S.phase === 'live' && document.getElementById('c')) startLiveRefresh();
+}
+
 function rejoinRoom(code){
   code = sanitizeRoomCode(code);
   if(!code) return;
@@ -833,6 +841,7 @@ function rejoinRoom(code){
   checkAdminSession();
   connectToRoom(code);
   render();
+  startLiveIfShown();
 }
 
 function renderLobby(){
