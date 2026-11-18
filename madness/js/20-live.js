@@ -563,7 +563,9 @@ let _liveHiddenAt = 0; // when the app last went to the background (0 = it has n
 function liveVisibilityChanged(visible) {
   if (visible) {
     if (S.liveScoresDate && _liveHiddenAt && Date.now() - _liveHiddenAt > LIVE_PICKED_DAY_MAX_AWAY_MS) S.liveScoresDate = '';
-    if (S.phase === 'live') startLiveRefresh();
+    // Only with the Live tab on screen. The remembered tab can be Live at the lobby and behind the join screen
+    // too, and coming back to the app there restarted the score requests, the finals check and the screen lock.
+    if (S.phase === 'live' && document.getElementById('c')) startLiveRefresh();
   } else {
     _liveHiddenAt = Date.now();
     stopLiveRefresh();

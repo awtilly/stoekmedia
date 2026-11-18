@@ -14,6 +14,7 @@ function setup() {
   const t = { app, subscribed: [] };
   app.db = { collection: () => ({ doc: (id) => ({ onSnapshot: () => { t.subscribed.push(id); return () => {}; } }) }) };
   app.autoResolvePlayIns = () => {};
+  app.document = { getElementById: id => (id === 'c' ? {} : null), addEventListener() {}, querySelector() { return null; } }; // the Live tab is on screen
   app.requestWakeLock = () => {};
   app.releaseWakeLock = () => {};
   const real = { setTimeout: globalThis.setTimeout, setInterval: globalThis.setInterval, clearTimeout: globalThis.clearTimeout, clearInterval: globalThis.clearInterval, now: Date.now };
