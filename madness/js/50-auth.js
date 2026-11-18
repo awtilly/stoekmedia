@@ -251,13 +251,20 @@ async function selfRegister(){
     showToast('That name is taken. Tap your name below to rejoin.');
     return;
   }
-  const pinHash = await hashPin(pin);
+  if(_joinInFlight) return; // a second tap while the first is being handled
+  let pinHash;
+  _joinInFlight = true;
+  try { pinHash = await hashPin(pin); } finally { _joinInFlight = false; }
   const player = { id: generateId(), name, pinHash, teamIds: [] };
   S.players.push(player);
   setMyPlayerId(player.id);
   saveState();
   render();
 }
+
+// A Join tap is being handled (selfRegister). Hashing the PIN takes a moment, and a second tap in that moment
+// passed the "name taken" check too: the same person was in the room twice, and this phone held the second seat.
+let _joinInFlight = false;
 
 async function adminJoinAsPlayer(){
   if(!adminUnlocked) return;
