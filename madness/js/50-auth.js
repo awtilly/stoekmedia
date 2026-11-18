@@ -69,6 +69,14 @@ function lockAdmin(){
 
 let _pinFailCount = 0;
 
+/* Store a room PIN from an older format in the current one. Not awaited: with no connection set() only settles
+ * once the server has the write, so waiting for it left a correct PIN hanging on a spinner-less screen, and a
+ * refused write threw away a correct entry. The old format keeps working until the upgrade lands. */
+function _upgradeStoredPin(hashed){
+  db.collection("rooms").doc(roomId).set({ adminPin: hashed, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true })
+    .catch(e => console.warn('requireAdmin: PIN format upgrade not saved', e));
+}
+
 /* True only when a stored session exists and is older than the 4 h window. */
 function adminSessionExpired(){
   const k = adminSessionKey();
@@ -134,8 +142,7 @@ async function requireAdmin(){
   /* Legacy plaintext PIN migration (no colon, not 64 hex chars) */
   if(!data.adminPin.includes(':') && data.adminPin.length !== 64){
     if(entry.trim() === data.adminPin){
-      const hashed = await hashPin(entry.trim());
-      await db.collection("rooms").doc(roomId).set({ adminPin: hashed, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+      _upgradeStoredPin(await hashPin(entry.trim()));
       _pinFailCount = 0;
       unlockAdmin();
       return true;
@@ -149,8 +156,7 @@ async function requireAdmin(){
   if(ok){
     // Migrate unsalted hash to salted on successful verify
     if(!data.adminPin.includes(':')){
-      const salted = await migratePin(entry.trim());
-      await db.collection("rooms").doc(roomId).set({ adminPin: salted, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+      _upgradeStoredPin(await migratePin(entry.trim()));
     }
     _pinFailCount = 0;
     unlockAdmin();
