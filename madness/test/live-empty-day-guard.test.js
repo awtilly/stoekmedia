@@ -14,7 +14,7 @@ const tick = async () => { for (let i = 0; i < 5; i++) await new Promise(r => se
 
 function setup() {
   const app = createApp({ phase: 'live' });
-  vm.runInThisContext('liveScores = []; _liveScoresDay = null; liveLastError = false; _reportedFinals.clear(); _pendingAdvance.clear();');
+  vm.runInThisContext('liveScores = []; _liveScoresDay = null; liveLastError = false; _reportedFinals.clear(); _pendingAdvance.clear(); _emptyDaysConfirmed.clear(); _emptyDayUnconfirmed = null; _emptyDayCheckedAt = 0; _emptyDaysChecking.clear();');
   const T = id => app.S.teams.find(t => t.id === id);
   const game = finalGame(T('South-16'), T('South-1'), T('South-1'));
   game.state = 'in'; game.completed = false;
@@ -76,24 +76,27 @@ test('an empty doc for a different day is still accepted (day picker, overnight 
     t.app.startLiveRefresh();
     t.doc([t.game]);
     t.app.S.liveScoresDate = '20270323'; // an off day; liveScores still holds the 19th until the doc lands
+    t.relay = { ok: true, json: async () => ({ games: [] }) }; // the relay agrees: no games that day
     t.app.startLiveRefresh();
     assert.equal(t.docId, '20270323');
     t.doc([]);
     await tick();
     assert.equal(t.app.eval('liveScores.length'), 0);
-    assert.equal(t.fetches.length, 0);
+    assert.equal(t.fetches.length, 1, 'the first empty document for a day is confirmed once (live-empty-day-confirm.test.js)');
+    assert.equal(t.app.eval('liveLastError'), false);
   } finally { t.done(); }
 });
 
-test('an empty doc on first load is accepted', async () => {
+test('an empty doc on first load is accepted once the relay agrees it is an off day', async () => {
   const t = setup();
   try {
     t.app.S.liveScoresDate = '20270323';
+    t.relay = { ok: true, json: async () => ({ games: [] }) };
     t.app.startLiveRefresh();
     t.doc([]);
     await tick();
     assert.equal(t.app.eval('liveScores.length'), 0);
-    assert.equal(t.fetches.length, 0);
+    assert.equal(t.fetches.length, 1);
     assert.equal(t.app.eval('liveLastError'), false);
   } finally { t.done(); }
 });
