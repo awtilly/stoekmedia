@@ -635,6 +635,19 @@ function _applyRoomSnapshot(doc){
       b.players = JSON.parse(JSON.stringify(S.players));
       _syncBase = JSON.stringify(b);
     }
+    // Players a save in flight is adding, still shown here, that this (older) snapshot does not have: they stay in
+    // the baseline too. Where another roster change was pending they were kept on screen by that merge, and the
+    // baseline became the snapshot's roster: taking them off again was then "nothing to send".
+    const flyingKept = Object.keys(_rosterInFlight).filter(id => (S.players || []).some(p => p && p.id === id) && !(remote.players || []).some(p => p && p.id === id));
+    if(flyingKept.length){
+      const b = JSON.parse(_syncBase);
+      const missing = S.players.filter(p => p && flyingKept.includes(p.id) && !(b.players || []).some(q => q && q.id === p.id));
+      if(missing.length){
+        b.players = (b.players || []).concat(JSON.parse(JSON.stringify(missing)));
+        _syncBase = JSON.stringify(b);
+        if(!(_syncedShared.players || []).some(q => q && missing.some(m => m.id === q.id))) _syncedShared.players = (_syncedShared.players || []).concat(JSON.parse(JSON.stringify(missing)));
+      }
+    }
     if(goneBack.length){
       // The baseline keeps them, so the roster counts as edited and the save takes them out of the room.
       const b = JSON.parse(_syncBase);
