@@ -371,6 +371,27 @@ function scores(){
   }).sort((a,b) => b.tot - a.tot);
 }
 
+
+/* ── Shared-state merge (guards the debounced whole-state write) ──
+ * Picks are committed by transactions; everything else is written as the whole state blob after a
+ * debounce. If a pick landed between our last snapshot and that write, our copy of ds/rosters is
+ * stale and would roll the pick back. Draft progress only ever moves forward, so when the server
+ * is further along we keep the server's ds and rosters and layer our other edits on top. */
+function mergeSharedState(local, remote){
+  const out = Object.assign({}, local);
+  if(!remote || !remote.ds || !local || !local.ds) return out;
+  // ds.epoch is bumped by every action that moves the draft backwards (start, reset, undo). A higher
+  // epoch always wins; only within the same epoch does "further along" (higher cp) mean "newer".
+  const remoteEpoch = remote.ds.epoch || 0, localEpoch = local.ds.epoch || 0;
+  if(localEpoch > remoteEpoch) return out;
+  const remoteCp = remote.ds.cp || 0, localCp = local.ds.cp || 0;
+  if(remoteEpoch === localEpoch && remoteCp <= localCp) return out;
+  out.ds = remote.ds;
+  const remoteRosters = {};
+  for(const p of (remote.players || [])) remoteRosters[p.id] = p.teamIds || [];
+  out.players = (local.players || []).map(p => Object.assign({}, p, { teamIds: remoteRosters[p.id] || p.teamIds || [] }));
+  return out;
+}
 // Standard competition ranking over scores(): players level on points share a rank (and a medal),
 // and the next rank skips (1, 2, 2, 4).
 function withRanks(sc){ return sc.map(s => ({...s, rank: 1 + sc.filter(o => o.tot > s.tot).length})); }

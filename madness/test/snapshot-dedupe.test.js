@@ -16,7 +16,7 @@ function roomApp() {
   app.unsubRoom = null;
   app._roomGeneration = 0;
   app._pickInFlight = false;
-  vm.runInThisContext('_lastSyncedState = null; _sharedAtSync = null'); // module-level let in 60-rooms.js; isolate tests
+  vm.runInThisContext('_lastSyncedState = null; _syncBase = null; _sharedAtSync = null'); // module-level let in 60-rooms.js; isolate tests
   app.firebase = {
     firestore: {
       Timestamp: function (s, n) { this.seconds = s; this.nanoseconds = n; },
