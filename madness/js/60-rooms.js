@@ -632,7 +632,10 @@ function _applyRoomSnapshot(doc){
     }
     if(rosterKept){
       const b = JSON.parse(_syncBase);
-      b.players = JSON.parse(JSON.stringify(S.players));
+      // With a roster edit of this phone still waiting to be saved, the screen holds players the room has never
+      // been sent: the baseline must not take them, or the save would find nothing of its own in the roster.
+      if(pending && 'players' in pending) b.players = (b.players || []).filter(p => !(p && stillRemoving.includes(p.id)));
+      else b.players = JSON.parse(JSON.stringify(S.players));
       _syncBase = JSON.stringify(b);
     }
     // Players a save in flight is adding, still shown here, that this (older) snapshot does not have: they stay in
