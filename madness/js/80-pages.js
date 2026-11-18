@@ -389,7 +389,7 @@ async function checkPlayIns(){
   showToast('Checking First Four results...');
   try {
     _lastAutoResolve = 0; // the hourly throttle must not swallow an explicit check
-    await autoResolvePlayIns();
+    if(await autoResolvePlayIns() === false){ showToast('Could not reach NCAA.com. Check your connection and try again.'); return; }
     const left = S.teams.filter(t => t.playIn && !t.playInResolved).length;
     showToast(left ? `${left} play-in game${left === 1 ? '' : 's'} not final yet.` : 'Play-in slots settled!');
   } catch(e) {

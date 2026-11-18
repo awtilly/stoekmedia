@@ -43,7 +43,8 @@ function teamRecordDisplay(t) {
 async function resolvePlayIn(teamId, winnerIdx) {
   const team = S.teams.find(t => t.id === teamId);
   if (!team || !team.playIn) return;
-  const winner = team.playInTeams[winnerIdx];
+  const winner = team.playInTeams && team.playInTeams[winnerIdx];
+  if (!winner) return; // bad index or a slot with no play-in pair: leave it for the admin
   team.name = winner.name;
   team.logo = '';
   team.abbr = winner.abbr || '';
@@ -56,14 +57,21 @@ async function resolvePlayIn(teamId, winnerIdx) {
 }
 
 let _lastAutoResolve = 0;
+let _autoResolveFetching = false; // a bracket fetch is in flight: a second call must not start another
 async function autoResolvePlayIns() {
   const now = Date.now();
-  if (now - _lastAutoResolve < 3600000) return; // once per hour max
+  if (now - _lastAutoResolve < 3600000 || _autoResolveFetching) return; // once per hour max, one fetch at a time
   const unresolved = S.teams.filter(t => t.playIn && !t.playInResolved);
   if (unresolved.length === 0) return;
-  _lastAutoResolve = now;
   // One bracket fetch: the First Four games there carry isWinner once they are final.
-  const decided = ncaa.firstFourWinners(await ncaa.fetchBracket(S.year));
+  let data;
+  _autoResolveFetching = true;
+  try { data = await ncaa.fetchBracket(S.year); } finally { _autoResolveFetching = false; }
+  // Only arm the hourly throttle once the bracket actually answered; a dead network on First Four
+  // night must not lock auto-resolve out for an hour.
+  if (!data) return false; // the request failed: the manual check says so instead of "not final yet"
+  _lastAutoResolve = now;
+  const decided = ncaa.firstFourWinners(data);
   for (const ff of decided) {
     for (const ut of unresolved) {
       if (ut.playInResolved) continue;
