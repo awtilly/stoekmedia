@@ -37,12 +37,16 @@ function _showModal(html) {
 }
 
 /* Attributes for appPrompt's <input>. PIN prompts (the message says "4-digit", or the caller passes
-   inputmode: 'numeric') get the phone number pad, a 4-character cap and no autocorrect/suggestions;
-   every other prompt keeps exactly the attributes it had. */
+   inputmode: 'numeric') are masked like the join screen's PIN box (a commissioner unlocking admin on a
+   screen cast to the TV must not show the PIN) and get the phone number pad, a 4-character cap and no
+   autocorrect/suggestions; every other prompt keeps exactly the attributes it had.
+   A PIN that is being chosen ("Set a 4-digit PIN...") stays visible: there is no type-it-again step, so a
+   masked typo would leave the room's admin, or a seat, behind a PIN nobody knows. */
 function promptInputAttrs(message, { placeholder = '', defaultValue = '', inputmode = '' } = {}) {
   const numeric = inputmode === 'numeric' || /(^|[^0-9a-z])4-digit([^0-9a-z]|$)/i.test(message || '');
   let attrs = `placeholder="${escapeHtml(placeholder)}" value="${escapeHtml(defaultValue)}"`;
-  if (numeric) attrs += ' inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="done"';
+  const choosing = /(^|[^a-z])set([^a-z]|$)/i.test(message || '');
+  if (numeric) attrs += (choosing ? '' : ' type="password"') + ' inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="done"';
   else if (inputmode) attrs += ` inputmode="${escapeHtml(inputmode)}"`;
   return attrs;
 }
