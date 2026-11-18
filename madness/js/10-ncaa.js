@@ -67,7 +67,33 @@ const ncaa = {
   /** All 64 first-round slots with seed and region; a slot still waiting on a First Four game becomes one
    * unresolved play-in entry carrying both teams. [] when the bracket is not published yet. */
   async fetchTournamentTeams() {
-    const champ = this.bracketGames(await this.fetchBracket(S.year));
+    return this.tournamentTeams(await this.fetchBracket(S.year));
+  },
+
+  /** Which regional champions meet in each national semifinal, read from the bracket feed: each regional final
+   * (bracketId 5xx) names the semifinal it feeds in victorBracketPositionId (601 or 602). The committee changes
+   * this pairing every year, so it must not be assumed. Returns [[regionA, regionB], [regionC, regionD]] in the
+   * canonical order ffPairs() uses (each pair and the pair list sorted by REGIONS order), or null when the feed
+   * does not carry a complete pairing (then the app keeps its default). */
+  finalFourPairs(data) {
+    const champ = this.bracketGames(data);
+    if (!champ) return null;
+    const regionOf = this.regionBySection(champ);
+    const semis = champ.games.filter(g => Math.floor(g.bracketId / 100) === 6).sort((a, b) => a.bracketId - b.bracketId);
+    if (semis.length !== 2) return null;
+    const pairs = semis.map(s => champ.games
+      .filter(g => Math.floor(g.bracketId / 100) === 5 && g.victorBracketPositionId === s.bracketPositionId)
+      .map(g => regionOf[g.sectionId]).filter(Boolean));
+    if (pairs.some(p => p.length !== 2) || new Set(pairs.flat()).size !== 4) return null;
+    const ri = r => REGIONS.indexOf(r);
+    pairs.forEach(p => p.sort((a, b) => ri(a) - ri(b)));
+    pairs.sort((a, b) => ri(a[0]) - ri(b[0]));
+    return pairs;
+  },
+
+  /** Pure half of fetchTournamentTeams: `data` is the bracket payload. */
+  tournamentTeams(data) {
+    const champ = this.bracketGames(data);
     if (!champ) return [];
     const regionOf = this.regionBySection(champ);
     const firstFour = champ.games.filter(g => Math.floor(g.bracketId / 100) === 1);

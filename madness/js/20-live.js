@@ -273,12 +273,12 @@ function autoAdvanceBracket(game) {
     }
   }
 
-  // Check Final Four semis (ff[0], ff[1])
-  const ffPairs = [[0,1],[2,3]];
+  // Check Final Four semis (ff[0], ff[1]); the pairing is the room's (ffPairs), not a fixed South-East / Midwest-West
+  const pairs = ffPairs();
   for (let fi = 0; fi < 2; fi++) {
     if (S.bracket.ff[fi]) continue;
-    const t0id = S.bracket[REGIONS[ffPairs[fi][0]]][14];
-    const t1id = S.bracket[REGIONS[ffPairs[fi][1]]][14];
+    const t0id = S.bracket[pairs[fi][0]][14];
+    const t1id = S.bracket[pairs[fi][1]][14];
     if (!t0id || !t1id) continue;
     const t0 = S.teams.find(t => t.id === t0id);
     const t1 = S.teams.find(t => t.id === t1id);
