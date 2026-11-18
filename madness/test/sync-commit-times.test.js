@@ -147,3 +147,30 @@ test('a snapshot without a commit time is handled as before', withTimers(async (
   app._applyRoomSnapshot({ exists: true, data: () => ({ state: older.state, updatedAt: null }), metadata: {} });
   assert.equal(app.S.year, 2027, 'after the confirmation an unstamped snapshot is the server\'s word');
 }));
+
+test('a save whose own snapshot carries the same commit time as the room it was built on still settles', withTimers(async () => {
+  const { app, finish, fire, elsewhere, deliver, set, server, srv } = stampedRoom();
+  set('year', 2029);
+  await fire();
+  await finish(0);                                  // built on the room stamped v0
+  assert.equal(server().year, 2029);
+  deliver({ state: srv.state, v: 0 });              // the save's own snapshot, with that same stamp
+  assert.equal(app.S.year, 2029);
+  assert.deepEqual(app.eval('Object.keys(_inFlight)'), [], 'not held: a different document with an equal stamp is not older');
+  const back = elsewhere(r => { r.year = 2027; });  // another phone sets it back afterwards: same stamp again
+  deliver({ state: back.state, v: 0 });
+  assert.equal(app.S.year, 2027, 'the later change is shown');
+}));
+
+test('the room a save was built on, arriving after the confirmation with its own commit time, is still older than the save', withTimers(async () => {
+  const { app, finish, fire, deliver, now, set, elsewhere } = stampedRoom();
+  const pre = elsewhere(r => { r.rp[3] = 9; });     // the room the save will read; its snapshot is on its way
+  set('year', 2029);
+  await fire();
+  await finish(0);
+  deliver(pre);                                     // equal stamp AND the very room the save read
+  assert.equal(app.S.year, 2029, 'the saved year did not flick back');
+  deliver(now());
+  assert.equal(app.S.year, 2029);
+  assert.deepEqual(app.eval('Object.keys(_inFlight)'), []);
+}));
