@@ -185,6 +185,10 @@ async function refreshLiveScores() {
   if (_scoreboardFresh && liveScores.length > 0 && liveScores.every(g => g.state === 'post')) return;
   _scoreboardFresh = false;
   const data = await ncaa.fetchScoreboard(dateStr);
+  // The day on screen changed while the request was out (the day arrows tapped again, or the scoreboard day
+  // turned over): this answer is for a day no longer shown. Whichever request answered last used to win, so an
+  // earlier day's games could sit under the later day's date. The request for the day now shown brings its own.
+  if ((S.liveScoresDate || scoreboardDay()) !== dateStr) return;
   liveLastError = !data; // fetchScoreboard returns null on any failure
   if (data) {
     liveScores = ncaa.parseScoreboard(data);
