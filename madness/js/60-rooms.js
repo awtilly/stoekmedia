@@ -478,6 +478,22 @@ function _writeSharedState(){
           if(back.length){ const b = JSON.parse(baseAtStart); for(const k of back) b[k] = server[k]; _syncBase = JSON.stringify(b); }
         } catch(err){}
       }
+      // A player this save was left to add (their own adding save had failed) is listed in that starting point as
+      // already sent. Still on this screen, not in the room as last seen, no other save adding them: out of the
+      // baseline, so the retry adds them and they are waited for like any new player.
+      if(failedRoster.length && _serverSeen && _syncBase){
+        try {
+          const there = new Set((JSON.parse(_serverSeen).players || []).map(p => p && p.id));
+          const lost = failedRoster.filter(id => !_rosterInFlight[id] && !there.has(id) && (S.players || []).some(p => p && p.id === id));
+          const b = lost.length ? JSON.parse(_syncBase) : null;
+          if(b && (b.players || []).some(p => p && lost.includes(p.id))){
+            b.players = b.players.filter(p => !(p && lost.includes(p.id)));
+            _syncBase = JSON.stringify(b);
+            if(_syncedShared && _syncedShared.players) _syncedShared.players = _syncedShared.players.filter(p => !(p && lost.includes(p.id)));
+            _sharedAtSync = null;
+          }
+        } catch(err){}
+      }
     }
     if(here() && _sharedAtSync === localJson) _sharedAtSync = null;
     console.warn("Firestore write error:", e);
