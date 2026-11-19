@@ -460,9 +460,13 @@ function _writeSharedState(){
     if((failedRoster.length || failedRemoving.length) && _syncBase !== localJson && _serverSeen && here()){
       try {
         const server = JSON.parse(_serverSeen), there = new Set((server.players || []).map(p => p && p.id));
-        if(failedRoster.some(id => !there.has(id) && (S.players || []).some(p => p.id === id)) || failedRemoving.some(id => there.has(id) && !(S.players || []).some(p => p.id === id))){
+        // (A removal also counts when this phone knows the player to be in the room from a confirmed save of its
+        // own: that save's echo is not applied, so the room as last seen can still be without them. They go back
+        // into the baseline as the refused save started with them.)
+        const knownGone = failedRemoving.filter(id => !there.has(id) && (_lastSnapshotPlayerIds || []).includes(id) && !(S.players || []).some(p => p.id === id));
+        if(knownGone.length || failedRoster.some(id => !there.has(id) && (S.players || []).some(p => p.id === id)) || failedRemoving.some(id => there.has(id) && !(S.players || []).some(p => p.id === id))){
           const b = JSON.parse(_syncBase);
-          b.players = server.players || [];
+          b.players = (server.players || []).concat(((base && base.players) || []).filter(p => p && knownGone.includes(p.id)));
           if(_syncedShared) _syncedShared.players = JSON.parse(JSON.stringify(b.players));
           _syncBase = JSON.stringify(b);
           _sharedAtSync = null;
