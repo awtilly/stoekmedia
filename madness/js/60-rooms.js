@@ -197,7 +197,7 @@ function _sharedJson(){
 }
 // Newest snapshot that arrived while a pick transaction was in flight ({gen, doc}); see replayDroppedSnapshot.
 let _droppedDuringPick = null;
-function _debouncedFirestoreWrite(){
+function _debouncedFirestoreWrite(delay){ // delay: only the slow retry of a save that keeps failing
   clearTimeout(_firestoreWriteTimer);
   const target = roomId; // the room this change was made in
   _firestoreWriteTimer = setTimeout(() => {
@@ -207,7 +207,7 @@ function _debouncedFirestoreWrite(){
     // into the newly entered room.
     if(!roomId || roomId !== target || _isRemoteUpdate) return;
     _writeSharedState();
-  }, 800);
+  }, delay || 800);
 }
 
 /* The plain merge write (what every write was before the transaction): Firestore queues it offline and
@@ -498,13 +498,16 @@ function _writeSharedState(){
     if(here() && _sharedAtSync === localJson) _sharedAtSync = null;
     console.warn("Firestore write error:", e);
     // Try again shortly rather than waiting for the next save: the toast used to promise "saved locally", but
-    // the next snapshot replaced S and the local copy and nothing was armed to send the edit again. A few tries,
-    // then give up: a write the server refuses for good would otherwise loop every 800 ms while the tab is open.
+    // the next snapshot replaced S and the local copy and nothing was armed to send the edit again. A few quick
+    // tries, then slowly (15 s, 30 s, ... at most every 2 min): a write the server refuses for good must not loop
+    // every 800 ms while the tab is open, but giving up left the edit on this screen with no save armed, and an
+    // edit is only kept across room updates while one is: the next update from anybody took it off the screen.
     if(here() && ++_writeRetries <= 5){
       _debouncedFirestoreWrite();
       showToast("Sync error \u2014 trying again");
-    } else {
-      showToast("Sync error \u2014 changes saved locally");
+    } else if(here()){
+      _debouncedFirestoreWrite(Math.min(120000, 15000 * (_writeRetries - 5)));
+      showToast("Sync error \u2014 not saved yet, still trying");
     }
   });
   // Counted until its last run is over: connectToRoom keeps what this save's visit knew for as long as it runs.

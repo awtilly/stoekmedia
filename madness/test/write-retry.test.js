@@ -6,7 +6,7 @@ const { createApp } = require('./_harness');
 /* A save whose transaction fails outright (not offline: contention after Firestore's own retries, a refused write)
  * used to leave the edit in S with a "saved locally" toast and nothing armed to send it again. The next snapshot
  * from another phone then replaced S and the local copy, and the edit was gone. Now the save is retried through the
- * debounce (a few times, then it gives up), and until then the edit is protected from snapshots the way an edit in
+ * debounce (a few times quickly, then at a slow, growing interval), and until then the edit is protected from snapshots the way an edit in
  * the debounce window is. */
 function room() {
   const app = createApp();
@@ -76,34 +76,51 @@ test('a save fails for good, another phone\'s snapshot lands first: the edit sta
   } finally { mock.timers.reset(); }
 });
 
-test('a save that keeps failing is retried a few times, then the user is told it is only saved locally; a save that gets through resets the count', async () => {
+test('a save that keeps failing is retried quickly a few times, then slowly: the edit stays armed, survives another phone\'s update and goes out when the server accepts again', async () => {
   mock.timers.enable({ apis: ['setTimeout'] });
   try {
-    const { app, srv } = room();
+    const { app, srv, snapshot } = room();
+    const toasts = app.__calls.toasts;
     app.S.rp[3] = 9;
     srv.failWith = { code: 'permission-denied' };
     app._writeSharedState();
     await settle();
-    let rounds = 0;
-    while (timerArmed() && rounds < 20) { rounds++; mock.timers.tick(800); await settle(); }
-    assert.equal(rounds, 5, 'five retries');
-    assert.ok(!timerArmed(), 'then it stops');
-    assert.equal(app.__calls.toasts.filter(t => t === 'Sync error — trying again').length, 5);
-    assert.equal(app.__calls.toasts[app.__calls.toasts.length - 1], 'Sync error — changes saved locally');
-    assert.equal(JSON.parse(srv.state).rp[3], 4, 'nothing reached the server');
-    assert.equal(app.S.rp[3], 9, 'the edit is still here');
-    // The server accepts again: the next save gets through and a later failure is retried once more.
-    srv.failWith = null;
-    app.S.ub = false;
-    app._writeSharedState();
+    for (let i = 0; i < 5; i++) { assert.ok(timerArmed(), 'quick retry ' + (i + 1)); mock.timers.tick(800); await settle(); }
+    assert.equal(toasts.filter(t => t === 'Sync error — trying again').length, 5);
+    assert.equal(toasts.length, 6);
+    assert.equal(toasts[5], 'Sync error — not saved yet, still trying');
+    assert.ok(timerArmed(), 'the save stays armed');
+    mock.timers.tick(800);
     await settle();
-    assert.equal(JSON.parse(srv.state).rp[3], 9, 'the edit went out with the next save');
-    assert.equal(JSON.parse(srv.state).ub, false);
+    assert.equal(toasts.length, 6, 'but it is no longer tried every 800 ms');
+    assert.equal(JSON.parse(srv.state).rp[3], 4, 'nothing reached the server');
+    // Another phone's update arrives while the save is waiting: the unsent edit stays on this screen.
+    otherDevice(srv, r => { r.ub = false; });
+    snapshot(srv.state);
+    assert.equal(app.S.ub, false, 'the other phone\'s change arrived');
+    assert.equal(app.S.rp[3], 9, 'the edit is still here');
+    mock.timers.tick(15000);
+    await settle();
+    assert.equal(toasts.length, 7, 'tried again after 15 s, refused again');
+    assert.ok(timerArmed());
+    mock.timers.tick(15000);
+    await settle();
+    assert.equal(toasts.length, 7, 'the next try waits longer');
+    // The server accepts again: the next slow try gets through.
+    srv.failWith = null;
+    mock.timers.tick(15000);
+    await settle();
+    assert.equal(JSON.parse(srv.state).rp[3], 9, 'the edit went out');
+    assert.equal(JSON.parse(srv.state).ub, false, 'and the other phone\'s change was kept');
+    assert.ok(!timerArmed());
+    assert.equal(vm.runInThisContext('_writeRetries'), 0);
+    // A later failure starts with the quick retries again.
     srv.failWith = { code: 'aborted' };
     app.S.rp[4] = 10;
     app._writeSharedState();
     await settle();
     assert.ok(timerArmed(), 'a failure after a success is retried again');
+    assert.equal(toasts[toasts.length - 1], 'Sync error — trying again');
   } finally { mock.timers.reset(); }
 });
 
