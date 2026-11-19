@@ -120,7 +120,7 @@ function _pendingLocalEdits(remote, baseRaw, seenRaw, at){
   const edits = {};
   if(_firestoreWriteTimer && _syncedShared) for(const k in S){
     if(VIEW_LOCAL.includes(k)) continue;
-    if(JSON.stringify(S[k]) !== JSON.stringify(_syncedShared[k])) edits[k] = S[k];
+    if(JSON.stringify(S[k]) !== JSON.stringify(_syncedShared[k]) || _resendKeys[k] > 0) edits[k] = S[k]; // (or left unsent by a refused save)
   }
   // A key the snapshot changed as well is a real conflict: the snapshot wins, as it always has (another phone
   // may have advanced more of the bracket than this one). ds and players have a proper merge below instead.

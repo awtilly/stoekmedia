@@ -107,3 +107,24 @@ test('a save after a refused one does not carry settings the refused save did no
   assert.equal(app.S.ub, false);
   assert.deepEqual(Object.keys(app.eval('_resendKeys')), [], 'nothing is left to resend');
 }));
+
+/* Until the retry runs, a setting of the refused save is an edit waiting to be saved: an update from the room must
+ * not take it off the screen, also when the screen happens to equal the point the refused save went back to. */
+test('a setting put back to an earlier unsent value after a refused save survives an update from the room', withTimers(async () => {
+  const { app, finish, refuse, fire, deliver, elsewhere, now, set, server, txs } = stampedRoom();
+  set('year', 2028);
+  await fire();                                     // save 1: 2028 (the room has 2027), still on its way
+  set('year', 2029);
+  await fire();                                     // save 2: 2029
+  await refuse(1);                                  // refused: back to the point save 2 started from (2028)
+  set('year', 2028);                                // and the screen says 2028 again
+  deliver(elsewhere(r => { r.ub = false; }));       // an update from the room, which still has 2027
+  assert.equal(app.S.year, 2028, 'the choice is still on this screen');
+  await fire();
+  for (let i = 0; i < txs.length; i++) if (i !== 1) await finish(i);
+  await fire();
+  for (let i = 2; i < txs.length; i++) await finish(i);
+  deliver(now());
+  assert.equal(server().year, 2028, 'and it reached the room');
+  assert.equal(app.S.year, 2028);
+}));
