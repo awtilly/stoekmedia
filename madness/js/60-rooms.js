@@ -219,6 +219,9 @@ let _queuedPlainWrites = {}; // room id -> plain writes handed to Firestore and 
 // Saves retried after a write failed outright (not offline: see the catch in _writeSharedState). Reset by a write
 // that gets through and on entering a room.
 let _writeRetries = 0;
+// Settings of a save that was refused: key -> that save's number. The next save carries them whatever the baseline
+// says (earlier saves of this phone leave those keys to the refused one, so nothing else would deliver them).
+let _resendKeys = {};
 function _plainSharedWrite(ref, json, left){ // left: the visit this save was made in is over (see here() in _writeSharedState)
   const id = ref.id;
   _queuedPlainWrites[id] = (_queuedPlainWrites[id] || 0) + 1;
@@ -248,7 +251,9 @@ function _writeSharedState(){
   const baseAtStart = _syncBase;
   let base = null;
   try { base = baseAtStart ? JSON.parse(baseAtStart) : null; } catch(e){}
-  const mine = base && Object.keys(shared).filter(k => JSON.stringify(shared[k]) !== JSON.stringify(base[k]));
+  const resend = _resendKeys;
+  _resendKeys = {};
+  const mine = base && Object.keys(shared).filter(k => JSON.stringify(shared[k]) !== JSON.stringify(base[k]) || (resend[k] > 0 && resend[k] <= _writeSeq));
   _syncBase = localJson; // these edits are now with this write; the next write sends only what changes after this
   _syncedShared = JSON.parse(localJson); // nothing is pending any more: this is what the server is being sent
   _recentSent.push(shared);
@@ -433,6 +438,7 @@ function _writeSharedState(){
     // itself is still good (its own keys over whatever the room holds then), so it is run again, a few times.
     if(e && e.code === 'aborted' && !here() && ++awayTries <= 5){ again = true; return; }
     const failedKeys = Object.keys(_inFlight).filter(k => _inFlight[k].no === writeNo);
+    if(here()) for(const k of failedKeys) _resendKeys[k] = writeNo;
     const failedRoster = Object.keys(_rosterInFlight).filter(id => _rosterInFlight[id] === writeNo);
     const failedRemoving = Object.keys(_rosterRemoving).filter(id => _rosterRemoving[id] === writeNo);
     dropInFlight(true); // a player this save was adding goes to a later save that still lists them
@@ -643,6 +649,7 @@ function connectToRoom(code){
   _sharedAtSync = _sharedJson();
   _droppedDuringPick = null;
   _writeRetries = 0;
+  _resendKeys = {}; // the refused saves of the room just left are not this room's
   unsubRoom = db.collection("rooms").doc(code).onSnapshot(doc => {
     if(gen !== _roomGeneration) return; // stale listener
     // Calibrate the draft clock against Firestore's clock (defined in 80-pages.js; unit tests load this file alone).
