@@ -61,7 +61,9 @@ let _saveSends = {};
 let _saveBuilt = {};
 /** The earliest other running save of this phone that lists the player and has not built its roster yet. */
 function _addHeir(id, writeNo){
-  return Object.keys(_savesRunning).map(Number).filter(n => n !== writeNo && !_saveBuilt[n] && (_saveSends[n] || []).includes(id)).sort((a, b) => a - b)[0];
+  const nos = Object.keys(_savesRunning).map(Number).filter(n => n !== writeNo && (_saveSends[n] || []).includes(id)).sort((a, b) => a - b);
+  // (Or, failing that, one that has built its roster with the player in it: it is about to land them.)
+  return nos.filter(n => !_saveBuilt[n])[0] || nos.filter(n => Array.isArray(_saveBuilt[n]) && _saveBuilt[n].includes(id))[0];
 }
 let _handedOver = {}; // player id -> the save their add was handed to
 /** A handed-over player the heir did not write, still on this screen: out of the baseline, and a save is armed. */
@@ -354,6 +356,7 @@ function _writeSharedState(){
     _saveBuilt[writeNo] = true; // from here on this save's roster is fixed: a player handed to it now would not be written
     const json = JSON.stringify(merged);
     writtenIds = (merged.players || []).map(p => p.id);
+    _saveBuilt[writeNo] = writtenIds; // what this run writes: see _addHeir
     for(const id of Object.keys(_rosterInFlight)){ if(_rosterInFlight[id] === writeNo && !writtenIds.includes(id)){ delete _rosterInFlight[id]; if(here() && !(S.players || []).some(p => p && p.id === id)) _rosterGone[id] = 3; else if(here() && _syncBase && _handedOver[id] === writeNo) _resendHandedOver(id); } }
     // The echo of this write is skipped by _applyRoomSnapshot only when it carries exactly what we
     // sent from. If the merge took anything from the server (draft progress, another device's edit), or
