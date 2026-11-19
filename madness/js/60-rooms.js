@@ -466,6 +466,34 @@ function _writeSharedState(){
     if(here() && _syncBase === localJson){
       _syncBase = baseAtStart;
       try { _syncedShared = baseAtStart ? JSON.parse(baseAtStart) : null; } catch(err){}
+      // A key of this save that the screen has since put back to what the save started from (an edit waiting in
+      // the debounce): that starting value can be one an earlier save of this phone was still sending, and that
+      // save leaves the key to this one. Where the room was last seen to hold something else, the room's value
+      // is the baseline, so the retry sends the key instead of finding nothing changed.
+      if(failedKeys.length && base && _serverSeen && _syncedShared){
+        try {
+          const server = JSON.parse(_serverSeen), same = (x, y) => JSON.stringify(x) === JSON.stringify(y);
+          const back = failedKeys.filter(k => same(base[k], S[k]) && !same(server[k], S[k]));
+          for(const k of back) _syncedShared[k] = server[k];
+          if(back.length){ const b = JSON.parse(baseAtStart); for(const k of back) b[k] = server[k]; _syncBase = JSON.stringify(b); }
+        } catch(err){}
+      }
+      // A player this save was left to add (their own adding save had failed) is listed in that starting point as
+      // already sent. Still on this screen, not in the room as last seen, no other save adding them: out of the
+      // baseline, so the retry adds them and they are waited for like any new player.
+      if(failedRoster.length && _serverSeen && _syncBase){
+        try {
+          const there = new Set((JSON.parse(_serverSeen).players || []).map(p => p && p.id));
+          const lost = failedRoster.filter(id => !_rosterInFlight[id] && !there.has(id) && (S.players || []).some(p => p && p.id === id));
+          const b = lost.length ? JSON.parse(_syncBase) : null;
+          if(b && (b.players || []).some(p => p && lost.includes(p.id))){
+            b.players = b.players.filter(p => !(p && lost.includes(p.id)));
+            _syncBase = JSON.stringify(b);
+            if(_syncedShared && _syncedShared.players) _syncedShared.players = _syncedShared.players.filter(p => !(p && lost.includes(p.id)));
+            _sharedAtSync = null;
+          }
+        } catch(err){}
+      }
     }
     if(here() && _sharedAtSync === localJson) _sharedAtSync = null;
     console.warn("Firestore write error:", e);
