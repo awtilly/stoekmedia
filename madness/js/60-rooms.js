@@ -55,6 +55,27 @@ let _knownAtExit = {};
 let _visitSaves = {};
 // The saves whose last run is not over yet, by write number.
 let _savesRunning = {};
+// What each running save lists, and whether it has built the roster it writes: a save that gives up while adding
+// a player hands that player to a running save that lists them and has still to build its roster.
+let _saveSends = {};
+let _saveBuilt = {};
+/** The earliest other running save of this phone that lists the player and has not built its roster yet. */
+function _addHeir(id, writeNo){
+  return Object.keys(_savesRunning).map(Number).filter(n => n !== writeNo && !_saveBuilt[n] && (_saveSends[n] || []).includes(id)).sort((a, b) => a - b)[0];
+}
+let _handedOver = {}; // player id -> the save their add was handed to
+/** A handed-over player the heir did not write, still on this screen: out of the baseline, and a save is armed. */
+function _resendHandedOver(id){
+  delete _handedOver[id];
+  try {
+    const b = JSON.parse(_syncBase);
+    b.players = (b.players || []).filter(p => !(p && p.id === id));
+    _syncBase = JSON.stringify(b);
+    if(_syncedShared && _syncedShared.players) _syncedShared.players = _syncedShared.players.filter(p => !(p && p.id === id));
+    _sharedAtSync = null;
+    _debouncedFirestoreWrite();
+  } catch(err){}
+}
 // Every roster id an update or a confirmed save of this visit has shown to be in the room, also one removed since.
 let _knownEver = [];
 // The ids above that `players` (a roster of this phone) does not list: "removed here", whatever the server says.
@@ -238,8 +259,8 @@ function _writeSharedState(){
   // (Not ds and players: those are merged with the server's copy below, never sent as a whole.)
   if(mine) for(const k of mine){ if(k !== 'ds' && k !== 'players') _keyWriteNo[k] = writeNo; }
   // (One no longer on this screen was removed here in the meantime: remembered, a later snapshot can still bring them.)
-  const dropRoster = () => { for(const id of Object.keys(_rosterInFlight)){ if(_rosterInFlight[id] !== writeNo) continue; delete _rosterInFlight[id]; if(here() && !(S.players || []).some(p => p && p.id === id)) _rosterGone[id] = 3; } };
-  const dropInFlight = () => { dropRoster(); for(const id of Object.keys(_rosterRemoving)){ if(_rosterRemoving[id] === writeNo) delete _rosterRemoving[id]; } for(const k of Object.keys(_inFlight)){ if(_inFlight[k].no === writeNo) delete _inFlight[k]; } };
+  const dropRoster = handOver => { for(const id of Object.keys(_rosterInFlight)){ if(_rosterInFlight[id] !== writeNo) continue; const heir = handOver && _addHeir(id, writeNo); if(heir){ _rosterInFlight[id] = heir; _handedOver[id] = heir; continue; } delete _rosterInFlight[id]; if(here() && !(S.players || []).some(p => p && p.id === id)) _rosterGone[id] = 3; } };
+  const dropInFlight = handOver => { dropRoster(handOver); for(const id of Object.keys(_rosterRemoving)){ if(_rosterRemoving[id] === writeNo) delete _rosterRemoving[id]; } for(const k of Object.keys(_inFlight)){ if(_inFlight[k].no === writeNo) delete _inFlight[k]; } };
   let preAtSaved = null;
   let preState = null; // what the server held when the transaction (its last run) read the room
   let expectSynced = _lastSyncedState; // what _lastSyncedState holds unless a snapshot is applied during the write
@@ -255,6 +276,7 @@ function _writeSharedState(){
   // commit first and the older queued copy of the room would then land on top of it, undoing this edit.
   if((typeof navigator !== 'undefined' && navigator.onLine === false) || _queuedPlainWrites[roomId]){ _plainSharedWrite(ref, localJson); return; }
   if(mine) for(const k of mine){ if(k !== 'ds' && k !== 'players') _inFlight[k] = { v: JSON.stringify(shared[k]), no: writeNo, sent: false, held: false, acked: false }; }
+  _saveSends[writeNo] = (shared.players || []).map(p => p && p.id);
   const adding = []; // the players this save is adding
   if(mine && mine.includes('players')){
     for(const p of ((base && base.players) || [])){ if(p && p.id && !(shared.players || []).some(q => q && q.id === p.id)) { _rosterRemovedNo[p.id] = writeNo; _rosterRemoving[p.id] = writeNo; } }
@@ -324,9 +346,10 @@ function _writeSharedState(){
       if(late.length) known = (known || []).concat(late);
     }
     const merged = remote ? mergeSharedState(ours, remote, known, true) : ours;
+    _saveBuilt[writeNo] = true; // from here on this save's roster is fixed: a player handed to it now would not be written
     const json = JSON.stringify(merged);
     writtenIds = (merged.players || []).map(p => p.id);
-    for(const id of Object.keys(_rosterInFlight)){ if(_rosterInFlight[id] === writeNo && !writtenIds.includes(id)){ delete _rosterInFlight[id]; if(here() && !(S.players || []).some(p => p && p.id === id)) _rosterGone[id] = 3; } }
+    for(const id of Object.keys(_rosterInFlight)){ if(_rosterInFlight[id] === writeNo && !writtenIds.includes(id)){ delete _rosterInFlight[id]; if(here() && !(S.players || []).some(p => p && p.id === id)) _rosterGone[id] = 3; else if(here() && _syncBase && _handedOver[id] === writeNo) _resendHandedOver(id); } }
     // The echo of this write is skipped by _applyRoomSnapshot only when it carries exactly what we
     // sent from. If the merge took anything from the server (draft progress, another device's edit), or
     // a snapshot replaced S while the write was in flight, leave the echo to be applied so this device
@@ -412,7 +435,7 @@ function _writeSharedState(){
     const failedKeys = Object.keys(_inFlight).filter(k => _inFlight[k].no === writeNo);
     const failedRoster = Object.keys(_rosterInFlight).filter(id => _rosterInFlight[id] === writeNo);
     const failedRemoving = Object.keys(_rosterRemoving).filter(id => _rosterRemoving[id] === writeNo);
-    dropInFlight();
+    dropInFlight(true); // a player this save was adding goes to a later save that still lists them
     if(failedKeys.length && _syncBase !== localJson && _serverSeen && here()){
       try {
         const server = JSON.parse(_serverSeen), b = JSON.parse(_syncBase);
@@ -455,7 +478,7 @@ function _writeSharedState(){
   // Counted until its last run is over: connectToRoom keeps what this save's visit knew for as long as it runs.
   _visitSaves[visit] = (_visitSaves[visit] || 0) + 1;
   _savesRunning[writeNo] = true;
-  const over = () => { if(again){ again = false; run(); return; } delete _savesRunning[writeNo]; if(--_visitSaves[visit] <= 0) delete _visitSaves[visit]; };
+  const over = () => { if(again){ again = false; run(); return; } delete _savesRunning[writeNo]; delete _saveSends[writeNo]; delete _saveBuilt[writeNo]; for(const id of Object.keys(_handedOver)){ if(_handedOver[id] === writeNo) delete _handedOver[id]; } if(--_visitSaves[visit] <= 0) delete _visitSaves[visit]; };
   const run = () => attempt().then(over, over);
   run();
 }
