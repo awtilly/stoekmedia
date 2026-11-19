@@ -439,7 +439,11 @@ function _writeSharedState(){
     if(failedKeys.length && _syncBase !== localJson && _serverSeen && here()){
       try {
         const server = JSON.parse(_serverSeen), b = JSON.parse(_syncBase);
-        for(const k of failedKeys){ b[k] = server[k]; if(_syncedShared) _syncedShared[k] = server[k]; }
+        // (Where the screen shows what the room was last seen to hold, the retry would find nothing to send, and an
+        // earlier save of this phone that is still on its way with the previous value would win: there the baseline
+        // goes back to what this save started from, so the retry sends the key again.)
+        const same = (x, y) => JSON.stringify(x) === JSON.stringify(y);
+        for(const k of failedKeys){ const v = base && same(server[k], S[k]) && !same(base[k], S[k]) ? base[k] : server[k]; b[k] = v; if(_syncedShared) _syncedShared[k] = v; }
         _syncBase = JSON.stringify(b);
         _sharedAtSync = null;
       } catch(err){}
