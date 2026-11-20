@@ -457,7 +457,10 @@ function _writeSharedState(){
     const failedRoster = Object.keys(_rosterInFlight).filter(id => _rosterInFlight[id] === writeNo);
     const failedRemoving = Object.keys(_rosterRemoving).filter(id => _rosterRemoving[id] === writeNo);
     dropInFlight(true); // a player this save was adding goes to a later save that still lists them
-    if(failedKeys.length && _syncBase !== localJson && _serverSeen && here()){
+    // (A later save of this phone that started with the very same text has made the baseline its own: going back
+    // to this save's starting point would undo what that save is carrying.)
+    const baseMoved = _syncBase !== localJson || _writeSeq !== writeNo;
+    if(failedKeys.length && baseMoved && _serverSeen && here()){
       try {
         const server = JSON.parse(_serverSeen), b = JSON.parse(_syncBase);
         // (Where the screen shows what the room was last seen to hold, the retry would find nothing to send, and an
@@ -469,7 +472,7 @@ function _writeSharedState(){
         _sharedAtSync = null;
       } catch(err){}
     }
-    if((failedRoster.length || failedRemoving.length) && _syncBase !== localJson && _serverSeen && here()){
+    if((failedRoster.length || failedRemoving.length) && baseMoved && _serverSeen && here()){
       try {
         const server = JSON.parse(_serverSeen), there = new Set((server.players || []).map(p => p && p.id));
         // (A removal also counts when this phone knows the player to be in the room from a confirmed save of its
@@ -492,7 +495,7 @@ function _writeSharedState(){
     // Nothing was written: go back to the earlier base, so the next write still carries these edits. The
     // pending-edit baseline goes back too (unless a snapshot moved it on during the write): until the save is
     // retried, a snapshot from another phone must keep these edits the way it keeps an edit in the debounce.
-    if(here() && _syncBase === localJson){
+    if(here() && !baseMoved){
       _syncBase = baseAtStart;
       try { _syncedShared = baseAtStart ? JSON.parse(baseAtStart) : null; } catch(err){}
       // A key of this save that the screen has since put back to what the save started from (an edit waiting in
