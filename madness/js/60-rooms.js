@@ -22,6 +22,8 @@ function _sharedCopyOfS(){
 // phone's own save of it that the snapshot does not show yet, or shows for the first time.
 let _serverSeen = null;
 let _recentSent = [];
+// The ones of them the server refused: they put nothing in the room, so they are the first to leave the list.
+const _refusedSent = new WeakSet();
 // Counts snapshots applied; _writeSharedState uses it to see that one was applied while its write was in flight.
 let _snapshotSeq = 0;
 // Saves are numbered; _keyWriteNo[key] is the number of the newest save that sent that key.
@@ -265,7 +267,9 @@ function _writeSharedState(){
   _syncBase = localJson; // these edits are now with this write; the next write sends only what changes after this
   _syncedShared = JSON.parse(localJson); // nothing is pending any more: this is what the server is being sent
   _recentSent.push(shared);
-  if(_recentSent.length > 12) _recentSent.shift();
+  // (Retries of a refused save would otherwise push out the save that did land: its value in a later room update
+  // then read as another phone's change and replaced the edit still waiting to be sent.)
+  if(_recentSent.length > 12){ const i = _recentSent.findIndex(x => _refusedSent.has(x)); _recentSent.splice(i < 0 ? 0 : i, 1); }
   const seqAtStart = _snapshotSeq;
   // A later save from this phone that also carries a key makes this one's copy of that key the older one.
   const writeNo = ++_writeSeq;
@@ -452,6 +456,7 @@ function _writeSharedState(){
     // below sends the edit again, but that reads the screen, and the screen is no longer this visit's. The save
     // itself is still good (its own keys over whatever the room holds then), so it is run again, a few times.
     if(e && e.code === 'aborted' && !here() && ++awayTries <= 5){ again = true; return; }
+    _refusedSent.add(shared);
     const failedKeys = Object.keys(_inFlight).filter(k => _inFlight[k].no === writeNo);
     if(here()) for(const k of failedKeys) _resendKeys[k] = writeNo;
     const failedRoster = Object.keys(_rosterInFlight).filter(id => _rosterInFlight[id] === writeNo);
