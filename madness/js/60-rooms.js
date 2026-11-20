@@ -241,8 +241,16 @@ function _plainSharedWrite(ref, json, left){ // left: the visit this save was ma
     _syncBase = json;
     _sharedAtSync = json;
   }
+  const visit = _roomGeneration;
   ref.set({ state: json, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, {merge: true})
-    .then(settled, err => { settled(); console.warn("Firestore offline write error:", err); });
+    .then(() => {
+      settled();
+      // The server has this phone's whole copy now: its players are in the room, as after a confirmed save. Without
+      // this, one added by this write and taken off again here looked like a player another phone had added, the
+      // removal was not sent, and the player stayed in the room for everybody but this phone.
+      if(left || roomId !== id || visit !== _roomGeneration || !_lastSnapshotPlayerIds) return;
+      try { _lastSnapshotPlayerIds = Array.from(new Set(_lastSnapshotPlayerIds.concat((JSON.parse(json).players || []).map(p => p && p.id).filter(Boolean)))); } catch(e){}
+    }, err => { settled(); console.warn("Firestore offline write error:", err); });
 }
 
 /* Write the shared (non-view) part of S to the current room's document now. */
