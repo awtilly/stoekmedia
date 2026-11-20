@@ -62,8 +62,9 @@ let _saveBuilt = {};
 /** The earliest other running save of this phone that lists the player and has not built its roster yet. */
 function _addHeir(id, writeNo){
   const nos = Object.keys(_savesRunning).map(Number).filter(n => n !== writeNo && (_saveSends[n] || []).includes(id)).sort((a, b) => a - b);
-  // (Or, failing that, one that has built its roster with the player in it: it is about to land them.)
-  return nos.filter(n => !_saveBuilt[n])[0] || nos.filter(n => Array.isArray(_saveBuilt[n]) && _saveBuilt[n].includes(id))[0];
+  // (Or, failing that, one that has built its roster with the player in it: it is about to land them. Or any
+  // other: a run that is sent round again builds its roster anew; if it never writes them, they are sent again.)
+  return nos.filter(n => !_saveBuilt[n])[0] || nos.filter(n => Array.isArray(_saveBuilt[n]) && _saveBuilt[n].includes(id))[0] || nos[0];
 }
 let _handedOver = {}; // player id -> the save their add was handed to
 /** A handed-over player the heir did not write, still on this screen: out of the baseline, and a save is armed. */
@@ -392,6 +393,12 @@ function _writeSharedState(){
       const sent = new Set((shared.players || []).map(p => p.id)), ids = writtenIds.filter(id => sent.has(id));
       if(visit === _roomGeneration) _lastSnapshotPlayerIds = Array.from(new Set((_lastSnapshotPlayerIds || []).concat(ids)));
       else if(_knownAtExit[visit]) _knownAtExit[visit] = Array.from(new Set(_knownAtExit[visit].concat(ids)));
+    }
+    // A player handed to this save after it had built its roster without them: it did not write them. Sent again.
+    if(writtenIds && here()) for(const id of Object.keys(_rosterInFlight)){
+      if(_rosterInFlight[id] !== writeNo || _handedOver[id] !== writeNo || writtenIds.includes(id)) continue;
+      delete _rosterInFlight[id];
+      if((S.players || []).some(p => p && p.id === id) && _syncBase) _resendHandedOver(id); else _rosterGone[id] = 3;
     }
     for(const id of Object.keys(_rosterRemoving)){ if(_rosterRemoving[id] === writeNo) delete _rosterRemoving[id]; }
     // Unless an update later than the room this save read has already been applied and does not have the player:
