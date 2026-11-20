@@ -415,13 +415,21 @@ function _writeSharedState(){
       delete _rosterInFlight[id];
       if((S.players || []).some(p => p && p.id === id) && _syncBase) _resendHandedOver(id); else _rosterGone[id] = 3;
     }
-    for(const id of Object.keys(_rosterRemoving)){ if(_rosterRemoving[id] === writeNo) delete _rosterRemoving[id]; }
+    const tookOff = Object.keys(_rosterRemoving).filter(id => _rosterRemoving[id] === writeNo); // the players this save removed
+    for(const id of tookOff) delete _rosterRemoving[id];
     // Unless an update later than the room this save read has already been applied and does not have the player:
     // another phone took them off after this save. Nothing newer is promised, so there is nothing to wait for;
     // that update is shown again below, now that the player is no longer on their way.
     let rosterReapply = false;
     if(preAtSaved && here()){
       let lastIds = null; // the players of the last applied update, when it is later than the room this save read
+      // A player this save took off whom such an update has: put back since (a phone that was offline wrote its
+      // old copy of the room). The room holds them and nothing more is on its way from here: shown again below.
+      for(const id of tookOff){
+        if((S.players || []).some(p => p && p.id === id)) continue;
+        if(lastIds === null) lastIds = _laterRosterIds(preAtSaved, preState) || false;
+        if(lastIds && lastIds.has(id)) rosterReapply = true;
+      }
       for(const id of Object.keys(_rosterInFlight)){
         if(_rosterInFlight[id] !== writeNo || !(S.players || []).some(p => p && p.id === id)) continue;
         if(lastIds === null) lastIds = _laterRosterIds(preAtSaved, preState) || false;
