@@ -68,6 +68,8 @@ function _addHeir(id, writeNo){
 let _handedOver = {}; // player id -> the save their add was handed to
 /** A handed-over player the heir did not write, still on this screen: out of the baseline, and a save is armed. */
 function _resendHandedOver(id){
+  const next = _addHeir(id, _handedOver[id]);
+  if(next){ _rosterInFlight[id] = next; _handedOver[id] = next; return; } // another running save still lists them
   delete _handedOver[id];
   try {
     const b = JSON.parse(_syncBase);
