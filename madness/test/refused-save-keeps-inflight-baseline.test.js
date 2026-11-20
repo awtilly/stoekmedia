@@ -125,3 +125,34 @@ test('the same, and the first save is refused as well: both players are sent aga
   assert.deepEqual(ids(server().players), ['n1', 'n2', 'p1']);
   assert.deepEqual(ids(app.S.players), ['n1', 'n2', 'p1']);
 }));
+
+/* Save 1 adds a player and is confirmed; its own echo from the room is not applied, so the room as last seen is
+ * still without them. Saves 2 and 3 each add another player; save 2 is refused while save 3 is on its way. The
+ * retry's starting point was rebuilt from the room as last seen plus the players still being added, without the
+ * first player: taking them off the screen was then "nothing changed", and the next update from the room put
+ * them back. */
+for (const retryRefused of [false, true]) test('a player a confirmed save of this phone added is in the starting point after another save is refused' + (retryRefused ? ' (the retry is refused too)' : ''), withTimers(async () => {
+  const { app, finish, refuse, fire, deliver, elsewhere, now, set, server, txs } = stampedRoom();
+  set('players', app.S.players.concat([N('n1')]));
+  await fire();                                     // save 1 adds n1
+  await finish(0);                                  // ... and lands
+  deliver(now());                                   // its own echo: not applied
+  set('players', app.S.players.concat([N('n2')]));
+  await fire();                                     // save 2 adds n2
+  set('players', app.S.players.concat([N('n3')]));
+  await fire();                                     // save 3 adds n3, on its way too
+  await refuse(1);                                  // save 2 is refused
+  set('players', app.S.players.filter(p => p.id !== 'n1')); // n1 is taken off this screen
+  deliver(elsewhere(r => { r.year = 2030; }));      // another phone's update: the room has n1
+  assert.deepEqual(ids(app.S.players), ['n2', 'n3', 'p1'], 'the removed player is not back on this screen');
+  await fire();                                     // the retry
+  if (retryRefused) await refuse(3);
+  for (let round = 0; round < 4; round++) {
+    for (let i = 2; i < txs.length; i++) if (!txs[i].failed) await finish(i);
+    deliver(now());
+    await fire();
+  }
+  assert.deepEqual(ids(server().players), ['n2', 'n3', 'p1'], 'the removed player is not in the room');
+  assert.deepEqual(ids(app.S.players), ['n2', 'n3', 'p1']);
+  assert.equal(server().year, 2030, 'the other phone\'s change is kept');
+}));
