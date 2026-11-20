@@ -1,6 +1,6 @@
 # Madness on the App Store: Capacitor wrapper plan
 
-Status: DRAFT for Joe's review (night shift, 2026-10-14; refreshed 2026-11-02 for the NCAA.com data source, #53). Scaffold is on main (builds 1-4); nothing submitted.
+Status: DRAFT for Joe's review (night shift, 2026-10-14; refreshed 2026-11-02 for the NCAA.com data source, #53). Scaffold is on main (builds 1-7, version 1.0.1); section 12 refreshed 2026-11-20 after #65; nothing submitted.
 Target go/no-go: **2027-02-01**. Selection Sunday 2027 is **2027-03-14**. Feature freeze **2027-02-15**.
 
 ## 1. Scope and constraints
@@ -184,7 +184,7 @@ Reviewers get a demo in the Review Notes, no account needed (good: no login = no
 | When | Milestone | Owner |
 |------|-----------|-------|
 | Nov 2026 | DONE 10-30/31: #2 (modularization), #3 (score cache), #53 (NCAA.com data source) merged. Store name "Madness Draft" (section 2). | Joe |
-| Nov 2026 | DONE: `madness/ios-app/` scaffold on main, builds 1-4 on device, App Review screen recordings in progress (`ios-app/assets/review/`, gitignored). | Night shift drafts, Joe runs Xcode |
+| Nov 2026 | DONE: `madness/ios-app/` scaffold on main, builds 1-7 on device (1.0.1), App Review screen recordings in progress (`ios-app/assets/review/`, gitignored). | Night shift drafts, Joe runs Xcode |
 | Dec 2026 | Web guards PR (section 4). Functions push payload change (section 5, Joe). APNs key in Firebase. | Both |
 | Dec 2026 | TestFlight build to Joe's phone. Test: push on draft turn, haptics, share, offline open. | Joe |
 | Jan 2027, by the 10th | Privacy page live, screenshots, description, demo room, App Store Connect record. | Both |
@@ -214,37 +214,55 @@ Reviewers get a demo in the Review Notes, no account needed (good: no login = no
   no phone talks to NCAA.com directly.
 - Web Share availability in WKWebView: verify on the first simulator build before relying on it.
 
-## 12. Submission gate: what must be in the build before "Submit for Review" (added 2026-11-09)
+## 12. Submission gate: what must be in the build before "Submit for Review" (added 2026-11-09, refreshed 2026-11-20)
 
-Builds 1-4 were bundled from `main` as it stands today (`npm run sync` copies `../index.html` and `../js` into
-`www/`). The web code on `main` only detects the shell (`isNativeShell` in `js/90-boot.js`); it makes no native
-call at all. The plugins are installed in `ios-app/`, but nothing uses them yet. So builds 1-4 have:
+Every build is bundled from `main` as it stands on the day (`npm run sync` copies `../index.html` and `../js` into
+`www/`), so a build has exactly the native features `main` had when it was cut:
 
-- no push notifications (the web-push path is switched off inside the shell, the native one is in #54);
-- no haptics and no iOS share sheet (#58);
-- an invite link that nobody can open: sharing from the app sends `capacitor://localhost/?room=...` (fixed in #58).
+| Build | Cut from | Native calls in the bundle |
+|-------|----------|----------------------------|
+| 1-4 (to 2026-10-31) | `main` before #65 | none: the web code only detected the shell (`isNativeShell` in `js/90-boot.js`) |
+| 5-7 (1.0.1, 2026-11-10) | `main` the same afternoon #65 landed | run the check below on the archive's `www/`; before #65 = none |
+| the next one, from `main` today | `main` with #65 | iOS share sheet, invite links that open the app (universal links). Still **no push, no haptics** |
 
-That is the "just a website" case from the 4.2 row in section 6, plus a visibly broken feature (2.1). A build
-submitted in this state is likely to come back rejected and costs one of the review rounds the timeline allows for.
+What #65 settled (2026-11-10): sharing from the app sends an `https://stoekmedia.com/madness/?room=...` link
+instead of `capacitor://localhost/...`, the share goes through the native share sheet, and a tapped invite link
+opens the installed app. What is still missing on `main`:
+
+- push notifications (the web-push path is switched off inside the shell, the native one is in #54);
+- haptics (#58; the share half of #58 overlaps #65 and merges clean).
+
+A build without push is still close to the "just a website" case from the 4.2 row in section 6: the share sheet
+alone is thin. A build submitted in this state is likely to come back rejected and costs one of the review rounds
+the timeline allows for.
 
 **Merged into `main`, and the build cut after that:**
 
 | Order | What | Why it gates the submission |
 |-------|------|------------------------------|
 | 1 | #51 `fcm-token-once`, then #54 `native-push` (stacked on #51) | Native push: permission prompt, token, "you're on the clock" |
-| 2 | #58 `native-haptics-share` | Share sheet, a link people can open, Taptic feedback |
+| 2 | #58 `native-haptics-share` | Taptic feedback at the ten-second pick-clock warning |
 | 3 | `madness/ios-badge-reset` (Swift, staged) | Badge clears when the app opens |
 | 4 | Section 5 (push payload in `functions/`, APNs key in Firebase) | Without it iOS shows nothing while the app is in the background (data-only messages) |
+| 5 | #69 `support-page` | The Support URL in section 13 is a 404 until it merges; App Review opens that link |
 
 **Ten-second check on the Mac, after `npm run sync` and before archiving** (from `madness/ios-app/`):
 
 ```sh
-grep -c "Plugins.PushNotifications" www/js/30-state.js              # 1 or more = #54 is in the bundle
-grep -cE "Plugins.(Share|Haptics)" www/js/80-pages.js         # 2 = #58 is in the bundle
+grep -c "Plugins.Share" www/js/80-pages.js                # 1 = #65 is in the bundle (share sheet, real links)
+grep -c "Plugins.PushNotifications" www/js/30-state.js    # 1 or more = #54 is in the bundle
+grep -c "Plugins.Haptics" www/js/80-pages.js              # 1 = #58 is in the bundle
 ```
 
-Both print `0` for builds 1-4. Then the device pass from section 9 (push on draft turn, haptic at 10 s, share an
-invite and open it on a second phone), and only then the Review Notes, which should name those three features.
+Checked 2026-11-20: `main` prints 1 / 0 / 0, and the tree with #54 and #58 merged prints 1 / 1 / 1. Submit only a
+build that prints three non-zero lines. Then the device pass from section 9 (push on draft turn, haptic at 10 s,
+share an invite and open it on a second phone), and only then the Review Notes, which should name those three
+features.
+
+Two links outside the build that App Review can reach (probed 2026-11-20): the Support URL
+`https://stoekmedia.com/madness/support.html` answers 404 until #69 merges, and the App Store link that every
+invite text carries (`apps.apple.com/app/id6829126016`) answers 404 until the app is approved. The second one is
+expected during review; if approval slips past the go/no-go date, hide that line of the invite text on the website.
 
 ## 13. App Store Connect listing: ready-to-paste text (added 2026-11-10)
 
