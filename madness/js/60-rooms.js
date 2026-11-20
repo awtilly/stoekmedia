@@ -475,9 +475,10 @@ function _writeSharedState(){
         const knownGone = failedRemoving.filter(id => !there.has(id) && (_lastSnapshotPlayerIds || []).includes(id) && !(S.players || []).some(p => p.id === id));
         if(knownGone.length || failedRoster.some(id => !there.has(id) && (S.players || []).some(p => p.id === id)) || failedRemoving.some(id => there.has(id) && !(S.players || []).some(p => p.id === id))){
           const b = JSON.parse(_syncBase);
-          // (Players another save of this phone is still adding stay in the baseline, as a snapshot keeps them: one
+          // (Players another save of this phone is still adding stay in the baseline, as a snapshot keeps them, and
+          // so do players a confirmed save of this phone added whom the room as last seen does not show yet: one
           // taken off this screen next is then a removal to send, not "nothing changed".)
-          const flying = (b.players || []).filter(p => p && _rosterInFlight[p.id] && !there.has(p.id) && !knownGone.includes(p.id));
+          const flying = (b.players || []).filter(p => p && (_rosterInFlight[p.id] || (_lastSnapshotPlayerIds || []).includes(p.id)) && !there.has(p.id) && !knownGone.includes(p.id));
           b.players = (server.players || []).concat(flying, ((base && base.players) || []).filter(p => p && knownGone.includes(p.id)));
           if(_syncedShared) _syncedShared.players = JSON.parse(JSON.stringify(b.players));
           _syncBase = JSON.stringify(b);
