@@ -756,7 +756,7 @@ function _applyRoomSnapshot(doc){
     // The same text as the last update applied, with a later commit time: a newer room that happens to read the same
     // (a value changed and changed back). Nothing to draw, but it is the last word: a save confirmed after it asks.
     const newer = !!(_lastRoomDoc && _lastRoomDoc.exists && _lastRoomDoc.data().state === data.state && _laterThan(doc, _docAt(_lastRoomDoc.data())));
-    if(newer) _lastRoomDoc = doc;
+    if(newer || (echoAt && _lastRoomDoc && _lastRoomDoc.exists && _laterThan(doc, _docAt(_lastRoomDoc.data())))) _lastRoomDoc = doc;
     if(_echoWriteNo) for(const k of Object.keys(_inFlight)){ const f = _inFlight[k]; if(f.no <= _echoWriteNo && !(f.sent && _notAfter(echoAt, f.preAt, data.state === f.pre))) delete _inFlight[k]; }
     // Its new players are in the room from here on: "known", so removing one before the save is confirmed is a removal.
     if(_echoWriteNo) for(const id of Object.keys(_rosterRemoving)){ if(_rosterRemoving[id] <= _echoWriteNo) delete _rosterRemoving[id]; }
