@@ -246,7 +246,10 @@ function _plainSharedWrite(ref, json, left){ // left: the visit this save was ma
 /* Write the shared (non-view) part of S to the current room's document now. */
 function _writeSharedState(){
   const localJson = _sharedJson();
-  if(localJson === _sharedAtSync) return; // nothing shared changed since the last sync
+  // (A setting a refused save left unsent still goes out when the screen reads like the room again: a room update
+  // can show the value on this screen while an earlier save of this phone, built with the value before it, is
+  // still on its way and would land last.)
+  if(localJson === _sharedAtSync && !Object.keys(_resendKeys).length) return; // nothing shared changed since the last sync
   _sharedAtSync = localJson;
   // A private copy: S can move on (a snapshot, another edit) while the transaction below is retried.
   const shared = JSON.parse(localJson);
