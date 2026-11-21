@@ -85,6 +85,11 @@ function _resendHandedOver(id){
 }
 // Every roster id an update or a confirmed save of this visit has shown to be in the room, also one removed since.
 let _knownEver = [];
+/** For a save of an earlier visit: plus the players this phone has been shown in the same room since it came back. */
+function _knownSince(atExit, code){
+  if(!roomId || code !== roomId || !_lastSnapshotPlayerIds) return atExit;
+  return (atExit || []).concat(_knownEver, _lastSnapshotPlayerIds);
+}
 // The ids above that `players` (a roster of this phone) does not list: "removed here", whatever the server says.
 function _removedHereIds(players){
   const has = id => (players || []).some(p => p && p.id === id);
@@ -379,7 +384,7 @@ function _writeSharedState(){
     // if the server no longer has them they were removed on another phone, not added by this save.
     let known = knownIds;
     // (After Home, or Home and back: the ids as they were when this save's visit ended.)
-    const knownNow = here() ? _lastSnapshotPlayerIds : (visit === _roomGeneration ? _knownEver.concat(_lastSnapshotPlayerIds || []) : (_knownAtExit[visit] || null)); // away: no screen to ask, so every id the visit saw
+    const knownNow = here() ? _lastSnapshotPlayerIds : (visit === _roomGeneration ? _knownEver.concat(_lastSnapshotPlayerIds || []) : _knownSince(_knownAtExit[visit] || null, ref.id)); // away: no screen to ask, so every id the visit saw
     if(knownNow){
       const late = knownNow.filter(id => !(known || []).includes(id) && (shared.players || []).some(p => p && p.id === id));
       if(late.length) known = (known || []).concat(late);
