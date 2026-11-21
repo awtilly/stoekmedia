@@ -345,6 +345,13 @@ function _writeSharedState(){
       // this phone has landed: a key that newer save carries is left as the server holds it, not put back.
       for(const k in shared) ours[k] = ((mine.includes(k) && !(_keyWriteNo[k] > writeNo)) || !(k in remote)) ? shared[k] : remote[k];
       for(const k in remote){ if(!(k in ours) && !VIEW_LOCAL.includes(k)) ours[k] = remote[k]; }
+      // A player handed to this save by one that gave up, where the roster is not among the keys this save sends:
+      // written with the room's roster, as a save that sends its roster would. (It used to be left to the screen to
+      // send them again once this save was confirmed; after Home there is no screen, and the player was lost.)
+      if(!mine.includes('players')){
+        const handed = (shared.players || []).filter(p => p && _handedOver[p.id] === writeNo && !(remote.players || []).some(q => q && q.id === p.id));
+        if(handed.length) ours.players = (remote.players || []).concat(handed);
+      }
     }
     // A player this save was adding who has been taken off this phone again since: a later save carries (or has
     // already made) that removal, and this one may be landing after it. Not written.
