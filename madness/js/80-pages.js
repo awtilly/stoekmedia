@@ -660,8 +660,10 @@ function renderMyTeams(c, myId){
   const status = t => {
     const lost = (S.games || []).find(g => (g.t1 === t.id || g.t2 === t.id) && g.wid && g.wid !== t.id);
     if(lost) return 'Out \u00b7 ' + ROUND_SHORT[lost.round];
-    const nextG = (S.games || []).find(g => (g.t1 === t.id || g.t2 === t.id) && !g.wid);
-    return nextG ? RN[nextG.round] : (teamWins(t.id) === 6 ? 'Champion' : 'Alive');
+    // Still in: the round of their next game. (S.games only holds decided games, so there is no "next game" to
+    // look up; a team that has won n games plays in round n + 1.)
+    const w = teamWins(t.id);
+    return w >= 6 ? 'Champion' : (RN[w + 1] || 'Alive');
   };
   const dots = w => `<span class="wins">${Array.from({length: 6}, (_, k) => `<i class="${k < w ? 'w' : ''}"></i>`).join('')}</span>`;
   c.innerHTML = `<div class="page-title">My Teams<small>${playerDot(myId)}${escapeHtml(myP.name)}</small></div>
