@@ -94,6 +94,13 @@ function _removedHereIds(players){
 let _pendingBase = {};
 // The save whose exact echo _lastSyncedState is waiting for (0: none), and the last snapshot applied.
 let _echoWriteNo = 0;
+// What each running save last wrote and the commit time of the room it read (write number -> { json, at }), and the
+// saves whose own write this phone has since been shown by a room update (write number -> that text): such a save has
+// landed, whatever its transaction is told afterwards.
+let _saveWrote = {};
+let _landedSeen = {};
+// Players a refused save was adding (id -> true): the save may have landed all the same.
+let _refusedAdds = {};
 let _lastRoomDoc = null;
 // A snapshot with no commit time (a room last written by the previous version of the app), while a confirmed save's
 // added player is waited for: snapshots arrive in server order, so once the room that save read has been seen every
@@ -373,6 +380,8 @@ function _writeSharedState(){
     const merged = remote ? mergeSharedState(ours, remote, known, true) : ours;
     _saveBuilt[writeNo] = true; // from here on this save's roster is fixed: a player handed to it now would not be written
     const json = JSON.stringify(merged);
+    _saveWrote[writeNo] = { json, at: preAt };
+    if(json === preState) _landedSeen[writeNo] = json; // the room this run read already holds exactly what it writes
     writtenIds = (merged.players || []).map(p => p.id);
     _saveBuilt[writeNo] = writtenIds; // what this run writes: see _addHeir
     for(const id of Object.keys(_rosterInFlight)){ if(_rosterInFlight[id] === writeNo && !writtenIds.includes(id)){ delete _rosterInFlight[id]; if(here() && !(S.players || []).some(p => p && p.id === id)) _rosterGone[id] = 3; else if(here() && _syncBase && _handedOver[id] === writeNo) _resendHandedOver(id); } }
@@ -389,6 +398,14 @@ function _writeSharedState(){
       state: json,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     }, {merge: true});
+  }).catch(e => {
+    // Told the save failed, after this phone has been shown the room with the save in it: only the confirmation
+    // was lost. It is a confirmed save. (Treated as refused, the baseline went back to before the save: a player
+    // it had added, taken off this screen next, was never removed from the room, and a setting tapped back was
+    // "nothing to send".)
+    // (What its LAST run wrote: Firestore can run a save again after an earlier run has landed.)
+    if(visit === _roomGeneration && _saveWrote[writeNo] && _landedSeen[writeNo] === _saveWrote[writeNo].json) return;
+    throw e;
   }).then(() => {
     // The server now holds the roster we just wrote, and our own echo is skipped by _applyRoomSnapshot, so
     // record it here. Otherwise a player added on this device and then removed on this device would look
@@ -416,6 +433,7 @@ function _writeSharedState(){
       if((S.players || []).some(p => p && p.id === id) && _syncBase) _resendHandedOver(id); else _rosterGone[id] = 3;
     }
     const tookOff = Object.keys(_rosterRemoving).filter(id => _rosterRemoving[id] === writeNo); // the players this save removed
+    for(const p of (shared.players || [])){ if(p) delete _refusedAdds[p.id]; } // a confirmed save of this phone listed them itself: in the room for certain, and known
     for(const id of tookOff) delete _rosterRemoving[id];
     // Unless an update later than the room this save read has already been applied and does not have the player:
     // another phone took them off after this save. Nothing newer is promised, so there is nothing to wait for;
@@ -473,9 +491,13 @@ function _writeSharedState(){
     // itself is still good (its own keys over whatever the room holds then), so it is run again, a few times.
     if(e && e.code === 'aborted' && !here() && ++awayTries <= 5){ again = true; return; }
     _refusedSent.add(shared);
+    // (The save may have landed all the same and its update is still to come. That update must not be skipped as
+    // this save's echo: it is how this phone learns the room holds what it sent, such as a player it added.)
+    if(visit === _roomGeneration && _echoWriteNo === writeNo && expectSynced !== null && _lastSyncedState === expectSynced){ _lastSyncedState = _lastRoomDoc && _lastRoomDoc.exists ? _lastRoomDoc.data().state : null; _echoWriteNo = 0; }
     const failedKeys = Object.keys(_inFlight).filter(k => _inFlight[k].no === writeNo);
     if(here()) for(const k of failedKeys) _resendKeys[k] = writeNo;
     const failedRoster = Object.keys(_rosterInFlight).filter(id => _rosterInFlight[id] === writeNo);
+    if(here() && !(e && e.code === 'aborted')) for(const id of failedRoster) _refusedAdds[id] = true; // (not a save the busy room never let through: that one did not land)
     const failedRemoving = Object.keys(_rosterRemoving).filter(id => _rosterRemoving[id] === writeNo);
     dropInFlight(true); // a player this save was adding goes to a later save that still lists them
     // (A later save of this phone that started with the very same text has made the baseline its own: going back
@@ -563,7 +585,7 @@ function _writeSharedState(){
   // Counted until its last run is over: connectToRoom keeps what this save's visit knew for as long as it runs.
   _visitSaves[visit] = (_visitSaves[visit] || 0) + 1;
   _savesRunning[writeNo] = true;
-  const over = () => { if(again){ again = false; run(); return; } delete _savesRunning[writeNo]; delete _saveSends[writeNo]; delete _saveBuilt[writeNo]; for(const id of Object.keys(_handedOver)){ if(_handedOver[id] === writeNo) delete _handedOver[id]; } if(--_visitSaves[visit] <= 0) delete _visitSaves[visit]; };
+  const over = () => { if(again){ again = false; run(); return; } delete _savesRunning[writeNo]; delete _saveWrote[writeNo]; delete _landedSeen[writeNo]; delete _saveSends[writeNo]; delete _saveBuilt[writeNo]; for(const id of Object.keys(_handedOver)){ if(_handedOver[id] === writeNo) delete _handedOver[id]; } if(--_visitSaves[visit] <= 0) delete _visitSaves[visit]; };
   const run = () => attempt().then(over, over);
   run();
 }
@@ -693,6 +715,7 @@ function connectToRoom(code){
   for(const id of goneAtExit) _rosterGone[id] = 3;
   _rosterAcked = {};
   _rosterRemoving = {};
+  _refusedAdds = {};
   _echoWriteNo = 0;
   _lastRoomDoc = null;
   saveRecentRoom(code);
@@ -747,6 +770,8 @@ function _applyRoomSnapshot(doc){
   _awaitingRoom = false;
   const data = doc.data();
   if(!data || !data.state) return;
+  // (Exactly what a running save wrote, stamped later than the room that save read: the save is in the room.)
+  for(const no of Object.keys(_saveWrote)){ if(data.state === _saveWrote[no].json && _laterThan(doc, _saveWrote[no].at)) _landedSeen[no] = data.state; }
   // Firestore delivers our own write back twice (latency-compensated, then server-acked with the
   // real updatedAt). Both carry the exact string we wrote, so neither needs a parse or a redraw.
   if(data.state === _lastSyncedState){
@@ -793,6 +818,13 @@ function _applyRoomSnapshot(doc){
     _lastSnapshotPlayerIds = (remote.players || []).map(p => p.id);
     for(const id of (knownBefore || []).concat(_lastSnapshotPlayerIds)){ if(!_knownEver.includes(id)) _knownEver.push(id); }
     const shownBefore = S.players || [];
+    // A player a refused save was adding, since taken off this screen: if that save landed after all, the room has
+    // them (or will): the removal is answered like any player removed here before the room showed them.
+    for(const id of Object.keys(_refusedAdds)){
+      if(_rosterInFlight[id]) continue; // another save of this phone is adding them now
+      if(!shownBefore.some(p => p && p.id === id)){ _rosterGone[id] = 3; delete _refusedAdds[id]; }
+      else if((remote.players || []).some(p => p && p.id === id)) delete _refusedAdds[id]; // in the room and on this screen: known from here on
+    }
     // A removal still waiting to be saved (in the baseline, off this screen) and this snapshot has no such player
     // either: it may simply be older than the player. Remembered, in case a newer snapshot brings them (see _rosterGone).
     if(_firestoreWriteTimer && _syncedShared) for(const p of (_syncedShared.players || [])){
@@ -813,6 +845,8 @@ function _applyRoomSnapshot(doc){
     // A player a save of this phone is removing: this snapshot is older than that save. Kept off the screen.
     const stillRemoving = Object.keys(_rosterRemoving).filter(id => !shownBefore.some(p => p && p.id === id) && (S.players || []).some(p => p && p.id === id));
     if(stillRemoving.length){ S.players = S.players.filter(p => !(p && stillRemoving.includes(p.id))); rosterKept = true; }
+    // (Taken off this screen by this update, not by a tap here: no removal to answer.)
+    for(const id of Object.keys(_refusedAdds)){ if(shownBefore.some(p => p && p.id === id) && !(S.players || []).some(p => p && p.id === id)) delete _refusedAdds[id]; }
     // A player removed here before the room showed them, and this snapshot brings them (from the save that added
     // them): the removal stands on this screen and is saved again below. Answered a few times at most.
     for(const id of Object.keys(_rosterGone)){ if(shownBefore.some(p => p && p.id === id)) delete _rosterGone[id]; } // listed here again on purpose
