@@ -244,11 +244,13 @@ let _writeRetries = 0;
 // Settings of a save that was refused: key -> that save's number. The next save carries them whatever the baseline
 // says (earlier saves of this phone leave those keys to the refused one, so nothing else would deliver them).
 let _resendKeys = {};
-function _plainSharedWrite(ref, json, left){ // left: the visit this save was made in is over (see here() in _writeSharedState)
+function _plainSharedWrite(ref, json){
   const id = ref.id;
   _queuedPlainWrites[id] = (_queuedPlainWrites[id] || 0) + 1;
   const settled = () => { if(--_queuedPlainWrites[id] <= 0) delete _queuedPlainWrites[id]; };
-  if(!left && roomId && ref.id === roomId){
+  // (Also for a save of an earlier visit when the phone is back in this room: that visit's copy is older than
+  // the room this screen was drawn from, and sent whole it took out what every phone had added since.)
+  if(roomId && ref.id === roomId){
     const cur = {};
     for(const k in S){ if(!VIEW_LOCAL.includes(k)) cur[k] = S[k]; }
     json = JSON.stringify(cur);
@@ -263,7 +265,7 @@ function _plainSharedWrite(ref, json, left){ // left: the visit this save was ma
       // The server has this phone's whole copy now: its players are in the room, as after a confirmed save. Without
       // this, one added by this write and taken off again here looked like a player another phone had added, the
       // removal was not sent, and the player stayed in the room for everybody but this phone.
-      if(left || roomId !== id || visit !== _roomGeneration || !_lastSnapshotPlayerIds) return;
+      if(roomId !== id || visit !== _roomGeneration || !_lastSnapshotPlayerIds) return;
       try { _lastSnapshotPlayerIds = Array.from(new Set(_lastSnapshotPlayerIds.concat((JSON.parse(json).players || []).map(p => p && p.id).filter(Boolean)))); } catch(e){}
     }, err => { settled(); console.warn("Firestore offline write error:", err); });
 }
@@ -502,7 +504,7 @@ function _writeSharedState(){
     // queues and flushes on reconnect (the pre-transaction behaviour).
     if(e && (e.code === 'unavailable' || e.code === 'failed-precondition' || (typeof navigator !== 'undefined' && navigator.onLine === false))){
       dropInFlight();
-      _plainSharedWrite(ref, localJson, !here());
+      _plainSharedWrite(ref, localJson);
       return;
     }
     // Nothing is on its way any more. Where a snapshot was applied meanwhile, the baseline for this save's keys
