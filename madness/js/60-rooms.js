@@ -409,7 +409,14 @@ function _writeSharedState(){
       const landed = (shared.players || []).map(p => p && p.id).filter(id => id && _addLanded[id] && !(known || []).includes(id));
       if(landed.length) known = (known || []).concat(landed);
     }
-    const merged = remote ? mergeSharedState(ours, remote, known, true) : ours;
+    let merged = remote ? mergeSharedState(ours, remote, known, true) : ours;
+    // Reset Draft carried by this save and still the newest word on the draft: the rosters go with it. (The reset
+    // is tapped on a screen; a pick that landed before this phone was shown it is not on that screen, so "the
+    // players" were not among the keys this save changed and the pick's team stayed on a roster of a draft that
+    // had not started.)
+    if(mine && mine.includes('ds') && merged.ds && !merged.ds.started && (merged.players || []).some(p => p && p.teamIds && p.teamIds.length)){
+      merged = Object.assign({}, merged, { players: merged.players.map(p => (p && p.teamIds && p.teamIds.length) ? Object.assign({}, p, { teamIds: [] }) : p) });
+    }
     _saveBuilt[writeNo] = true; // from here on this save's roster is fixed: a player handed to it now would not be written
     const json = JSON.stringify(merged);
     _saveWrote[writeNo] = { json, at: preAt };

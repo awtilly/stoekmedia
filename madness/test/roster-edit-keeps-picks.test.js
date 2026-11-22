@@ -124,3 +124,29 @@ test('Reset Draft from this phone still empties the rosters, also when a pick la
   assert.equal(rosters(r.server()), 'p1: p2:');
   assert.equal(r.server().ds.started, false);
 }));
+
+/* The other way round: Reset Draft is tapped on a screen. A pick that landed before this phone was shown it is
+ * not on that screen, so the rosters there are already what the reset wants and "the players" are not among
+ * the keys the save changed: the reset landed, and the pick's team stayed on a roster of a draft not started. */
+test('Reset Draft tapped while a pick lands leaves no team on a roster', withTimers(async () => {
+  const r = draftRoom(0);                                    // this screen: nobody has picked yet
+  r.app.S.ds = { order: [], cp: 0, started: false, complete: false, epoch: 2 }; // as resetDraft() does
+  r.app.S.players.forEach(p => { p.teamIds = []; });
+  r.app._debouncedFirestoreWrite();
+  await r.fire();
+  r.elsewhere(room => { room.players[0].teamIds.push('t1'); room.ds.cp = 1; }); // a pick lands first
+  await r.finish(0);
+  assert.equal(r.server().ds.started, false, 'the reset is in the room');
+  assert.equal(rosters(r.server()), 'p1: p2:', 'and no pick is left on a roster');
+}));
+
+test('a pause that loses to a pick that landed meanwhile leaves the rosters alone', withTimers(async () => {
+  const r = draftRoom(1);
+  r.app.S.ds = Object.assign({}, r.app.S.ds, { timerPaused: true, pausedRemaining: 5000, pickDeadline: null }); // as pauseDraftClock() does
+  r.app._debouncedFirestoreWrite();
+  await r.fire();
+  r.elsewhere(room => { room.players[1].teamIds.push('t2'); room.ds.cp = 2; });
+  await r.finish(0);
+  assert.equal(rosters(r.server()), 'p1:t1 p2:t2');
+  assert.equal(r.server().ds.cp, 2);
+}));
