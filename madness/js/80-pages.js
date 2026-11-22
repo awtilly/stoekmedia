@@ -751,7 +751,9 @@ async function startDraft(){
         // (Players the room has and this screen does not yet, joined a second ago elsewhere, are in the draft as before.)
         if(_startWouldMissLocal(players, teams)) throw { code: 'unsaved', msg: 'Still saving your last change. Tap Start Draft again in a moment.' };
         if(players.length < 2 || teams.length < players.length) throw { code: 'not-ready', msg: 'Need 2+ players and at least one team per player' };
+        const roomEpoch = (remote.ds && remote.ds.epoch) || 0; // the room may be ahead of this screen (a reset or undo not shown here yet)
         remote.ds = _freshDraftState(players, teams, duration);
+        if(remote.ds.epoch <= roomEpoch) remote.ds.epoch = roomEpoch + 1;
         players.forEach(p => p.teamIds = []);
         tx.update(ref, {
           state: JSON.stringify(remote),
