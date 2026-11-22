@@ -366,7 +366,8 @@ function _writeSharedState(){
       // The rosters (who picked which team) change only together with the draft state: a pick, an undo, a reset.
       // A save that does not carry the draft state takes them as the room holds them. (Its copy of the draft state
       // is the room's by now, so the merge below cannot tell that its copy of the rosters is the older one: a
-      // player renamed or moved while a pick was landing took that pick's team off the roster again.)
+      // seat claimed with a PIN, a late joiner or a player moved in the list while a pick was landing took that
+      // pick's team off the roster again.)
       if(!mine.includes('ds') && Array.isArray(ours.players)){
         const picks = {};
         for(const p of (remote.players || [])){ if(p && p.id) picks[p.id] = p.teamIds || []; }
