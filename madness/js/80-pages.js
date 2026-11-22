@@ -704,7 +704,9 @@ async function startDraft(){
         if(remote.ds && remote.ds.started) throw { code: 'started', msg: 'The draft was already started on another device' };
         const players = remote.players || [], teams = remote.teams || [];
         if(players.length < 2 || teams.length < players.length) throw { code: 'not-ready', msg: 'Need 2+ players and at least one team per player' };
+        const roomEpoch = (remote.ds && remote.ds.epoch) || 0; // the room may be ahead of this screen (a reset or undo not shown here yet)
         remote.ds = _freshDraftState(players, teams, duration);
+        if(remote.ds.epoch <= roomEpoch) remote.ds.epoch = roomEpoch + 1;
         players.forEach(p => p.teamIds = []);
         tx.update(ref, {
           state: JSON.stringify(remote),

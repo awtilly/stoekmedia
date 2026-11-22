@@ -95,3 +95,23 @@ test('locally started draft is refused a second time; solo rooms still start loc
   assert.equal(app.__calls.saveState, 1);
   assert.equal(calls.update, 0);
 });
+/* The new draft must outrank everything the room has seen. Its epoch used to come from this screen only: a start
+ * on a screen that had not been shown the last reset or undo gave the new draft a LOWER epoch than the room's. */
+test('room: the new draft outranks the room, also when this screen is behind on resets and undos', async () => {
+  const { app, calls } = draftApp({ players: twoPlayers(), teams: fourTeams(), ds: { started: false, order: [], cp: 0, epoch: 5 } });
+  app.S.players = twoPlayers();
+  app.S.teams = fourTeams();
+  app.S.ds = { started: false, order: [], cp: 0, epoch: 2 }; // this screen: two resets behind
+  await app.startDraft();
+  assert.equal(calls.update, 1);
+  assert.equal(calls.written.ds.epoch, 6);
+});
+
+test('room: a screen ahead of the room still counts on from its own epoch', async () => {
+  const { app, calls } = draftApp({ players: twoPlayers(), teams: fourTeams(), ds: { started: false, order: [], cp: 0, epoch: 1 } });
+  app.S.players = twoPlayers();
+  app.S.teams = fourTeams();
+  app.S.ds = { started: false, order: [], cp: 0, epoch: 4 }; // a reset made here, still on its way
+  await app.startDraft();
+  assert.equal(calls.written.ds.epoch, 5);
+});
