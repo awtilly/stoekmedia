@@ -106,6 +106,9 @@ let _saveWrote = {};
 let _landedSeen = {};
 // Players a refused save was adding (id -> true): the save may have landed all the same.
 let _refusedAdds = {};
+// Players this phone is adding whom a run of one of its saves has found in the room: the add has landed, whatever
+// the phone is told about that save afterwards. (Ids are made on this phone, so nobody else can have added them.)
+let _addLanded = {};
 let _lastRoomDoc = null;
 // A snapshot with no commit time (a room last written by the previous version of the app), while a confirmed save's
 // added player is waited for: snapshots arrive in server order, so once the room that save read has been seen every
@@ -339,6 +342,7 @@ function _writeSharedState(){
     // Cleaned like every copy this device shows: the merge below reads its roster and draft state.
     const remote = snap.exists && snap.data().state ? sanitizeSharedState(JSON.parse(snap.data().state)) : null;
     preState = snap.exists ? snap.data().state : null;
+    if(remote) for(const p of (remote.players || [])){ if(p && (_rosterInFlight[p.id] || adding.includes(p.id) || earlier[p.id])) _addLanded[p.id] = true; } // (adding / earlier: after Home and back the new visit no longer has them as on their way)
     const preAt = snap.exists ? _docAt(snap.data()) : null;
     preAtSaved = preAt;
     for(const k in _inFlight){ if(_inFlight[k].no === writeNo){ _inFlight[k].sent = true; _inFlight[k].pre = preState; _inFlight[k].preAt = preAt; _inFlight[k].sawPre = _serverSeen === preState; } }
@@ -388,6 +392,11 @@ function _writeSharedState(){
     if(knownNow){
       const late = knownNow.filter(id => !(known || []).includes(id) && (shared.players || []).some(p => p && p.id === id));
       if(late.length) known = (known || []).concat(late);
+    }
+    // And the players it lists whom a run of a save of this phone has read in the room (see _addLanded).
+    {
+      const landed = (shared.players || []).map(p => p && p.id).filter(id => id && _addLanded[id] && !(known || []).includes(id));
+      if(landed.length) known = (known || []).concat(landed);
     }
     const merged = remote ? mergeSharedState(ours, remote, known, true) : ours;
     _saveBuilt[writeNo] = true; // from here on this save's roster is fixed: a player handed to it now would not be written
@@ -706,7 +715,7 @@ function connectToRoom(code){
   // (_recentSent too: the update that brings a save from the last visit is this phone's own value, not another phone's change.)
   const changedRoom = code !== _writeNoRoom;
   const goneAtExit = changedRoom ? [] : _removedHereIds(S.players); // read before the lists below are emptied
-  if(changedRoom){ _recentSent = []; _keyWriteNo = {}; _rosterRemovedNo = {}; _writeNoRoom = code; } // kept for the same room: a save from the last visit may still be on its way
+  if(changedRoom){ _recentSent = []; _keyWriteNo = {}; _rosterRemovedNo = {}; _addLanded = {}; _writeNoRoom = code; } // kept for the same room: a save from the last visit may still be on its way
   else { for(const id of _removedHereIds(S.players)) _rosterRemovedNo[id] = _writeSeq + 1; } // added and taken off again in the last visit (S is this phone's cached copy of that screen): the save that was adding them leaves them out
   // A setting a save from the last visit to this room is still carrying stays in flight (`carried`): until that save
   // is seen, the value it sent is this phone's baseline for the setting, as it was before Home.
