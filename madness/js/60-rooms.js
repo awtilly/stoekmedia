@@ -363,6 +363,15 @@ function _writeSharedState(){
         const handed = (shared.players || []).filter(p => p && _handedOver[p.id] === writeNo && !(remote.players || []).some(q => q && q.id === p.id));
         if(handed.length) ours.players = (remote.players || []).concat(handed);
       }
+      // The rosters (who picked which team) change only together with the draft state: a pick, an undo, a reset.
+      // A save that does not carry the draft state takes them as the room holds them. (Its copy of the draft state
+      // is the room's by now, so the merge below cannot tell that its copy of the rosters is the older one: a
+      // player renamed or moved while a pick was landing took that pick's team off the roster again.)
+      if(!mine.includes('ds') && Array.isArray(ours.players)){
+        const picks = {};
+        for(const p of (remote.players || [])){ if(p && p.id) picks[p.id] = p.teamIds || []; }
+        ours.players = ours.players.map(p => (p && picks[p.id]) ? Object.assign({}, p, { teamIds: picks[p.id] }) : p);
+      }
     }
     // A player this save was adding who has been taken off this phone again since: a later save carries (or has
     // already made) that removal, and this one may be landing after it. Not written.
