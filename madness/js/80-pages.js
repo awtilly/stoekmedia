@@ -870,7 +870,8 @@ async function resetDraft(){
   // reached the room in that moment could win over it, and the draft kept running without a word. Now it is
   // numbered one above whatever the room holds when it is written, and it either lands or says so.
   if(roomId){
-    if(_resetInFlight) return;
+    // (Not dropped without a word: the first reset may already be in the room and the draft started again since.)
+    if(_resetInFlight){ showToast('Still resetting — tap Reset again in a moment'); return; }
     _resetInFlight = true;
     try {
       await db.runTransaction(async (tx) => {
