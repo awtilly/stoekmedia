@@ -191,6 +191,11 @@ function _pendingLocalEdits(remote, baseRaw, seenRaw, at){
   if(!Object.keys(edits).length) return null;
   if('ds' in edits || 'players' in edits){
     const gone = _removedHereIds(S.players);
+    // A Reset Draft of this screen that is not sent yet, and the room's running draft has the same draft number (an
+    // Undo this screen had not been shown when Reset was tapped): the reset stays, one above the room (see the same
+    // tie in _writeSharedState). It used to be replaced by the running draft here, and was never sent.
+    const resetTie = ('ds' in edits) && S.ds && !S.ds.started && remote && remote.ds && remote.ds.started && (remote.ds.epoch || 0) === (S.ds.epoch || 0);
+    if(resetTie) S.ds = Object.assign({}, S.ds, { epoch: (remote.ds.epoch || 0) + 1 });
     const merged = mergeSharedState({ ds: S.ds, players: S.players }, remote, gone.length ? (_lastSnapshotPlayerIds || []).concat(gone) : _lastSnapshotPlayerIds);
     if('ds' in edits) edits.ds = merged.ds;
     if('players' in edits) edits.players = merged.players;
@@ -376,6 +381,13 @@ function _writeSharedState(){
         for(const p of (remote.players || [])){ if(p && p.id) picks[p.id] = p.teamIds || []; }
         ours.players = ours.players.map(p => (p && picks[p.id]) ? Object.assign({}, p, { teamIds: picks[p.id] }) : p);
       }
+    }
+    // Reset Draft carried by this save, and the room's draft is running under the same draft number: an Undo
+    // landed since the reset was tapped (both count one on from the same draft). Between equal numbers the draft
+    // that is further along wins, so the reset used to be dropped without a word. It goes out one above the room.
+    // (Only for this tie: a draft that was reset and started again since is two or more above, and stays.)
+    if(remote && mine && mine.includes('ds') && ours.ds && !ours.ds.started && remote.ds && remote.ds.started && (remote.ds.epoch || 0) === (ours.ds.epoch || 0)){
+      ours = Object.assign({}, ours, { ds: Object.assign({}, ours.ds, { epoch: (remote.ds.epoch || 0) + 1 }) });
     }
     // A player this save was adding who has been taken off this phone again since: a later save carries (or has
     // already made) that removal, and this one may be landing after it. Not written.
