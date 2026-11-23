@@ -129,3 +129,30 @@ test('a reset with nothing else going on is numbered as before', withTimers(asyn
   assert.equal(r.server().ds.started, false);
   assert.equal(r.server().ds.epoch, 2);
 }));
+
+/* The same tie one step earlier, on the screen: Reset tapped on a screen that had not been shown the Undo yet. The
+ * update bringing the undone draft (same draft number as the reset) arrives inside the save delay. */
+test('a reset not sent yet stays on the screen when the update with an Undo arrives, and then lands', withTimers(async () => {
+  const r = draftRoom(2);
+  const undone = r.elsewhere(undoElsewhere);  // in the room, not shown here yet
+  resetHere(r);
+  r.deliver(undone);
+  assert.equal(r.app.S.ds.started, false, 'the reset is still what this screen shows');
+  await r.fire();
+  await r.finish(0);
+  assert.equal(r.server().ds.started, false, 'and it reached the room');
+  assert.equal(r.server().ds.epoch, 3);
+  assert.equal(rosters(r.server()), 'p1: p2:');
+}));
+
+test('an update with a draft that was reset and started again elsewhere still replaces a reset not sent yet', withTimers(async () => {
+  const r = draftRoom(2);
+  const restarted = r.elsewhere(room => {
+    room.ds = { order: ['p2', 'p1', 'p1', 'p2'], cp: 1, started: true, complete: false, epoch: 3 };
+    room.players[0].teamIds = []; room.players[1].teamIds = ['t3'];
+  });
+  resetHere(r);                               // numbered 2
+  r.deliver(restarted);
+  assert.equal(r.app.S.ds.started, true);
+  assert.equal(r.app.S.ds.epoch, 3);
+}));

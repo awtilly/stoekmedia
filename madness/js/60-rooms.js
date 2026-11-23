@@ -191,6 +191,11 @@ function _pendingLocalEdits(remote, baseRaw, seenRaw, at){
   if(!Object.keys(edits).length) return null;
   if('ds' in edits || 'players' in edits){
     const gone = _removedHereIds(S.players);
+    // A Reset Draft of this screen that is not sent yet, and the room's running draft has the same draft number (an
+    // Undo this screen had not been shown when Reset was tapped): the reset stays, one above the room (see the same
+    // tie in _writeSharedState). It used to be replaced by the running draft here, and was never sent.
+    const resetTie = ('ds' in edits) && S.ds && !S.ds.started && remote && remote.ds && remote.ds.started && (remote.ds.epoch || 0) === (S.ds.epoch || 0);
+    if(resetTie) S.ds = Object.assign({}, S.ds, { epoch: (remote.ds.epoch || 0) + 1 });
     const merged = mergeSharedState({ ds: S.ds, players: S.players }, remote, gone.length ? (_lastSnapshotPlayerIds || []).concat(gone) : _lastSnapshotPlayerIds);
     if('ds' in edits) edits.ds = merged.ds;
     if('players' in edits) edits.players = merged.players;
