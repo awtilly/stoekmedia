@@ -861,9 +861,38 @@ async function undoDraft(){
   render();
 }
 
+let _resetInFlight = false; // a reset is being written: a second tap waits for it
 async function resetDraft(){
   if(!await requireAdmin()) return;
   if(!await appConfirm("Reset the entire draft? All picks will be lost.", { title: 'Reset Draft', danger: true, confirmLabel: 'Reset' })) return;
+  // Room: reset transactionally against the server copy, like startDraft(), undoDraft() and pickTeam(). The reset
+  // used to be a change on this screen, sent a moment later with everything else: an Undo or a run of picks that
+  // reached the room in that moment could win over it, and the draft kept running without a word. Now it is
+  // numbered one above whatever the room holds when it is written, and it either lands or says so.
+  if(roomId){
+    if(_resetInFlight) return;
+    _resetInFlight = true;
+    try {
+      await db.runTransaction(async (tx) => {
+        const ref = db.collection("rooms").doc(roomId);
+        const snap = await tx.get(ref);
+        if(!snap.exists) throw { code: 'no-room', msg: 'Room not found' };
+        const remote = JSON.parse(snap.data().state || '{}');
+        const roomEpoch = (remote.ds && remote.ds.epoch) || 0;
+        remote.ds = {order:[], cp:0, started:false, complete:false, epoch: Math.max(roomEpoch, (S.ds && S.ds.epoch) || 0) + 1};
+        (remote.players || []).forEach(p => { if(p) p.teamIds = []; });
+        tx.update(ref, {
+          state: JSON.stringify(remote),
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+      });
+      stopDraftClock(); // the snapshot listener applies the reset draft and render() shows the lobby
+    } catch(err){
+      if(err && err.msg) showToast(err.msg);
+      else { console.warn('Reset draft failed:', err); showToast('Reset failed \u2014 try again'); }
+    } finally { _resetInFlight = false; }
+    return;
+  }
   stopDraftClock();
   S.ds = {order:[], cp:0, started:false, complete:false, epoch: ((S.ds && S.ds.epoch) || 0) + 1};
   S.players.forEach(p => p.teamIds = []);
