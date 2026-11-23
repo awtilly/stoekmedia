@@ -49,7 +49,7 @@ test('room: a failed gameResults read still advances locally but is retried on t
   await app.checkGameFinals();
   assert.equal(calls.set, 1, 'retry reported the final');
   assert.equal(reported.size, 1);
-  assert.equal(app.__calls.saveState, 0, 'bracket already advanced on the first pass: nothing new to sync');
+  assert.equal(app.__calls.saveState, 1, 'the retry made this device the first reporter: the advance from the first pass is saved to the room now');
   await app.checkGameFinals();
   assert.equal(calls.set, 1, 'third poll is a no-op');
 });
