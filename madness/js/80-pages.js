@@ -269,10 +269,14 @@ async function addPlayer(){
   setTimeout(() => document.getElementById("pn")?.focus(), 0);
 }
 
+// Players taken off on THIS phone. Until that save has reached the room, the room's copy still lists them.
+let _removedHere = {};
+
 async function removePlayer(id){
   if(!await requireAdmin()) return;
   // ds.order was fixed when the draft started; dropping a player leaves their id in it (a turn nobody can take).
   if(S.ds && S.ds.started){ showToast('The draft has started. Reset the draft before removing a player.'); return; }
+  _removedHere[id] = true; // see _startWouldMissLocal
   S.players = S.players.filter(p => p.id !== id);
   saveState();
   render();
@@ -687,12 +691,16 @@ function _freshDraftState(players, teams, duration){
   };
 }
 
-/* True when this screen shows a player the room's copy does not have, or a different set of teams. */
+/* True when this screen shows a player the room's copy does not have, or a different set of teams, or when the room
+   still has a player who was removed on this phone a moment ago and is not on this screen: started now, the draft
+   would give that player turns, and the removal landing afterwards leaves turns nobody can take. (A removed player
+   who is back on this screen, because the removal did not go through, is in the draft like everybody else.) */
 function _startWouldMissLocal(players, teams){
   const has = (list, id) => list.some(x => x && x.id === id);
   const mine = S.teams || [];
   // Counted the way this screen got them: a record with an id the app does not accept was never shown here.
   const theirs = teams.filter(t => t && isSafeId(t.id));
+  if(players.some(p => p && _removedHere[p.id] && !has(S.players || [], p.id))) return true;
   return (S.players || []).some(p => !has(players, p.id)) || mine.length !== theirs.length || mine.some(t => !has(theirs, t.id));
 }
 
