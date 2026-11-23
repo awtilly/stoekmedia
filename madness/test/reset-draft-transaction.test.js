@@ -91,3 +91,18 @@ test('no room: Reset Draft works on this phone as before', async () => {
   assert.equal(app.S.ds.started, false);
   assert.equal(calls.saved, 1);
 });
+
+test('room: a second Reset tapped before the first is confirmed is answered, not dropped without a word', async () => {
+  const { app, calls } = draftApp(running(2, 1));
+  Object.assign(app.S, running(2, 1));
+  let release; const held = new Promise(r => { release = r; });
+  app.db.runTransaction = async () => { calls.update++; await held; };
+  const first = app.resetDraft();
+  await new Promise(r => setImmediate(r));
+  await app.resetDraft();
+  assert.equal(calls.update, 1, 'one write at a time');
+  assert.match(calls.toasts.join('|'), /Still resetting/);
+  release(); await first;
+  await app.resetDraft();
+  assert.equal(calls.update, 2, 'and the next tap goes through');
+});
