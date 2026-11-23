@@ -663,9 +663,10 @@ async function confirmPick(tid){
   if(!t) return;
   const rec = teamRecordDisplay(t);
   const seenCp = S.ds ? S.ds.cp : null; // the pick this tap is for: see pickTeam
+  const seenEpoch = S.ds ? (S.ds.epoch || 0) : null; // and the draft it is for
   // appConfirm escapes its text, so the message is built as plain text.
   const ok = await appConfirm(t.seed + ' seed \u00b7 ' + t.region + (rec ? ' \u00b7 ' + rec : ''), { title: teamDisplayName(t), confirmLabel: 'Draft ' + teamDisplayName(t) });
-  if(ok) pickTeam(tid, seenCp);
+  if(ok) pickTeam(tid, seenCp, seenEpoch);
 }
 
 /* ── My Teams (after the draft) ── */
@@ -780,7 +781,7 @@ async function startDraft(){
 // Eliminates the "two clients pick at once" race that broke the live draft last year.
 // Server-state is the source of truth; local S updates via the snapshot listener.
 let _pickInFlight = false;
-async function pickTeam(tid, seenCp){
+async function pickTeam(tid, seenCp, seenEpoch){
   if(_pickInFlight) return; // ignore re-entrant taps while a pick is settling
   const myId = getMyPlayerId();
   // No-room (solo/offline) mode: simple local mutation
@@ -800,6 +801,9 @@ async function pickTeam(tid, seenCp){
       // An unlocked commissioner may pick for whoever is on the clock, so the turn check below does not apply. If
       // the draft has moved on since the tap (that player, or the auto-pick, picked at the same moment), this team
       // would go to the NEXT player: refuse, and let the commissioner look again.
+      // The tap was made in a draft that has been reset and started again (or a pick was undone) while it was on its
+      // way: the same position can be another player's turn now. Nobody chose this team for the draft as it is.
+      if(seenEpoch != null && (ds.epoch || 0) !== seenEpoch) throw { code: 'moved', msg: 'The draft was just changed. Check who is on the clock, then pick again.' };
       if(adminUnlocked && seenCp != null && ds.cp !== seenCp) throw { code: 'moved', msg: 'Another pick just came in. Check who is on the clock, then pick again.' };
       if(!adminUnlocked && myId !== ds.order[ds.cp]){
         throw { code: 'not-turn', msg: "It's not your turn anymore" };
