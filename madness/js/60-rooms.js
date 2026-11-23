@@ -368,7 +368,10 @@ function _writeSharedState(){
       // is the room's by now, so the merge below cannot tell that its copy of the rosters is the older one: a
       // seat claimed with a PIN, a late joiner or a player moved in the list while a pick was landing took that
       // pick's team off the roster again.)
-      if(!mine.includes('ds') && Array.isArray(ours.players)){
+      // The same for a save that carries a draft that is running on this screen (a pause, a resume): the rosters
+      // are not its to change, and this screen can hold older ones (a Reset Draft tapped here that lost to a pick,
+      // then a pause tapped on the draft that came back, wrote the reset's empty rosters into the running draft).
+      if((!mine.includes('ds') || (shared.ds && shared.ds.started)) && Array.isArray(ours.players)){
         const picks = {};
         for(const p of (remote.players || [])){ if(p && p.id) picks[p.id] = p.teamIds || []; }
         ours.players = ours.players.map(p => (p && picks[p.id]) ? Object.assign({}, p, { teamIds: picks[p.id] }) : p);
@@ -417,6 +420,18 @@ function _writeSharedState(){
     // had not started.)
     if(mine && mine.includes('ds') && merged.ds && !merged.ds.started && (merged.players || []).some(p => p && p.teamIds && p.teamIds.length)){
       merged = Object.assign({}, merged, { players: merged.players.map(p => (p && p.teamIds && p.teamIds.length) ? Object.assign({}, p, { teamIds: [] }) : p) });
+    }
+    // A removal carried by this save (tapped on a screen whose draft had not started) while the room's draft is
+    // running with that player in its order: the player stays, as the room holds them. Taken out now, their turns
+    // would be left for nobody and the draft stops there. (removePlayer refuses the same tap on a started screen.)
+    if(remote && merged.ds && merged.ds.started && Array.isArray(merged.ds.order) && Array.isArray(merged.players)){
+      const have = new Set(merged.players.map(p => p && p.id));
+      const _keptDrafting = (remote.players || []).filter(p => p && p.id && !have.has(p.id) && merged.ds.order.includes(p.id));
+      if(_keptDrafting.length){
+        const players = merged.players.slice();
+        for(const p of _keptDrafting) players.splice(Math.min(remote.players.indexOf(p), players.length), 0, p);
+        merged = Object.assign({}, merged, { players });
+      }
     }
     _saveBuilt[writeNo] = true; // from here on this save's roster is fixed: a player handed to it now would not be written
     const json = JSON.stringify(merged);
