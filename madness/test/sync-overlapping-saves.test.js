@@ -85,7 +85,7 @@ test('another phone changing the SAME setting still wins over an edit waiting in
   tap('South', 1, 'South-8');                     // waiting in the debounce
   deliver(elsewhere(r => { r.bracket.South[0] = 'South-16'; })); // somebody else corrects game 0
   assert.equal(app.S.bracket.South[0], 'South-16', 'the other phone\'s bracket is shown');
-  assert.equal(app.S.bracket.South[1], null, 'as before, the whole bracket is theirs');
+  assert.equal(app.S.bracket.South[1], 'South-8', 'and the result entered here for ANOTHER game stays on top of it (it used to be dropped with the rest of this phone\'s bracket)');
 }));
 
 test('snapshots applied during a save are noticed even when they end on the state the save started from', withTimers(async () => {
