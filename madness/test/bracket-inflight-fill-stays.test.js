@@ -115,15 +115,103 @@ test('finals scored during a poll, after the save in flight was started, stay on
   assert.equal(gameIds(r.server()), 'South_0:S1 South_1:S8 South_2:S5');
 }));
 
-test('a winner an update brought and the room has dropped since is not kept while a save of this phone is on its way', withTimers(async () => {
+/* A correction (a winner changed or cleared) is written whole by the phone that made it. It can have landed after
+ * this phone's save, and the room then no longer has this phone's winners: the screen follows it, and this phone's
+ * final is back with the update that carries its own save. */
+test('a correction that arrives while a save of this phone is on its way wins on the screen; the final is back once the save has landed', withTimers(async () => {
   const r = bracketRoom();
   fill(r, 0, 'S1');
   await r.fire();                                   // this phone's save is started
   r.deliver(fillElsewhere(r, 1, 'S8', 'S8', 'S9')); // another phone's winner arrives: shown next to ours
   assert.equal(r.app.S.bracket.South[1], 'S8');
+  assert.equal(r.app.S.bracket.South[0], 'S1');
   r.deliver(r.elsewhere(room => { room.bracket.South[1] = null; room.games = room.games.filter(g => g.id !== 'South_1'); })); // the commissioner clears it
   assert.equal(r.app.S.bracket.South[1], null, 'the cleared winner is gone here too');
-  assert.equal(r.app.S.bracket.South[0], 'S1', 'this phone\'s own final is still shown');
   await r.finish(0);
-  assert.equal(gameIds(r.server()), 'South_0:S1');
+  r.deliver(r.now());
+  assert.equal(gameIds(r.server()), 'South_0:S1', 'this phone\'s final is in the room');
+  assert.equal(r.app.S.bracket.South[0], 'S1', 'and on its screen');
+  assert.equal(gameIds(r.app.S), 'South_0:S1');
 }));
+
+/** The room already holds South game 1 (S8), shown to this phone. */
+const roomWithS8 = () => { const r = bracketRoom(); r.deliver(fillElsewhere(r, 1, 'S8', 'S8', 'S9')); return r; };
+/** This phone's save is in the room, its confirmation has not come back yet. */
+const landUnconfirmed = async (r, i) => { r.txs[i].rerun = true; for (let n = 0; n < 8 && !r.txs[i].done; n++) { r.txs[i].go(); await r.flush(); } assert.equal(r.txs[i].done, true); };
+
+test('a correction written whole AFTER this phone\'s save landed: the screen shows the room, not the final the room no longer has', withTimers(async () => {
+  const r = roomWithS8();
+  fill(r, 0, 'S1');
+  await r.fire();
+  await landUnconfirmed(r, 0);
+  assert.equal(gameIds(r.server()), 'South_0:S1 South_1:S8');
+  // another phone, which had not been shown S1, corrects game 1 and writes its whole bracket
+  r.deliver(r.elsewhere(room => { room.bracket.South[0] = null; room.bracket.South[1] = 'S9'; room.games = [{ id: 'South_1', round: 1, t1: 'S8', t2: 'S9', wid: 'S9' }]; }));
+  assert.deepEqual(r.app.S.bracket.South.slice(0, 2), r.server().bracket.South.slice(0, 2), 'this screen shows what the room holds');
+  assert.equal(gameIds(r.app.S), gameIds(r.server()));
+}));
+
+test('two phones fill the same game differently: the screen shows the winner the update brings', withTimers(async () => {
+  const r = bracketRoom();
+  fill(r, 0, 'S1');
+  await r.fire();
+  await landUnconfirmed(r, 0);
+  r.deliver(r.elsewhere(room => { room.bracket.South[0] = 'S16'; room.games = [{ id: 'South_0', round: 1, t1: 'S1', t2: 'S16', wid: 'S16' }]; })); // the commissioner's tap, after ours
+  assert.equal(r.app.S.bracket.South[0], 'S16');
+  assert.equal(gameIds(r.app.S), 'South_0:S16');
+}));
+
+test('a final on its way stays next to an update that fills OTHER games, and the games list on the screen is the one that bracket makes', withTimers(async () => {
+  const r = bracketRoom();
+  fill(r, 0, 'S1');
+  await r.fire();
+  r.deliver(fillElsewhere(r, 1, 'S8', 'S8', 'S9'));
+  assert.equal(gameIds(r.app.S), 'South_0:S1 South_1:S8');
+  r.deliver(fillElsewhere(r, 2, 'S5', 'S5', 'S12'));
+  assert.equal(gameIds(r.app.S), 'South_0:S1 South_1:S8 South_2:S5');
+  await r.finish(0);
+  r.deliver(r.now());
+  assert.equal(gameIds(r.server()), 'South_0:S1 South_1:S8 South_2:S5');
+  assert.equal(gameIds(r.app.S), gameIds(r.server()));
+}));
+
+test('a save that carries a corrected bracket and not the games list still writes the list that bracket makes', withTimers(async () => {
+  const r = roomWithS8();
+  r.app.S.bracket.South[1] = 'S9';                  // a winner changed here; the games list on this screen is not rebuilt yet
+  r.app._debouncedFirestoreWrite();
+  await r.fire();
+  await r.finish(0);
+  assert.equal(r.server().bracket.South[1], 'S9');
+  assert.equal(gameIds(r.server()), 'South_1:S9', 'the room\'s list follows the bracket written');
+}));
+
+test('a winner corrected here stays on the screen when the echo of this phone\'s own older save arrives', withTimers(async () => {
+  const r = bracketRoom();
+  fill(r, 0, 'S1');
+  await r.fire();
+  await r.finish(0);
+  const echo = r.now();                             // the update that carries save 1, still on its way to this phone
+  r.app.S.bracket.South[0] = 'S16'; r.app.eval('syncGames()'); r.app._debouncedFirestoreWrite(); // corrected here
+  await r.fire();                                   // save 2 is started
+  r.deliver(echo);
+  assert.equal(r.app.S.bracket.South[0], 'S16', 'the correction is still shown');
+  await r.finish(1);
+  assert.equal(gameIds(r.server()), 'South_0:S16');
+}));
+
+/* A score check fills its slots one by one and starts the save at its end: in between, the screen is ahead of the
+ * room with no save waiting and none on its way. */
+test('finals filled during a score check, before any save is started, stay when an update arrives', withTimers(async () => {
+  const r = bracketRoom();
+  r.app.S.bracket.South[0] = 'S1';                  // the check has filled its first final; it is still reading the others
+  r.deliver(fillElsewhere(r, 1, 'S8', 'S8', 'S9')); // another phone's winner arrives
+  assert.equal(r.app.S.bracket.South[0], 'S1', 'this phone\'s final is still shown');
+  assert.equal(r.app.S.bracket.South[1], 'S8');
+  r.deliver(fillElsewhere(r, 2, 'S5', 'S5', 'S12')); // and a second update before the check ends
+  assert.deepEqual(r.app.S.bracket.South.slice(0, 3), ['S1', 'S8', 'S5']);
+  r.app.eval('syncGames()'); r.app._debouncedFirestoreWrite(); // the end of the check
+  await r.fire();
+  await r.finish(0);
+  assert.equal(gameIds(r.server()), 'South_0:S1 South_1:S8 South_2:S5');
+}));
+
