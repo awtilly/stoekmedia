@@ -1,13 +1,13 @@
 name: Madness tests
 
 # Runs the Madness unit suite (zero dependencies: node:test only) and checks that index.html carries the
-# current js/ stamp, on every pull request or push that touches madness/. Nothing is deployed from here.
+# current js/ stamp, on every pull request or push that touches madness/ (or this file). Nothing is deployed from here.
 on:
   pull_request:
-    paths: ['madness/**']
+    paths: ['madness/**', '.github/workflows/madness-tests.yml']
   push:
     branches: [main]
-    paths: ['madness/**']
+    paths: ['madness/**', '.github/workflows/madness-tests.yml']
 
 # Read-only: the job only checks out the code and runs the tests.
 permissions:
