@@ -26,14 +26,6 @@
     <priority>0.9</priority>
   </url>
 
-  <!-- ShopCaddie Landing Page -->
-  <url>
-    <loc>https://stoekmedia.com/software/shopcaddie/</loc>
-    <lastmod>2026-05-15</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.7</priority>
-  </url>
-
   <!-- Bookings / Contact -->
   <url>
     <loc>https://stoekmedia.com/bookings/</loc>
@@ -130,6 +122,14 @@
     <lastmod>2026-05-15</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
+  </url>
+
+  <!-- Privacy -->
+  <url>
+    <loc>https://stoekmedia.com/privacy/</loc>
+    <lastmod>2026-11-13</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.2</priority>
   </url>
 
 </urlset>
