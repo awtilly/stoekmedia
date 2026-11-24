@@ -134,6 +134,33 @@ function _docAt(data){
 // True when both times are known and `at` is not later than `pre`. Equal times: only when the caller says the
 // document is the very one `pre` was read from (`same`); two different documents with one stamp are not ordered.
 function _notAfter(at, pre, same){ return !!(at && pre) && (at.s < pre.s || (at.s === pre.s && (at.n < pre.n || (at.n === pre.n && same !== false)))); }
+// The bracket is saved as one key, but it is filled one game at a time, by whichever phone sees a final first.
+// An edit that only FILLS slots that were open (it never changes or clears a winner), laid over the room's
+// bracket: the room's winners stay and this phone's new ones are added. null when the edit is not of that kind
+// or the shapes differ (the copy then goes out as it is, as before).
+// keepMine (the save itself): a winner this copy holds stays even where the room has none. The copy can be ahead
+// of the room there (an earlier save of this phone still on its way), so only winners this copy lacks are taken from the room.
+function _bracketFillsOnto(base, mineB, theirs, keepMine){
+  if(!base || !mineB || !theirs) return null;
+  const out = {};
+  for(const k of Object.keys(mineB)){
+    const b = base[k], m = mineB[k], t = theirs[k];
+    if(!Array.isArray(b) || !Array.isArray(m) || !Array.isArray(t) || b.length !== m.length || t.length !== m.length) return null;
+    out[k] = [];
+    for(let i = 0; i < m.length; i++){
+      if(b[i] && m[i] !== b[i]) return null; // a winner changed or cleared here: a correction, sent whole
+      if(m[i] !== b[i]) out[k][i] = m[i];
+      else if(keepMine && m[i]) out[k][i] = m[i];
+      else out[k][i] = t[i];
+    }
+  }
+  return out;
+}
+// The games list is derived from the bracket (syncGames reads S): rebuilt here for a merged bracket.
+function _gamesOfBracket(st){
+  const shown = S;
+  try { S = Object.assign({}, st); syncGames(); return S.games; } finally { S = shown; }
+}
 function _pendingLocalEdits(remote, baseRaw, seenRaw, at){
   _pendingBase = {};
   const flying = Object.keys(_inFlight);
@@ -162,11 +189,17 @@ function _pendingLocalEdits(remote, baseRaw, seenRaw, at){
   // sent before the commit can still arrive after the confirmation).
   const older = f => f.sent && _notAfter(at, f.preAt, _serverSeen === f.pre);
   const isEcho = f => f.sent && (f.acked || f.sawPre) && !older(f);
+  let keptFills = null;
   for(const k of Object.keys(edits)){
     if(k === 'ds' || k === 'players') continue;
     const theirs = JSON.stringify(remote[k]);
     const f = _inFlight[k];
-    if(!isKnown(k, theirs) && !(f && older(f))){ delete edits[k]; delete _inFlight[k]; continue; }
+    if(!isKnown(k, theirs) && !(f && older(f))){
+      // (bracket: a final scored here and not sent yet stays, on top of the winners the update brings)
+      const fills = k === 'bracket' && !f && _syncedShared ? _bracketFillsOnto(_syncedShared.bracket, S.bracket, remote.bracket) : null;
+      if(fills){ edits.bracket = fills; keptFills = fills; continue; }
+      delete edits[k]; delete _inFlight[k]; continue;
+    }
     if(!f) continue;
     // Edited again while the earlier save of this key is still on its way. If the snapshot does not show that
     // save yet, the baseline is the value in flight: the newer edit may equal what the snapshot shows and still
@@ -174,6 +207,7 @@ function _pendingLocalEdits(remote, baseRaw, seenRaw, at){
     // (Also after the server has confirmed that save: a snapshot from before it can still arrive.)
     if(theirs === f.v && isEcho(f)) delete _inFlight[k]; else _pendingBase[k] = f.v;
   }
+  if(keptFills) edits.games = _gamesOfBracket(Object.assign({}, remote, { bracket: keptFills }));
   // Keys in flight with no newer edit: keep them on screen while the snapshot is merely older than the save.
   for(const k of flying){
     const f = _inFlight[k];
@@ -361,6 +395,16 @@ function _writeSharedState(){
       // this phone has landed: a key that newer save carries is left as the server holds it, not put back.
       for(const k in shared) ours[k] = ((mine.includes(k) && !(_keyWriteNo[k] > writeNo)) || !(k in remote)) ? shared[k] : remote[k];
       for(const k in remote){ if(!(k in ours) && !VIEW_LOCAL.includes(k)) ours[k] = remote[k]; }
+      // A final scored on this phone fills its slot; the winners other phones have saved since this copy was taken
+      // stay in the room. (The whole bracket used to go out: a save that was slow to land emptied their slots
+      // again, and a phone that had already reported those finals did not fill them a second time.)
+      if(mine.includes('bracket') && !(_keyWriteNo.bracket > writeNo) && base){
+        const both = _bracketFillsOnto(base.bracket, shared.bracket, remote.bracket, true);
+        if(both){ ours.bracket = both; ours.games = _gamesOfBracket(ours); }
+      }
+      // The games list always goes out as the bracket being written makes it: a save that carried an older list
+      // next to the room's newer bracket left the room one game short.
+      if(mine.includes('games') && !(_keyWriteNo.games > writeNo) && ours.bracket && Array.isArray(ours.teams)) ours.games = _gamesOfBracket(ours);
       // A player handed to this save by one that gave up, where the roster is not among the keys this save sends:
       // written with the room's roster, as a save that sends its roster would. (It used to be left to the screen to
       // send them again once this save was confirmed; after Home there is no screen, and the player was lost.)
