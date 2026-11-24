@@ -161,6 +161,10 @@ function _gamesOfBracket(st){
   const shown = S;
   try { S = Object.assign({}, st); syncGames(); return S.games; } finally { S = shown; }
 }
+// True when the bracket `b` shows every winner of `fv` (a bracket as JSON text): the screen is that save plus fills.
+function _bracketHasAll(b, fv){
+  try { const o = JSON.parse(fv); return Object.keys(b).every(r => Array.isArray(o[r]) && o[r].length === b[r].length && o[r].every((v, i) => !v || b[r][i] === v)); } catch(e){ return false; }
+}
 function _pendingLocalEdits(remote, baseRaw, seenRaw, at){
   _pendingBase = {};
   const flying = Object.keys(_inFlight);
@@ -217,6 +221,13 @@ function _pendingLocalEdits(remote, baseRaw, seenRaw, at){
     // that is the server's word), or a value this phone no longer shows: the snapshot wins, as before.
     // (The same value before the save has even been handed over is an older save's echo, not this one's.)
     if(theirs === f.v){ if(isEcho(f)) delete _inFlight[k]; continue; }
+    // (bracket: the finals this phone has scored since it last saw the room, on their way or filled later in the
+    // same score check, stay on the screen; every other slot follows the update. Three-way from the room as last
+    // seen here, so a winner an earlier update brought and the room has dropped since is not kept.)
+    if(k === 'bracket' && !f.acked && seen && _bracketHasAll(S.bracket, f.v)){
+      const both = _bracketFillsOnto(seen.bracket, S.bracket, remote.bracket);
+      if(both){ edits.bracket = both; edits.games = _gamesOfBracket(Object.assign({}, remote, { bracket: both })); _pendingBase[k] = f.v; f.held = true; continue; }
+    }
     if(JSON.stringify(S[k]) !== f.v || (!older(f) && (f.acked || !(isKnown(k, theirs) || (f.carried && !seenRaw))))){ delete _inFlight[k]; continue; }
     edits[k] = S[k];
     _pendingBase[k] = f.v;
