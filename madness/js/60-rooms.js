@@ -161,12 +161,23 @@ function _gamesOfBracket(st){
   const shown = S;
   try { S = Object.assign({}, st); syncGames(); return S.games; } finally { S = shown; }
 }
+// True when the bracket `b` shows every winner of `fv` (a bracket as JSON text): the screen is that save plus fills.
+function _bracketHasAll(b, fv){
+  try { const o = JSON.parse(fv); return Object.keys(b).every(r => Array.isArray(o[r]) && o[r].length === b[r].length && o[r].every((v, i) => !v || b[r][i] === v)); } catch(e){ return false; }
+}
 function _pendingLocalEdits(remote, baseRaw, seenRaw, at){
   _pendingBase = {};
   const flying = Object.keys(_inFlight);
   if(!_syncedShared && !flying.length) return null;
-  if(!_firestoreWriteTimer && !flying.length) return null;
+  // Finals being scored in a score check: its slots are filled one by one and the save is started at the end of the
+  // check. Until then the screen is ahead of the room with no save waiting and none on its way; an update that
+  // arrived in that moment replaced the bracket, and the finals (already reported) were never filled again.
+  const midCheck = !_firestoreWriteTimer && !!_syncedShared && !_inFlight.bracket && !!S.bracket && JSON.stringify(S.bracket) !== JSON.stringify(_syncedShared.bracket);
+  if(!_firestoreWriteTimer && !flying.length && !midCheck) return null;
   const edits = {};
+  // (Only as fills laid over the update's bracket, decided here: the screen can also be BEHIND the room in that state,
+  // after an older update, and its bracket kept as it is was later sent as if winners had been cleared.)
+  if(midCheck){ const fl = remote ? _bracketFillsOnto(_syncedShared.bracket, S.bracket, remote.bracket) : null; if(fl && JSON.stringify(fl) !== JSON.stringify(remote.bracket)) edits.bracket = fl; }
   if(_firestoreWriteTimer && _syncedShared) for(const k in S){
     if(VIEW_LOCAL.includes(k)) continue;
     if(JSON.stringify(S[k]) !== JSON.stringify(_syncedShared[k]) || _resendKeys[k] > 0) edits[k] = S[k]; // (or left unsent by a refused save)
@@ -189,7 +200,6 @@ function _pendingLocalEdits(remote, baseRaw, seenRaw, at){
   // sent before the commit can still arrive after the confirmation).
   const older = f => f.sent && _notAfter(at, f.preAt, _serverSeen === f.pre);
   const isEcho = f => f.sent && (f.acked || f.sawPre) && !older(f);
-  let keptFills = null;
   for(const k of Object.keys(edits)){
     if(k === 'ds' || k === 'players') continue;
     const theirs = JSON.stringify(remote[k]);
@@ -197,7 +207,7 @@ function _pendingLocalEdits(remote, baseRaw, seenRaw, at){
     if(!isKnown(k, theirs) && !(f && older(f))){
       // (bracket: a final scored here and not sent yet stays, on top of the winners the update brings)
       const fills = k === 'bracket' && !f && _syncedShared ? _bracketFillsOnto(_syncedShared.bracket, S.bracket, remote.bracket) : null;
-      if(fills){ edits.bracket = fills; keptFills = fills; continue; }
+      if(fills){ edits.bracket = fills; continue; }
       delete edits[k]; delete _inFlight[k]; continue;
     }
     if(!f) continue;
@@ -207,7 +217,6 @@ function _pendingLocalEdits(remote, baseRaw, seenRaw, at){
     // (Also after the server has confirmed that save: a snapshot from before it can still arrive.)
     if(theirs === f.v && isEcho(f)) delete _inFlight[k]; else _pendingBase[k] = f.v;
   }
-  if(keptFills) edits.games = _gamesOfBracket(Object.assign({}, remote, { bracket: keptFills }));
   // Keys in flight with no newer edit: keep them on screen while the snapshot is merely older than the save.
   for(const k of flying){
     const f = _inFlight[k];
@@ -217,10 +226,33 @@ function _pendingLocalEdits(remote, baseRaw, seenRaw, at){
     // that is the server's word), or a value this phone no longer shows: the snapshot wins, as before.
     // (The same value before the save has even been handed over is an older save's echo, not this one's.)
     if(theirs === f.v){ if(isEcho(f)) delete _inFlight[k]; continue; }
+    // (bracket: the finals this phone has scored since it last saw the room, on their way or filled later in the
+    // same score check, stay on the screen; every other slot follows the update. Three-way from the room as last
+    // seen here, so a winner an earlier update brought and the room has dropped since is not kept.)
+    // Only when the update is itself a fill over the room as last seen here (every winner seen is still there). One
+    // that changed or cleared a winner is a correction, written whole: it can have landed AFTER this phone's save,
+    // and the room then no longer has these winners. The update wins there, as it did before.
+    if(k === 'bracket' && !f.acked && seen && remote.bracket && _bracketHasAll(S.bracket, f.v) && _bracketHasAll(remote.bracket, JSON.stringify(seen.bracket))){
+      const both = _bracketFillsOnto(seen.bracket, S.bracket, remote.bracket);
+      // A slot the update fills itself shows the update's winner (another phone wrote that slot, perhaps after this
+      // phone's save landed): only winners in slots the update leaves open stay. None left = no hold. (Not a winner
+      // one of this phone's own recent saves put there: that is the echo of an older save, and a correction made here since stays.)
+      if(both){ for(const r of Object.keys(both)) both[r] = both[r].map((w, i) => { const t = remote.bracket[r][i]; return t && !_recentSent.some(x => x.bracket && x.bracket[r] && x.bracket[r][i] === t) ? t : w; }); }
+      if(both && JSON.stringify(both) !== theirs){ edits.bracket = both; _pendingBase[k] = f.v; f.held = true; continue; }
+    }
     if(JSON.stringify(S[k]) !== f.v || (!older(f) && (f.acked || !(isKnown(k, theirs) || (f.carried && !seenRaw))))){ delete _inFlight[k]; continue; }
     edits[k] = S[k];
     _pendingBase[k] = f.v;
     f.held = true;
+  }
+  // The games list is made from the bracket (and the teams): on the screen it follows the bracket the screen ends
+  // up with, kept winners included. Held by itself it stayed one update behind the bracket shown next to it. Where
+  // the update's own list is that list, the update simply wins.
+  if(('games' in edits || 'bracket' in edits || _inFlight.games) && remote && remote.bracket && Array.isArray(remote.teams)){
+    const shownNext = Object.assign({}, remote, edits); delete shownNext.games;
+    let made = null; try { made = _gamesOfBracket(shownNext); } catch(e){} // (a bracket of an unexpected shape: left as it was)
+    if(made && JSON.stringify(made) === JSON.stringify(remote.games)){ delete edits.games; delete _pendingBase.games; delete _inFlight.games; }
+    else if(made) edits.games = made;
   }
   if(!Object.keys(edits).length) return null;
   if('ds' in edits || 'players' in edits){
@@ -403,8 +435,9 @@ function _writeSharedState(){
         if(both){ ours.bracket = both; ours.games = _gamesOfBracket(ours); }
       }
       // The games list always goes out as the bracket being written makes it: a save that carried an older list
-      // next to the room's newer bracket left the room one game short.
-      if(mine.includes('games') && !(_keyWriteNo.games > writeNo) && ours.bracket && Array.isArray(ours.teams)) ours.games = _gamesOfBracket(ours);
+      // next to the room's newer bracket left the room one game short. Also when the save carries the bracket and
+      // not the list (the list on this screen was already the right one, or was put there by a room update).
+      if((mine.includes('games') || (mine.includes('bracket') && !(_keyWriteNo.bracket > writeNo))) && !(_keyWriteNo.games > writeNo) && ours.bracket && Array.isArray(ours.teams)) ours.games = _gamesOfBracket(ours);
       // A player handed to this save by one that gave up, where the roster is not among the keys this save sends:
       // written with the room's roster, as a save that sends its roster would. (It used to be left to the screen to
       // send them again once this save was confirmed; after Home there is no screen, and the player was lost.)
